@@ -16,13 +16,16 @@ import { Skybox } from './Skybox.js';
 import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
 import { outsideColor } from './canvas-style.js';
 import type { GroundBounds } from './camera-3d.js';
+import { useViewMode, type ViewMode } from './view-mode-store.js';
+import { useViewDirector } from './use-view-director.js';
+import { ViewToggle } from './ViewToggle.js';
 
 function BoardScene({
   scene,
   source,
   grid,
   additiveMode,
-  mode3d,
+  viewMode,
   bounds,
   canvasSize,
   frameKey,
@@ -32,7 +35,7 @@ function BoardScene({
   source: Scene | null;
   grid: RenderGrid | null;
   additiveMode: boolean;
-  mode3d: boolean;
+  viewMode: ViewMode;
   bounds: GroundBounds | null;
   canvasSize: SceneBounds;
   frameKey: string;
@@ -42,6 +45,13 @@ function BoardScene({
   useEffect(() => {
     invalidate();
   }, [scene, invalidate]);
+  // M2-05: the camera, tokens, lighting and skybox follow the *rendered* mode, which trails the
+  // requested one until the return tween has finished.
+  const director = useViewDirector(viewMode, bounds);
+  const mode3d = director.rendered === '3d';
+  useEffect(() => {
+    invalidate();
+  }, [mode3d, invalidate]);
 
   const backdrop = useMemo(
     () => resolveBackground(scene?.background, scene?.zenith),
@@ -53,16 +63,22 @@ function BoardScene({
       <color attach="background" args={[outsideColor(scene?.background)]} />
       {mode3d && backdrop.zenith && <Skybox spec={backdrop} />}
       {mode3d ? (
-        <OrbitControls3D bounds={bounds} resetToken={resetToken} />
+        <OrbitControls3D
+          bounds={bounds}
+          resetToken={resetToken}
+          orbitRef={director.orbitRef}
+          applyRef={director.applyRef}
+          keepInitialOrbit={director.keepInitialOrbit}
+        />
       ) : (
         <>
           <PanZoomControls bounds={canvasSize} frameKey={frameKey} />
           <OrthographicCamera
             makeDefault
-            position={[0, 20, 0]}
+            position={[director.view2d.centerX, 20, director.view2d.centerZ]}
             up={[0, 0, -1]}
             rotation={[-Math.PI / 2, 0, 0]}
-            zoom={48}
+            zoom={director.view2d.zoom}
             near={0.1}
             far={1000}
           />
@@ -75,7 +91,12 @@ function BoardScene({
       {/* TODO(M1-18): PanZoomControls pans on any left-drag past a threshold, even one that
           starts on a selectable token. Token drag will own that arbitration. Plain clicks
           reach picking because only a drag-ending click is swallowed. */}
-      <PickableEntities rendered={scene} scene={source} additiveMode={additiveMode} />
+      <PickableEntities
+        rendered={scene}
+        scene={source}
+        additiveMode={additiveMode}
+        mode={mode3d ? '3d' : '2d'}
+      />
       {/* M1-20: 2D transform handles; the 3D gizmo is M2-08. */}
       {!mode3d && <TransformGizmo />}
     </>
@@ -83,7 +104,9 @@ function BoardScene({
 }
 
 /** Single on-demand Three scene for the active host-filtered Scene. */
-export function BoardCanvas({ mode3d = false }: { mode3d?: boolean } = {}) {
+export function BoardCanvas() {
+  const viewMode = useViewMode();
+  const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
   const [additiveMode, setAdditiveMode] = useState(false);
   const campaign = useClientStore((state) => state.campaign);
@@ -127,6 +150,7 @@ export function BoardCanvas({ mode3d = false }: { mode3d?: boolean } = {}) {
         >
           Clear selection
         </button>
+        <ViewToggle />
         {mode3d && (
           <button
             type="button"
@@ -153,7 +177,7 @@ export function BoardCanvas({ mode3d = false }: { mode3d?: boolean } = {}) {
           source={source}
           grid={grid}
           additiveMode={additiveMode}
-          mode3d={mode3d}
+          viewMode={viewMode}
           bounds={bounds}
           canvasSize={canvasSize}
           frameKey={frameKey}
