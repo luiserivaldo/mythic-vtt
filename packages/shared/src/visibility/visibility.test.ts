@@ -310,3 +310,148 @@ describe('co-DM audience (D32)', () => {
     expect(visibleTo(other, after).scenes[IDS.scene]?.entities[dmId]).toBeDefined();
   });
 });
+
+describe('label visibility (D35, TOK-04 + PERM-03)', () => {
+  const NAME = 'Archmage Zorn the Unseen';
+  const labelId = testId(20);
+  const host: Audience = { kind: 'host' };
+  const coDm: Audience = { kind: 'seat', seatId: IDS.coDm };
+  const owner = audiences.owner as Audience;
+  const other = audiences.other as Audience;
+  const spectators = audiences.spectators as Audience;
+  const everyone: [string, Audience][] = [
+    ['host', host],
+    ['co-DM', coDm],
+    ['owner', owner],
+    ['other player', other],
+    ['spectator', spectators],
+  ];
+  type Mode = 'all' | 'owner' | 'dm';
+  // Who may read the real name, per mode.
+  const allowed: Record<Mode, string[]> = {
+    all: ['host', 'co-DM', 'owner', 'other player', 'spectator'],
+    owner: ['host', 'co-DM', 'owner'],
+    dm: ['host', 'co-DM'],
+  };
+
+  const withLabel = (mode: Mode): Campaign =>
+    produce(makeCampaign(), (d) => {
+      const s = d.scenes[IDS.scene];
+      if (!s) return;
+      s.entities[labelId] = makeEntity(labelId, {
+        name: NAME,
+        owners: [IDS.owner],
+        token: { sizeCells: 1, heightCells: 1, labelVisibility: mode },
+      });
+    });
+  const nameFor = (a: Audience, s: Campaign) =>
+    visibleTo(a, s).scenes[IDS.scene]?.entities[labelId]?.name;
+
+  describe.each(['all', 'owner', 'dm'] as Mode[])('mode %s', (mode) => {
+    it.each(everyone)('%s: sees the name only when allowed, never in serialized form', (who, a) => {
+      const s = withLabel(mode);
+      const view = visibleTo(a, s);
+      expect(view.scenes[IDS.scene]?.entities[labelId]).toBeDefined(); // the token itself stays
+      if (allowed[mode].includes(who)) expect(nameFor(a, s)).toBe(NAME);
+      else {
+        expect(nameFor(a, s)).toBe('');
+        expect(JSON.stringify(view)).not.toContain(NAME);
+      }
+    });
+  });
+
+  it('keeps every other field of a masked entity intact', () => {
+    const s = withLabel('dm');
+    const real = s.scenes[IDS.scene]?.entities[labelId];
+    expect(nameFor(other, s)).toBe('');
+    expect({ ...visibleTo(other, s).scenes[IDS.scene]?.entities[labelId], name: NAME }).toEqual(
+      real,
+    );
+  });
+
+  const hiddenFrom = (mode: Mode) => everyone.filter(([who]) => !allowed[mode].includes(who));
+
+  it('rename while hidden yields no patch and no name for non-allowed audiences', () => {
+    const before = withLabel('dm');
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const e = d.scenes[IDS.scene]?.entities[labelId];
+      if (e) e.name = 'Renamed-Secret-Name';
+    });
+    for (const [who, a] of everyone) {
+      const fast = patchesFor(a, before, after, raw);
+      expect(fast, who).toEqual(patchesFor(a, before, after));
+      if (allowed.dm.includes(who)) expect(fast.length, who).toBeGreaterThan(0);
+      else expect(fast, who).toEqual([]);
+    }
+  });
+
+  it('creating a hidden-label entity never carries the name for non-allowed audiences', () => {
+    const before = makeCampaign();
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const s = d.scenes[IDS.scene];
+      if (s)
+        s.entities[labelId] = makeEntity(labelId, {
+          name: NAME,
+          token: { sizeCells: 1, heightCells: 1, labelVisibility: 'owner' },
+        });
+    });
+    for (const [who, a] of hiddenFrom('owner')) {
+      const fast = patchesFor(a, before, after, raw);
+      expect(fast, who).toEqual(patchesFor(a, before, after));
+      expect(JSON.stringify(fast), who).not.toContain(NAME);
+      expect(
+        fast.map((p) => p.op),
+        who,
+      ).toEqual(['add']);
+    }
+  });
+
+  const flips: [Mode, Mode][] = [
+    ['all', 'owner'],
+    ['all', 'dm'],
+    ['owner', 'all'],
+    ['owner', 'dm'],
+    ['dm', 'all'],
+    ['dm', 'owner'],
+  ];
+  it.each(flips)('flipping labelVisibility %s -> %s reveals or hides consistently', (from, to) => {
+    const before = withLabel(from);
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const t = d.scenes[IDS.scene]?.entities[labelId]?.token;
+      if (t) t.labelVisibility = to;
+    });
+    for (const [who, a] of everyone) {
+      const fast = patchesFor(a, before, after, raw);
+      expect(fast, who).toEqual(patchesFor(a, before, after)); // oracle
+      expect(applyPatches(visibleTo(a, before), fast), who).toEqual(visibleTo(a, after));
+      const sees = (m: Mode) => allowed[m].includes(who);
+      if (!sees(from) && sees(to)) expect(JSON.stringify(fast), who).toContain(NAME);
+      if (!sees(to)) expect(JSON.stringify(fast), who).not.toContain(NAME);
+    }
+  });
+
+  it('changing owners flips the name for the affected seat (owner mode)', () => {
+    const before = withLabel('owner');
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const e = d.scenes[IDS.scene]?.entities[labelId];
+      if (e) e.owners = [IDS.other];
+    });
+    for (const [who, a] of everyone) {
+      const fast = patchesFor(a, before, after, raw);
+      expect(fast, who).toEqual(patchesFor(a, before, after));
+      expect(applyPatches(visibleTo(a, before), fast), who).toEqual(visibleTo(a, after));
+    }
+    expect(nameFor(other, after)).toBe(NAME);
+    expect(nameFor(owner, after)).toBe('');
+  });
+
+  it('demoting a co-DM masks dm-only names in its view', () => {
+    const s = withLabel('dm');
+    const demoted = produce(s, (d) => {
+      const seat = d.seats[IDS.coDm];
+      if (seat) seat.role = 'player';
+    });
+    expect(nameFor(coDm, s)).toBe(NAME);
+    expect(nameFor(coDm, demoted)).toBe('');
+  });
+});
