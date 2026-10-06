@@ -14,5 +14,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "immer": "^10.2.0",
+    "zod": "^4.6.5"
   }
 }
