@@ -1,8 +1,7 @@
 import { RulerPreview } from '@mythic/protocol';
-import { Html, Line } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { useContext, useEffect, useMemo, useRef } from 'react';
-import { Raycaster, Vector2 } from 'three';
+import { Raycaster, Vector2, type Object3D } from 'three';
 import { useStore } from 'zustand';
 import type { Scene, Vec3 } from '@mythic/shared';
 import { useClientStore } from '../store/react.js';
@@ -10,7 +9,6 @@ import { rulerStore } from '../tools/ruler-store.js';
 import { intersectPlaneY } from '../tools/token-drag.js';
 import {
   appendWaypoint,
-  measureRuler,
   prepareRulerPoint,
   RULER_HEARTBEAT_MS,
   rulerExpired,
@@ -19,13 +17,15 @@ import {
   withCursor,
   type RulerPhase,
 } from '../tools/ruler.js';
+import { prepareRulerPoint3d } from '../tools/ruler-3d.js';
 import { EphemeralContext } from '../ui/ephemeral-context.js';
 import { DRAG_THRESHOLD_PX } from './camera-2d.js';
 import { pointerClaims } from './pointer-claims.js';
+import { RulerPath } from './RulerPath.js';
+import type { ViewMode } from './view-mode-store.js';
 
 const LOCAL_COLOR = '#38bdf8';
 const REMOTE_COLOR = '#f59e0b';
-const LIFT = 0.05;
 const NO_REMOTE: readonly never[] = [];
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -39,7 +39,16 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * pan and TokenDrag does not start; a click adds a waypoint, double-click or Enter finishes,
  * Esc cancels. The path is render-local plus an ephemeral relay; nothing is an action.
  */
-export function RulerTool() {
+function entityIdForObject(object: Object3D, scene: Scene): string | undefined {
+  let current: Object3D | null = object;
+  while (current) {
+    if (current.name && scene.entities[current.name]) return current.name;
+    current = current.parent;
+  }
+  return undefined;
+}
+
+export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
@@ -48,8 +57,8 @@ export function RulerTool() {
   const scene: Scene | null = campaign?.activeSceneId
     ? (campaign.scenes[campaign.activeSceneId] ?? null)
     : null;
-  const latest = useRef({ scene, ephemeral });
-  latest.current = { scene, ephemeral };
+  const latest = useRef({ scene, ephemeral, mode });
+  latest.current = { scene, ephemeral, mode };
   const sceneId = scene?.id ?? null;
 
   const phase = useStore(rulerStore, (s) => s.phase);
@@ -110,7 +119,7 @@ export function RulerTool() {
       eph.send('ruler.preview', { sceneId: sc.id, points: path, phase: kind });
     };
 
-    const groundAt = (e: { clientX: number; clientY: number }): Vec3 | null => {
+    const pointAt = (e: { clientX: number; clientY: number }): Vec3 | null => {
       const sc = latest.current.scene;
       if (!sc) return null;
       const r = el.getBoundingClientRect();
@@ -119,6 +128,17 @@ export function RulerTool() {
         -(((e.clientY - r.top) / r.height) * 2 - 1),
       );
       raycaster.setFromCamera(ndc, getState().camera);
+      if (latest.current.mode === '3d') {
+        for (const intersection of raycaster.intersectObjects(getState().scene.children, true)) {
+          const entityId = entityIdForObject(intersection.object, sc);
+          if (!entityId) continue;
+          return prepareRulerPoint3d(
+            { x: intersection.point.x, y: intersection.point.y, z: intersection.point.z },
+            sc,
+            entityId,
+          );
+        }
+      }
       const { origin, direction } = raycaster.ray;
       const hit = intersectPlaneY(
         {
@@ -127,7 +147,11 @@ export function RulerTool() {
         },
         0,
       );
-      return hit ? prepareRulerPoint(hit, sc) : null;
+      return hit
+        ? latest.current.mode === '3d'
+          ? prepareRulerPoint3d(hit, sc)
+          : prepareRulerPoint(hit, sc)
+        : null;
     };
 
     const finish = () => {
@@ -165,7 +189,7 @@ export function RulerTool() {
       pointerClaims.release(start.pointerId);
       if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > DRAG_THRESHOLD_PX) return;
       const sc = latest.current.scene;
-      const point = groundAt(e);
+      const point = pointAt(e);
       if (!sc || !point) return;
       const s = rulerStore.getState();
       if (s.phase === 'active') s.setPoints(appendWaypoint(s.points, point));
@@ -183,7 +207,7 @@ export function RulerTool() {
     const onMove = (e: PointerEvent) => {
       const s = rulerStore.getState();
       if (!s.tool || s.phase !== 'active') return;
-      const point = groundAt(e);
+      const point = pointAt(e);
       if (!point) return;
       s.setCursor(point);
       publish('active', false);
@@ -252,7 +276,7 @@ export function RulerTool() {
   if (!scene) return null;
   return (
     <group name="rulers">
-      <RulerPath points={localPoints} scene={scene} color={LOCAL_COLOR} owner={null} />
+      <RulerPath points={localPoints} scene={scene} color={LOCAL_COLOR} owner={null} mode={mode} />
       {remotes.map(([from, r]) => (
         <RulerPath
           key={from}
@@ -260,93 +284,9 @@ export function RulerTool() {
           scene={scene}
           color={REMOTE_COLOR}
           owner={rulerOwnerName(seats ?? {}, from)}
+          mode={mode}
         />
       ))}
-    </group>
-  );
-}
-
-const pillStyle = {
-  padding: '1px 6px',
-  borderRadius: 4,
-  background: 'rgba(16,25,35,0.85)',
-  color: '#fff',
-  whiteSpace: 'nowrap',
-  userSelect: 'none',
-} as const;
-
-/** The line, waypoint dots and camera-facing HTML readouts (never world-space text). */
-function RulerPath({
-  points,
-  scene,
-  color,
-  owner,
-}: {
-  points: readonly Vec3[];
-  scene: Scene;
-  color: string;
-  owner: string | null;
-}) {
-  const measured = useMemo(() => measureRuler(points, scene.grid), [points, scene.grid]);
-  const last = points[points.length - 1];
-  if (!last || points.length === 0) return null;
-  const testId = owner === null ? 'ruler' : 'remote-ruler';
-  return (
-    <group>
-      {points.length > 1 && (
-        <Line
-          points={points.map((p) => [p.x, LIFT, p.z] as [number, number, number])}
-          color={color}
-          lineWidth={3}
-          depthTest={false}
-          renderOrder={950}
-          raycast={() => null}
-        />
-      )}
-      {points.map((p, i) => (
-        <mesh
-          key={`${String(i)}:${String(p.x)}:${String(p.z)}`}
-          position={[p.x, LIFT, p.z]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          renderOrder={951}
-          raycast={() => null}
-        >
-          <circleGeometry args={[0.09, 16]} />
-          <meshBasicMaterial color={color} depthTest={false} />
-        </mesh>
-      ))}
-      {measured.segments.length > 1 &&
-        measured.segments.map((segment, i) => (
-          <Html
-            key={`${String(i)}:${segment.label}`}
-            center
-            position={[segment.midpoint.x, LIFT, segment.midpoint.z]}
-            zIndexRange={[5, 0]}
-            style={{ pointerEvents: 'none' }}
-          >
-            <div
-              data-testid={`${testId}-segment`}
-              style={{ ...pillStyle, fontSize: 11, opacity: 0.85 }}
-            >
-              {segment.label}
-            </div>
-          </Html>
-        ))}
-      {measured.segments.length > 0 && (
-        <Html
-          center
-          position={[last.x, LIFT, last.z]}
-          zIndexRange={[6, 0]}
-          style={{ pointerEvents: 'none', transform: 'translateY(-18px)' }}
-        >
-          <div
-            data-testid={`${testId}-total`}
-            style={{ ...pillStyle, fontSize: 13, border: `1px solid ${color}` }}
-          >
-            {owner === null ? measured.totalLabel : `${owner}: ${measured.totalLabel}`}
-          </div>
-        </Html>
-      )}
     </group>
   );
 }

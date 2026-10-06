@@ -15,12 +15,20 @@ export interface RulerSegment {
   readonly midpoint: Vec3;
   readonly cells: number;
   readonly label: string;
+  readonly horizontalCells: number;
+  readonly verticalCells: number;
+  readonly horizontalLabel: string;
+  readonly verticalLabel: string;
 }
 
 export interface RulerMeasurement {
   readonly segments: readonly RulerSegment[];
   readonly totalCells: number;
   readonly totalLabel: string;
+  readonly horizontalCells: number;
+  readonly verticalCells: number;
+  readonly horizontalLabel: string;
+  readonly verticalLabel: string;
 }
 
 function trim(value: number): string {
@@ -38,21 +46,38 @@ export function formatRulerDistance(cells: number, grid: Pick<Grid, 'unitsPerCel
 export function measureRuler(points: readonly Vec3[], grid: Grid): RulerMeasurement {
   const segments: RulerSegment[] = [];
   let totalCells = 0;
+  let horizontalCells = 0;
+  let verticalCells = 0;
   for (let index = 1; index < points.length; index += 1) {
     const from = points[index - 1];
     const to = points[index];
     if (!from || !to) continue;
-    const cells = distance(from, to, grid.diagonal).total;
+    const measured = distance(from, to, grid.diagonal);
+    const cells = measured.total;
     totalCells += cells;
+    horizontalCells += measured.horizontal;
+    verticalCells += measured.vertical;
     segments.push({
       from,
       to,
-      midpoint: { x: (from.x + to.x) / 2, y: 0, z: (from.z + to.z) / 2 },
+      midpoint: { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2, z: (from.z + to.z) / 2 },
       cells,
       label: formatRulerDistance(cells, grid),
+      horizontalCells: measured.horizontal,
+      verticalCells: measured.vertical,
+      horizontalLabel: formatRulerDistance(measured.horizontal, grid),
+      verticalLabel: formatRulerDistance(measured.vertical, grid),
     });
   }
-  return { segments, totalCells, totalLabel: formatRulerDistance(totalCells, grid) };
+  return {
+    segments,
+    totalCells,
+    totalLabel: formatRulerDistance(totalCells, grid),
+    horizontalCells,
+    verticalCells,
+    horizontalLabel: formatRulerDistance(horizontalCells, grid),
+    verticalLabel: formatRulerDistance(verticalCells, grid),
+  };
 }
 
 /** Ground-plane point, snapped when the shared grid implementation supports that grid type. */

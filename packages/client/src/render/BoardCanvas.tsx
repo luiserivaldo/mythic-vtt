@@ -105,7 +105,7 @@ function BoardScene({
       {/* M1-18: TokenDrag claims a press on a selected, movable token (pointer-claims) so only
           empty board pans. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
-      <RulerTool />
+      <RulerTool mode={mode3d ? '3d' : '2d'} />
       {!aoeActive && <TokenDrag />}
       <PickableEntities
         rendered={shown}
