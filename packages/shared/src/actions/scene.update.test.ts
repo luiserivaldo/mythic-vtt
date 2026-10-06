@@ -78,6 +78,16 @@ describe(`${T} reducer`, () => {
     });
   });
 
+  it('sets and clears the optional zenith gradient colour', () => {
+    const set = reduceAction(makeCampaign(), envelope({ sceneId: IDS.scene, zenith: '#112233' }));
+    expect(set.state.scenes[IDS.scene]?.environment).toEqual({
+      background: '#000000',
+      zenith: '#112233',
+    });
+    const cleared = reduceAction(set.state, envelope({ sceneId: IDS.scene, zenith: null }));
+    expect(cleared.state.scenes[IDS.scene]?.environment).toEqual({ background: '#000000' });
+  });
+
   it('is deterministic: same state + envelope gives identical results', () => {
     expect(reduceAction(makeCampaign(), envelope())).toEqual(
       reduceAction(makeCampaign(), envelope()),

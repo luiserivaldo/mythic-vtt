@@ -70,6 +70,17 @@ const campaign = {
   activeSceneId: C,
 };
 
+describe('scene environment zenith (ENV-07)', () => {
+  it('is optional and additive', () => {
+    expect(Scene.safeParse(scene).success).toBe(true);
+    const withZenith = { ...scene, environment: { background: '#000000', zenith: '#335577' } };
+    expect(Scene.parse(withZenith).environment.zenith).toBe('#335577');
+    expect(
+      Scene.safeParse({ ...scene, environment: { background: '#000', zenith: 5 } }).success,
+    ).toBe(false);
+  });
+});
+
 describe('round-trip parse', () => {
   it.each([
     ['Campaign', Campaign, campaign],

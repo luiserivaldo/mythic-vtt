@@ -10,6 +10,8 @@ import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
 import { OrbitControls3D } from './OrbitControls3D.js';
+import { Skybox } from './Skybox.js';
+import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
 import type { GroundBounds } from './camera-3d.js';
 
 function BoardScene({
@@ -34,9 +36,14 @@ function BoardScene({
     invalidate();
   }, [scene, invalidate]);
 
+  const backdrop = useMemo(
+    () => resolveBackground(scene?.background, scene?.zenith),
+    [scene?.background, scene?.zenith],
+  );
   return (
     <>
-      <color attach="background" args={[scene?.background ?? '#101923']} />
+      <color attach="background" args={[scene?.background ?? DEFAULT_BACKGROUND]} />
+      {mode3d && backdrop.zenith && <Skybox spec={backdrop} />}
       {mode3d ? (
         <OrbitControls3D bounds={bounds} resetToken={resetToken} />
       ) : (

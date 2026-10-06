@@ -3,6 +3,8 @@ import { newId } from './ids.js';
 import { sceneActivateIntent, sceneCreateIntent, sceneRenameIntent } from './intent-specs.js';
 import { NameForm } from './NameForm.js';
 import { isValidSceneName, sceneRows } from './scene-list.js';
+import { BackgroundForm } from './BackgroundForm.js';
+import { backgroundDraft } from './background-form.js';
 import { useSubmit } from './submit.js';
 
 export function ScenePanel({ campaign }: { campaign: Campaign }) {
@@ -37,6 +39,14 @@ export function ScenePanel({ campaign }: { campaign: Campaign }) {
               validate={(t) => isValidSceneName(t) && t.trim() !== row.name}
               onSubmit={(t) => send(sceneRenameIntent(row.id, t))}
             />
+            {row.active && (
+              <BackgroundForm
+                key={`${row.id}:${JSON.stringify(backgroundDraft(campaign, row.id))}`}
+                sceneId={row.id}
+                initial={backgroundDraft(campaign, row.id)}
+                send={send}
+              />
+            )}
           </li>
         ))}
       </ul>
