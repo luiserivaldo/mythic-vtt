@@ -8,7 +8,13 @@ import { useAoEHighlights } from './use-aoe-highlights.js';
 
 const HIGHLIGHT = '#ffb347';
 
-function CellHighlights({ cells, mode }: { cells: ReturnType<typeof useAoEHighlights>['cells']; mode: RenderMode }) {
+function CellHighlights({
+  cells,
+  mode,
+}: {
+  cells: ReturnType<typeof useAoEHighlights>['cells'];
+  mode: RenderMode;
+}) {
   const mesh = useRef<InstancedMesh>(null);
   const invalidate = useThree((state) => state.invalidate);
 
@@ -60,7 +66,8 @@ export function AoEHighlights({
 }) {
   const highlights = useAoEHighlights(scene);
   const affected = useMemo(() => new Set(highlights.tokenIds), [highlights.tokenIds]);
-  const tokens = rendered?.entities.filter((entity) => entity.token && affected.has(entity.id)) ?? [];
+  const tokens =
+    rendered?.entities.filter((entity) => entity.token && affected.has(entity.id)) ?? [];
 
   return (
     <group name="aoe-affected-highlights">

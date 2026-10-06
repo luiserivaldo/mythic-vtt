@@ -63,7 +63,11 @@ export function deriveAoEHighlights(
       continue;
     const shape = AoEShape.safeParse(entity.aoe);
     if (shape.success)
-      aoes.push({ ...shape.data, position: entity.transform.position, rotation: entity.transform.rotation });
+      aoes.push({
+        ...shape.data,
+        position: entity.transform.position,
+        rotation: entity.transform.rotation,
+      });
   }
   if (override) aoes.push(override.aoe);
 
