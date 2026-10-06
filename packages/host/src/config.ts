@@ -7,6 +7,8 @@ export interface HostConfig {
   host: string;
   dataDir: string;
   hostSecretPath: string;
+  /** Campaign to open (`MYTHIC_CAMPAIGN_ID`); default: most recently updated, else a new one. */
+  campaignId?: string;
   /** Exposes /__test/connections for the e2e harness; never enable on a real table. */
   testEndpoints: boolean;
 }
@@ -29,5 +31,6 @@ export function loadConfig(env: Record<string, string | undefined>): HostConfig 
       ? resolve(env['MYTHIC_HOST_SECRET_PATH'])
       : join(dataDir, 'host-secret'),
     testEndpoints: env['MYTHIC_TEST_ENDPOINTS'] === '1',
+    ...(env['MYTHIC_CAMPAIGN_ID'] ? { campaignId: env['MYTHIC_CAMPAIGN_ID'] } : {}),
   };
 }
