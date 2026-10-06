@@ -22,12 +22,29 @@ export function extractHostToken(loc: LocationLike, history: HistoryLike): strin
   return token === '' ? undefined : token;
 }
 
-/** Hands the token out once (the first hello); reconnects must not resend a consumed token. */
-export function createHostTokenTaker(token: string | undefined): () => string | undefined {
+/**
+ * Holds the host token until the host has authenticated us. The token is resent on every hello
+ * until `confirm()` (called on the first snapshot after a hello that carried it), so a socket
+ * dropping before authentication does not lose it. After a successful bind it is never resent.
+ */
+export interface HostTokenHolder {
+  /** The token to put in the next hello, if still unconfirmed. Marks it as in flight. */
+  take(): string | undefined;
+  /** A snapshot arrived: if the last hello carried the token, the bind succeeded; clear it. */
+  confirm(): void;
+}
+
+export function createHostTokenHolder(token: string | undefined): HostTokenHolder {
   let pending = token;
-  return () => {
-    const t = pending;
-    pending = undefined;
-    return t;
+  let inFlight = false;
+  return {
+    take() {
+      inFlight = pending !== undefined;
+      return pending;
+    },
+    confirm() {
+      if (inFlight) pending = undefined;
+      inFlight = false;
+    },
   };
 }

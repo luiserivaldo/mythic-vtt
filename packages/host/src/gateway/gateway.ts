@@ -54,6 +54,8 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
     maxPayload: options.maxPayloadBytes ?? 1024 * 1024,
   });
   const sockets = new Set<WebSocket>();
+  // Live authenticated connections by identity, so a host rebind can drop stale host state.
+  const liveByIdentity = new Map<string, Set<GatewayConnection>>();
 
   app.get('/healthz', () => ({ ok: true, protocol: PROTOCOL_VERSION }));
 
@@ -113,7 +115,11 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
       clearTimeout(helloTimer);
       if (heartbeat) clearInterval(heartbeat);
       sockets.delete(ws);
-      if (conn) handler.onDisconnect(conn);
+      if (conn) {
+        liveByIdentity.get(conn.identityId)?.delete(conn);
+        if (liveByIdentity.get(conn.identityId)?.size === 0) liveByIdentity.delete(conn.identityId);
+        handler.onDisconnect(conn);
+      }
     });
     ws.on('error', () => {
       ws.terminate();
@@ -150,7 +156,12 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         helloInFlight = true;
         try {
           conn = await authenticate(ws, msg);
-          if (conn) clearTimeout(helloTimer);
+          if (conn) {
+            clearTimeout(helloTimer);
+            const set = liveByIdentity.get(conn.identityId) ?? new Set<GatewayConnection>();
+            set.add(conn);
+            liveByIdentity.set(conn.identityId, set);
+          }
         } finally {
           helloInFlight = false;
         }
@@ -204,10 +215,13 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
           fail(socket, 'unauthorized', 'host token rejected', true);
           return undefined;
         }
-        const bound = await identities.bindHostIfAbsent(hello.identityId);
-        if (bound !== hello.identityId) {
-          fail(socket, 'unauthorized', 'host token rejected', true);
-          return undefined;
+        // D29: a valid fresh token rebinds host to this identity. Connections of the old host
+        // (and other tabs of this identity, whose isHost was fixed at connect) are closed with
+        // 1008 so they reconnect and are re-evaluated; closing is safer than flipping isHost live.
+        const previous = await identities.rebindHost(hello.identityId);
+        for (const id of new Set([previous, hello.identityId])) {
+          if (id === undefined) continue;
+          for (const old of liveByIdentity.get(id) ?? []) old.close(CLOSE_POLICY, 'host-rebound');
         }
       }
       const isHost = (await identities.getHostIdentityId()) === hello.identityId;
