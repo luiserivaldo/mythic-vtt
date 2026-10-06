@@ -2,6 +2,9 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
 import { OrthographicCamera } from '@react-three/drei';
 import { useEffect, useMemo, useState } from 'react';
+import { useStore } from 'zustand';
+import { tokenDragStore } from '../tools/token-drag-store.js';
+import { withLocalDrag } from '../tools/token-drag.js';
 import { useClientStore } from '../store/react.js';
 import { activeRenderScene, type RenderScene } from './scene-model.js';
 import { PickableEntities } from './PickableEntities.js';
@@ -9,6 +12,7 @@ import { selectionStore } from '../tools/selection-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
+import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
 import { TransformPanel } from '../ui/TransformPanel.js';
 import { OrbitControls3D } from './OrbitControls3D.js';
@@ -22,7 +26,6 @@ import { ViewToggle } from './ViewToggle.js';
 import { AoEToolPanel } from '../ui/AoEToolPanel.js';
 import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
-import { useStore } from 'zustand';
 
 function BoardScene({
   scene,
@@ -47,9 +50,11 @@ function BoardScene({
 }) {
   const invalidate = useThree((state) => state.invalidate);
   const aoeActive = useStore(aoeToolStore, (s) => s.active);
+  const localDrag = useStore(tokenDragStore, (state) => state.local);
+  const shown = useMemo(() => withLocalDrag(scene, localDrag), [scene, localDrag]);
   useEffect(() => {
     invalidate();
-  }, [scene, invalidate]);
+  }, [shown, invalidate]);
   // M2-05: the camera, tokens, lighting and skybox follow the *rendered* mode, which trails the
   // requested one until the return tween has finished.
   const director = useViewDirector(viewMode, bounds);
@@ -93,11 +98,11 @@ function BoardScene({
       {grid && (
         <GridLines grid={grid} fill={scene?.background ?? DEFAULT_BACKGROUND} renderOrder={-1} />
       )}
-      {/* TODO(M1-18): PanZoomControls pans on any left-drag past a threshold, even one that
-          starts on a selectable token. Token drag will own that arbitration. Plain clicks
-          reach picking because only a drag-ending click is swallowed. */}
+      {/* M1-18: TokenDrag claims a press on a selected, movable token (pointer-claims) so only
+          empty board pans. */}
+      {!aoeActive && <TokenDrag />}
       <PickableEntities
-        rendered={scene}
+        rendered={shown}
         scene={source}
         additiveMode={additiveMode}
         mode={mode3d ? '3d' : '2d'}
