@@ -27,6 +27,8 @@ export interface Session {
   joinSeat: (seatId: string) => void;
   /** Stable for the whole page, so contexts never change; fails fast until a client exists. */
   submitIntent: SubmitIntent;
+  sendEphemeral: (channel: string, data: unknown) => void;
+  onEphemeral: (listener: Parameters<GameClient['onEphemeral']>[0]) => () => void;
 }
 
 export function createSession(deps: SessionDeps): Session {
@@ -62,6 +64,11 @@ export function createSession(deps: SessionDeps): Session {
     },
     joinSeat(seatId) {
       client?.join({ seatId });
+    },
+    sendEphemeral: (channel, data) => client?.sendEphemeral(channel, data),
+    onEphemeral: (listener) => {
+      const unsubscribe = client?.onEphemeral(listener);
+      return () => unsubscribe?.();
     },
     submitIntent: (type, payload, sceneId) =>
       client
