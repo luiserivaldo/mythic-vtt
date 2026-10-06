@@ -13,6 +13,11 @@ import {
 import type { GatewayConnection, GatewayHandler } from '../gateway/engine-seam.js';
 import type { CampaignStore } from '../storage/types.js';
 import { actorFor, audienceFor, audienceViewKey } from './audience.js';
+import {
+  createEphemeralRelay,
+  type EphemeralRelayOptions,
+  type EphemeralRelayStats,
+} from './ephemeral-relay.js';
 import { buildHostPresence } from './presence.js';
 import {
   cryptoRandom,
@@ -44,6 +49,8 @@ export interface EngineOptions {
   rngCount?: (type: string, payload: unknown) => number;
   /** Unexpected failures (reducer throw, log write). Default: console.error. */
   onError?: (error: unknown) => void;
+  /** Size and token-bucket limits for the non-durable ephemeral path. */
+  ephemeral?: EphemeralRelayOptions;
 }
 
 /** One room per campaign (§4.2): owns the authoritative state, `seq` and the connections. */
@@ -52,6 +59,7 @@ export interface Engine extends GatewayHandler {
   readonly sessionId: string;
   state(): Campaign;
   seq(): number;
+  ephemeralStats(): EphemeralRelayStats;
   /** Ends this Session, releasing only per-session seat bindings through durable actions. */
   endSession(): Promise<void>;
   /** Resolves once every queued connect/intent/join has been processed. */
@@ -89,6 +97,7 @@ export function createEngine(options: EngineOptions): Engine {
   /** Ring of recently applied actions, oldest first, contiguous in `seq`. */
   const history: Applied[] = [];
   const members = new Map<string, Member>();
+  const ephemeralRelay = createEphemeralRelay(clock, options.ephemeral);
 
   // All state-touching work runs one item at a time, so `seq` order equals broadcast order and a
   // connect never observes a half-applied action.
@@ -261,6 +270,7 @@ export function createEngine(options: EngineOptions): Engine {
     sessionId,
     state: () => state,
     seq: () => seq,
+    ephemeralStats: () => ephemeralRelay.stats(),
     endSession() {
       return serialize(async () => {
         const seatIds = Object.values(state.seats)
@@ -334,13 +344,18 @@ export function createEngine(options: EngineOptions): Engine {
       });
     },
 
-    // Ephemeral relay (filtered, rate-limited) is M1-07; until then ephemerals are dropped.
-    onEphemeral: () => undefined,
+    onEphemeral(conn, msg) {
+      return serialize(() => {
+        if (!members.has(conn.connectionId)) return;
+        ephemeralRelay.relay(conn, msg, state, members.values());
+      });
+    },
 
     onDisconnect(conn) {
       // SES-05/06: a dropped connection is not the end of the Session. Both binding modes remain
       // seated so the same Identity can reconnect without DM action.
       members.delete(conn.connectionId);
+      ephemeralRelay.disconnect(conn.connectionId);
       publishPresence();
     },
   };
