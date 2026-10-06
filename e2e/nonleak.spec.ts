@@ -291,6 +291,85 @@ test('DM-layer data never reaches players or spectators, across layer moves, edi
   ]);
 });
 
+test('a hidden token label name never reaches players or spectators, across renames and flips (D35)', async () => {
+  const s = secretFor(21);
+  const token = (labelVisibility: string) => ({
+    sizeCells: 1,
+    heightCells: 1,
+    labelVisibility,
+  });
+  const ent = { ...entityFor(s, 'tokens'), token: token('dm'), pin: undefined };
+  await ok(host.intent('entity.create', { sceneId: SCENE, entity: ent }));
+
+  const player = await connectPlayer();
+  const spectator = await connectSpectator();
+  await player.waitFor('snapshot', () => player.state !== undefined);
+  await spectator.waitFor('snapshot', () => spectator.state !== undefined);
+  const watchers = [player, spectator];
+  const settle = async () => {
+    const target = host.lastSeq;
+    await Promise.all(watchers.map((c) => c.waitForSeq(target)));
+  };
+  const nameOf = (c: RawClient) => seen(c, s.id)?.['name'];
+
+  // The token is visible to everyone, but its name is not on the wire (snapshot path).
+  for (const c of watchers) {
+    expect(seen(c, s.id), c.opts.name).toBeDefined();
+    expect(nameOf(c)).toBe('');
+    expect(leaksIn(c.frames, [s.name]), c.opts.name).toEqual([]);
+  }
+
+  // Rename while hidden (patch path).
+  const renamed = 'SECRET-LABEL-RENAMED';
+  await ok(
+    host.intent('entity.update', { sceneId: SCENE, entityId: s.id, changes: { name: renamed } }),
+  );
+  await settle();
+  for (const c of watchers) expect(leaksIn(c.frames, [s.name, renamed]), c.opts.name).toEqual([]);
+
+  // Reveal to everyone: now the name is delivered (positive control), and it hides again.
+  await ok(
+    host.intent('entity.update', {
+      sceneId: SCENE,
+      entityId: s.id,
+      changes: { token: token('all') },
+    }),
+  );
+  await settle();
+  for (const c of watchers) expect(nameOf(c), c.opts.name).toBe(renamed);
+  await ok(
+    host.intent('entity.update', {
+      sceneId: SCENE,
+      entityId: s.id,
+      changes: { token: token('owner') },
+    }),
+  );
+  await settle();
+  for (const c of watchers) expect(nameOf(c), c.opts.name).toBe('');
+  const mark = watchers.map((c) => c.frames.length);
+
+  // Renames after re-hiding must not appear in any later frame.
+  const lateName = 'SECRET-LABEL-AFTER-HIDE';
+  await ok(
+    host.intent('entity.update', { sceneId: SCENE, entityId: s.id, changes: { name: lateName } }),
+  );
+  await settle();
+  for (const [i, c] of watchers.entries()) {
+    expect(leaksIn(c.frames.slice(mark[i]), [renamed, lateName, s.name]), c.opts.name).toEqual([]);
+  }
+
+  // A fresh snapshot is clean too.
+  const fresh = await connectPlayer();
+  await fresh.waitForSeq(host.lastSeq);
+  expect(leaksIn(fresh.frames, [s.name, renamed, lateName])).toEqual([]);
+  expect(seen(fresh, s.id)).toBeDefined();
+
+  // Positive control: the host receives every name.
+  expect(leaksIn(host.frames, [lateName]).length).toBeGreaterThan(0);
+
+  await Promise.all([fresh.close(), player.close(), spectator.close()]);
+});
+
 test('a real browser client (spectator) never receives DM-layer frames either', async ({
   browser,
 }) => {
