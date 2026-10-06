@@ -194,6 +194,16 @@ export function pinchUpdate(
   return next;
 }
 
+/** D37: keep the orbit focus on the canvas. Null (no scene) leaves the focus alone. */
+export function clampTargetToGround(o: Orbit3D, ground: GroundBounds | null): Orbit3D {
+  if (!ground) return o;
+  return {
+    ...o,
+    targetX: clamp(o.targetX, ground.minX, ground.maxX),
+    targetZ: clamp(o.targetZ, ground.minZ, ground.maxZ),
+  };
+}
+
 /** Default isometric-ish view framing the given ground bounds (or a 20x20 area when empty). */
 export function defaultOrbit(bounds: GroundBounds | null): Orbit3D {
   const b = bounds ?? { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };

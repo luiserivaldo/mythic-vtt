@@ -101,3 +101,23 @@ describe(`${T} visibility`, () => {
     }
   });
 });
+
+describe(`${T} bounds (D37)`, () => {
+  it('validates optional bounds as whole cells 1..200', () => {
+    const ok = (b: unknown) => sceneCreate.schema.safeParse({ ...payload, bounds: b }).success;
+    expect(ok({ width: 1, height: 200 })).toBe(true);
+    expect(ok({ width: 0, height: 10 })).toBe(false);
+    expect(ok({ width: 201, height: 10 })).toBe(false);
+    expect(ok({ width: 10.5, height: 10 })).toBe(false);
+    expect(ok({ width: 10 })).toBe(false);
+  });
+  it('stores bounds when given and omits them otherwise', () => {
+    const withB = reduceAction(
+      makeCampaign(),
+      envelope({ ...payload, bounds: { width: 20, height: 15 } }),
+    );
+    expect(withB.state.scenes[testId(20)]?.bounds).toEqual({ width: 20, height: 15 });
+    const without = reduceAction(makeCampaign(), envelope());
+    expect(without.state.scenes[testId(20)]).not.toHaveProperty('bounds');
+  });
+});

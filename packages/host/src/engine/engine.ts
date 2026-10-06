@@ -13,6 +13,7 @@ import {
 import type { GatewayConnection, GatewayHandler } from '../gateway/engine-seam.js';
 import type { CampaignStore } from '../storage/types.js';
 import { actorFor, audienceFor, audienceViewKey } from './audience.js';
+import { buildHostPresence } from './presence.js';
 import {
   cryptoRandom,
   randomFloats,
@@ -181,6 +182,19 @@ export function createEngine(options: EngineOptions): Engine {
     }
   }
 
+  /** M1-11: the roster goes to host connections only; it carries identity ids (PERM-03). */
+  function publishPresence(): void {
+    let message: ServerMessage | undefined;
+    for (const member of members.values()) {
+      if (!member.conn.isHost) continue;
+      message ??= buildHostPresence(
+        state,
+        Array.from(members.values(), (m) => m.conn),
+      );
+      member.conn.send(message);
+    }
+  }
+
   type Outcome = { ok: true; seq: number } | { ok: false; reason: RejectReason; detail?: string };
 
   /** Pipeline steps 2-8 (§4.2) for one intent from `conn`. */
@@ -244,6 +258,7 @@ export function createEngine(options: EngineOptions): Engine {
           onError(error);
         }
       }
+      publishPresence();
       return { ok: true, seq: entry.seq };
     } catch (error) {
       onError(error);
@@ -280,6 +295,7 @@ export function createEngine(options: EngineOptions): Engine {
         const member: Member = { conn, audience, key: audienceViewKey(state, placeOf(conn)) };
         members.set(conn.connectionId, member);
         greet(member);
+        publishPresence();
       });
     },
 
@@ -335,6 +351,7 @@ export function createEngine(options: EngineOptions): Engine {
       // SES-05/06: a dropped connection is not the end of the Session. Both binding modes remain
       // seated so the same Identity can reconnect without DM action.
       members.delete(conn.connectionId);
+      publishPresence();
     },
   };
 }

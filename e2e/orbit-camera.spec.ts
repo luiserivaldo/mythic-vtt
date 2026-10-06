@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { openClient, RawClient, startTable, testUlid, type Table } from './harness.js';
 
-// M2-04: the 3D orbit camera is opt-in (?camera=3d) until the toggle lands in M2-05. It must mount,
+// M2-04: the 3D orbit camera (opened here via the ?camera=3d initial-mode override; M2-05 added the toggle). It must mount,
 // respond to right-drag orbit, wheel dolly and shift-drag pan, and reset, without runtime errors.
 
 let table: Table;

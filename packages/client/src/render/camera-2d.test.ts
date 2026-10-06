@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   applyWheel,
   classifyWheel,
+  clampViewToBounds,
   clampZoom,
+  frameBounds,
   MAX_ZOOM,
   MIN_ZOOM,
+  PAN_MARGIN_CELLS,
   panByPixels,
   pinchUpdate,
   screenToWorld,
@@ -114,5 +117,22 @@ describe('camera-2d', () => {
     expect(back.zoom).toBeCloseTo(view.zoom);
     expect(back.centerX).toBeCloseTo(view.centerX);
     expect(back.centerZ).toBeCloseTo(view.centerZ);
+  });
+});
+
+describe('canvas bounds (D37)', () => {
+  const b = { width: 40, height: 30 };
+  it('clamps the centre to the canvas plus margin', () => {
+    const v = clampViewToBounds({ centerX: -100, centerZ: 500, zoom: 48 }, b);
+    expect(v).toEqual({ centerX: -PAN_MARGIN_CELLS, centerZ: 30 + PAN_MARGIN_CELLS, zoom: 48 });
+    const inside = { centerX: 10, centerZ: 5, zoom: 20 };
+    expect(clampViewToBounds(inside, b)).toEqual(inside);
+  });
+  it('frames the whole canvas centred', () => {
+    const v = frameBounds({ width: 800, height: 600 }, b);
+    expect(v.centerX).toBe(20);
+    expect(v.centerZ).toBe(15);
+    expect(v.zoom * (b.width + 2)).toBeLessThanOrEqual(800 + 1e-9);
+    expect(v.zoom * (b.height + 2)).toBeLessThanOrEqual(600 + 1e-9);
   });
 });

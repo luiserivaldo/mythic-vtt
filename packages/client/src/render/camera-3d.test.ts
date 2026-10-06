@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   clampOrbit,
+  clampTargetToGround,
   dampVelocity,
   defaultOrbit,
   dolly,
@@ -225,5 +226,20 @@ describe('camera-3d', () => {
     let v = 3;
     for (let i = 0; i < 200 && v !== 0; i++) v = dampVelocity(v, 1 / 60);
     expect(v).toBe(0);
+  });
+});
+
+describe('clampTargetToGround (D37)', () => {
+  const ground = { minX: 0, maxX: 40, minZ: 0, maxZ: 30 };
+  it('clamps the focus to the canvas and leaves null alone', () => {
+    const o = defaultOrbit(ground);
+    expect(clampTargetToGround({ ...o, targetX: -50, targetZ: 99 }, ground)).toMatchObject({
+      targetX: 0,
+      targetZ: 30,
+    });
+    expect(clampTargetToGround({ ...o, targetX: -50 }, null).targetX).toBe(-50);
+  });
+  it('defaultOrbit frames the canvas centre', () => {
+    expect(defaultOrbit(ground)).toMatchObject({ targetX: 20, targetZ: 15 });
   });
 });

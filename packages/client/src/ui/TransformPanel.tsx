@@ -82,14 +82,10 @@ function TransformFields({ entity, scene }: { entity: Entity; scene: Scene }) {
   };
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className="ui-panel"
-      style={{ position: 'absolute', top: 8, right: 8, zIndex: 1, minWidth: 180 }}
-    >
+    <section aria-labelledby={headingId} className="ui-panel ui-overlay ui-transform">
       <h2 id={headingId}>Transform: {entity.name}</h2>
       {FIELDS.map(({ field, label }) => (
-        <label key={field} style={{ display: 'block' }}>
+        <label key={field} className="ui-field">
           {label(unitLabel)}
           <input
             type="text"

@@ -75,25 +75,30 @@ test('host selects a token, drags its move handle and types values', async ({ br
   await expect(page.getByTestId('token-label')).toHaveText('Goblin');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('no canvas box');
-  const zoom = 48; // default 2D zoom: px per cell, world origin at the canvas centre
+  // D37: the 2D view opens framing the whole default 40 x 30 canvas (1 cell padding): the
+  // canvas centre is at the viewport centre and zoom fits the padded canvas.
+  const zoom = Math.min(box.width / 42, box.height / 32);
   const at = (x: number, z: number) => ({
-    x: box.x + box.width / 2 + x * zoom,
-    y: box.y + box.height / 2 + z * zoom,
+    x: box.x + box.width / 2 + (x - 20) * zoom,
+    y: box.y + box.height / 2 + (z - 15) * zoom,
   });
 
   const panel = page.getByRole('region', { name: /Transform/ });
   await expect(panel).toHaveCount(0);
   const start = at(2.5, 3.5);
-  await page.mouse.click(start.x, start.y);
-  await expect(panel).toBeVisible();
+  // The view frames the canvas once the orthographic camera mounts, so retry the click until then.
+  await expect(async () => {
+    await page.mouse.click(start.x, start.y);
+    await expect(panel).toBeVisible({ timeout: 1000 });
+  }).toPass();
 
   const labelBefore = await page.getByTestId('token-label').boundingBox();
 
   // Drag the move handle (token centre) two cells right; the camera must not pan.
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
-  await page.mouse.move(start.x + 48, start.y, { steps: 4 });
-  await page.mouse.move(start.x + 96, start.y, { steps: 4 });
+  await page.mouse.move(start.x + zoom, start.y, { steps: 4 });
+  await page.mouse.move(start.x + 2 * zoom, start.y, { steps: 4 });
   await page.mouse.up();
 
   const reader = await hostClient(false);
@@ -107,13 +112,13 @@ test('host selects a token, drags its move handle and types values', async ({ br
   await expect(panel).toBeVisible();
 
   // Dragging empty board still pans (the label moves on screen).
-  const empty = at(-4, -3);
+  const empty = at(10, 8);
   await page.mouse.move(empty.x, empty.y);
   await page.mouse.down();
   await page.mouse.move(empty.x + 60, empty.y, { steps: 5 });
   await page.mouse.up();
   const labelAfterPan = await page.getByTestId('token-label').boundingBox();
-  expect(labelAfterPan?.x).toBeGreaterThan((labelBefore?.x ?? 0) + 96);
+  expect(labelAfterPan?.x).toBeGreaterThan((labelBefore?.x ?? 0) + 2 * zoom);
 
   // Typed values: invalid input is rejected locally, valid input is one commit.
   const unitsPerCell = (reader.state as Snapshot).scenes[scene]?.grid.unitsPerCell ?? 1;
