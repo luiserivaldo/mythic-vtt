@@ -70,3 +70,14 @@ export const seatPermissionIntent = (
   type: 'permission.update',
   payload: { target: 'seat', seatId, permissions: { [permission]: allowed } },
 });
+
+/** ENV-07: horizon/plain colour plus optional gradient top (null clears it). */
+export const sceneBackgroundIntent = (
+  sceneId: string,
+  background: string,
+  zenith: string | null,
+): IntentSpec => ({
+  type: 'scene.update',
+  payload: { sceneId, background, zenith },
+  sceneId,
+});

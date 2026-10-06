@@ -9,8 +9,10 @@ export const sceneUpdate = defineAction({
       sceneId: Id,
       name: z.string().trim().min(1).max(120).optional(),
       background: z.string().min(1).max(64).optional(),
+      // ENV-07: null clears the gradient back to a plain colour.
+      zenith: z.string().min(1).max(64).nullable().optional(),
     })
-    .refine((p) => p.name !== undefined || p.background !== undefined, {
+    .refine((p) => p.name !== undefined || p.background !== undefined || p.zenith !== undefined, {
       message: 'at least one field to update is required',
     }),
   permission: (state, actor, p) =>
@@ -20,6 +22,8 @@ export const sceneUpdate = defineAction({
     if (!scene) return;
     if (a.payload.name !== undefined) scene.name = a.payload.name;
     if (a.payload.background !== undefined) scene.environment.background = a.payload.background;
+    if (a.payload.zenith === null) delete scene.environment.zenith;
+    else if (a.payload.zenith !== undefined) scene.environment.zenith = a.payload.zenith;
   },
   modExposed: false,
 });
