@@ -25,6 +25,10 @@ function actorFor(seatId: string | null, seats: SceneSelectionSeats): SelectionA
 
 type SceneSelectionSeats = Record<string, Seat>;
 
+// Stable fallback: a fresh `{}` inside a store selector changes identity on every read and
+// makes React re-render forever while no campaign has loaded yet.
+const NO_SEATS: SceneSelectionSeats = {};
+
 export function PickableEntities({
   rendered,
   scene,
@@ -35,7 +39,7 @@ export function PickableEntities({
   additiveMode: boolean;
 }) {
   const seatId = useClientStore((state) => state.seatId);
-  const seats = useClientStore((state) => state.campaign?.seats ?? {});
+  const seats = useClientStore((state) => state.campaign?.seats ?? NO_SEATS);
   const selected = useStore(selectionStore, (state) => state.ids);
   const actor = actorFor(seatId, seats);
 
