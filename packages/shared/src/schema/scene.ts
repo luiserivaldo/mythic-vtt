@@ -27,7 +27,13 @@ export const Scene = z.object({
   id: Id,
   name: z.string(),
   grid: Grid,
-  environment: z.object({ background: z.string(), skybox: AssetRef.optional() }),
+  environment: z.object({
+    background: z.string(),
+    // ENV-07: optional additive (no schemaVersion bump). When set, 3D shows a vertical gradient
+    // from `background` (horizon) up to `zenith`; absent means a plain colour.
+    zenith: z.string().min(1).max(64).optional(),
+    skybox: AssetRef.optional(),
+  }),
   layers: z.partialRecord(LayerId, z.object({ locked: z.boolean() })),
   entities: z.record(Id, Entity),
 });

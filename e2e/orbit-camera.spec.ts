@@ -60,3 +60,25 @@ test('3D orbit camera orbits, dollies, pans and resets without errors', async ({
   await expect(canvas).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+// M2-09: a scene with a zenith colour mounts the gradient dome in 3D and orbiting stays error-free.
+test('3D gradient skybox renders and orbits without errors', async ({ browser }) => {
+  const scene = testUlid('SCENE', 1);
+  await host.intent('scene.update', { sceneId: scene, background: '#102030', zenith: '#6688aa' });
+  const client = await openClient(browser, table, 'viewer');
+  const errors: string[] = [];
+  client.page.on('pageerror', (e) => errors.push(e.message));
+  await client.page.goto(`${table.clientUrl}?camera=3d`);
+  const canvas = client.page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas has no box');
+  await client.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await client.page.mouse.down({ button: 'right' });
+  await client.page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 - 60, {
+    steps: 5,
+  });
+  await client.page.mouse.up({ button: 'right' });
+  await expect(canvas).toBeVisible();
+  expect(errors).toEqual([]);
+});

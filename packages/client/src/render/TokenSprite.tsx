@@ -49,7 +49,16 @@ function useTexture(url: string | null) {
  * Material for a token: its image when loaded; otherwise the placeholder colour (while loading,
  * on error, or for library assets that have no URL yet).
  */
-export function TokenMaterial({ entity, color }: { entity: RenderEntity; color: string }) {
+export function TokenMaterial({
+  entity,
+  color,
+  depth = false,
+}: {
+  entity: RenderEntity;
+  color: string;
+  /** 3D standees take part in depth testing; the 2D overlay sprite does not. */
+  depth?: boolean;
+}) {
   const entry = useTexture(assetUrl(ASSET_BASE_URL, entity.token?.image));
   const map = entry.status === 'ready' ? entry.texture : null;
   return (
@@ -59,8 +68,8 @@ export function TokenMaterial({ entity, color }: { entity: RenderEntity; color: 
       {...(map ? { map } : {})}
       transparent={map !== null}
       side={DoubleSide}
-      depthTest={false}
-      depthWrite={false}
+      depthTest={depth}
+      depthWrite={depth && map === null}
     />
   );
 }
@@ -81,7 +90,16 @@ export function SelectionRing({ size }: { size: number }) {
  * TOK-04 / CAM-04: an HTML label projected to the screen, so it is always upright and faces the
  * camera; never world-space text. Rendered only if this viewer may see it.
  */
-export function TokenLabel({ entity, actor }: { entity: RenderEntity; actor: SelectionActor }) {
+export function TokenLabel({
+  entity,
+  actor,
+  anchor,
+}: {
+  entity: RenderEntity;
+  actor: SelectionActor;
+  /** Label position relative to the token; defaults to just below the 2D footprint. */
+  anchor?: readonly [number, number, number];
+}) {
   const token = entity.token;
   if (!token) return null;
   const shown = labelVisible(
@@ -98,7 +116,7 @@ export function TokenLabel({ entity, actor }: { entity: RenderEntity; actor: Sel
   return (
     <Html
       center
-      position={[0, -entity.sizeCells / 2 - 0.2, 0]}
+      position={anchor ? [...anchor] : [0, -entity.sizeCells / 2 - 0.2, 0]}
       zIndexRange={[5, 0]}
       style={{ pointerEvents: 'none' }}
     >

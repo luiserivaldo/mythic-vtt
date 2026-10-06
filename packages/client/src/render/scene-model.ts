@@ -1,4 +1,12 @@
-import type { AssetRef, Campaign, Entity, Scene } from '@mythic/shared';
+import {
+  primitiveDimensions,
+  yawFromQuaternion,
+  type AssetRef,
+  type Campaign,
+  type Entity,
+  type PrimitiveKind,
+  type Scene,
+} from '@mythic/shared';
 import { footprintCells } from './token-footprint.js';
 
 // TECHNICAL.md §6.4: these slots also reserve space for later prop overlays and UI.
@@ -18,6 +26,8 @@ export interface RenderEntity {
   position: readonly [number, number, number];
   sizeCells: number;
   secret: boolean;
+  /** Present only for primitive entities (ENV-02). */
+  shape?: RenderShape;
   /** ENV-01: present for map-layer entities with an image; `scale` is the image height in cells. */
   mapImage?: { asset: AssetRef; scale: number };
   /** Present only for token entities. */
@@ -31,9 +41,25 @@ export interface RenderEntity {
   };
 }
 
+/** ENV-02: primitive shape data, already reduced to render-ready numbers. */
+export interface RenderShape {
+  kind: PrimitiveKind;
+  color: string;
+  walkable: boolean;
+  /** Bounding size in cells; the footprint centre is `position`, the base is `position[1]`. */
+  width: number;
+  height: number;
+  depth: number;
+  yaw: number;
+  /** Scale as authored, for footprint building. */
+  scale: { x: number; y: number; z: number };
+}
+
 export interface RenderScene {
   id: string;
   background: string;
+  /** ENV-07: optional gradient top colour (3D only). */
+  zenith?: string;
   entities: RenderEntity[];
 }
 
@@ -66,6 +92,20 @@ export function orderedEntities(entities: readonly RenderEntity[]): RenderEntity
   return [...entities].sort((a, b) => rank(a.layer) - rank(b.layer));
 }
 
+function renderShape(entity: Entity, shape: NonNullable<Entity['shape']>): RenderShape {
+  const { width, height, depth } = primitiveDimensions(shape.kind, entity.transform.scale);
+  return {
+    kind: shape.kind,
+    color: shape.color,
+    walkable: shape.walkable,
+    width,
+    height,
+    depth,
+    yaw: yawFromQuaternion(entity.transform.rotation),
+    scale: entity.transform.scale,
+  };
+}
+
 /** A malformed scale falls back to one cell rather than hiding or exploding the image. */
 export function mapImageScale(scale: number): number {
   return Number.isFinite(scale) && scale > 0 ? scale : 1;
@@ -75,6 +115,7 @@ export function mapScene(scene: Scene): RenderScene {
   return {
     id: scene.id,
     background: scene.environment.background,
+    ...(scene.environment.zenith ? { zenith: scene.environment.zenith } : {}),
     entities: orderedEntities(
       Object.values(scene.entities).map((entity) => ({
         id: entity.id,
@@ -86,6 +127,7 @@ export function mapScene(scene: Scene): RenderScene {
         ),
         sizeCells: footprintCells(entity.token?.sizeCells),
         secret: entity.layer === 'dm',
+        ...(entity.shape ? { shape: renderShape(entity, entity.shape) } : {}),
         ...(entity.layer === 'map' && entity.image
           ? {
               mapImage: {
