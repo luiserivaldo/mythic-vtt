@@ -2,16 +2,18 @@ import type { Entity, Scene } from '@mythic/shared';
 import { useContext, useId, useState, type KeyboardEvent } from 'react';
 import { useStore } from 'zustand';
 import { commitTransform } from '../tools/gizmo-commit.js';
+import { elevationFromUnits, formatUnits, nextElevation } from '../tools/elevation.js';
 import { gizmoStore } from '../tools/gizmo-store.js';
 import {
   draftFromEntity,
   formatTyped,
+  parseNumber,
   parseTypedValues,
   type TypedField,
   type TypedInput,
 } from '../tools/transform-gizmo.js';
 import { useGizmoTarget } from '../tools/use-gizmo-target.js';
-import { SubmitContext } from './submit.js';
+import { describeFailure, SubmitContext } from './submit.js';
 
 /** ENV-03: numeric entry for the selected entity. Numbers live in HTML, never in the scene. */
 export function TransformPanel() {
@@ -108,7 +110,86 @@ function TransformFields({ entity, scene }: { entity: Entity; scene: Scene }) {
       <button type="button" disabled={busy} onClick={apply}>
         Apply
       </button>
+      <ElevationControls entity={entity} scene={scene} />
       {error && <p role="alert">{error}</p>}
     </section>
+  );
+}
+
+/** TOK-03 / D25: +/- (Shift = 5 cells) and a numeric field, each one `token.setElevation`. */
+function ElevationControls({ entity, scene }: { entity: Entity; scene: Scene }) {
+  const submit = useContext(SubmitContext);
+  const { grid } = scene;
+  const cells = entity.transform.position.y;
+  const [typed, setTyped] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const fieldId = useId();
+  if (!entity.token) return null;
+
+  const send = async (elevation: number) => {
+    if (!submit || busy) return;
+    setBusy(true);
+    try {
+      const result = await submit(
+        'token.setElevation',
+        { sceneId: scene.id, entityId: entity.id, elevation },
+        scene.id,
+      );
+      setError(result.ok ? null : describeFailure(result));
+      if (result.ok) setTyped(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const apply = () => {
+    const value = typed === null ? null : parseNumber(typed);
+    const elevation = value === null ? null : elevationFromUnits(value, grid);
+    if (elevation === null) {
+      setError('Enter an elevation within 1000 cells.');
+      return;
+    }
+    void send(elevation);
+  };
+
+  return (
+    <div role="group" aria-label="Elevation" className="ui-elevation">
+      <button
+        type="button"
+        aria-label="Lower elevation"
+        disabled={busy}
+        onClick={(e) => void send(nextElevation(cells, grid, -1, e.shiftKey))}
+      >
+        -
+      </button>
+      <label className="ui-field" htmlFor={fieldId}>
+        Elevation ({grid.unitLabel})
+        <input
+          id={fieldId}
+          type="text"
+          inputMode="decimal"
+          value={typed ?? formatUnits(cells, grid.unitsPerCell)}
+          onChange={(e) => {
+            setTyped(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              apply();
+            }
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        aria-label="Raise elevation"
+        disabled={busy}
+        onClick={(e) => void send(nextElevation(cells, grid, 1, e.shiftKey))}
+      >
+        +
+      </button>
+      {error && <p role="alert">{error}</p>}
+    </div>
   );
 }

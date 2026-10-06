@@ -275,3 +275,10 @@ main [tabindex]:focus-visible {
     width: 48%;
   }
 }
+
+.ui-elevation {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}

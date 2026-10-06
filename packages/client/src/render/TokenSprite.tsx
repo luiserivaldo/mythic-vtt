@@ -4,6 +4,8 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { DoubleSide, SRGBColorSpace, TextureLoader, type Texture } from 'three';
 import { assetUrl } from '../assets/asset-url.js';
 import { createTextureCache } from '../assets/texture-cache.js';
+import { formatElevation } from '../tools/elevation.js';
+import { useClientStore } from '../store/react.js';
 import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
 import { labelVisible } from './token-labels.js';
@@ -133,6 +135,55 @@ export function TokenLabel({
         }}
       >
         {token.name}
+      </div>
+    </Html>
+  );
+}
+
+/**
+ * TOK-03: 2D elevation badge ("+10 ft") as an HTML overlay, never world-space text. Shown only
+ * above ground and only where the viewer could see the token's label rules (same visibility
+ * check, ignoring the name and label mode).
+ */
+export function ElevationBadge({ entity, actor }: { entity: RenderEntity; actor: SelectionActor }) {
+  const token = entity.token;
+  const grid = useClientStore((s) => {
+    const sceneId = s.campaign?.activeSceneId;
+    return sceneId ? s.campaign?.scenes[sceneId]?.grid : undefined;
+  });
+  if (!token || !grid) return null;
+  const visible = labelVisible(
+    {
+      name: '-',
+      layer: token.entityLayer,
+      owners: token.owners,
+      perms: token.perms,
+      labelVisibility: 'all',
+    },
+    actor,
+  );
+  const text = visible ? formatElevation(entity.position[1], grid) : null;
+  if (text === null) return null;
+  return (
+    <Html
+      center
+      position={[0, entity.sizeCells / 2 + 0.2, 0]}
+      zIndexRange={[5, 0]}
+      style={{ pointerEvents: 'none' }}
+    >
+      <div
+        data-testid="elevation-badge"
+        style={{
+          padding: '1px 6px',
+          borderRadius: 4,
+          background: 'rgba(60,40,10,0.85)',
+          color: '#ffe066',
+          fontSize: 12,
+          whiteSpace: 'nowrap',
+          userSelect: 'none',
+        }}
+      >
+        {text}
       </div>
     </Html>
   );

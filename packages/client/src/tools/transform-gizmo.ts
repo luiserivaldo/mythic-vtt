@@ -242,7 +242,7 @@ export type TypedField = keyof TypedInput;
 export type TypedResult =
   { ok: true; draft: GizmoDraft } | { ok: false; errors: Partial<Record<TypedField, string>> };
 
-function parseNumber(text: string): number | null {
+export function parseNumber(text: string): number | null {
   const trimmed = text.trim().replace(',', '.');
   if (trimmed === '' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(trimmed)) return null;
   const value = Number(trimmed);
