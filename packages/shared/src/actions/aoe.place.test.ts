@@ -61,18 +61,18 @@ describe(`${T} permissions`, () => {
     });
   });
 
-  it('allows a player granted edit to place only their own visible-layer AoE', () => {
+  it('does not let a seat-level edit grant bypass admin-only placement', () => {
     const state = makeCampaign();
     const seat = state.seats[IDS.owner];
     if (seat) seat.permissions.edit = true;
     const owned = { ...payload, entity: { ...entity, owners: [IDS.owner] } };
-    expect(aoePlace.permission(state, ACTORS.owner, owned)).toBe(true);
-    expect(
-      aoePlace.permission(state, ACTORS.owner, {
-        ...owned,
-        entity: { ...owned.entity, layer: 'dm' },
-      }),
-    ).toBe(false);
+    expect(aoePlace.permission(state, ACTORS.owner, owned)).toBe(false);
+  });
+
+  it('keeps DM-layer placement host-only', () => {
+    const hidden = { ...payload, entity: { ...entity, layer: 'dm' as const } };
+    expect(aoePlace.permission(makeCampaign(), ACTORS.host, hidden)).toBe(true);
+    expect(aoePlace.permission(makeCampaign(), ACTORS.coDm, hidden)).toBe(false);
   });
 
   it('rejects duplicate ids, unknown owners and locked layers', () => {

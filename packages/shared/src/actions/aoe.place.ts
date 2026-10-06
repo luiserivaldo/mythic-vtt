@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { AoEEntity, Id } from '../schema/index.js';
-import { defineAction, seatOf } from './define.js';
-import { isAdmin, isLayerLocked } from './entity-access.js';
+import { defineAction } from './define.js';
+import { isAdminOn, isLayerLocked } from './entity-access.js';
 
 export const aoePlace = defineAction({
   type: 'aoe.place',
@@ -16,18 +16,9 @@ export const aoePlace = defineAction({
       !p.entity.owners.every((ownerId) => ownerId in state.seats)
     )
       return false;
-    if (isAdmin(state, actor)) return true;
-
-    const seat = seatOf(state, actor);
-    // D23: placing shared map content is denied by default; a host-granted seat edit
-    // capability permits a player to place only their own non-DM AoE.
-    return (
-      seat !== undefined &&
-      seat.permissions.edit &&
-      p.entity.layer !== 'dm' &&
-      p.entity.owners.length === 1 &&
-      p.entity.owners[0] === seat.id
-    );
+    // D23: placement changes the shared map and is admin-only. Once placed, the normal
+    // ownership and per-entity grants apply to update/remove.
+    return isAdminOn(state, actor, p.entity.layer);
   },
   reduce: (draft, a) => {
     const scene = draft.scenes[a.payload.sceneId];
