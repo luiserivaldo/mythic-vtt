@@ -5,6 +5,7 @@ import {
   DEFAULT_GRID_OPACITY,
   Grid,
   resolveGridStyle,
+  resolveSceneBounds,
   Campaign,
   Entity,
   Id,
@@ -162,4 +163,21 @@ describe('grid colour and opacity (GRID-01)', () => {
       expect(Grid.safeParse({ ...scene.grid, ...extra }).success).toBe(false);
     },
   );
+});
+
+describe('scene bounds (D37)', () => {
+  it('is optional, whole cells 1..200, and defaults to 40 x 30 at read time', () => {
+    expect(Scene.safeParse(scene).success).toBe(true);
+    expect(resolveSceneBounds(Scene.parse(scene))).toEqual({ width: 40, height: 30 });
+    const withBounds = Scene.parse({ ...scene, bounds: { width: 200, height: 1 } });
+    expect(resolveSceneBounds(withBounds)).toEqual({ width: 200, height: 1 });
+    for (const bounds of [
+      { width: 0, height: 5 },
+      { width: 5, height: 201 },
+      { width: 2.5, height: 5 },
+      { width: 5 },
+    ]) {
+      expect(Scene.safeParse({ ...scene, bounds }).success).toBe(false);
+    }
+  });
 });

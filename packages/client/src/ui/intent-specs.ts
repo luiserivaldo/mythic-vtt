@@ -7,9 +7,23 @@ export interface IntentSpec {
   sceneId?: string;
 }
 
-export const sceneCreateIntent = (sceneId: string, name: string): IntentSpec => ({
+export const sceneCreateIntent = (
+  sceneId: string,
+  name: string,
+  bounds?: { width: number; height: number },
+): IntentSpec => ({
   type: 'scene.create',
-  payload: { sceneId, name: name.trim() },
+  payload: bounds ? { sceneId, name: name.trim(), bounds } : { sceneId, name: name.trim() },
+});
+
+/** D37: resize the scene canvas (whole cells). */
+export const sceneBoundsIntent = (
+  sceneId: string,
+  bounds: { width: number; height: number },
+): IntentSpec => ({
+  type: 'scene.update',
+  payload: { sceneId, bounds },
+  sceneId,
 });
 
 export const sceneRenameIntent = (sceneId: string, name: string): IntentSpec => ({

@@ -23,10 +23,21 @@ export const Grid = z.object({
 });
 export type Grid = z.infer<typeof Grid>;
 
+/** D37: whole grid cells, so the canvas always lines up with the grid. */
+export const MAX_SCENE_CELLS = 200;
+export const DEFAULT_SCENE_WIDTH = 40;
+export const DEFAULT_SCENE_HEIGHT = 30;
+
+const BoundsCells = z.number().int().min(1).max(MAX_SCENE_CELLS);
+export const SceneBounds = z.strictObject({ width: BoundsCells, height: BoundsCells });
+export type SceneBounds = z.infer<typeof SceneBounds>;
+
 export const Scene = z.object({
   id: Id,
   name: z.string(),
   grid: Grid,
+  // D37: optional additive (no schemaVersion bump); read through resolveSceneBounds().
+  bounds: SceneBounds.optional(),
   environment: z.object({
     background: z.string(),
     // ENV-07: optional additive (no schemaVersion bump). When set, 3D shows a vertical gradient
@@ -50,4 +61,9 @@ export function resolveGridStyle(grid: Pick<Grid, 'color' | 'opacity'>): GridSty
     color: grid.color ?? DEFAULT_GRID_COLOR,
     opacity: grid.opacity ?? DEFAULT_GRID_OPACITY,
   };
+}
+
+/** D37: the scene canvas with the 40 x 30 default for scenes that predate bounds. */
+export function resolveSceneBounds(scene: Pick<Scene, 'bounds'>): SceneBounds {
+  return scene.bounds ?? { width: DEFAULT_SCENE_WIDTH, height: DEFAULT_SCENE_HEIGHT };
 }

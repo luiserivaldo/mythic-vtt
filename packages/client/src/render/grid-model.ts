@@ -1,8 +1,15 @@
-import { resolveGridStyle, type Campaign } from '@mythic/shared';
+import {
+  resolveGridStyle,
+  resolveSceneBounds,
+  type Campaign,
+  type SceneBounds,
+} from '@mythic/shared';
 
 export interface RenderGrid {
   color: string;
   opacity: number;
+  /** D37: the canvas the grid is clipped to. */
+  bounds: SceneBounds;
 }
 
 /**
@@ -11,7 +18,7 @@ export interface RenderGrid {
  */
 export function activeRenderGrid(campaign: Campaign | null): RenderGrid | null {
   if (!campaign?.activeSceneId) return null;
-  const grid = campaign.scenes[campaign.activeSceneId]?.grid;
-  if (!grid || grid.type !== 'square') return null;
-  return resolveGridStyle(grid);
+  const scene = campaign.scenes[campaign.activeSceneId];
+  if (!scene || scene.grid.type !== 'square') return null;
+  return { ...resolveGridStyle(scene.grid), bounds: resolveSceneBounds(scene) };
 }
