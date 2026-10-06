@@ -20,6 +20,11 @@ export interface ClientState {
   /** Last applied `seq`; null until the first snapshot. */
   seq: number | null;
   seatId: string | null;
+  /**
+   * D24/D29: this client claimed host authority (DM link). The server sends no role, so this is a
+   * UI hint only; the host still checks every intent. Hides DM panels, grants nothing.
+   */
+  isHost: boolean;
   presence: { seats: Of<'presence'>['seats']; spectators: number } | null;
   notices: Notice[];
   /** Fatal host error, e.g. protocol mismatch; shown instead of the table. */
@@ -30,6 +35,7 @@ export interface ClientState {
 export interface ClientActions {
   setConnection(status: ConnectionStatus, error?: string): void;
   setPendingIntents(n: number): void;
+  setHost(isHost: boolean): void;
   dismissNotice(index: number): void;
   /**
    * Apply a host message. Returns 'resync' when state diverged and the caller must reconnect
@@ -48,6 +54,7 @@ const initial: ClientState = {
   campaign: null,
   seq: null,
   seatId: null,
+  isHost: false,
   presence: null,
   notices: [],
   fatalError: null,
@@ -70,6 +77,10 @@ export function createClientStore(): StoreApi<ClientStore> {
 
     setPendingIntents: (pendingIntents) => {
       set({ pendingIntents });
+    },
+
+    setHost: (isHost) => {
+      set({ isHost });
     },
 
     dismissNotice(index) {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { EntityPermissions, Id, SeatPermissions } from '../schema/index.js';
 import { defineAction } from './define.js';
-import { isAdmin } from './entity-access.js';
+import { isAdmin, isAdminOn } from './entity-access.js';
 
 const PermissionChanges = SeatPermissions.partial()
   .strict()
@@ -26,9 +26,10 @@ export const permissionUpdate = defineAction({
   ]),
   permission: (state, actor, p) => {
     if (!isAdmin(state, actor)) return false;
-    return p.target === 'seat'
-      ? p.seatId in state.seats
-      : state.scenes[p.sceneId]?.entities[p.entityId] !== undefined;
+    if (p.target === 'seat') return p.seatId in state.seats;
+    const entity = state.scenes[p.sceneId]?.entities[p.entityId];
+    // D32: a co-DM cannot grant itself access to DM-layer entities.
+    return entity !== undefined && isAdminOn(state, actor, entity.layer);
   },
   reduce: (draft, a) => {
     const p = a.payload;

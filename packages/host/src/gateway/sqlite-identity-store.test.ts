@@ -45,12 +45,14 @@ it('registers once, keeps the first secret hash and updates the profile', async 
   }
 });
 
-it('binds the host once and persists identities and the binding across restarts', async () => {
+it('rebinds the host (returning the previous one) and persists identities and the binding', async () => {
   const first = createSqliteIdentityStore(path);
   await first.registerIfAbsent({ identityId: A, secretHash: 'h1', displayName: 'Ana' });
   expect(await first.getHostIdentityId()).toBeUndefined();
-  expect(await first.bindHostIfAbsent(A)).toBe(A);
-  expect(await first.bindHostIfAbsent(B)).toBe(A);
+  expect(await first.rebindHost(A)).toBeUndefined();
+  expect(await first.rebindHost(B)).toBe(A);
+  expect(await first.getHostIdentityId()).toBe(B);
+  expect(await first.rebindHost(A)).toBe(B);
   first.close();
 
   const second = createSqliteIdentityStore(path);

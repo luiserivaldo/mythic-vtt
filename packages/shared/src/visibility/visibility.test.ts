@@ -228,3 +228,85 @@ describe('patchesFor with raw patches (hybrid translation, D21)', () => {
     }
   });
 });
+
+// D32: co-DM seats see the DM layer; players and spectators never do.
+describe('co-DM audience (D32)', () => {
+  const coDm: Audience = { kind: 'seat', seatId: IDS.coDm };
+  const players = [audiences.owner, audiences.other, audiences.spectators] as Audience[];
+  const entPath = (id: string) => ['scenes', IDS.scene, 'entities', id];
+
+  it('includes DM-layer entities in the co-DM snapshot only', () => {
+    const s = withEntities();
+    expect(visibleTo(coDm, s).scenes[IDS.scene]?.entities[dmId]?.name).toBe(SECRET);
+    for (const a of players) expect(JSON.stringify(visibleTo(a, s))).not.toContain(SECRET);
+  });
+
+  it('stops being a co-DM view once the role is demoted', () => {
+    const s = withEntities();
+    const demoted = produce(s, (d) => {
+      const seat = d.seats[IDS.coDm];
+      if (seat) seat.role = 'player';
+    });
+    expect(visibleTo(coDm, demoted).scenes[IDS.scene]?.entities[dmId]).toBeUndefined();
+  });
+
+  const recipes: Record<string, (d: Campaign) => void> = {
+    create: (d) => {
+      const s = d.scenes[IDS.scene];
+      if (s) s.entities[testId(13)] = makeEntity(testId(13), { layer: 'dm', name: SECRET });
+    },
+    edit: (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) e.name = 'Changed';
+    },
+    move: (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) e.transform.position.x = 9;
+    },
+    delete: (d) => {
+      const s = d.scenes[IDS.scene];
+      if (s) Reflect.deleteProperty(s.entities, dmId);
+    },
+    'layer onto dm': (d) => {
+      const e = d.scenes[IDS.scene]?.entities[pubId];
+      if (e) e.layer = 'dm';
+    },
+    'layer off dm': (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) e.layer = 'tokens';
+    },
+  };
+
+  it.each(Object.entries(recipes))('%s: co-DM gets patches, players get none', (name, recipe) => {
+    const before = withEntities();
+    const [after, raw] = produceWithPatches(before, recipe);
+    const fast = patchesFor(coDm, before, after, raw);
+    expect(applyPatches(visibleTo(coDm, before), fast)).toEqual(visibleTo(coDm, after));
+    expect(fast).toEqual(patchesFor(coDm, before, after));
+    const ops = fast.map((p) => p.op);
+    if (name === 'create') expect(ops).toEqual(['add']);
+    if (name === 'delete') expect(ops).toEqual(['remove']);
+    if (name === 'edit' || name === 'move') expect(fast.length).toBeGreaterThan(0);
+    if (name === 'layer onto dm')
+      expect(fast).toEqual([{ op: 'replace', path: [...entPath(pubId), 'layer'], value: 'dm' }]);
+    if (name !== 'layer onto dm' && name !== 'layer off dm') {
+      for (const a of players) expect(patchesFor(a, before, after, raw)).toEqual([]);
+    }
+    if (name !== 'layer off dm') {
+      for (const a of players) {
+        expect(JSON.stringify(patchesFor(a, before, after, raw))).not.toContain(SECRET);
+      }
+    }
+  });
+
+  it('role promotion changes the audience view of the same state', () => {
+    const before = withEntities();
+    const after = produce(before, (d) => {
+      const seat = d.seats[IDS.other];
+      if (seat) seat.role = 'codm';
+    });
+    const other = audiences.other as Audience;
+    expect(visibleTo(other, before).scenes[IDS.scene]?.entities[dmId]).toBeUndefined();
+    expect(visibleTo(other, after).scenes[IDS.scene]?.entities[dmId]).toBeDefined();
+  });
+});
