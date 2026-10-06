@@ -92,3 +92,22 @@ export function permissionMatrix(
     names.map((n) => [n, canPerform(state, ACTORS[n], type, payload)]),
   ) as Record<ActorName, boolean>;
 }
+
+/** Entity fixture for visibility and action tests. */
+export function makeEntity(
+  id: string,
+  overrides: Partial<import('../schema/index.js').Entity> = {},
+): import('../schema/index.js').Entity {
+  return {
+    id,
+    layer: 'tokens',
+    name: `Entity ${id.slice(0, 4)}`,
+    owners: [],
+    transform: {
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+    ...overrides,
+  };
+}
