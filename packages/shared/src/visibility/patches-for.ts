@@ -6,14 +6,7 @@ import { viewEntity, visibleTo } from './visible-to.js';
 
 // Paths that carry nothing an audience may not see, so raw patches can be forwarded unchanged.
 // Default-deny: any path not listed here (including fields added later) takes the diff fallback.
-const SAFE_ROOT_KEYS = new Set([
-  'id',
-  'name',
-  'schemaVersion',
-  'settings',
-  'seats',
-  'activeSceneId',
-]);
+const SAFE_ROOT_KEYS = new Set(['id', 'name', 'schemaVersion', 'settings', 'activeSceneId']);
 const SAFE_SCENE_KEYS = new Set(['name', 'grid', 'environment', 'layers']);
 
 /** Reference implementation: diff the audience's filtered before/after views. O(scene size). */
@@ -72,8 +65,10 @@ export function patchesFor(
   for (const [sceneId, entityId] of touched.values()) {
     const b = before.scenes[sceneId]?.entities[entityId];
     const a = after.scenes[sceneId]?.entities[entityId];
-    const vb = b ? viewEntity(audience, b) : null;
-    const va = a ? viewEntity(audience, a) : null;
+    const beforeSeat = audience.kind === 'seat' ? before.seats[audience.seatId] : undefined;
+    const afterSeat = audience.kind === 'seat' ? after.seats[audience.seatId] : undefined;
+    const vb = b ? viewEntity(audience, b, beforeSeat) : null;
+    const va = a ? viewEntity(audience, a, afterSeat) : null;
     const path = ['scenes', sceneId, 'entities', entityId];
     if (vb && va) out.push(...prefixed(path, diffPatches(vb, va)));
     else if (vb) out.push({ op: 'remove', path });
