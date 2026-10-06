@@ -5,6 +5,9 @@ import type { Identity } from '../net/identity.js';
 import type { ClientStore } from '../store/store.js';
 import type { Profile } from './join-screen.js';
 import type { SubmitIntent } from './submit.js';
+import type { ServerMessage } from '@mythic/protocol';
+
+type Ephemeral = Extract<ServerMessage, { t: 'ephemeral' }>;
 
 export interface SessionDeps {
   url: string;
@@ -27,16 +30,21 @@ export interface Session {
   joinSeat: (seatId: string) => void;
   /** Stable for the whole page, so contexts never change; fails fast until a client exists. */
   submitIntent: SubmitIntent;
+  sendEphemeral: (channel: string, data: unknown) => void;
+  onEphemeral: (listener: (message: Ephemeral) => void) => () => void;
 }
 
 export function createSession(deps: SessionDeps): Session {
   let client: GameClient | undefined;
+  let detachEphemerals: (() => void) | undefined;
   const listeners = new Set<() => void>();
+  const ephemeralListeners = new Set<(message: Ephemeral) => void>();
   const notify = () => {
     for (const l of listeners) l();
   };
   return {
     start(profile) {
+      detachEphemerals?.();
       client?.stop();
       client = createGameClient({
         url: deps.url,
@@ -47,10 +55,15 @@ export function createSession(deps: SessionDeps): Session {
         store: deps.store,
         createSocket: deps.createSocket,
       });
+      detachEphemerals = client.onEphemeral((message) => {
+        for (const listener of ephemeralListeners) listener(message);
+      });
       client.start();
       notify();
     },
     stop() {
+      detachEphemerals?.();
+      detachEphemerals = undefined;
       client?.stop();
       client = undefined;
       notify();
@@ -67,5 +80,12 @@ export function createSession(deps: SessionDeps): Session {
       client
         ? client.submitIntent(type, payload, sceneId)
         : Promise.resolve({ ok: false as const, reason: 'connection-lost' as const }),
+    sendEphemeral(channel, data) {
+      client?.sendEphemeral(channel, data);
+    },
+    onEphemeral(listener) {
+      ephemeralListeners.add(listener);
+      return () => ephemeralListeners.delete(listener);
+    },
   };
 }

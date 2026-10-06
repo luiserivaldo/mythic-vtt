@@ -55,6 +55,22 @@ export const TokenDragPreview = z.strictObject({
 });
 export type TokenDragPreview = z.infer<typeof TokenDragPreview>;
 
+const RulerPoint = z.strictObject({ x: z.number(), y: z.number(), z: z.number() });
+
+/** MEAS-01 live ruler path. It is relayed only and never enters campaign state or the action log. */
+export const RulerPreview = z.strictObject({
+  t: z.literal('ephemeral'),
+  channel: z.literal('ruler.preview'),
+  data: z.strictObject({
+    sceneId: Ulid,
+    points: z.array(RulerPoint).max(64),
+    phase: z.enum(['active', 'finished', 'cancelled']),
+  }),
+  /** Set by the host when relaying; clients omit it. */
+  from: Ulid.optional(),
+});
+export type RulerPreview = z.infer<typeof RulerPreview>;
+
 /** Ephemeral (not logged, not persisted; §4.3): cursors, pings, drag previews, live rulers. */
 export const Ephemeral = z
   .strictObject({
@@ -65,8 +81,14 @@ export const Ephemeral = z
     from: Ulid.optional(),
   })
   .superRefine((message, context) => {
-    if (message.channel !== 'token.drag-preview') return;
-    const parsed = TokenDragPreview.safeParse(message);
+    const schema =
+      message.channel === 'token.drag-preview'
+        ? TokenDragPreview
+        : message.channel === 'ruler.preview'
+          ? RulerPreview
+          : null;
+    if (!schema) return;
+    const parsed = schema.safeParse(message);
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         context.addIssue({ code: 'custom', path: issue.path, message: issue.message });
