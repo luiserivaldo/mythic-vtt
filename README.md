@@ -30,7 +30,21 @@ pnpm install && pnpm build      # once
 node packages/host/dist/main.js --lan   # or: mythic-host --lan
 ```
 
-The command serves the built client and the game host on one port (default 8787) and prints the address players open and your single-use DM link (`#host=...`). By default it only listens on this machine (`127.0.0.1`); `--lan` listens on your network so players on the same Wi-Fi can join. Internet play (tunnels, port forwarding, a VPS) will be documented with the first release.
+The command serves the built client and the game host on one port (default 8787) and prints the address players open and your single-use DM link (`#host=...`). By default it only listens on this machine (`127.0.0.1`); `--lan` listens on your network so players on the same Wi-Fi can join.
+
+### Local play (same Wi-Fi)
+
+```sh
+mythic-host --lan
+```
+
+Prints: `http://192.168.1.5:8787` (your local IP). Players on the same network open this address.
+
+### Internet play (anywhere)
+
+See **[Internet Play Guide](docs/internet-play.md)** for tunnels (recommended), port forwarding, and VPS options.
+
+### Configuration
 
 | Setting                    | Flag         | Env var             | Config file key |
 | -------------------------- | ------------ | ------------------- | --------------- |
