@@ -10,8 +10,8 @@ export interface PointerClaims {
   claim(pointerId: number, owner?: string): void;
   release(pointerId: number): void;
   isClaimed(pointerId: number): boolean;
-  owner(): string | null;
-  subscribe(listener: () => void): () => void;
+  owner: () => string | null;
+  subscribe: (listener: () => void) => () => void;
 }
 
 export function createPointerClaims(): PointerClaims {
@@ -42,5 +42,9 @@ export function createPointerClaims(): PointerClaims {
 export const pointerClaims = createPointerClaims();
 
 export function usePointerOwner(): string | null {
-  return useSyncExternalStore(pointerClaims.subscribe, pointerClaims.owner, pointerClaims.owner);
+  return useSyncExternalStore(
+    (listener) => pointerClaims.subscribe(listener),
+    () => pointerClaims.owner(),
+    () => pointerClaims.owner(),
+  );
 }

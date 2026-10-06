@@ -28,7 +28,7 @@ function redact(value: unknown, seen: WeakSet<object>): unknown {
 export function summarizePayload(payload: unknown, maxLength = 96): string {
   let summary: string;
   try {
-    summary = JSON.stringify(redact(payload, new WeakSet())) ?? String(payload);
+    summary = JSON.stringify(redact(payload, new WeakSet()));
   } catch {
     summary = '[unavailable]';
   }

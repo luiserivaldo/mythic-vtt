@@ -29,7 +29,13 @@ function ToastItem({ toast, dismiss }: { toast: Toast; dismiss: (id: number) => 
   return (
     <div className="ui-toast" role="alert">
       <span>{toast.message}</span>
-      <button type="button" aria-label="Dismiss message" onClick={() => dismiss(toast.id)}>
+      <button
+        type="button"
+        aria-label="Dismiss message"
+        onClick={() => {
+          dismiss(toast.id);
+        }}
+      >
         ×
       </button>
     </div>
@@ -55,7 +61,12 @@ function useDevOverlayToggle(): [boolean, () => void] {
       window.removeEventListener('keydown', toggle);
     };
   }, []);
-  return [open, () => setOpen((value) => !value)];
+  return [
+    open,
+    () => {
+      setOpen((value) => !value);
+    },
+  ];
 }
 
 function DevOverlay({

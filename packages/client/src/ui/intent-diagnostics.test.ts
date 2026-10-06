@@ -23,7 +23,8 @@ describe('intent diagnostics', () => {
       outcome: 'ack' as const,
       latencyMs: 1,
     }));
-    expect(appendDiagnostic(base, { ...base[0]!, id: 20 }).map((item) => item.id)).toEqual(
+    const newest = { id: 20, type: 'test', payload: '{}', outcome: 'ack' as const, latencyMs: 1 };
+    expect(appendDiagnostic(base, newest).map((item) => item.id)).toEqual(
       Array.from({ length: 20 }, (_, index) => index + 1),
     );
   });
