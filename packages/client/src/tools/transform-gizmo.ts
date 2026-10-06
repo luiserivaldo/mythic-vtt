@@ -27,8 +27,12 @@ export interface Xz {
 export interface GizmoDraft {
   x: number;
   z: number;
+  /** M2-08: present for a 3D elevation preview; absent keeps the stored elevation. */
+  y?: number;
   /** Radians, normalised to (-PI, PI]. */
   yaw: number;
+  /** M2-08: full 3-axis rotation; absent keeps the 2D yaw behaviour. */
+  rotation?: Transform['rotation'];
   /** Uniform scale factor (transform.scale.x). */
   scale: number;
 }
@@ -95,8 +99,8 @@ export function buildTransform(base: Transform, draft: GizmoDraft): Transform {
   const sameYaw = Math.abs(normalizeYaw(draft.yaw - yawFromQuaternion(base.rotation))) < EPS;
   const ratio = Math.abs(base.scale.x) < EPS ? null : draft.scale / base.scale.x;
   return {
-    position: { x: draft.x, y: base.position.y, z: draft.z },
-    rotation: sameYaw ? base.rotation : quaternionFromYaw(draft.yaw),
+    position: { x: draft.x, y: draft.y ?? base.position.y, z: draft.z },
+    rotation: draft.rotation ?? (sameYaw ? base.rotation : quaternionFromYaw(draft.yaw)),
     scale:
       ratio === null
         ? { x: draft.scale, y: draft.scale, z: draft.scale }

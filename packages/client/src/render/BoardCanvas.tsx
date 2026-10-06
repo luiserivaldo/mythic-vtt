@@ -14,6 +14,8 @@ import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
+import { TransformGizmo3D } from './TransformGizmo3D.js';
+import { TransformPanel3D } from '../ui/TransformPanel3D.js';
 import { TransformPanel } from '../ui/TransformPanel.js';
 import { OrbitControls3D } from './OrbitControls3D.js';
 import { Skybox } from './Skybox.js';
@@ -108,8 +110,8 @@ function BoardScene({
         mode={mode3d ? '3d' : '2d'}
         grid={grid}
       />
-      {/* M1-20: 2D transform handles; the 3D gizmo is M2-08. */}
-      {!mode3d && !aoeActive && <TransformGizmo />}
+      {/* M1-20 / M2-08: 2D handles, or the 3D gizmo; both are off while the AoE tool is active. */}
+      {!aoeActive && (mode3d ? <TransformGizmo3D /> : <TransformGizmo />)}
       <AoEPlacementCanvas scene={source} mode={mode3d ? '3d' : '2d'} />
     </>
   );
@@ -176,7 +178,7 @@ export function BoardCanvas() {
         )}
       </div>
       <AoEToolPanel scene={source} />
-      {!mode3d && !aoeActive && <TransformPanel />}
+      {!aoeActive && (mode3d ? <TransformPanel3D /> : <TransformPanel />)}
       <Canvas
         frameloop="demand"
         shadows={false}
