@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   AssetRef,
+  AoEEntity,
+  AoEShape,
   DEFAULT_GRID_COLOR,
   DEFAULT_GRID_OPACITY,
   Grid,
@@ -176,6 +178,47 @@ describe('grid colour and opacity (GRID-01)', () => {
       expect(Grid.safeParse({ ...scene.grid, ...extra }).success).toBe(false);
     },
   );
+});
+
+describe('AoE schemas (MEAS-03)', () => {
+  const shapes = [
+    { kind: 'sphere', radius: 3, color: '#ff0000' },
+    { kind: 'cylinder', radius: 2, height: 4, color: '#00ff00' },
+    { kind: 'cone', radius: 3, length: 6, color: '#0000ff' },
+    { kind: 'cube', size: 4, color: '#ffffff' },
+    { kind: 'line', length: 6, width: 1, height: 1, color: '#ffff00' },
+  ] as const;
+
+  it.each(shapes)('round-trips the $kind geometry fields', (shape) => {
+    expect(AoEShape.parse(shape)).toEqual(shape);
+    expect(
+      AoEEntity.safeParse({
+        id: entity.id,
+        layer: entity.layer,
+        name: entity.name,
+        owners: entity.owners,
+        transform: entity.transform,
+        aoe: shape,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects missing, negative, non-finite and extra dimensions', () => {
+    expect(AoEShape.safeParse({ kind: 'sphere', color: '#fff' }).success).toBe(false);
+    expect(AoEShape.safeParse({ kind: 'sphere', radius: -1, color: '#fff' }).success).toBe(false);
+    expect(AoEShape.safeParse({ kind: 'sphere', radius: Infinity, color: '#fff' }).success).toBe(
+      false,
+    );
+    expect(
+      AoEShape.safeParse({ kind: 'sphere', radius: 1, length: 2, color: '#fff' }).success,
+    ).toBe(false);
+  });
+
+  it('keeps the pre-M3 placeholder component parseable', () => {
+    expect(
+      Entity.safeParse({ ...entity, aoe: { kind: 'sphere', size: 3, color: '#fff' } }).success,
+    ).toBe(true);
+  });
 });
 
 describe('scene bounds (D37)', () => {

@@ -20,3 +20,6 @@ export { entitySetOwners } from './entity.setOwners.js';
 export { layerLock } from './layer.lock.js';
 export { permissionUpdate } from './permission.update.js';
 export { tokenMove } from './token.move.js';
+export { aoePlace } from './aoe.place.js';
+export { aoeUpdate } from './aoe.update.js';
+export { aoeRemove } from './aoe.remove.js';

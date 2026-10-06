@@ -27,12 +27,43 @@ const ShapeComponent = z.object({
   showGridOnTop: z.boolean().optional(),
 });
 
-const AoeComponent = z.object({
+const dimension = z.number().nonnegative();
+
+// MEAS-03: these names intentionally match shared/geometry's AoE inputs. Cones and lines
+// originate at the entity transform and extend along local +Z.
+export const AoEShape = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('sphere'), radius: dimension, color: z.string() }),
+  z.strictObject({
+    kind: z.literal('cylinder'),
+    radius: dimension,
+    height: dimension,
+    color: z.string(),
+  }),
+  z.strictObject({
+    kind: z.literal('cone'),
+    radius: dimension,
+    length: dimension,
+    color: z.string(),
+  }),
+  z.strictObject({ kind: z.literal('cube'), size: dimension, color: z.string() }),
+  z.strictObject({
+    kind: z.literal('line'),
+    length: dimension,
+    width: dimension,
+    height: dimension,
+    color: z.string(),
+  }),
+]);
+export type AoEShape = z.infer<typeof AoEShape>;
+
+// The pre-M3 placeholder remains readable so adding the concrete shape schemas is additive.
+const LegacyAoEComponent = z.strictObject({
   kind: z.enum(['sphere', 'cylinder', 'cone', 'cube', 'line']),
-  size: z.number().positive(),
-  size2: z.number().positive().optional(),
+  size: dimension,
+  size2: dimension.optional(),
   color: z.string(),
 });
+const AoEComponent = z.union([AoEShape, LegacyAoEComponent]);
 
 const PinComponent = z.object({
   text: z.string(),
@@ -50,8 +81,20 @@ export const Entity = z.object({
   shape: ShapeComponent.optional(),
   model: z.object({ asset: AssetRef }).optional(),
   image: z.object({ asset: AssetRef, calibrated: z.boolean() }).optional(),
-  aoe: AoeComponent.optional(),
+  aoe: AoEComponent.optional(),
   aura: z.object({ radius: z.number().positive(), color: z.string() }).optional(),
   pin: PinComponent.optional(),
 });
 export type Entity = z.infer<typeof Entity>;
+
+/** The exact entity accepted by `aoe.place`; unrelated components are deliberately excluded. */
+export const AoEEntity = z.strictObject({
+  id: Id,
+  layer: LayerId,
+  name: z.string(),
+  owners: z.array(Id),
+  perms: EntityPermissions.partial().optional(),
+  transform: Transform,
+  aoe: AoEShape,
+});
+export type AoEEntity = z.infer<typeof AoEEntity>;

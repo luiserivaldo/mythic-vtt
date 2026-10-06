@@ -1,4 +1,4 @@
-import type { Grid, Quat, Vec3 } from '../schema/index.js';
+import type { AoEShape, Grid, Quat, Vec3 } from '../schema/index.js';
 import { UnsupportedGridError } from './snap-to-grid.js';
 
 export type AoEInclusion = 'center' | 'any-overlap';
@@ -11,12 +11,8 @@ interface BaseAoE {
 // MEAS-03: dimensions are finite, non-negative cells and rotation is a unit
 // quaternion. The cone and line extend along local +Z from position; the
 // cylinder and cube are centred on position.
-export type AoE =
-  | (BaseAoE & { kind: 'sphere'; radius: number })
-  | (BaseAoE & { kind: 'cylinder'; radius: number; height: number })
-  | (BaseAoE & { kind: 'cone'; radius: number; length: number })
-  | (BaseAoE & { kind: 'cube'; size: number })
-  | (BaseAoE & { kind: 'line'; length: number; width: number; height: number });
+type GeometryShape<T> = T extends AoEShape ? Omit<T, 'color'> : never;
+export type AoE = BaseAoE & GeometryShape<AoEShape>;
 
 export type AoECell = Vec3;
 
