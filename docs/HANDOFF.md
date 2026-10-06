@@ -140,3 +140,10 @@ Alpha caveats (nothing below was verified by eye or on real devices): drag, rule
 so a pitch or roll set with the 3D gizmo is stored but not drawn; AoE affected-token highlighting (M3-05) and the 3D
 ruler (M3-06) are not built, so an AoE does not yet show who is inside it; ghosts for remote token drags fade 1.5 s after
 the last preview (no "drag ended" message).
+
+## Update 2026-10-06: first manual playtest (alpha candidate)
+
+Findings: `docs/playtests/2026-10-06-alpha.md` (PT1-01 to PT1-17). Fixes are queued in `TASKS.md` §3 "Playtest fix
+queue" (M0-15, M1-26 to M1-32, M2-12, M2-13); pick them up after in-flight MVP work. Design questions Q18-Q23 are open
+in `DESIGN.md` §14 and gate M1-28 and any palette, marquee, scaling or direct-manipulation work. Do M0-15 first: AoE
+placement failed with `unknown-action` because `pnpm dev:table` does not rebuild `@mythic/shared`.
