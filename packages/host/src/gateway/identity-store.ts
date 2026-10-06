@@ -7,8 +7,8 @@ export interface StoredIdentity {
 }
 
 /**
- * Seam for persistence. M0-07/M0-10 will back this with the CampaignStore; until then the
- * in-memory implementation below is used.
+ * Seam for persistence. The in-memory implementation below is for tests and ephemeral hosts; the
+ * host uses the SQLite-backed store (`sqlite-identity-store.ts`).
  */
 export interface IdentityStore {
   get(identityId: string): Promise<StoredIdentity | undefined>;
@@ -17,8 +17,11 @@ export interface IdentityStore {
   update(identityId: string, patch: { displayName: string; avatar?: string }): Promise<void>;
   /** D24: the identity bound as host, if any. */
   getHostIdentityId(): Promise<string | undefined>;
-  /** Atomically bind `identityId` as host if none is bound; returns the bound host identity. */
-  bindHostIfAbsent(identityId: string): Promise<string>;
+  /**
+   * D29: atomically make `identityId` the host binding, replacing any previous one. Returns the
+   * previously bound identity (undefined if none). Only called after a valid startup token.
+   */
+  rebindHost(identityId: string): Promise<string | undefined>;
 }
 
 export function createMemoryIdentityStore(): IdentityStore {
@@ -26,9 +29,10 @@ export function createMemoryIdentityStore(): IdentityStore {
   let hostId: string | undefined;
   return {
     getHostIdentityId: () => Promise.resolve(hostId),
-    bindHostIfAbsent(identityId) {
-      hostId ??= identityId;
-      return Promise.resolve(hostId);
+    rebindHost(identityId) {
+      const previous = hostId;
+      hostId = identityId;
+      return Promise.resolve(previous);
     },
     get: (id) => Promise.resolve(map.get(id)),
     registerIfAbsent(candidate) {

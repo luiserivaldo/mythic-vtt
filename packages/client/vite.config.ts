@@ -9,5 +9,10 @@ export default defineConfig({
   plugins: [react()],
   // assetsDir is not "assets": the host owns /assets/* for uploaded images (M1-10).
   build: { outDir: 'dist/app', assetsDir: 'static', emptyOutDir: true },
-  server: { proxy: { '/ws': { target: `ws://127.0.0.1:${hostPort}`, ws: true } } },
+  server: {
+    proxy: {
+      '/ws': { target: `ws://127.0.0.1:${hostPort}`, ws: true },
+      '/assets': `http://127.0.0.1:${hostPort}`,
+    },
+  },
 });

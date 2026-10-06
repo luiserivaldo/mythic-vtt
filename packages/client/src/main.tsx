@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import { createGameClient } from './net/client.js';
-import { createHostTokenTaker, extractHostToken } from './net/host-token.js';
+import { createHostTokenHolder, extractHostToken } from './net/host-token.js';
 import { loadOrCreateIdentity } from './net/identity.js';
 import { ClientStoreContext } from './store/react.js';
 import { createClientStore } from './store/store.js';
@@ -15,7 +15,7 @@ const identity = loadOrCreateIdentity(localStorage, Date.now(), randomByte);
 
 // D24: the DM link carries `#host=<token>`; read it once and scrub it from the address bar.
 const hostToken = extractHostToken(location, history);
-const takeHostToken = createHostTokenTaker(hostToken);
+const hostTokenHolder = createHostTokenHolder(hostToken);
 
 const store = createClientStore();
 const uiStore = createUiStore();
@@ -49,7 +49,7 @@ const client = createGameClient({
   url: `${wsProtocol}//${location.host}/ws`,
   identity,
   displayName: 'Player',
-  takeHostToken,
+  hostToken: hostTokenHolder,
   store,
   createSocket: (url) => new WebSocket(url),
 });
