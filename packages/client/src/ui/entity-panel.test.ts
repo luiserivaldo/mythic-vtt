@@ -6,6 +6,7 @@ import {
   entityRenameIntent,
   entityShowGridOnTopIntent,
   entityRows,
+  isValidEntityName,
   isValidColour,
   isValidPropSize,
   ownerOptions,
@@ -13,6 +14,7 @@ import {
   SPAWN_STEPS,
   propCreateIntent,
   tokenCreateIntent,
+  TOKEN_FORM_DEFAULTS,
   TOKEN_SIZE_NAMES,
 } from './entity-panel.js';
 import { toolbarItems } from './toolbar-items.js';
@@ -202,6 +204,21 @@ describe('entity panel intents', () => {
       );
       expect(canPerform(state, host, spec.type, spec.payload)).toBe(true);
     }
+  });
+});
+
+describe('token form defaults (M1-30)', () => {
+  it('starts with public labels and requires the DM to supply a non-empty name', () => {
+    expect(TOKEN_FORM_DEFAULTS).toMatchObject({
+      name: '',
+      size: 'medium',
+      layer: 'tokens',
+      labelVisibility: 'all',
+      ownerId: '',
+    });
+    expect(isValidEntityName(TOKEN_FORM_DEFAULTS.name)).toBe(false);
+    expect(isValidEntityName('   ')).toBe(false);
+    expect(isValidEntityName('Goblin')).toBe(true);
   });
 });
 

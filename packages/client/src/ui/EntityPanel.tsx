@@ -20,6 +20,7 @@ import {
   ownerOptions,
   PRIMITIVE_KINDS,
   propCreateIntent,
+  TOKEN_FORM_DEFAULTS,
   tokenCreateIntent,
   TOKEN_SIZE_NAMES,
   type LabelVisibility,
@@ -81,13 +82,13 @@ function TokenForm({
   uploader: ImageUploader;
   onError: (message: string | null) => void;
 }) {
-  const [name, setName] = useState('');
-  const [size, setSize] = useState<TokenSizeName>('medium');
-  const [layer, setLayer] = useState<LayerId>('tokens');
-  const [labels, setLabels] = useState<LabelVisibility>('all');
-  const [owner, setOwner] = useState('');
+  const [name, setName] = useState(TOKEN_FORM_DEFAULTS.name);
+  const [size, setSize] = useState<TokenSizeName>(TOKEN_FORM_DEFAULTS.size);
+  const [layer, setLayer] = useState<LayerId>(TOKEN_FORM_DEFAULTS.layer);
+  const [labels, setLabels] = useState<LabelVisibility>(TOKEN_FORM_DEFAULTS.labelVisibility);
+  const [owner, setOwner] = useState(TOKEN_FORM_DEFAULTS.ownerId);
   const [file, setFile] = useState<File | null>(null);
-  const [color, setColor] = useState(DEFAULT_TOKEN_COLOR);
+  const [color, setColor] = useState(TOKEN_FORM_DEFAULTS.color);
   const [busy, setBusy] = useState(false);
   const owners = useMemo(() => ownerOptions(campaign), [campaign]);
 
@@ -137,12 +138,19 @@ function TokenForm({
         <input
           type="text"
           value={name}
+          required
           maxLength={120}
+          aria-describedby="token-name-requirement"
           onChange={(e) => {
             setName(e.target.value);
           }}
         />
       </label>
+      {!isValidEntityName(name) && (
+        <span id="token-name-requirement" className="ui-validation">
+          Enter a token name.
+        </span>
+      )}
       <label>
         Size{' '}
         <select

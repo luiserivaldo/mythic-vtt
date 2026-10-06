@@ -208,6 +208,11 @@ main > p {
   border-radius: 3px;
   color: var(--ui-muted);
 }
+.ui-validation {
+  flex-basis: 100%;
+  color: var(--ui-danger);
+  font-size: 0.82rem;
+}
 .ui-visually-hidden {
   position: absolute;
   width: 1px;
