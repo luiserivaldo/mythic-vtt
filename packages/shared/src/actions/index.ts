@@ -19,3 +19,4 @@ export { entitySetLayer } from './entity.setLayer.js';
 export { entitySetOwners } from './entity.setOwners.js';
 export { layerLock } from './layer.lock.js';
 export { permissionUpdate } from './permission.update.js';
+export { tokenMove } from './token.move.js';

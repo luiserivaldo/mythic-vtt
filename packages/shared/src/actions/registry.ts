@@ -16,6 +16,7 @@ import { seatCreate } from './seat.create.js';
 import { seatRelease } from './seat.release.js';
 import { seatUpdate } from './seat.update.js';
 import { sessionJoin } from './session.join.js';
+import { tokenMove } from './token.move.js';
 
 /** Append-only (AGENTS.md §6): add new actions at the end to keep merges painless. */
 export const allActions: readonly AnyAction[] = [
@@ -36,6 +37,7 @@ export const allActions: readonly AnyAction[] = [
   entitySetOwners,
   layerLock,
   permissionUpdate,
+  tokenMove,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));
