@@ -52,7 +52,11 @@ export function RulerPath({
         ? measured.segments.map((segment, index) => (
             <Line
               key={`guide:${String(index)}`}
-              points={[lifted(segment.from), lifted(rulerGuideCorner(segment.from, segment.to)), lifted(segment.to)]}
+              points={[
+                lifted(segment.from),
+                lifted(rulerGuideCorner(segment.from, segment.to)),
+                lifted(segment.to),
+              ]}
               color={color}
               lineWidth={3}
               depthTest={false}
@@ -91,7 +95,10 @@ export function RulerPath({
             zIndexRange={[5, 0]}
             style={{ pointerEvents: 'none' }}
           >
-            <div data-testid={`${testId}-segment`} style={{ ...pillStyle, fontSize: 11, opacity: 0.85 }}>
+            <div
+              data-testid={`${testId}-segment`}
+              style={{ ...pillStyle, fontSize: 11, opacity: 0.85 }}
+            >
               {mode === '3d'
                 ? breakdown(segment.horizontalLabel, segment.verticalLabel, segment.label)
                 : segment.label}
@@ -105,7 +112,10 @@ export function RulerPath({
           zIndexRange={[6, 0]}
           style={{ pointerEvents: 'none', transform: 'translateY(-18px)' }}
         >
-          <div data-testid={`${testId}-total`} style={{ ...pillStyle, fontSize: 13, border: `1px solid ${color}` }}>
+          <div
+            data-testid={`${testId}-total`}
+            style={{ ...pillStyle, fontSize: 13, border: `1px solid ${color}` }}
+          >
             {owner === null ? total : `${owner}: ${total}`}
           </div>
         </Html>

@@ -60,6 +60,19 @@ describe('3D ruler picks (MEAS-02)', () => {
     });
   });
 
+  it('measures a non-walkable primitive surface too', () => {
+    const nonWalkable: Scene = {
+      ...scene,
+      entities: {
+        [box.id]: {
+          ...box,
+          shape: { kind: 'box', color: '#888888', walkable: false },
+        },
+      },
+    };
+    expect(prepareRulerPoint3d({ x: 5, y: 5, z: 5 }, nonWalkable, box.id).y).toBe(5);
+  });
+
   it('keeps the guide horizontal at the first point before its vertical leg', () => {
     expect(rulerGuideCorner({ x: 1, y: 0, z: 2 }, { x: 4, y: 10, z: 7 })).toEqual({
       x: 4,

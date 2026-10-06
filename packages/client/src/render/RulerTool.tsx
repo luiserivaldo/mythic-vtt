@@ -34,7 +34,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * MEAS-01: the multi-waypoint ruler on the ground plane (2D, and 3D via the same plane pick).
+ * MEAS-01/02: the multi-waypoint ruler uses the ground plane in 2D and ray-hit surfaces in 3D.
  * While the tool is armed a press claims its pointer (pointer-claims) so the camera does not
  * pan and TokenDrag does not start; a click adds a waypoint, double-click or Enter finishes,
  * Esc cancels. The path is render-local plus an ephemeral relay; nothing is an action.

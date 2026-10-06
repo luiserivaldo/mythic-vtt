@@ -2,6 +2,7 @@ import {
   dropElevation,
   surfaceHeightAt,
   walkableFromEntity,
+  yawFromQuaternion,
   type Scene,
   type Vec3,
   type WalkableSurface,
@@ -25,12 +26,18 @@ export function prepareRulerPoint3d(raw: Vec3, scene: Scene, entityId?: string):
   if (entity?.token) return { ...entity.transform.position };
 
   const horizontal = prepareRulerPoint(raw, scene);
-  const walkables = rulerWalkables(scene);
-  const highest = surfaceHeightAt(horizontal.x, horizontal.z, walkables);
-  const dropped = dropElevation(
-    { x: horizontal.x, y: raw.y, z: horizontal.z },
-    walkables,
-  );
+  // Measurement can target any primitive surface, even when it is not walkable for token drops.
+  const targetSurface: WalkableSurface | undefined = entity?.shape
+    ? {
+        kind: entity.shape.kind,
+        position: entity.transform.position,
+        scale: entity.transform.scale,
+        yaw: yawFromQuaternion(entity.transform.rotation),
+      }
+    : undefined;
+  const surfaces = targetSurface ? [targetSurface] : rulerWalkables(scene);
+  const highest = surfaceHeightAt(horizontal.x, horizontal.z, surfaces);
+  const dropped = dropElevation({ x: horizontal.x, y: raw.y, z: horizontal.z }, surfaces);
   // A top-face hit should choose the surface reached by the ray. The highest profile remains a
   // stable fallback for numerical misses after X/Z snapping.
   const y = dropped > 0 || raw.y <= 0 ? dropped : highest;
