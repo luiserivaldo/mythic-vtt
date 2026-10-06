@@ -23,7 +23,7 @@ const ShapeComponent = z.object({
   showGridOnTop: z.boolean().optional(),
 });
 
-const dimension = z.number().finite().nonnegative();
+const dimension = z.number().nonnegative();
 
 // MEAS-03: these names intentionally match shared/geometry's AoE inputs. Cones and lines
 // originate at the entity transform and extend along local +Z.
