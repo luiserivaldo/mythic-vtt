@@ -30,6 +30,32 @@ export function visibleCellRange(view: View2D, viewport: Viewport): CellRange {
   };
 }
 
+/**
+ * D37: intersect a line range with the canvas [0,width] x [0,height]. Null when they do not
+ * overlap, so nothing is drawn rather than a degenerate buffer.
+ */
+export function clipRangeToBounds(
+  range: CellRange,
+  bounds: { readonly width: number; readonly height: number },
+): CellRange | null {
+  const clipped = {
+    minX: Math.max(range.minX, 0),
+    maxX: Math.min(range.maxX, bounds.width),
+    minZ: Math.max(range.minZ, 0),
+    maxZ: Math.min(range.maxZ, bounds.height),
+  };
+  return clipped.minX > clipped.maxX || clipped.minZ > clipped.maxZ ? null : clipped;
+}
+
+/** Four border segments (x1,y,z1,x2,y,z2 each) around the canvas, as one LineSegments buffer. */
+export function borderSegments(
+  bounds: { readonly width: number; readonly height: number },
+  y = 0,
+): Float32Array {
+  const { width: w, height: h } = bounds;
+  return new Float32Array([0, y, 0, w, y, 0, w, y, 0, w, y, h, w, y, h, 0, y, h, 0, y, h, 0, y, 0]);
+}
+
 export function sameRange(a: CellRange | null, b: CellRange): boolean {
   return (
     a !== null && a.minX === b.minX && a.maxX === b.maxX && a.minZ === b.minZ && a.maxZ === b.maxZ

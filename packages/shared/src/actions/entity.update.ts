@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { Entity, Id } from '../schema/index.js';
+import { isWithinBounds } from '../geometry/bounds.js';
+import { Entity, Id, resolveSceneBounds } from '../schema/index.js';
 import { defineAction } from './define.js';
 import { canUseEntity, isLayerLocked } from './entity-access.js';
 
@@ -17,6 +18,13 @@ export const entityUpdate = defineAction({
     const scene = state.scenes[p.sceneId];
     const entity = scene?.entities[p.entityId];
     if (!scene || !entity || isLayerLocked(scene, entity.layer)) return false;
+
+    // D37: a move may not leave the canvas.
+    if (
+      p.changes.transform &&
+      !isWithinBounds(resolveSceneBounds(scene), p.changes.transform.position)
+    )
+      return false;
 
     const keys = Object.keys(p.changes);
     const needsMove = keys.includes('transform');

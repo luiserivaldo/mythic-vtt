@@ -1,8 +1,11 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import { BufferAttribute, BufferGeometry, LineBasicMaterial, type OrthographicCamera } from 'three';
+import { BORDER_COLOR } from './canvas-style.js';
 import type { RenderGrid } from './grid-model.js';
 import {
+  borderSegments,
+  clipRangeToBounds,
   gridSegments,
   gridVisible,
   sameRange,
@@ -16,11 +19,30 @@ import {
  * so panning inside the margin costs nothing. Runs under frameloop="demand": pan/zoom
  * already invalidate, and the effect below invalidates on style changes.
  */
-export function GridLines({ grid, renderOrder = 0 }: { grid: RenderGrid; renderOrder?: number }) {
+export function GridLines({
+  grid,
+  fill,
+  renderOrder = 0,
+}: {
+  grid: RenderGrid;
+  /** Scene background colour shown inside the canvas. */
+  fill: string;
+  renderOrder?: number;
+}) {
   const invalidate = useThree((s) => s.invalidate);
   const geometry = useMemo(() => new BufferGeometry(), []);
   const material = useMemo(
     () => new LineBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }),
+    [],
+  );
+  // D37: the canvas border and the fill that makes the area inside distinct from outside.
+  const border = useMemo(() => {
+    const g = new BufferGeometry();
+    g.setAttribute('position', new BufferAttribute(borderSegments(grid.bounds, 0), 3));
+    return g;
+  }, [grid.bounds]);
+  const borderMaterial = useMemo(
+    () => new LineBasicMaterial({ color: BORDER_COLOR, depthWrite: false, depthTest: false }),
     [],
   );
   const range = useRef<CellRange | null>(null);
@@ -35,6 +57,13 @@ export function GridLines({ grid, renderOrder = 0 }: { grid: RenderGrid; renderO
 
   useEffect(
     () => () => {
+      border.dispose();
+    },
+    [border],
+  );
+  useEffect(
+    () => () => {
+      borderMaterial.dispose();
       geometry.dispose();
       material.dispose();
     },
@@ -47,24 +76,55 @@ export function GridLines({ grid, renderOrder = 0 }: { grid: RenderGrid; renderO
     if (lines.current) lines.current.visible = show;
     visible.current = show;
     if (!show) return;
-    const next = visibleCellRange(
+    const visibleRange = visibleCellRange(
       { centerX: cam.position.x, centerZ: cam.position.z, zoom: cam.zoom },
       { width: size.width, height: size.height },
     );
+    // D37: only lines inside the canvas; a null clip (canvas off screen) draws nothing.
+    const next = clipRangeToBounds(visibleRange, grid.bounds);
+    if (next === null) {
+      range.current = null;
+      geometry.setAttribute('position', new BufferAttribute(new Float32Array(0), 3));
+      return;
+    }
     if (sameRange(range.current, next)) return;
     range.current = next;
     geometry.setAttribute('position', new BufferAttribute(gridSegments(next), 3));
     geometry.computeBoundingSphere();
   });
 
+  // The cached range belongs to the old bounds once they change.
+  useEffect(() => {
+    range.current = null;
+    invalidate();
+  }, [grid.bounds, invalidate]);
+
   return (
-    <lineSegments
-      ref={lines}
-      geometry={geometry}
-      material={material}
-      renderOrder={renderOrder}
-      frustumCulled={false}
-      name="grid"
-    />
+    <>
+      <mesh
+        position={[grid.bounds.width / 2, 0, grid.bounds.height / 2]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        renderOrder={renderOrder - 2}
+        name="canvas-fill"
+      >
+        <planeGeometry args={[grid.bounds.width, grid.bounds.height]} />
+        <meshBasicMaterial color={fill} depthWrite={false} depthTest={false} />
+      </mesh>
+      <lineSegments
+        geometry={border}
+        material={borderMaterial}
+        renderOrder={renderOrder + 1}
+        frustumCulled={false}
+        name="canvas-border"
+      />
+      <lineSegments
+        ref={lines}
+        geometry={geometry}
+        material={material}
+        renderOrder={renderOrder}
+        frustumCulled={false}
+        name="grid"
+      />
+    </>
   );
 }

@@ -3,6 +3,7 @@ import { PerspectiveCamera } from '@react-three/drei';
 import { useCallback, useEffect, useRef } from 'react';
 import type { PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import {
+  clampTargetToGround,
   dampVelocity,
   defaultOrbit,
   dolly,
@@ -19,7 +20,7 @@ import {
 } from './camera-3d.js';
 
 export interface OrbitControls3DProps {
-  /** Ground extent used by the default/reset view. Keep the reference stable (memoise). */
+  /** D37: canvas extent: the default/reset view frames it and the focus is clamped to it. Keep the reference stable (memoise). */
   bounds: GroundBounds | null;
   /** Increment to return to the default view. */
   resetToken?: number;
@@ -37,12 +38,16 @@ export function OrbitControls3D({ bounds, resetToken = 0 }: OrbitControls3DProps
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
   const activeCamera = useThree((s) => s.camera);
+  const boundsRef = useRef(bounds);
+  boundsRef.current = bounds;
   const orbit = useRef<Orbit3D>(defaultOrbit(bounds));
   // Angular velocity (rad/s) used for post-release damping; only moves the camera while non-zero.
   const velocity = useRef({ az: 0, polar: 0 });
 
   const apply = useCallback(
-    (next: Orbit3D) => {
+    (raw: Orbit3D) => {
+      // D37: the focus stays on the canvas.
+      const next = clampTargetToGround(raw, boundsRef.current);
       orbit.current = next;
       const cam = getState().camera as ThreePerspectiveCamera;
       const p = orbitPosition(next);

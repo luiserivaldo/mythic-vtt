@@ -6,6 +6,7 @@ import {
   entityMoveLayerIntent,
   layerLockIntent,
   sceneActivateIntent,
+  sceneBoundsIntent,
   sceneCreateIntent,
   sceneRenameIntent,
   seatAssignIntent,
@@ -201,5 +202,23 @@ describe('intent specs are accepted by the shared actions', () => {
     );
     expect(canPerform(state, coDm, 'scene.activate', sceneActivateIntent(S).payload)).toBe(true);
     expect(canPerform(state, coDm, 'seat.update', seatRoleIntent(P, 'codm').payload)).toBe(false);
+  });
+});
+
+describe('scene bounds intents (D37)', () => {
+  it('sceneCreateIntent carries bounds only when given', () => {
+    expect(sceneCreateIntent(tid(11), 'Inn').payload).toEqual({ sceneId: tid(11), name: 'Inn' });
+    expect(sceneCreateIntent(tid(11), 'Inn', { width: 20, height: 10 }).payload).toEqual({
+      sceneId: tid(11),
+      name: 'Inn',
+      bounds: { width: 20, height: 10 },
+    });
+  });
+  it('sceneBoundsIntent is a scene.update', () => {
+    expect(sceneBoundsIntent(S, { width: 9, height: 8 })).toEqual({
+      type: 'scene.update',
+      payload: { sceneId: S, bounds: { width: 9, height: 8 } },
+      sceneId: S,
+    });
   });
 });

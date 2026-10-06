@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id } from '../schema/index.js';
+import { Id, SceneBounds } from '../schema/index.js';
 import { defineAction, isCoDm, isHost } from './define.js';
 
 export const sceneUpdate = defineAction({
@@ -11,10 +11,19 @@ export const sceneUpdate = defineAction({
       background: z.string().min(1).max(64).optional(),
       // ENV-07: null clears the gradient back to a plain colour.
       zenith: z.string().min(1).max(64).nullable().optional(),
+      // D37: shrinking never moves entities; they stay and can be dragged back in.
+      bounds: SceneBounds.optional(),
     })
-    .refine((p) => p.name !== undefined || p.background !== undefined || p.zenith !== undefined, {
-      message: 'at least one field to update is required',
-    }),
+    .refine(
+      (p) =>
+        p.name !== undefined ||
+        p.background !== undefined ||
+        p.zenith !== undefined ||
+        p.bounds !== undefined,
+      {
+        message: 'at least one field to update is required',
+      },
+    ),
   permission: (state, actor, p) =>
     p.sceneId in state.scenes && (isHost(actor) || isCoDm(state, actor)),
   reduce: (draft, a) => {
@@ -22,6 +31,7 @@ export const sceneUpdate = defineAction({
     if (!scene) return;
     if (a.payload.name !== undefined) scene.name = a.payload.name;
     if (a.payload.background !== undefined) scene.environment.background = a.payload.background;
+    if (a.payload.bounds !== undefined) scene.bounds = a.payload.bounds;
     if (a.payload.zenith === null) delete scene.environment.zenith;
     else if (a.payload.zenith !== undefined) scene.environment.zenith = a.payload.zenith;
   },
