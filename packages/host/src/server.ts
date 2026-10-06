@@ -2,7 +2,12 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { storeMigrate } from '@mythic/shared';
 import type { HostConfig } from './config.js';
-import { denyAssetUploads, registerAssetRoutes, type UploadAuthorizer } from './http/index.js';
+import {
+  denyAssetUploads,
+  registerAssetRoutes,
+  registerStaticClient,
+  type UploadAuthorizer,
+} from './http/index.js';
 import {
   createEngine,
   cryptoRandom,
@@ -109,6 +114,8 @@ export async function startHost(
       authenticated,
     }));
   }
+  // After every explicit route: the static handler is the not-found fallback.
+  if (config.clientDir) registerStaticClient(gateway.app, config.clientDir);
   let port: number;
   try {
     port = await gateway.listen({ port: config.port, host: config.host });
