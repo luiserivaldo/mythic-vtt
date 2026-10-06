@@ -105,3 +105,22 @@ prettier and ESLint). Running the commands from a normal terminal has no such li
   crash-looping (`systemctl status ollama`, `journalctl -u ollama`), so local Qwen3.8-27b is not available until that
   is fixed. Hermes suits low-difficulty, well-specified tasks: docs, fixtures, small actions that copy an existing
   pattern, test additions.
+
+## Update 2026-10-06 ~19:45: alpha wave 1 stalled on Codex quota
+
+Five Codex tasks were launched in parallel (about 480k tokens used) and the usage limit hit before any finished.
+Partial, uncommitted work is saved in these worktrees (no commits, nothing merged, `develop` is unchanged at
+`f474722`):
+
+| Task                            | Worktree           | Notes                                                                              |
+| ------------------------------- | ------------------ | ---------------------------------------------------------------------------------- |
+| M1-18 token drag and snap       | `m1-18-token-drag` | highest priority; was wiring `sendEphemeral`/`onEphemeral` into the client context |
+| M1-21 2D ruler                  | `m1-21-ruler-2d`   | adding a ruler ephemeral kind in packages/protocol (additive)                      |
+| M3-04 AoE placement tool        | `m3-04-aoe-tool`   | had 17 lint errors left to fix                                                     |
+| M2-08 3D gizmo                  | `m2-08-gizmo-3d`   |                                                                                    |
+| M3-07 grid on elevated surfaces | `m3-07-grid-tops`  |                                                                                    |
+
+Resume after the Codex reset (8:55 PM): run at most **two or three Codex agents at once**, in the order above, and tell
+each to commit WIP early, then `git merge develop`, then run the gates once. Do not run five at a time: the docs
+reading and parallel build/e2e runs use up a window before anything lands. After these, M3-05 (needs M3-04) and
+M3-06 (needs M1-21), then M0-14, M1-24 and the alpha build.
