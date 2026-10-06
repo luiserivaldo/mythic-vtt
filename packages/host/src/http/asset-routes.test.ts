@@ -22,7 +22,11 @@ describe('asset HTTP routes', () => {
 
   const authorizer: UploadAuthorizer = {
     authorize: () =>
-      Promise.resolve(authorized ? { identityId: 'identity-1', seatId: 'seat-1' } : null),
+      Promise.resolve(
+        authorized
+          ? { ok: true, identityId: 'identity-1', seatId: 'seat-1' }
+          : { ok: false, status: 401 },
+      ),
   };
 
   beforeEach(async () => {

@@ -58,6 +58,8 @@ export interface RenderShape {
 export interface RenderScene {
   id: string;
   background: string;
+  /** ENV-07: optional gradient top colour (3D only). */
+  zenith?: string;
   entities: RenderEntity[];
 }
 
@@ -113,6 +115,7 @@ export function mapScene(scene: Scene): RenderScene {
   return {
     id: scene.id,
     background: scene.environment.background,
+    ...(scene.environment.zenith ? { zenith: scene.environment.zenith } : {}),
     entities: orderedEntities(
       Object.values(scene.entities).map((entity) => ({
         id: entity.id,
