@@ -1,39 +1,21 @@
 import { Canvas, useThree } from '@react-three/fiber';
+import type { Scene } from '@mythic/shared';
 import { OrthographicCamera } from '@react-three/drei';
-import { useEffect, useMemo } from 'react';
-import { DoubleSide } from 'three';
+import { useEffect, useMemo, useState } from 'react';
 import { useClientStore } from '../store/react.js';
-import {
-  activeRenderScene,
-  RENDER_LAYERS,
-  type RenderEntity,
-  type RenderScene,
-} from './scene-model.js';
+import { activeRenderScene, type RenderScene } from './scene-model.js';
+import { PickableEntities } from './PickableEntities.js';
+import { selectionStore } from '../tools/selection-store.js';
 
-const COLORS = {
-  map: '#51637a',
-  'props-under': '#8a96a5',
-  tokens: '#46b6cf',
-  'props-over': '#a8b5c3',
-  effects: '#f0ae55',
-  ui: '#ffffff',
-} as const;
-
-function FoundationMarker({ entity, order }: { entity: RenderEntity; order: number }) {
-  return (
-    <mesh position={[...entity.position]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={order}>
-      <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
-      <meshBasicMaterial
-        color={entity.secret ? '#a577ce' : COLORS[entity.layer]}
-        side={DoubleSide}
-        depthTest={false}
-        depthWrite={false}
-      />
-    </mesh>
-  );
-}
-
-function BoardScene({ scene }: { scene: RenderScene | null }) {
+function BoardScene({
+  scene,
+  source,
+  additiveMode,
+}: {
+  scene: RenderScene | null;
+  source: Scene | null;
+  additiveMode: boolean;
+}) {
   const invalidate = useThree((state) => state.invalidate);
   useEffect(() => {
     invalidate();
@@ -51,29 +33,56 @@ function BoardScene({ scene }: { scene: RenderScene | null }) {
         near={0.1}
         far={1000}
       />
-      {scene &&
-        RENDER_LAYERS.map((layer, order) => (
-          <group key={layer} name={layer}>
-            {scene.entities
-              .filter((entity) => entity.layer === layer)
-              .map((entity) => (
-                <FoundationMarker key={entity.id} entity={entity} order={order} />
-              ))}
-          </group>
-        ))}
+      <PickableEntities rendered={scene} scene={source} additiveMode={additiveMode} />
     </>
   );
 }
 
 /** Single on-demand Three scene for the active host-filtered Scene. */
 export function BoardCanvas() {
+  const [additiveMode, setAdditiveMode] = useState(false);
   const campaign = useClientStore((state) => state.campaign);
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
+  const source = campaign?.activeSceneId ? (campaign.scenes[campaign.activeSceneId] ?? null) : null;
 
   return (
-    <div aria-label="Scene board" style={{ width: '100%', height: 'min(70vh, 720px)' }}>
-      <Canvas frameloop="demand" shadows={false} gl={{ antialias: true }}>
-        <BoardScene scene={scene} />
+    <div
+      aria-label="Scene board"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') selectionStore.getState().clear();
+      }}
+      style={{ width: '100%', height: 'min(70vh, 720px)', position: 'relative' }}
+    >
+      <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>
+        <button
+          type="button"
+          aria-pressed={additiveMode}
+          onClick={() => {
+            setAdditiveMode((value) => !value);
+          }}
+        >
+          Multi-select
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            selectionStore.getState().clear();
+          }}
+        >
+          Clear selection
+        </button>
+      </div>
+      <Canvas
+        frameloop="demand"
+        shadows={false}
+        gl={{ antialias: true }}
+        onPointerMissed={(event) => {
+          if (!additiveMode && !event.shiftKey && !event.ctrlKey && !event.metaKey)
+            selectionStore.getState().clear();
+        }}
+      >
+        <BoardScene scene={scene} source={source} additiveMode={additiveMode} />
       </Canvas>
     </div>
   );
