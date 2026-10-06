@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useClientStore } from '../store/react.js';
 import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
+import { MapImageMesh } from './MapImage.js';
 import { SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
 
@@ -62,34 +63,45 @@ export function PickableEntities({
     <group key={layer} name={layer}>
       {rendered?.entities
         .filter((entity) => entity.layer === layer)
-        .map((entity: RenderEntity) => (
-          <mesh
-            key={entity.id}
-            name={entity.id}
-            position={[...entity.position]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            renderOrder={order}
-            onClick={onClick}
-          >
-            <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
-            <TokenMaterial
+        .map((entity: RenderEntity) =>
+          entity.mapImage ? (
+            <MapImageMesh
+              key={entity.id}
               entity={entity}
-              color={
-                entity.token?.image
-                  ? COLORS.tokens
-                  : selected.includes(entity.id)
-                    ? '#ffe066'
-                    : entity.secret
-                      ? '#a577ce'
-                      : COLORS[entity.layer]
-              }
+              mapImage={entity.mapImage}
+              renderOrder={order}
+              selected={selected.includes(entity.id)}
+              onPick={onClick}
             />
-            {entity.token?.image && selected.includes(entity.id) && (
-              <SelectionRing size={entity.sizeCells} />
-            )}
-            <TokenLabel entity={entity} actor={actor} />
-          </mesh>
-        ))}
+          ) : (
+            <mesh
+              key={entity.id}
+              name={entity.id}
+              position={[...entity.position]}
+              rotation={[-Math.PI / 2, 0, 0]}
+              renderOrder={order}
+              onClick={onClick}
+            >
+              <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
+              <TokenMaterial
+                entity={entity}
+                color={
+                  entity.token?.image
+                    ? COLORS.tokens
+                    : selected.includes(entity.id)
+                      ? '#ffe066'
+                      : entity.secret
+                        ? '#a577ce'
+                        : COLORS[entity.layer]
+                }
+              />
+              {entity.token?.image && selected.includes(entity.id) && (
+                <SelectionRing size={entity.sizeCells} />
+              )}
+              <TokenLabel entity={entity} actor={actor} />
+            </mesh>
+          ),
+        )}
     </group>
   ));
 }

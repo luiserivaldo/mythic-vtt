@@ -18,6 +18,8 @@ export interface RenderEntity {
   position: readonly [number, number, number];
   sizeCells: number;
   secret: boolean;
+  /** ENV-01: present for map-layer entities with an image; `scale` is the image height in cells. */
+  mapImage?: { asset: AssetRef; scale: number };
   /** Present only for token entities. */
   token?: {
     image: AssetRef | undefined;
@@ -64,6 +66,11 @@ export function orderedEntities(entities: readonly RenderEntity[]): RenderEntity
   return [...entities].sort((a, b) => rank(a.layer) - rank(b.layer));
 }
 
+/** A malformed scale falls back to one cell rather than hiding or exploding the image. */
+export function mapImageScale(scale: number): number {
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
 export function mapScene(scene: Scene): RenderScene {
   return {
     id: scene.id,
@@ -79,6 +86,14 @@ export function mapScene(scene: Scene): RenderScene {
         ),
         sizeCells: footprintCells(entity.token?.sizeCells),
         secret: entity.layer === 'dm',
+        ...(entity.layer === 'map' && entity.image
+          ? {
+              mapImage: {
+                asset: entity.image.asset,
+                scale: mapImageScale(entity.transform.scale.x),
+              },
+            }
+          : {}),
         ...(entity.token
           ? {
               token: {
