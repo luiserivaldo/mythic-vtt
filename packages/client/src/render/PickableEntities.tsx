@@ -7,6 +7,7 @@ import { pickEntity, validSelection, type SelectionActor } from '../tools/select
 import { selectionStore } from '../tools/selection-store.js';
 import { MapImageMesh } from './MapImage.js';
 import { SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { TokenStandee } from './TokenStandee.js';
 import { PrimitiveLights, PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
 
@@ -23,6 +24,11 @@ function actorFor(seatId: string | null, seats: SceneSelectionSeats): SelectionA
   if (seatId === null) return { kind: 'host' };
   const seat = seats[seatId];
   return seat ? { kind: 'seat', seat } : { kind: 'spectator' };
+}
+
+function standeeColor(entity: RenderEntity, selected: boolean): string {
+  if (entity.token?.image) return COLORS.tokens;
+  return selected ? '#ffe066' : entity.secret ? '#a577ce' : COLORS[entity.layer];
 }
 
 type SceneSelectionSeats = Record<string, Seat>;
@@ -87,6 +93,16 @@ export function PickableEntities({
                   shape={entity.shape}
                   mode={mode}
                   selected={selected.includes(entity.id)}
+                  renderOrder={order}
+                  onClick={onClick}
+                />
+              ) : mode === '3d' && entity.token ? (
+                <TokenStandee
+                  key={entity.id}
+                  entity={entity}
+                  color={standeeColor(entity, selected.includes(entity.id))}
+                  selected={selected.includes(entity.id)}
+                  actor={actor}
                   renderOrder={order}
                   onClick={onClick}
                 />
