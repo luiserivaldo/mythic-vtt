@@ -37,6 +37,8 @@ export interface EngineOptions {
   random?: RandomSource;
   /** Last `seq` already used by this campaign (M0-11 passes the recovered value). Default 0. */
   initialSeq?: number;
+  /** Called after an action commits, in sequence order; used for autosave (HIST-02). */
+  onApplied?: (state: Campaign, seq: number) => Promise<void>;
   /** How many applied actions are kept in memory for reconnect replay (§7.1). Default 1000. */
   replayLimit?: number;
   /** How many `rng` values an action needs. No registered action uses randomness yet. */
@@ -231,6 +233,14 @@ export function createEngine(options: EngineOptions): Engine {
       history.push(entry);
       if (history.length > replayLimit) history.shift();
       broadcast(entry, conn, extra.clientRef);
+      if (options.onApplied) {
+        try {
+          await options.onApplied(state, seq);
+        } catch (error) {
+          // The action is already logged and committed; a failed checkpoint must not reject it.
+          onError(error);
+        }
+      }
       return { ok: true, seq: entry.seq };
     } catch (error) {
       onError(error);

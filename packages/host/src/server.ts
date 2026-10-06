@@ -20,6 +20,7 @@ import {
   type Gateway,
 } from './gateway/index.js';
 import { LocalCampaignStore } from './storage/index.js';
+import { recoverCampaign, saveCampaignCheckpoint } from './engine/recovery.js';
 
 export interface RunningHost {
   readonly gateway: Gateway;
@@ -58,17 +59,34 @@ export async function startHost(
 
   let engine: Engine;
   try {
-    const campaign = await loadOrCreateCampaign(store, {
+    const savedFiles = await loadOrCreateCampaign(store, {
       clock,
       random,
       ...(config.campaignId !== undefined ? { campaignId: config.campaignId } : {}),
     });
+    const { campaign, seq } = await recoverCampaign(store, savedFiles);
+    const startedAt = clock();
+    const sessionId = ulid(startedAt, random);
+    await store.startSession(
+      campaign.id,
+      {
+        schemaVersion: campaign.schemaVersion,
+        sessionId,
+        startedAt,
+      },
+      { seq, state: campaign },
+    );
     engine = createEngine({
       campaign,
-      sessionId: ulid(clock(), random),
+      sessionId,
       store,
       clock,
       random,
+      initialSeq: seq,
+      onApplied: async (state, appliedSeq) => {
+        if (appliedSeq % config.autosaveEvery === 0)
+          await saveCampaignCheckpoint(store, state, sessionId, appliedSeq, 'autosave');
+      },
     });
   } catch (error) {
     await closeStores();
@@ -116,6 +134,7 @@ export async function startHost(
       await gateway.close();
       // Let queued intents finish their log append before the store closes (flushes fsync).
       await engine.idle();
+      await saveCampaignCheckpoint(store, engine.state(), engine.sessionId, engine.seq(), 'end');
       await closeStores();
     },
   };
