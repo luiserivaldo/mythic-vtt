@@ -33,7 +33,7 @@ describe('createHttpUploader', () => {
     const denied = createHttpUploader('', () => Promise.resolve(json(401, { error: 'x' })));
     const err = await denied(new Blob([])).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(UploadError);
-    expect(uploadFailureMessage(err as UploadError)).toMatch(/not accepting uploads/);
+    expect(uploadFailureMessage(err as UploadError)).toMatch(/did not recognise/);
     const bad = createHttpUploader('', () => Promise.resolve(json(415, { error: 'x' })));
     const err2 = (await bad(new Blob([])).catch((e: unknown) => e)) as UploadError;
     expect(uploadFailureMessage(err2)).toMatch(/not a supported image/);
@@ -44,5 +44,37 @@ describe('createHttpUploader', () => {
     await expect(odd(new Blob([]))).rejects.toBeInstanceOf(UploadError);
     const down = createHttpUploader('', () => Promise.reject(new TypeError('offline')));
     await expect(down(new Blob([]))).rejects.toMatchObject({ status: null });
+  });
+
+  it('sends the identity credential in the Authorization header only', async () => {
+    let seen: { url: string; headers: Record<string, string> } | undefined;
+    const upload = createHttpUploader(
+      'http://host',
+      (url, init) => {
+        seen = {
+          url: typeof url === 'string' ? url : '',
+          headers: init?.headers as Record<string, string>,
+        };
+        return Promise.resolve(
+          json(201, { image: { hash, width: 2, height: 2 }, deduplicated: false }),
+        );
+      },
+      () => ({ identityId: 'ID1', identitySecret: 'abcd' }),
+    );
+    await upload(new Blob([new Uint8Array([1])]));
+    expect(seen?.headers['Authorization']).toBe('Mythic ID1.abcd');
+    expect(seen?.url).not.toContain('abcd');
+  });
+
+  it('omits Authorization without an identity and explains 403 and 429', async () => {
+    let headers: Record<string, string> = {};
+    const upload = createHttpUploader('', (_url, init) => {
+      headers = init?.headers as Record<string, string>;
+      return Promise.resolve(json(403, { error: 'forbidden' }));
+    });
+    const err = (await upload(new Blob([])).catch((e: unknown) => e)) as UploadError;
+    expect(headers).not.toHaveProperty('Authorization');
+    expect(uploadFailureMessage(err)).toMatch(/host and co-DMs/);
+    expect(uploadFailureMessage(new UploadError('x', 429))).toMatch(/Too many/);
   });
 });

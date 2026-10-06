@@ -4,6 +4,8 @@ import { StorageDataError, type AssetStore } from '../storage/index.js';
 import type { UploadAuthorizer } from './upload-authorization.js';
 
 const UPLOAD_CONTENT_TYPES = ['application/octet-stream', 'image/jpeg', 'image/png', 'image/webp'];
+// Generic on purpose: nothing here says whether an identity exists (D36).
+const DENIED = { 401: 'unauthorized', 403: 'forbidden', 429: 'too many requests' } as const;
 const SHA256 = /^[0-9a-f]{64}$/;
 
 export interface AssetRouteOptions {
@@ -22,8 +24,8 @@ export function registerAssetRoutes(app: FastifyInstance, options: AssetRouteOpt
   );
 
   app.post('/assets/images', async (request, reply) => {
-    const seat = await options.uploadAuthorizer.authorize(request);
-    if (!seat) return reply.code(401).send({ error: 'authenticated seat required' });
+    const decision = await options.uploadAuthorizer.authorize(request);
+    if (!decision.ok) return reply.code(decision.status).send({ error: DENIED[decision.status] });
     if (!Buffer.isBuffer(request.body) || request.body.byteLength === 0) {
       return reply.code(400).send({ error: 'image body required' });
     }

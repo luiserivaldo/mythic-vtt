@@ -7,13 +7,19 @@ import {
   uploadFailureMessage,
   type ImageUploader,
 } from '../assets/image-upload.js';
+import { loadOrCreateIdentity } from '../net/identity.js';
 import { solveCalibration, type CalibrationUnit } from '../tools/battlemap-calibration.js';
 import { calibrationStore } from '../tools/battlemap-store.js';
 import { newId } from './ids.js';
 import { fileLabel, mapCalibrateIntent, mapPlaceIntent, mapRows } from './map-panel.js';
 import { useSubmit } from './submit.js';
 
-const defaultUploader = createHttpUploader('');
+// loadOrCreateIdentity returns the identity main.tsx already created (same storage key).
+const defaultUploader = createHttpUploader('', undefined, () =>
+  loadOrCreateIdentity(localStorage, Date.now(), randomByte),
+);
+
+const randomByte = () => crypto.getRandomValues(new Uint8Array(1))[0] ?? 0;
 
 const CALIBRATION_ERRORS = {
   'identical-points': 'The two points are the same spot. Click two different points.',
