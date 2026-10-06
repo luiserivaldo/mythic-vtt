@@ -82,13 +82,13 @@ function TokenForm({
   uploader: ImageUploader;
   onError: (message: string | null) => void;
 }) {
-  const [name, setName] = useState(TOKEN_FORM_DEFAULTS.name);
+  const [name, setName] = useState<string>(TOKEN_FORM_DEFAULTS.name);
   const [size, setSize] = useState<TokenSizeName>(TOKEN_FORM_DEFAULTS.size);
   const [layer, setLayer] = useState<LayerId>(TOKEN_FORM_DEFAULTS.layer);
   const [labels, setLabels] = useState<LabelVisibility>(TOKEN_FORM_DEFAULTS.labelVisibility);
-  const [owner, setOwner] = useState(TOKEN_FORM_DEFAULTS.ownerId);
+  const [owner, setOwner] = useState<string>(TOKEN_FORM_DEFAULTS.ownerId);
   const [file, setFile] = useState<File | null>(null);
-  const [color, setColor] = useState(TOKEN_FORM_DEFAULTS.color);
+  const [color, setColor] = useState<string>(TOKEN_FORM_DEFAULTS.color);
   const [busy, setBusy] = useState(false);
   const imageInputId = useId();
   const nameInputRef = useRef<HTMLInputElement>(null);
