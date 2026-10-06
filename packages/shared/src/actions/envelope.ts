@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Id } from '../schema/index.js';
 
-// TECHNICAL.md §4.1 (contract).
+// Action envelope contract.
 export const Actor = z.object({
   kind: z.enum(['host', 'seat', 'mod']),
   seatId: Id.optional(),

@@ -2,7 +2,7 @@ import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-// TECHNICAL.md §18: identity secrets are stored hashed. The secrets are 32 random bytes, so the
+// Identity secrets are stored hashed. The secrets are 32 random bytes, so the
 // KDF is about defence in depth if the store leaks, not about stretching a weak password.
 const KEY_LENGTH = 32;
 
@@ -33,7 +33,7 @@ export async function verifySecret(secret: string, stored: string): Promise<bool
 }
 
 /**
- * Host authority secret (TECHNICAL.md §7.2): created on first run and stored locally on the host,
+ * Host authority secret: created on first run and stored locally on the host,
  * never in the repo. Returns the secret and whether this call created it.
  */
 export async function loadOrCreateHostSecret(

@@ -49,7 +49,7 @@ export interface ConnectionOptions {
   pongTimeoutMs?: number | undefined;
 }
 
-/** WebSocket with hello handshake, heartbeat and exponential-backoff reconnect (TECHNICAL.md §7.1). */
+/** WebSocket with hello handshake, heartbeat and exponential-backoff reconnect. */
 export function createConnection(options: ConnectionOptions) {
   const backoff = options.backoff ?? DEFAULT_BACKOFF;
   const random = options.random ?? Math.random;

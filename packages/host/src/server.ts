@@ -51,7 +51,7 @@ export interface StartHostOptions {
 
 /**
  * Game host: gateway + engine room for one campaign, persisted in `config.dataDir` (§8.2).
- * The host secret is created on first run (TECHNICAL.md §7.2) and is never logged.
+ * The host secret is created on first run and is never logged.
  */
 export async function startHost(
   config: HostConfig,

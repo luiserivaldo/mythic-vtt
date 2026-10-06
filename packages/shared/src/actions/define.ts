@@ -33,7 +33,7 @@ export function isHost(actor: Actor): boolean {
 /**
  * The seat an actor sits in. A "seat" actor whose seatId is missing or unknown is a spectator
  * or stale connection: it resolves to undefined and must be denied (spectators are connections,
- * not seats; TECHNICAL.md §5).
+ * not seats).
  */
 export function seatOf(state: Campaign, actor: Actor): Seat | undefined {
   if (actor.kind !== 'seat' || actor.seatId === undefined) return undefined;

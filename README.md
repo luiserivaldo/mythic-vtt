@@ -6,11 +6,11 @@ Mythic VTT is a lightweight, open-source, browser-based virtual tabletop for TTR
 
 Built by **MythicTomes**. Self-hosting is free and fully featured; optional hosted services (Mythic Cloud) fund development.
 
-> **Status:** pre-alpha. Most of the first release is built (50 of 58 MVP tasks): shared 2D table, 2D/3D toggle, elevation, platforms and AoE rendering. The AoE affected-token highlight and the 3D ruler are still to come, and little has been tried by hand yet. Expect rough edges and breaking save-format changes. See [docs/HANDOFF.md](docs/HANDOFF.md) for the exact state.
+> **Status:** pre-alpha. The core table works, but it has had little real-world play so far. Expect rough edges and breaking changes to saved campaigns. A playable alpha release is the next milestone.
 
 ---
 
-## Features (first release)
+## Features
 
 - **Join by link.** Players enter a name and sit down. No accounts, no installs.
 - **Seats and permissions.** One DM and up to 10 players, with per-token control over who can move what.
@@ -21,61 +21,46 @@ Built by **MythicTomes**. Self-hosting is free and fully featured; optional host
 - **2D ↔ 3D in one click.** Elevation, platforms, primitive shapes, drop lines and a clamped camera. Everything works in 2D too; 3D only adds information.
 - **Area templates.** Sphere, cylinder, cone, cube and line.
 
-## Hosting a game
+## Running a game
 
-Mythic VTT runs as a small server on your own machine. You start it, share the link, and your players join from their browsers.
-
-```sh
-pnpm install && pnpm build      # once
-node packages/host/dist/main.js --lan   # or: mythic-host --lan
-```
-
-The command serves the built client and the game host on one port (default 8787) and prints the address players open and your single-use DM link (`#host=...`). By default it only listens on this machine (`127.0.0.1`); `--lan` listens on your network so players on the same Wi-Fi can join.
-
-Re-run `pnpm build` after pulling or changing source before starting the built host. For local development, `pnpm dev:table` rebuilds the host and its workspace dependencies automatically before it starts.
-
-### Local play (same Wi-Fi)
+Mythic VTT runs as a small server on your own computer. You start it, share the link, and your players join from their browsers. You need [Node.js](https://nodejs.org/) 22 or newer and [pnpm](https://pnpm.io/).
 
 ```sh
-mythic-host --lan
+pnpm install && pnpm build                 # once, and again after updating
+node packages/host/dist/main.js --lan      # start the table
 ```
 
-Prints: `http://192.168.1.5:8787` (your local IP). Players on the same network open this address.
+The command prints two things:
 
-### Internet play (anywhere)
+- the **address players open** in their browser, and
+- your **DM link** (it contains `#host=…`). Open it once; that browser becomes the host. Restart the server for a fresh link.
 
-See **[Internet Play Guide](docs/internet-play.md)** for tunnels (recommended), port forwarding, and VPS options.
+By default the server only listens on the computer it runs on. `--lan` lets players on the same Wi-Fi join, using the address it prints, for example `http://192.168.1.5:8787`.
+
+### Playing over the internet
+
+See the **[Internet Play Guide](docs/internet-play.md)** for tunnels (recommended), port forwarding and VPS options. This is a pre-alpha build, so avoid leaving it exposed to the internet longer than a session.
+
+### Your campaign data
+
+Campaigns are saved automatically in the data directory (set with `--data-dir`). The server checkpoints regularly and on a clean shutdown, and replays its action log after a crash. Log writes are synced to disk every 500 ms, so a sudden power loss can lose up to half a second of recent actions. Stop the server normally when you can, and keep backups of the data directory.
 
 ### Configuration
 
 | Setting                     | Flag         | Env var                   | Config file key |
 | --------------------------- | ------------ | ------------------------- | --------------- |
-| Port                        | `--port`     | `MYTHIC_PORT`             | `port`          |
+| Port (default 8787)         | `--port`     | `MYTHIC_PORT`             | `port`          |
 | Bind address                | `--host`     | `MYTHIC_HOST`             | `host`          |
 | Listen on LAN               | `--lan`      | `MYTHIC_LAN=1`            | `lan`           |
 | Data directory              | `--data-dir` | `MYTHIC_DATA_DIR`         | n/a             |
 | Autosave interval (actions) | n/a          | `MYTHIC_AUTOSAVE_ACTIONS` | n/a             |
 | Public URL for the DM link  | n/a          | `MYTHIC_PUBLIC_URL`       | `publicUrl`     |
 
-Precedence is flags, then environment, then the config file, then defaults. The config file is `mythic.config.json` in the data directory, or the path given to `--config`.
+Precedence is flags, then environment variables, then the config file, then defaults. The config file is `mythic.config.json` in the data directory, or the path given to `--config`.
 
-The host writes an atomic campaign and scene checkpoint every 200 actions by default (set `MYTHIC_AUTOSAVE_ACTIONS` to a positive integer) and on a clean session end. On restart it replays complete log entries after the last checkpoint. Log writes are synced to disk in batches every 500 ms, so a sudden power loss may lose up to 500 ms of recent actions; a clean stop flushes the log.
+## Feedback and contributing
 
-## Trying the current build
-
-This is a development build. Run it from a separate checkout pinned to a commit, with a throwaway data directory, so ongoing changes and test saves do not mix:
-
-```sh
-git worktree add ../mythic-vtt-test <commit>
-cd ../mythic-vtt-test && pnpm install --frozen-lockfile && pnpm build
-node packages/host/dist/main.js --data-dir ~/mythic-test-data
-```
-
-Open the printed DM link (it works once and makes that browser the host; restart the host for a fresh link). Players open the plain address and join with a name and a seat. What works and what does not is listed in [docs/HANDOFF.md](docs/HANDOFF.md). Do not expose a development build to the internet.
-
-## Contributing
-
-Contributions are welcome once the project's contributor terms are finalised. Watch this repository for an announcement. In the meantime, feel free to open an issue with feedback or ideas.
+Found a bug or have an idea? Please open an issue. If you want to help build Mythic VTT, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 

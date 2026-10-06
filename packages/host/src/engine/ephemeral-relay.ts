@@ -19,7 +19,7 @@ export interface EphemeralRelayOptions {
   readonly activeRate?: Partial<TokenBucketConfig>;
   /** Per-connection rate for unseated/spectator senders. */
   readonly spectatorRate?: Partial<TokenBucketConfig>;
-  /** Shared spectator audience fan-out rate (TECHNICAL.md §4.3/§7.4). */
+  /** Shared spectator audience fan-out rate. */
   readonly spectatorDeliveryRate?: Partial<TokenBucketConfig>;
 }
 

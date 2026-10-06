@@ -1,6 +1,6 @@
 export interface StoredIdentity {
   identityId: string;
-  /** `scrypt$salt$hash`; the raw secret is never stored (TECHNICAL.md §18). */
+  /** `scrypt$salt$hash`; the raw secret is never stored. */
   secretHash: string;
   displayName: string;
   avatar?: string;

@@ -15,7 +15,7 @@ import {
 import { footprintCells } from '../render/token-footprint.js';
 
 // ENV-03 (2D). Pure maths for the transform gizmo: hit-testing, snapping, rotation, typed values.
-// Positions are grid cells on the XZ plane (TECHNICAL.md §6.2); yaw is radians about +Y, the same
+// Positions are grid cells on the XZ plane; yaw is radians about +Y, the same
 // sense as three.js and `yawFromQuaternion`.
 
 export interface Xz {

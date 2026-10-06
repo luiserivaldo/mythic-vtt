@@ -13,7 +13,7 @@ export default defineConfig(
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
     rules: {
-      // AGENTS.md §6: named exports only, no `any`, no unexplained non-null assertions.
+      // Project convention: named exports only, no `any`, no unexplained non-null assertions.
       'no-restricted-exports': ['error', { restrictDefaultExports: { direct: true } }],
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
@@ -25,15 +25,15 @@ export default defineConfig(
     rules: { 'no-restricted-exports': 'off' },
   },
   {
-    // AGENTS.md §2.2: shared is pure.
+    // shared is pure.
     files: ['packages/shared/src/**/*.ts'],
     ignores: ['**/*.test.ts'],
     rules: {
       'no-restricted-globals': ['error', 'window', 'document', 'process', 'Buffer', 'fetch'],
       'no-restricted-properties': [
         'error',
-        { object: 'Math', property: 'random', message: 'shared must be pure (AGENTS.md §2.2)' },
-        { object: 'Date', property: 'now', message: 'shared must be pure (AGENTS.md §2.2)' },
+        { object: 'Math', property: 'random', message: 'shared must be pure' },
+        { object: 'Date', property: 'now', message: 'shared must be pure' },
       ],
     },
   },

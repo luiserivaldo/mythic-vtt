@@ -1,4 +1,4 @@
-// HIST-03 / TECHNICAL §8.4: portable zip of one campaign plus the assets it references.
+// HIST-03: portable zip of one campaign plus the assets it references.
 // Layout inside the zip (all paths are relative, forward-slash, whitelisted on import):
 //   manifest.json  campaign.json  scenes/<id>.json
 //   sessions/<id>/log.jsonl  sessions/<id>/snapshots/<label>.json

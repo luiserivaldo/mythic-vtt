@@ -18,7 +18,7 @@ export type AoECell = Vec3;
 
 export interface AoEToken {
   id: string;
-  position: Vec3; // centre of footprint at base, TECHNICAL.md §6.2
+  position: Vec3; // centre of footprint at base
   sizeCells: number;
   heightCells: number;
 }

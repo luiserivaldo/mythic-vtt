@@ -11,7 +11,7 @@ import {
 import { footprintCells } from './token-footprint.js';
 import type { Volume } from './aoe-geometry.js';
 
-// TECHNICAL.md §6.4: these slots also reserve space for later prop overlays and UI.
+// These slots also reserve space for later prop overlays and UI.
 export const RENDER_LAYERS = [
   'map',
   'props-under',

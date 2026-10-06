@@ -1,6 +1,6 @@
 import type { Entity } from '../schema/index.js';
 
-// ENV-02. Pure builders for primitive shapes. Convention (TECHNICAL.md §6.2): Y-up, 1 unit = 1 cell,
+// ENV-02. Pure builders for primitive shapes. Convention: Y-up, 1 unit = 1 cell,
 // the entity position is the footprint centre at the base, `transform.scale` is the bounding size
 // (x = width, y = height, z = depth) in cells, and rotation is a yaw about Y.
 

@@ -1,6 +1,6 @@
 import { CURRENT_SCHEMA_VERSION } from '../schema/index.js';
 
-/** Root file kinds that carry a `schemaVersion` on disk (TECHNICAL.md §8.3). */
+/** Root file kinds that carry a `schemaVersion` on disk. */
 export type SaveKind = 'campaign' | 'scene' | 'snapshot';
 
 /**

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Ulid, WirePatch } from './common.js';
 import { PROTOCOL_VERSION } from './version.js';
 
-// TECHNICAL.md §7.1: one WebSocket per client, JSON messages, discriminated by `t`.
+// One WebSocket per client, JSON messages, discriminated by `t`.
 
 // ---------- client -> host ----------
 

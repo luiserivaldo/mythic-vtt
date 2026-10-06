@@ -4,7 +4,7 @@ import { Id, LayerId } from './ids.js';
 import { EntityPermissions } from './permissions.js';
 import { Transform } from './math.js';
 
-// Components over inheritance (TECHNICAL.md §5): an entity is defined by which components it has.
+// Components over inheritance: an entity is defined by which components it has.
 // MVP components only; later ones (trigger, wall, light, anim, fx, modData) are added as optional fields.
 // D38: optional additive placeholder colour for tokens without an image (no schemaVersion bump).
 export const TokenColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);

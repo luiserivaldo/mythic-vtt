@@ -81,7 +81,7 @@ export const ACTORS = {
 export type ActorName = keyof typeof ACTORS;
 
 /**
- * Permission-matrix helper (TECHNICAL.md §4.4): who may perform `type` with `payload`?
+ * Permission-matrix helper: who may perform `type` with `payload`?
  * Returns the full matrix so tests assert every actor explicitly.
  */
 export function permissionMatrix(

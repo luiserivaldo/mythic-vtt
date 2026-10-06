@@ -1,11 +1,11 @@
 /**
- * Pure 3D orbit camera maths (CAM-02, TECHNICAL.md §6.3). No DOM or Three.js.
+ * Pure 3D orbit camera maths (CAM-02). No DOM or Three.js.
  *
  * Y-up world (§6.2): grid X -> world X, grid Y -> world Z, elevation -> world Y.
  * The camera is stored as spherical coordinates around a focus point, which makes
  * roll impossible by construction: the up vector is always world +Y and the only
  * degrees of freedom are azimuth, polar (tilt from vertical), distance and target.
- * Using lookAt(target) with up=+Y therefore never flips (Unity prototype lesson, DESIGN §6).
+ * Using lookAt(target) with up=+Y therefore never flips (Unity prototype lesson).
  */
 
 export interface Orbit3D {

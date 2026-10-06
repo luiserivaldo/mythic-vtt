@@ -119,7 +119,7 @@ function Footprint2D({
   );
 }
 
-/** Lit only in 3D mode (TECHNICAL.md §6.1). */
+/** Lit only in 3D mode. */
 export function PrimitiveLights() {
   return (
     <>

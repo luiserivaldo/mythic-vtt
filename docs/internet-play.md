@@ -347,5 +347,4 @@ A: Yes, Mythic Cloud (optional). But self-hosting is free and fully featured.
 ## Next steps
 
 - Check the [README](../README.md) for local LAN testing (`pnpm dev:table`).
-- Review [DESIGN.md](../DESIGN.md) section 8 for the self-hosting philosophy.
 - Report issues or ask questions on the [GitHub repo](https://github.com/MythicTomes/mythic-vtt).

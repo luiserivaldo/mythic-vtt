@@ -12,7 +12,7 @@ export type CheckResult =
   | { ok: true; action: AnyAction; payload: unknown }
   | { ok: false; reason: RejectReason; detail?: string };
 
-/** Pipeline steps 2-3 (TECHNICAL.md §4.2): schema, then permission. Mods need `modExposed`. */
+/** Pipeline steps 2-3: schema, then permission. Mods need `modExposed`. */
 export function checkIntent(
   state: Campaign,
   actor: Actor,

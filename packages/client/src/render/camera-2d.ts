@@ -2,7 +2,7 @@
  * Pure 2D camera maths (CAM-01). No DOM or Three.js here so it is unit-testable.
  *
  * The 2D camera looks straight down with screen-right = +X and screen-down = +Z
- * (TECHNICAL.md §6.2: grid X -> world X, grid Y -> world Z, 1 unit = 1 cell).
+ * (grid X -> world X, grid Y -> world Z, 1 unit = 1 cell).
  * `zoom` is pixels per grid cell, which equals the orthographic camera's zoom.
  */
 

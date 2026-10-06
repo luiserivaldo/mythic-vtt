@@ -10,7 +10,7 @@ export type Submit = (type: string, payload: unknown, sceneId?: string) => Promi
 
 /**
  * Commit a transform as ONE `entity.update` intent (release or Enter). Nothing is applied
- * optimistically (TECHNICAL.md §4.2): on reject the preview is dropped so the entity shows the
+ * optimistically: on reject the preview is dropped so the entity shows the
  * host's state again (D34: server order wins).
  */
 export async function commitTransform(args: {

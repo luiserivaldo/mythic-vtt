@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // PERM-02: view / move / edit / delete, per seat and per entity.
-// Shape is a lane decision (D19): TECHNICAL.md §5 names the types but does not define them.
+// Shape is chosen here: the design names these types but does not define them.
 export const PermissionSet = z.object({
   view: z.boolean(),
   move: z.boolean(),

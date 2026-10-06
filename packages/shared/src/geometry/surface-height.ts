@@ -6,13 +6,13 @@ import {
   type PrimitiveKind,
 } from './primitives.js';
 
-// ENV-04. Where a token stands. Pure: no DOM, clocks or randomness (AGENTS.md rule 2).
+// ENV-04. Where a token stands. Pure: no DOM, clocks or randomness.
 //
 // Height profiles, measured above the entity's base elevation (position.y). With (u, v) the point in
 // the primitive's local frame (yaw undone, origin at the footprint centre), hx/hz the half extents
 // and h the top height:
 //   box, plane, cylinder  flat top: h inside the footprint (cylinder: the ellipse).
-//   wedge                 linear ramp: h * (v + hz) / depth, rising toward +z (TECHNICAL.md §6.2).
+//   wedge                 linear ramp: h * (v + hz) / depth, rising toward +z.
 //   cone                  h * (1 - r), r = sqrt((u/hx)^2 + (v/hz)^2).
 //   pyramid               h * (1 - max(|u|/hx, |v|/hz)).
 //   sphere                upper half of an ellipsoid sitting on its base: h * (1 + sqrt(1 - r^2)) / 2,

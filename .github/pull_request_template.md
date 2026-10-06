@@ -1,27 +1,19 @@
-## Task
-
-<!-- e.g. M1-18 — token drag & snap. Title format: feat(M1-18): … -->
-
-Task:
-Requirements: <!-- e.g. TOK-02 -->
-
 ## What changed
 
-<!-- Short summary. Mention any files touched outside your lane. -->
+<!-- Short summary, and the issue this addresses (e.g. Fixes #123). -->
+
+## Why
+
+<!-- The problem or user need. -->
 
 ## Contract changes
 
 - [ ] None
-- [ ] Yes — followed `schema-change` skill (schemaVersion/migration/fixture/decision row)
+- [ ] Yes: schema, protocol, save format or action envelope changed (version bumped, migration and golden fixture added)
 
-## Checklist (AGENTS.md §7)
+## Checklist (see CONTRIBUTING.md)
 
-- [ ] "Done when" criteria from TASKS.md met
-- [ ] `pnpm check` passes; e2e added/updated if the task lists one
-- [ ] No hidden-information leak (if state or messages touched)
+- [ ] `pnpm check` passes; e2e added or updated where sync, permissions or rendering changed
+- [ ] No hidden-information leak (if state or messages were touched)
 - [ ] Works in 2D (and 3D if applicable)
 - [ ] Docs updated if behaviour, a contract or a command changed
-
-## Unblocks
-
-<!-- Tasks that become Ready when this merges -->

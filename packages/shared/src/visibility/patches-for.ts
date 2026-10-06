@@ -19,7 +19,7 @@ function prefixed(path: Patch['path'], patches: Patch[]): Patch[] {
 }
 
 /**
- * Per-audience patches for one reduced action (pipeline steps 7-8, TECHNICAL.md §4.2).
+ * Per-audience patches for one reduced action (pipeline steps 7-8).
  *
  * G1 (D21): entity-scoped raw patches are translated per touched entity (cost proportional to the
  * patch, ~0.04 ms vs ~16 ms for full diffing at 2000 entities x 11 audiences); anything else

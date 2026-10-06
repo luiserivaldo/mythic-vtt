@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Coordinates follow TECHNICAL.md §6.2: Y-up, 1 world unit = 1 grid cell.
+// Coordinates: Y-up, 1 world unit = 1 grid cell.
 // Objects (not tuples) keep patches readable: `/position/y` is elevation.
 export const Vec3 = z.object({
   x: z.number(),

@@ -10,7 +10,7 @@ import { billboardYaw, standeeDimensions, labelAnchor3d } from './token-standee.
 const SELECTED = '#ffe066';
 
 /**
- * M2-06 / TOK-03: a 3D token. Base disc at `position` (feet, y = elevation, TECHNICAL §6.2) plus an
+ * M2-06 / TOK-03: a 3D token. Base disc at `position` (feet, y = elevation) plus an
  * upright image quad that rotates about Y only to face the camera, so it never flips or mirrors
  * (CAM-04). Both meshes are named with the entity id so picking resolves either one. Works for
  * tokens without an image: the quad uses the flat placeholder colour.

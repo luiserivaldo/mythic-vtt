@@ -22,7 +22,7 @@ import { sessionJoin } from './session.join.js';
 import { tokenMove } from './token.move.js';
 import { tokenSetElevation } from './token.setElevation.js';
 
-/** Append-only (AGENTS.md §6): add new actions at the end to keep merges painless. */
+/** Append-only: add new actions at the end to keep merges painless. */
 export const allActions: readonly AnyAction[] = [
   sceneRename,
   sceneCreate,
