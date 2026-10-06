@@ -1,0 +1,54 @@
+.ui-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  max-width: 28rem;
+}
+.ui-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.ui-panel {
+  border: 1px solid #556;
+  border-radius: 4px;
+  padding: 0.5rem;
+}
+.ui-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ui-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ui-badge {
+  font-size: 0.8em;
+  padding: 0 0.4em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ui-shell button {
+  min-height: 2rem;
+}
+.ui-shell button:focus-visible,
+.ui-shell input:focus-visible,
+.ui-shell select:focus-visible {
+  outline: 2px solid #f0ae55;
+  outline-offset: 2px;
+}
