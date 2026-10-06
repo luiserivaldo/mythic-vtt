@@ -105,3 +105,40 @@ describe('grid coordinates', () => {
     expect(gridToWorld(1, 2)).toEqual([1, 0, 2]);
   });
 });
+
+describe('primitive shapes (ENV-02)', () => {
+  const shaped = (kind: 'box' | 'plane' | 'wedge', scale: { x: number; y: number; z: number }) =>
+    Entity.parse({
+      id: tid(20),
+      layer: 'props',
+      name: 'Platform',
+      owners: [],
+      transform: {
+        position: { x: 3, y: 1, z: 4 },
+        rotation: { x: 0, y: Math.sin(Math.PI / 4), z: 0, w: Math.cos(Math.PI / 4) },
+        scale,
+      },
+      shape: { kind, color: '#aa5522', walkable: true },
+    });
+  const map = (entity: Entity) =>
+    mapScene({ ...scene, entities: { [entity.id]: entity } }).entities[0];
+
+  it('maps shape data, size, yaw and base position', () => {
+    const rendered = map(shaped('box', { x: 2, y: 3, z: 4 }));
+    expect(rendered?.position).toEqual([3, 1, 4]);
+    expect(rendered?.shape).toMatchObject({
+      kind: 'box',
+      color: '#aa5522',
+      walkable: true,
+      width: 2,
+      height: 3,
+      depth: 4,
+    });
+    expect(rendered?.shape?.yaw).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('gives planes a fixed thickness and omits shape for non-shapes', () => {
+    expect(map(shaped('plane', { x: 5, y: 9, z: 5 }))?.shape?.height).toBeLessThan(0.1);
+    expect(map(entity(30, 'props'))?.shape).toBeUndefined();
+  });
+});

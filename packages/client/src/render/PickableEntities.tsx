@@ -6,6 +6,7 @@ import { useClientStore } from '../store/react.js';
 import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { PrimitiveLights, PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
 
 const COLORS = {
@@ -33,10 +34,13 @@ export function PickableEntities({
   rendered,
   scene,
   additiveMode,
+  mode = '2d',
 }: {
   rendered: RenderScene | null;
   scene: Scene | null;
   additiveMode: boolean;
+  /** 3D is only reachable explicitly until the 2D/3D toggle exists (M2-05). */
+  mode?: RenderMode;
 }) {
   const seatId = useClientStore((state) => state.seatId);
   const seats = useClientStore((state) => state.campaign?.seats ?? NO_SEATS);
@@ -58,38 +62,55 @@ export function PickableEntities({
       .pick(scene.id, id, additiveMode || event.shiftKey || event.ctrlKey || event.metaKey);
   }
 
-  return RENDER_LAYERS.map((layer, order) => (
-    <group key={layer} name={layer}>
-      {rendered?.entities
-        .filter((entity) => entity.layer === layer)
-        .map((entity: RenderEntity) => (
-          <mesh
-            key={entity.id}
-            name={entity.id}
-            position={[...entity.position]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            renderOrder={order}
-            onClick={onClick}
-          >
-            <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
-            <TokenMaterial
-              entity={entity}
-              color={
-                entity.token?.image
-                  ? COLORS.tokens
-                  : selected.includes(entity.id)
-                    ? '#ffe066'
-                    : entity.secret
-                      ? '#a577ce'
-                      : COLORS[entity.layer]
-              }
-            />
-            {entity.token?.image && selected.includes(entity.id) && (
-              <SelectionRing size={entity.sizeCells} />
+  return (
+    <>
+      {mode === '3d' && <PrimitiveLights />}
+      {RENDER_LAYERS.map((layer, order) => (
+        <group key={layer} name={layer}>
+          {rendered?.entities
+            .filter((entity) => entity.layer === layer)
+            .map((entity: RenderEntity) =>
+              entity.shape ? (
+                <PrimitiveMesh
+                  key={entity.id}
+                  entity={entity}
+                  shape={entity.shape}
+                  mode={mode}
+                  selected={selected.includes(entity.id)}
+                  renderOrder={order}
+                  onClick={onClick}
+                />
+              ) : (
+                <mesh
+                  key={entity.id}
+                  name={entity.id}
+                  position={[...entity.position]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  renderOrder={order}
+                  onClick={onClick}
+                >
+                  <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
+                  <TokenMaterial
+                    entity={entity}
+                    color={
+                      entity.token?.image
+                        ? COLORS.tokens
+                        : selected.includes(entity.id)
+                          ? '#ffe066'
+                          : entity.secret
+                            ? '#a577ce'
+                            : COLORS[entity.layer]
+                    }
+                  />
+                  {entity.token?.image && selected.includes(entity.id) && (
+                    <SelectionRing size={entity.sizeCells} />
+                  )}
+                  <TokenLabel entity={entity} actor={actor} />
+                </mesh>
+              ),
             )}
-            <TokenLabel entity={entity} actor={actor} />
-          </mesh>
-        ))}
-    </group>
-  ));
+        </group>
+      ))}
+    </>
+  );
 }
