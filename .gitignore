@@ -1,0 +1,39 @@
+# Agentic tooling, instructions and planning docs (kept local)
+.claude/
+AGENTS.md
+CLAUDE.md
+DESIGN.md
+TECHNICAL.md
+TASKS.md
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+.turbo/
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+
+# Local data and environment
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-journal
+data/
+
+# Logs
+*.log
+pnpm-debug.log*
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
