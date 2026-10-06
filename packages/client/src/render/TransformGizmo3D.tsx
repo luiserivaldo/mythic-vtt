@@ -137,8 +137,8 @@ export function TransformGizmo3D() {
       raycaster.setFromCamera(ndc, getState().camera);
       const { origin, direction } = raycaster.ray;
       return {
-        origin: { x: origin.x, y: origin.y, z: origin.z } as Vec3Like,
-        direction: { x: direction.x, y: direction.y, z: direction.z } as Vec3Like,
+        origin: { x: origin.x, y: origin.y, z: origin.z },
+        direction: { x: direction.x, y: direction.y, z: direction.z },
       };
     };
     const centerOf = (d: GizmoDraft): Vec3Like => ({ x: d.x, y: d.y ?? 0, z: d.z });
@@ -173,7 +173,10 @@ export function TransformGizmo3D() {
       camera.updateMatrixWorld();
       const handles = handleAnchors(c, reach, ks).map((h) => {
         const p = new Vector3(h.position.x, h.position.y, h.position.z).project(camera);
-        return { kind: h.kind, px: { x: ((p.x + 1) / 2) * r.width, y: ((1 - p.y) / 2) * r.height } };
+        return {
+          kind: h.kind,
+          px: { x: ((p.x + 1) / 2) * r.width, y: ((1 - p.y) / 2) * r.height },
+        };
       });
       const kind = hitScreenHandle(
         { x: e.clientX - r.left, y: e.clientY - r.top },
@@ -212,7 +215,7 @@ export function TransformGizmo3D() {
       if (!now) return;
       const start = drag.startDraft;
       const snap = t.scene.grid.snap && !e.shiftKey;
-      let next: GizmoDraft = start;
+      let next: GizmoDraft;
       if (drag.kind === 'move-y') {
         next = { ...start, y: snapLinear((start.y ?? 0) + now.t - drag.startT, snap) };
       } else if (drag.kind === 'move-xz') {

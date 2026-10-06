@@ -52,8 +52,7 @@ test('selecting a prop in 3D mounts the gizmo without errors and a typed value c
   await reader.waitFor('snapshot', () => reader.state !== undefined);
   const elevation = () => {
     const s = reader.state as Snapshot;
-    return Object.values(Object.values(s.scenes)[0]?.entities ?? {}).find(() => true)?.transform
-      .position.y;
+    return Object.values(Object.values(s.scenes)[0]?.entities ?? {})[0]?.transform.position.y;
   };
 
   const y = panel.getByLabel(/^Y /);

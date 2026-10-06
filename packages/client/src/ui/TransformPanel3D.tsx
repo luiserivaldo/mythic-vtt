@@ -42,7 +42,8 @@ function Fields({ entity, scene }: { entity: Entity; scene: Scene }) {
   const headingId = useId();
   const { unitsPerCell } = scene.grid;
 
-  const draft = preview && preview.entityId === entity.id ? preview.draft : draft3dFromEntity(entity);
+  const draft =
+    preview && preview.entityId === entity.id ? preview.draft : draft3dFromEntity(entity);
   const shown: Typed3D = typed ?? {
     ...formatTyped(draft, unitsPerCell),
     y: formatUnits(draft.y ?? entity.transform.position.y, unitsPerCell),

@@ -21,7 +21,12 @@ const S = tid(31);
 const E = tid(32);
 const P = tid(33);
 const grid: Grid = {
-  type: 'square', sizePx: 70, unitsPerCell: 5, unitLabel: 'ft', diagonal: 'chebyshev', snap: true,
+  type: 'square',
+  sizePx: 70,
+  unitsPerCell: 5,
+  unitLabel: 'ft',
+  diagonal: 'chebyshev',
+  snap: true,
 };
 const entity = (over: Partial<Entity> = {}): Entity => ({
   id: E,
@@ -92,7 +97,10 @@ describe('3D snapping and rotation', () => {
     const q = rotateDraft({ x: 0, y: 0, z: 0, w: 1 }, 'x', (22 * Math.PI) / 180, true);
     expect(q.x).toBeCloseTo(Math.sin(Math.PI / 24));
     expect(q.w).toBeCloseTo(Math.cos(Math.PI / 24));
-    const combined = multiplyQuaternions(q, quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, Math.PI / 2));
+    const combined = multiplyQuaternions(
+      q,
+      quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, Math.PI / 2),
+    );
     expect(Math.hypot(combined.x, combined.y, combined.z, combined.w)).toBeCloseTo(1);
   });
 });
@@ -103,17 +111,38 @@ describe('resolveGizmo3DTarget', () => {
     activeSceneId: S,
     seats: {
       [P]: {
-        id: P, label: 'Player', role: 'player', identityId: null, binding: 'persistent',
+        id: P,
+        label: 'Player',
+        role: 'player',
+        identityId: null,
+        binding: 'persistent',
         permissions: { view: true, move: true, edit: false, delete: false },
       },
     },
     scenes: {
       [S]: {
-        id: S, name: 'Ruins', grid, environment: { background: '#000000' }, layers: {},
+        id: S,
+        name: 'Ruins',
+        grid,
+        environment: { background: '#000000' },
+        layers: {},
         entities: {
           [E]: entity(),
-          [tid(34)]: entity({ id: tid(34), layer: 'tokens', shape: undefined, owners: [P], token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' } }),
-          [tid(35)]: entity({ id: tid(35), shape: undefined, image: { asset: { source: 'local', kind: 'image', hash: 'a'.repeat(64) }, calibrated: false } }),
+          [tid(34)]: entity({
+            id: tid(34),
+            layer: 'tokens',
+            shape: undefined,
+            owners: [P],
+            token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+          }),
+          [tid(35)]: entity({
+            id: tid(35),
+            shape: undefined,
+            image: {
+              asset: { source: 'local', kind: 'image', hash: 'a'.repeat(64) },
+              calibrated: false,
+            },
+          }),
         },
       },
     },
@@ -121,7 +150,9 @@ describe('resolveGizmo3DTarget', () => {
 
   it('permits host props and owner token elevation, but not unrelated entities', () => {
     expect(resolveGizmo3DTarget(campaign, [E], { kind: 'host' })?.kind).toBe('prop');
-    expect(resolveGizmo3DTarget(campaign, [tid(34)], { kind: 'seat', seatId: P })?.kind).toBe('token');
+    expect(resolveGizmo3DTarget(campaign, [tid(34)], { kind: 'seat', seatId: P })?.kind).toBe(
+      'token',
+    );
     expect(resolveGizmo3DTarget(campaign, [E], { kind: 'seat', seatId: P })).toBeNull();
     expect(resolveGizmo3DTarget(campaign, [tid(35)], { kind: 'host' })).toBeNull();
   });

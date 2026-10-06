@@ -1,4 +1,10 @@
-import { canPerform, yawFromQuaternion, type Actor, type Campaign, type Entity } from '@mythic/shared';
+import {
+  canPerform,
+  yawFromQuaternion,
+  type Actor,
+  type Campaign,
+  type Entity,
+} from '@mythic/shared';
 import type { GizmoDraft, GizmoTarget } from './transform-gizmo.js';
 
 export interface Vec3Like {
@@ -30,7 +36,11 @@ const cross = (a: Vec3Like, b: Vec3Like): Vec3Like => ({
 });
 
 export function axisVector(axis: RotationAxis): Vec3Like {
-  return axis === 'x' ? { x: 1, y: 0, z: 0 } : axis === 'y' ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 };
+  return axis === 'x'
+    ? { x: 1, y: 0, z: 0 }
+    : axis === 'y'
+      ? { x: 0, y: 1, z: 0 }
+      : { x: 0, y: 0, z: 1 };
 }
 
 /** Closest point on an infinite axis to a pointer ray, expressed as distance along the axis. */
@@ -153,7 +163,11 @@ export const HANDLE_LENGTH_PX = 70;
 export const HANDLE_HIT_PX_3D = 14;
 
 /** World size of `px` screen pixels at `distance` from a perspective camera (constant-size handles). */
-export function worldPerPixelAt(distance: number, fovDegrees: number, viewportHeightPx: number): number {
+export function worldPerPixelAt(
+  distance: number,
+  fovDegrees: number,
+  viewportHeightPx: number,
+): number {
   if (viewportHeightPx <= 0) return 0;
   return (2 * Math.max(distance, 0) * Math.tan((fovDegrees * Math.PI) / 360)) / viewportHeightPx;
 }
@@ -199,7 +213,5 @@ export function hitScreenHandle(
 }
 
 export function handlesFor(kind: 'prop' | 'token'): readonly Gizmo3DHandle[] {
-  return kind === 'token'
-    ? ['move-y']
-    : ['move-xz', 'move-y', 'rotate-x', 'rotate-y', 'rotate-z'];
+  return kind === 'token' ? ['move-y'] : ['move-xz', 'move-y', 'rotate-x', 'rotate-y', 'rotate-z'];
 }
