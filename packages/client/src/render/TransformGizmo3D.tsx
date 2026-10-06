@@ -186,7 +186,7 @@ export function TransformGizmo3D() {
       if (!kind) return;
       const start = sample(kind, e, d);
       if (!start) return;
-      pointerClaims.claim(e.pointerId);
+      pointerClaims.claim(e.pointerId, '3D gizmo');
       swallowClick = true;
       e.stopPropagation();
       el.setPointerCapture(e.pointerId);

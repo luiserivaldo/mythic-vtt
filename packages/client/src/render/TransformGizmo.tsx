@@ -129,7 +129,7 @@ export function TransformGizmo() {
       const kind = hitHandle(point, layout, HANDLE_HIT_PX / zoom);
       if (!kind) return;
       // Claim before PanZoomControls sees the press, and keep the click away from picking.
-      pointerClaims.claim(e.pointerId);
+      pointerClaims.claim(e.pointerId, '2D gizmo');
       swallowClick = true;
       e.stopPropagation();
       el.setPointerCapture(e.pointerId);

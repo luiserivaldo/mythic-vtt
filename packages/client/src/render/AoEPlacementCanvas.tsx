@@ -78,7 +78,7 @@ export function AoEPlacementCanvas({ scene, mode }: { scene: Scene | null; mode:
       const p = point(event);
       if (!p || !inside(p.x, p.z, state.scene)) return;
       consumed = true;
-      pointerClaims.claim(event.pointerId);
+      pointerClaims.claim(event.pointerId, 'AoE placement');
       event.stopImmediatePropagation();
       el.setPointerCapture(event.pointerId);
       const origin = { ...state.draft, ...p };

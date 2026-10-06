@@ -19,7 +19,7 @@ import {
 } from '../tools/token-drag.js';
 import { tokenDragStore } from '../tools/token-drag-store.js';
 import { EphemeralContext } from '../ui/ephemeral-context.js';
-import { describeFailure, SubmitContext } from '../ui/submit.js';
+import { SubmitContext } from '../ui/submit.js';
 import { useViewMode } from './view-mode-store.js';
 import { pointerClaims } from './pointer-claims.js';
 import type { OrthographicCamera } from 'three';
@@ -167,7 +167,6 @@ export function TokenDrag() {
         .then((result) => {
           if (!result.ok) {
             // D34: server order wins; the token snaps back to what the host holds.
-            console.warn(describeFailure(result));
             tokenDragStore.getState().setLocal(null);
           }
         })
@@ -208,7 +207,7 @@ export function TokenDrag() {
         const cam = getState().camera as OrthographicCamera;
         if (pressOnGizmoHandle(entity, ground, cam.zoom)) return;
       }
-      pointerClaims.claim(e.pointerId);
+      pointerClaims.claim(e.pointerId, 'token drag');
       e.stopPropagation();
       el.setPointerCapture(e.pointerId);
       press = {

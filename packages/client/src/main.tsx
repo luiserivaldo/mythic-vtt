@@ -8,7 +8,7 @@ import { createClientStore } from './store/store.js';
 import { JoinContext } from './ui/join-context.js';
 import { loadProfile } from './ui/join-screen.js';
 import { createSession } from './ui/session.js';
-import { SubmitContext } from './ui/submit.js';
+import { SubmitProvider } from './ui/SubmitProvider.js';
 import { EphemeralContext } from './ui/ephemeral-context.js';
 import { createUiStore, UiStoreContext } from './ui/ui-store.js';
 
@@ -68,7 +68,7 @@ createRoot(rootEl).render(
   <StrictMode>
     <ClientStoreContext.Provider value={store}>
       <UiStoreContext.Provider value={uiStore}>
-        <SubmitContext.Provider value={session.submitIntent}>
+        <SubmitProvider submit={session.submitIntent}>
           <EphemeralContext.Provider
             value={{ send: session.sendEphemeral, on: session.onEphemeral }}
           >
@@ -84,7 +84,7 @@ createRoot(rootEl).render(
               <App />
             </JoinContext.Provider>
           </EphemeralContext.Provider>
-        </SubmitContext.Provider>
+        </SubmitProvider>
       </UiStoreContext.Provider>
     </ClientStoreContext.Provider>
   </StrictMode>,
