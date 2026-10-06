@@ -91,10 +91,12 @@ test('the DM link shows live AoE affected tokens in 2D and 3D', async ({ browser
     ).toBe('ack');
     await expect(panel.getByText('Outside hero')).toBeVisible();
     await expect(panel.getByText('Inside hero')).toHaveCount(0);
+    await page.screenshot({ path: '/tmp/mythic-m3-05-aoe-highlight-2d.png' });
 
-    await page.getByRole('button', { name: '3D view' }).click();
+    const viewToggle = page.getByRole('button', { name: '3D view' });
+    await viewToggle.click();
     await expect(panel.getByText('Outside hero')).toBeVisible();
-    await expect(page.getByRole('button', { name: '2D view' })).toBeVisible();
+    await expect(viewToggle).toHaveAttribute('aria-pressed', 'true');
     expect(errors).toEqual([]);
   } finally {
     await host.close();
