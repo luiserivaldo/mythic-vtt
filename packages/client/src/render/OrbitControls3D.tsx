@@ -1,6 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import type { PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import {
   dampVelocity,
@@ -23,21 +23,34 @@ export interface OrbitControls3DProps {
   bounds: GroundBounds | null;
   /** Increment to return to the default view. */
   resetToken?: number;
+  /** M2-05: share the orbit state with the view director (otherwise private). */
+  orbitRef?: RefObject<Orbit3D>;
+  /** M2-05: receives a function that poses the camera and updates the orbit (tween driver). */
+  applyRef?: RefObject<((o: Orbit3D) => void) | null>;
+  /** M2-05: mount at `orbitRef`'s pose instead of the default view (Reset view still resets). */
+  keepInitialOrbit?: boolean;
 }
 
 /**
  * Self-contained 3D camera (CAM-02): perspective camera + orbit/pan/dolly input.
  * Mouse: right/middle drag orbits, shift+right/middle drag pans, wheel dollies.
  * Touch: one finger orbits, two fingers pinch-zoom and pan. Left mouse is left alone so
- * selection and token tools keep working. Not mounted by default (the 2D↔3D toggle is M2-05).
+ * selection and token tools keep working. Mounted by the 2D↔3D toggle (M2-05).
  * Maths lives in camera-3d.ts; the camera up vector is always +Y so roll cannot occur.
  */
-export function OrbitControls3D({ bounds, resetToken = 0 }: OrbitControls3DProps) {
+export function OrbitControls3D({
+  bounds,
+  resetToken = 0,
+  orbitRef,
+  applyRef,
+  keepInitialOrbit = false,
+}: OrbitControls3DProps) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
   const activeCamera = useThree((s) => s.camera);
-  const orbit = useRef<Orbit3D>(defaultOrbit(bounds));
+  const ownOrbit = useRef<Orbit3D>(defaultOrbit(bounds));
+  const orbit = orbitRef ?? ownOrbit;
   // Angular velocity (rad/s) used for post-release damping; only moves the camera while non-zero.
   const velocity = useRef({ az: 0, polar: 0 });
 
@@ -52,13 +65,26 @@ export function OrbitControls3D({ bounds, resetToken = 0 }: OrbitControls3DProps
       cam.updateMatrixWorld();
       invalidate();
     },
-    [getState, invalidate],
+    [getState, invalidate, orbit],
   );
 
-  // Reset on mount, on token change and when the scene bounds change.
+  useEffect(() => {
+    if (!applyRef) return;
+    applyRef.current = apply;
+    return () => {
+      applyRef.current = null;
+    };
+  }, [applyRef, apply]);
+
+  // Reset on mount, on token change and when the scene bounds change. A view switch keeps the
+  // pose it was given; the check is by value so a StrictMode re-run does not reset it either.
+  const seen = useRef({ bounds, resetToken });
   useEffect(() => {
     velocity.current = { az: 0, polar: 0 };
-    apply(defaultOrbit(bounds));
+    const unchanged = seen.current.bounds === bounds && seen.current.resetToken === resetToken;
+    seen.current = { bounds, resetToken };
+    apply(keepInitialOrbit && unchanged ? orbit.current : defaultOrbit(bounds));
+    // keepInitialOrbit only decides this application; it must not re-trigger a reset.
   }, [bounds, resetToken, apply]);
 
   // The drei camera replaces the default one after mount: pose it as soon as it is active.

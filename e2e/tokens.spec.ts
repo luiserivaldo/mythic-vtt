@@ -61,7 +61,7 @@ test('board mounts with a token entity, showing its label and falling back when 
   await client.context.close();
 });
 
-// M2-06: in 3D (?camera=3d until the toggle exists) tokens render as upright standees with an
+// M2-06: in 3D (?camera=3d initial-mode override) tokens render as upright standees with an
 // HTML label, with and without an image, and orbiting never raises page errors.
 test('3D mode mounts tokens as standees with labels and survives orbiting', async ({ browser }) => {
   const scene = testUlid('SCENE', 2);

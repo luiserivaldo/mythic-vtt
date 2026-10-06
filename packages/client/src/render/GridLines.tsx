@@ -1,6 +1,13 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
-import { BufferAttribute, BufferGeometry, LineBasicMaterial, type OrthographicCamera } from 'three';
+import {
+  BufferAttribute,
+  BufferGeometry,
+  LineBasicMaterial,
+  Vector3,
+  type OrthographicCamera,
+} from 'three';
+import { gridSegmentsChunked, perspectiveGridRange } from './grid-lines-3d.js';
 import type { RenderGrid } from './grid-model.js';
 import {
   gridSegments,
@@ -9,6 +16,8 @@ import {
   visibleCellRange,
   type CellRange,
 } from './grid-lines.js';
+
+const lookDir = new Vector3();
 
 /**
  * Square grid (GRID-01) as one LineSegments draw on the XZ plane, 1 world unit = 1 cell.
@@ -43,17 +52,25 @@ export function GridLines({ grid, renderOrder = 0 }: { grid: RenderGrid; renderO
 
   useFrame(({ camera, size }) => {
     const cam = camera as OrthographicCamera;
-    const show = gridVisible(cam.zoom);
+    // M2-05: the 3D perspective camera has no pixels-per-cell zoom, so size the grid from where
+    // it looks instead (the grid stays visible in both views).
+    const perspective = (camera as { isPerspectiveCamera?: boolean }).isPerspectiveCamera === true;
+    const show = perspective || gridVisible(cam.zoom);
     if (lines.current) lines.current.visible = show;
     visible.current = show;
     if (!show) return;
-    const next = visibleCellRange(
-      { centerX: cam.position.x, centerZ: cam.position.z, zoom: cam.zoom },
-      { width: size.width, height: size.height },
-    );
+    const next = perspective
+      ? perspectiveGridRange(camera.position, camera.getWorldDirection(lookDir))
+      : visibleCellRange(
+          { centerX: cam.position.x, centerZ: cam.position.z, zoom: cam.zoom },
+          { width: size.width, height: size.height },
+        );
     if (sameRange(range.current, next)) return;
     range.current = next;
-    geometry.setAttribute('position', new BufferAttribute(gridSegments(next), 3));
+    geometry.setAttribute(
+      'position',
+      new BufferAttribute(perspective ? gridSegmentsChunked(next) : gridSegments(next), 3),
+    );
     geometry.computeBoundingSphere();
   });
 
