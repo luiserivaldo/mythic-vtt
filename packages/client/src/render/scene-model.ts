@@ -1,4 +1,5 @@
-import type { Campaign, Entity, Scene } from '@mythic/shared';
+import type { AssetRef, Campaign, Entity, Scene } from '@mythic/shared';
+import { footprintCells } from './token-footprint.js';
 
 // TECHNICAL.md §6.4: these slots also reserve space for later prop overlays and UI.
 export const RENDER_LAYERS = [
@@ -17,6 +18,15 @@ export interface RenderEntity {
   position: readonly [number, number, number];
   sizeCells: number;
   secret: boolean;
+  /** Present only for token entities. */
+  token?: {
+    image: AssetRef | undefined;
+    name: string;
+    owners: readonly string[];
+    entityLayer: Entity['layer'];
+    perms: Entity['perms'];
+    labelVisibility: 'all' | 'owner' | 'dm';
+  };
 }
 
 export interface RenderScene {
@@ -67,8 +77,20 @@ export function mapScene(scene: Scene): RenderScene {
           entity.transform.position.z,
           entity.transform.position.y,
         ),
-        sizeCells: entity.token?.sizeCells ?? 1,
+        sizeCells: footprintCells(entity.token?.sizeCells),
         secret: entity.layer === 'dm',
+        ...(entity.token
+          ? {
+              token: {
+                image: entity.token.image,
+                name: entity.name,
+                owners: entity.owners,
+                entityLayer: entity.layer,
+                perms: entity.perms,
+                labelVisibility: entity.token.labelVisibility,
+              },
+            }
+          : {}),
       })),
     ),
   };
