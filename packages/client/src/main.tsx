@@ -9,6 +9,7 @@ import { JoinContext } from './ui/join-context.js';
 import { loadProfile } from './ui/join-screen.js';
 import { createSession } from './ui/session.js';
 import { SubmitContext } from './ui/submit.js';
+import { EphemeralContext } from './ui/ephemeral-context.js';
 import { createUiStore, UiStoreContext } from './ui/ui-store.js';
 
 // The browser edge is the only place that supplies the clock and randomness (SES-02).
@@ -68,17 +69,21 @@ createRoot(rootEl).render(
     <ClientStoreContext.Provider value={store}>
       <UiStoreContext.Provider value={uiStore}>
         <SubmitContext.Provider value={session.submitIntent}>
-          <JoinContext.Provider
-            value={{
-              session,
-              storage: localStorage,
-              identityId: identity.identityId,
-              hostVisitor,
-              initialProfile,
-            }}
+          <EphemeralContext.Provider
+            value={{ send: session.sendEphemeral, on: session.onEphemeral }}
           >
-            <App />
-          </JoinContext.Provider>
+            <JoinContext.Provider
+              value={{
+                session,
+                storage: localStorage,
+                identityId: identity.identityId,
+                hostVisitor,
+                initialProfile,
+              }}
+            >
+              <App />
+            </JoinContext.Provider>
+          </EphemeralContext.Provider>
         </SubmitContext.Provider>
       </UiStoreContext.Provider>
     </ClientStoreContext.Provider>
