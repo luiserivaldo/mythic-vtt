@@ -1,11 +1,11 @@
 import type { Scene, Seat } from '@mythic/shared';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
-import { DoubleSide } from 'three';
 import { useEffect } from 'react';
 import { useClientStore } from '../store/react.js';
 import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
+import { SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
 
 const COLORS = {
@@ -72,18 +72,22 @@ export function PickableEntities({
             onClick={onClick}
           >
             <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
-            <meshBasicMaterial
+            <TokenMaterial
+              entity={entity}
               color={
-                selected.includes(entity.id)
-                  ? '#ffe066'
-                  : entity.secret
-                    ? '#a577ce'
-                    : COLORS[entity.layer]
+                entity.token?.image
+                  ? COLORS.tokens
+                  : selected.includes(entity.id)
+                    ? '#ffe066'
+                    : entity.secret
+                      ? '#a577ce'
+                      : COLORS[entity.layer]
               }
-              side={DoubleSide}
-              depthTest={false}
-              depthWrite={false}
             />
+            {entity.token?.image && selected.includes(entity.id) && (
+              <SelectionRing size={entity.sizeCells} />
+            )}
+            <TokenLabel entity={entity} actor={actor} />
           </mesh>
         ))}
     </group>

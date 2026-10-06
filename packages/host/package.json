@@ -40,5 +40,8 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/ws": "^8.18.2",
     "vitest": "^5.0.3"
+  },
+  "bin": {
+    "mythic-host": "./dist/main.js"
   }
 }

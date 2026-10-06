@@ -23,7 +23,24 @@ Built by **MythicTomes**. Self-hosting is free and fully featured; optional host
 
 ## Hosting a game
 
-Mythic VTT runs as a small server on your own machine. You start it, share the link, and your players join from their browsers. Instructions for playing over a LAN or the internet (tunnels, port forwarding or a VPS) will be published here with the first release.
+Mythic VTT runs as a small server on your own machine. You start it, share the link, and your players join from their browsers.
+
+```sh
+pnpm install && pnpm build      # once
+node packages/host/dist/main.js --lan   # or: mythic-host --lan
+```
+
+The command serves the built client and the game host on one port (default 8787) and prints the address players open and your single-use DM link (`#host=...`). By default it only listens on this machine (`127.0.0.1`); `--lan` listens on your network so players on the same Wi-Fi can join. Internet play (tunnels, port forwarding, a VPS) will be documented with the first release.
+
+| Setting                    | Flag         | Env var             | Config file key |
+| -------------------------- | ------------ | ------------------- | --------------- |
+| Port                       | `--port`     | `MYTHIC_PORT`       | `port`          |
+| Bind address               | `--host`     | `MYTHIC_HOST`       | `host`          |
+| Listen on LAN              | `--lan`      | `MYTHIC_LAN=1`      | `lan`           |
+| Data directory             | `--data-dir` | `MYTHIC_DATA_DIR`   | n/a             |
+| Public URL for the DM link | n/a          | `MYTHIC_PUBLIC_URL` | `publicUrl`     |
+
+Precedence is flags, then environment, then the config file, then defaults. The config file is `mythic.config.json` in the data directory, or the path given to `--config`.
 
 ## Contributing
 

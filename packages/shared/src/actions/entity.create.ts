@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Entity, Id } from '../schema/index.js';
 import { defineAction } from './define.js';
-import { isAdmin, isLayerLocked } from './entity-access.js';
+import { isAdminOn, isLayerLocked } from './entity-access.js';
 
 export const entityCreate = defineAction({
   type: 'entity.create',
@@ -10,7 +10,7 @@ export const entityCreate = defineAction({
     const scene = state.scenes[p.sceneId];
     return (
       scene !== undefined &&
-      isAdmin(state, actor) &&
+      isAdminOn(state, actor, p.entity.layer) &&
       !(p.entity.id in scene.entities) &&
       !isLayerLocked(scene, p.entity.layer) &&
       new Set(p.entity.owners).size === p.entity.owners.length &&
