@@ -1,20 +1,172 @@
-.ui-shell {
+/*
+ * Shared look for the table UI: one dark palette for page, toolbars, drawer and board overlays.
+ * Contrast (WCAG AA, checked): --ui-fg on --ui-bg 13.6:1, --ui-muted on --ui-bg 7.4:1,
+ * --ui-fg on --ui-control 10.3:1, --ui-on-accent on --ui-accent 9.4:1.
+ */
+:root {
+  color-scheme: dark;
+  --ui-page: #0b1118;
+  --ui-bg: #17212b;
+  --ui-bg-raised: #1f2c39;
+  --ui-control: #26384a;
+  --ui-control-hover: #2f465c;
+  --ui-input: #0f1720;
+  --ui-fg: #e8eef4;
+  --ui-muted: #a9b6c3;
+  --ui-border: #4a5b6c;
+  --ui-accent: #f0ae55;
+  --ui-on-accent: #14110b;
+  --ui-danger: #ff9b8f;
+  --ui-bar-pad: 0.4rem;
+  --ui-drawer-width: min(28rem, 100vw);
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--ui-page);
+  color: var(--ui-fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+/* The table fills the window: header rows, then the board takes whatever remains. */
+main {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  max-width: 28rem;
+  height: 100dvh;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
+main > h1 {
+  margin: 0;
+  padding: var(--ui-bar-pad) 0.6rem 0;
+  font-size: 1.05rem;
+}
+main > p {
+  margin: 0;
+  padding: 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--ui-muted);
+}
+
+.ui-shell {
+  padding: var(--ui-bar-pad) 0.6rem;
+}
+.ui-board {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 16rem;
+  width: 100%;
+}
+
+/* Toolbar groups: the DM toolbar and the board controls share one segmented-button look. */
 .ui-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
 }
-.ui-panel {
-  border: 1px solid #556;
-  border-radius: 4px;
-  padding: 0.5rem;
+.ui-board-controls {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1;
+  max-width: calc(100% - 1rem);
+  padding: 0.25rem;
+  background: color-mix(in srgb, var(--ui-bg) 88%, transparent);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
 }
+
+/* DM panels open as a drawer over the board; `top` is set from the measured header height. */
+.ui-drawer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: var(--ui-drawer-width);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  overflow-y: auto;
+  background: var(--ui-bg);
+  border-left: 1px solid var(--ui-border);
+  box-shadow: -6px 0 18px rgb(0 0 0 / 45%);
+}
+.ui-drawer-head {
+  position: sticky;
+  top: -0.5rem;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.5rem -0.5rem 0;
+  padding: 0.4rem 0.5rem;
+  background: var(--ui-bg);
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-drawer .ui-panel {
+  max-height: none;
+  overflow: visible;
+}
+
+.ui-panel {
+  box-sizing: border-box;
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  padding: 0.6rem;
+}
+.ui-drawer .ui-panel {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.ui-panel h2,
+.ui-panel h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+.ui-panel h3 {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--ui-muted);
+}
+.ui-panel form {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* Floating panel over the board (transform fields), bottom-left so it never meets the drawer. */
+.ui-overlay {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 1;
+  min-width: 11rem;
+  max-width: calc(100% - 1rem);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+}
+.ui-field {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--ui-muted);
+}
+.ui-field input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.15rem;
+}
+
 .ui-list {
   list-style: none;
   margin: 0;
@@ -32,8 +184,9 @@
 .ui-badge {
   font-size: 0.8em;
   padding: 0 0.4em;
-  border: 1px solid currentColor;
+  border: 1px solid var(--ui-border);
   border-radius: 3px;
+  color: var(--ui-muted);
 }
 .ui-visually-hidden {
   position: absolute;
@@ -43,12 +196,82 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
-.ui-shell button {
-  min-height: 2rem;
+
+/* Controls (the board overlay is outside .ui-shell, so style by class and by page). */
+main button,
+main select,
+main input {
+  font: inherit;
+  color: var(--ui-fg);
 }
-.ui-shell button:focus-visible,
-.ui-shell input:focus-visible,
-.ui-shell select:focus-visible {
-  outline: 2px solid #f0ae55;
+main button {
+  min-height: 2rem;
+  padding: 0.2rem 0.65rem;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+main button:hover:not(:disabled):not([aria-pressed='true']) {
+  background: var(--ui-control-hover);
+}
+main button[aria-pressed='true'] {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+main button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+main select,
+main input:not([type='checkbox']):not([type='color']):not([type='file']) {
+  background: var(--ui-input);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+  min-height: 2rem;
+  box-sizing: border-box;
+}
+main input[type='color'] {
+  min-height: 2rem;
+  min-width: 2.5rem;
+  padding: 0 2px;
+  background: var(--ui-input);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+}
+main [role='alert'] {
+  color: var(--ui-danger);
+}
+main button:focus-visible,
+main input:focus-visible,
+main select:focus-visible,
+main [tabindex]:focus-visible {
+  outline: 2px solid var(--ui-accent);
   outline-offset: 2px;
+}
+.ui-entity[data-selected='true'] {
+  border-left: 3px solid var(--ui-accent);
+  padding-left: 0.4rem;
+}
+
+/* Phone width: the drawer is a bottom sheet leaving the board's top visible. */
+@media (max-width: 40rem) {
+  .ui-drawer {
+    width: 100vw;
+    top: auto !important;
+    height: 62dvh;
+    border-left: 0;
+    border-top: 1px solid var(--ui-border);
+    box-shadow: 0 -6px 18px rgb(0 0 0 / 45%);
+  }
+  .ui-overlay {
+    min-width: 0;
+    width: calc(100% - 1rem);
+  }
+  .ui-overlay .ui-field {
+    display: inline-block;
+    width: 48%;
+  }
 }

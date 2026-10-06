@@ -13,7 +13,8 @@ export const Hello = z.strictObject({
   identityId: Ulid,
   identitySecret: z.string().min(1),
   displayName: z.string().trim().min(1).max(80),
-  avatar: z.string().optional(),
+  /** M1-11: small image data URL, or a short emoji/initial; capped so a hello stays small. */
+  avatar: z.string().max(32_768).optional(),
   /** Last `seq` the client applied, for replay or a fresh snapshot on reconnect. */
   lastSeq: z.number().int().nonnegative().optional(),
   /**
@@ -120,6 +121,19 @@ export const Presence = z.strictObject({
     }),
   ),
   spectators: z.number().int().nonnegative(),
+  /**
+   * M1-11, additive: connected identities that hold no seat, so the DM can seat them (`seat.assign`).
+   * Sent to the host only, never to players or spectators (PERM-03: identity ids stay private).
+   */
+  unseated: z
+    .array(
+      z.strictObject({
+        identityId: Ulid,
+        displayName: z.string(),
+        avatar: z.string().max(32_768).optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const Pong = z.strictObject({ t: z.literal('pong'), n: z.number().int().nonnegative() });

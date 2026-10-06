@@ -150,3 +150,42 @@ export function applyWheel(
     ? zoomAboutPoint(view, viewport, cursor, gesture.factor)
     : panByPixels(view, gesture.dx, gesture.dy);
 }
+
+/** Cells of empty space the centre may travel beyond the canvas edge (D37). */
+export const PAN_MARGIN_CELLS = 3;
+
+export interface CanvasSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * D37: keep the view centre within the canvas plus a margin, so the board can never be
+ * panned fully off screen.
+ */
+export function clampViewToBounds(
+  view: View2D,
+  bounds: CanvasSize,
+  margin = PAN_MARGIN_CELLS,
+): View2D {
+  const clamp = (v: number, hi: number) =>
+    Math.min(hi + margin, Math.max(-margin, Number.isFinite(v) ? v : hi / 2));
+  return {
+    ...view,
+    centerX: clamp(view.centerX, bounds.width),
+    centerZ: clamp(view.centerZ, bounds.height),
+  };
+}
+
+/** D37: the view that shows the whole canvas, with a little padding, centred. */
+export function frameBounds(viewport: Viewport, bounds: CanvasSize, paddingCells = 1): View2D {
+  const zoom = Math.min(
+    viewport.width / (bounds.width + paddingCells * 2),
+    viewport.height / (bounds.height + paddingCells * 2),
+  );
+  return {
+    centerX: bounds.width / 2,
+    centerZ: bounds.height / 2,
+    zoom: clampZoom(Number.isFinite(zoom) && zoom > 0 ? zoom : DEFAULT_ZOOM),
+  };
+}

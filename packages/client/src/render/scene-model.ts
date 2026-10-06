@@ -33,6 +33,8 @@ export interface RenderEntity {
   /** Present only for token entities. */
   token?: {
     image: AssetRef | undefined;
+    /** D38: placeholder colour for a token without an image. */
+    color?: string;
     name: string;
     owners: readonly string[];
     entityLayer: Entity['layer'];
@@ -140,6 +142,7 @@ export function mapScene(scene: Scene): RenderScene {
           ? {
               token: {
                 image: entity.token.image,
+                ...(entity.token.color ? { color: entity.token.color } : {}),
                 name: entity.name,
                 owners: entity.owners,
                 entityLayer: entity.layer,

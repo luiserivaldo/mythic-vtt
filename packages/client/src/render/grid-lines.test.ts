@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  borderSegments,
+  clipRangeToBounds,
   gridSegments,
   gridVisible,
   MAX_LINES_PER_AXIS,
@@ -53,5 +55,35 @@ describe('gridVisible', () => {
     expect(gridVisible(48)).toBe(true);
     expect(gridVisible(2)).toBe(false);
     expect(gridVisible(Number.NaN)).toBe(false);
+  });
+});
+
+describe('canvas clipping (D37)', () => {
+  const bounds = { width: 4, height: 3 };
+  it('clips a viewport range to the canvas', () => {
+    expect(clipRangeToBounds({ minX: -7, maxX: 9, minZ: -5, maxZ: 5 }, bounds)).toEqual({
+      minX: 0,
+      maxX: 4,
+      minZ: 0,
+      maxZ: 3,
+    });
+    expect(clipRangeToBounds({ minX: 5, maxX: 9, minZ: 0, maxZ: 3 }, bounds)).toBeNull();
+  });
+  it('emits only lines inside the canvas', () => {
+    const range = clipRangeToBounds({ minX: -7, maxX: 9, minZ: -5, maxZ: 5 }, bounds);
+    const seg = gridSegments(range ?? { minX: 1, maxX: 0, minZ: 1, maxZ: 0 });
+    for (let i = 0; i < seg.length; i += 3) {
+      expect(seg[i]).toBeGreaterThanOrEqual(0);
+      expect(seg[i]).toBeLessThanOrEqual(4);
+      expect(seg[i + 2]).toBeGreaterThanOrEqual(0);
+      expect(seg[i + 2]).toBeLessThanOrEqual(3);
+    }
+    expect(seg.length).toBe((5 + 4) * 6);
+  });
+  it('draws a closed border rectangle', () => {
+    const b = borderSegments(bounds, 0);
+    expect(b.length).toBe(4 * 6);
+    expect(Array.from(b.slice(0, 6))).toEqual([0, 0, 0, 4, 0, 0]);
+    expect(Array.from(b.slice(18, 24))).toEqual([0, 0, 3, 0, 0, 0]);
   });
 });
