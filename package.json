@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev:table": "pnpm --filter @mythic/host dev",
+    "dev:table": "node scripts/dev-table.mjs",
     "build": "pnpm -r --filter './packages/*' build",
     "test": "vitest run",
     "test:e2e": "pnpm --filter @mythic/e2e test",

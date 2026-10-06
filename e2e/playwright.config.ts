@@ -3,6 +3,9 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
   testMatch: '**/*.spec.ts',
-  // Multi-client harness arrives with M0-13; until then there is nothing to run.
+  // Slow load tests are tagged @load and run on their own (multiclient-e2e skill).
+  grepInvert: /@load/,
+  timeout: 30_000,
   forbidOnly: true,
+  use: { trace: 'retain-on-failure' },
 });
