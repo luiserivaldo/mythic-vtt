@@ -1,15 +1,15 @@
 # Orchestration hand-off
 
 Snapshot taken 2026-10-06 ~14:10 WIB. `develop` is at the commit that adds this file; the last verified state
-was 594 unit tests and 13 e2e tests passing. Usage limits paused work: Claude resets in about 2 hours, Codex at
+was 641 unit tests and 14 e2e tests passing. Usage limits paused work: Claude resets in about 2 hours, Codex at
 3:50 PM. Hermes is out of scope until its Ollama issues are debugged.
 
-## Progress: 35 of 70 MVP tasks done
+## Progress: 36 of 70 MVP tasks done
 
 | Milestone  | Done                                              | Remaining                                    |
 | ---------- | ------------------------------------------------- | -------------------------------------------- |
 | M0 (12/14) | 01-10, 12, 13                                     | M0-11 autosave and recovery, M0-14 exit test |
-| M1 (17/25) | 01, 02, 03, 05, 06, 08, 09, 10, 12-17, 19, 22, 23 | 04, 07, 11, 18, 20 (in flight), 21, 24, 25   |
+| M1 (18/25) | 01, 02, 03, 05, 06, 08, 09, 10, 12-17, 19, 22, 23 | 04, 07, 11, 18, 20 (in flight), 21, 24, 25   |
 | M2 (5/11)  | 02, 03, 04, 06, 09                                | 01, 05, 07, 08, 10, 11                       |
 | M3 (1/8)   | 02                                                | 01, 03-08                                    |
 
@@ -17,12 +17,8 @@ was 594 unit tests and 13 e2e tests passing. Usage limits paused work: Claude re
 
 ## In flight when work paused
 
-Their results arrive as task notifications. They still need verifying and merging.
-
-| Work                                                                       | Agent           | Branch / worktree                    |
-| -------------------------------------------------------------------------- | --------------- | ------------------------------------ |
-| D36 HTTP auth: real `UploadAuthorizer` plus host-only export/import routes | Claude subagent | `feature/http-auth`, `d36-http-auth` |
-| M1-20 2D transform gizmo                                                   | Claude subagent | `feature/gizmo-2d`, `m1-20-gizmo-2d` |
+Nothing. Every Claude subagent finished and was merged (D36 HTTP auth and M1-20 gizmo were the last two).
+D36 is now in `develop`, so uploads work for the host and co-DM and the host-only export and import routes exist.
 
 ## Codex work waiting for its reset (3:50 PM)
 
@@ -63,7 +59,8 @@ withheld from audiences that may not see them). D29 is partly superseded by D33.
 Proposed decisions from agent reports that are **not** yet in the decision log (each agent's final message has the text):
 
 - M2-02 primitive sizing and 2D footprint rules; M2-06 standee proportions; M2-09 `environment.zenith`.
-- M1-19 map-image maths; M2-04 default 3D view and the temporary `?camera=3d` flag.
+- D36 HTTP auth scheme and rate limits; M1-20 gizmo snapping rules (rotate 15 degrees, whole-unit scale when `grid.snap`);
+  M1-19 map-image maths; M2-04 default 3D view and the temporary `?camera=3d` flag.
 - M2-03 surface-height step rules (`maxStepUp` default 0.5 cells, dome sphere profile).
 - M1-10 `assetsDir: static`; M1-09 archive layout, conflict policy and identity scrubbing.
 
@@ -98,7 +95,8 @@ Proposed decisions from agent reports that are **not** yet in the decision log (
 
 - Almost nothing has been checked by eye in a browser. Rendering, gestures, pan/zoom feel, gizmos and the 3D view
   rest on unit tests and "mounts without errors" e2e checks. A manual playtest is needed before M1-25.
-- Uploads are denied in production until D36 merges. M1-19 and token images can't work end to end before then.
+- D36 (merged) authenticates uploads with `Authorization: Mythic <identityId>.<secret>`. Failed-auth throttling is per IP,
+  so one NAT'd table shares a budget, and export does not flush a live room first. Still unverified with a real image.
 - `log.jsonl` lines carry no `schemaVersion` (§8.3 says every JSON root should).
 - There is no campaign or session id on the wire. `lastSeq` alone could match the wrong campaign if a client switches
   campaigns on one host. Adding one would be a protocol change.
