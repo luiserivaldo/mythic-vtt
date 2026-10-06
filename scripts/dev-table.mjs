@@ -6,9 +6,20 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const env = { ...process.env, MYTHIC_PORT: process.env.MYTHIC_PORT || '8787' };
+const revision = spawnSync('git', ['rev-parse', '--short=8', 'HEAD'], {
+  cwd: root,
+  encoding: 'utf8',
+});
+const env = {
+  ...process.env,
+  MYTHIC_PORT: process.env.MYTHIC_PORT || '8787',
+  MYTHIC_BUILD_COMMIT:
+    revision.status === 0 && revision.stdout.trim() ? revision.stdout.trim() : 'unknown',
+};
 
-const build = spawnSync('pnpm', ['--filter', '@mythic/host', 'build'], {
+// The trailing ellipsis includes workspace dependencies, so the host cannot load a stale shared
+// action registry after an action is added in source (PT1-01).
+const build = spawnSync('pnpm', ['--filter', '@mythic/host...', 'build'], {
   cwd: root,
   stdio: 'inherit',
 });
