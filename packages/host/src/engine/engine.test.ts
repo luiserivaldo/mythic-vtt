@@ -458,6 +458,63 @@ describe('reconnect', () => {
   });
 });
 
+describe('label visibility (D35, PERM-03)', () => {
+  const token = (labelVisibility: 'all' | 'owner' | 'dm') => ({
+    sizeCells: 1,
+    heightCells: 1,
+    labelVisibility,
+  });
+  const update = (changes: Record<string, unknown>, ref: string) =>
+    intent('entity.update', { sceneId: T.scene, entityId: T.hiddenName, changes }, ref);
+  const nameIn = (state: Campaign | null) => state?.scenes[T.scene]?.entities[T.hiddenName]?.name;
+
+  it('never sends a hidden name in live patches, replays or snapshots, and reveals it on a flip', async () => {
+    const { engine } = setup();
+    const host = fakeConnection(T.host, { isHost: true });
+    const alice = fakeConnection(T.alice);
+    const carol = fakeConnection(T.carol);
+    for (const c of [host, alice, carol]) await engine.onConnect(c);
+
+    // Renamed while the label is DM-only: players get an (empty) patch, no name.
+    await engine.onIntent(host, update({ name: 'LATER-SECRET-NAME' }, 'a'));
+    expect(alice.wire()).not.toContain('HIDDEN-NAME');
+    expect(alice.wire()).not.toContain('LATER-SECRET-NAME');
+    expect(carol.wire()).not.toContain('LATER-SECRET-NAME');
+
+    // Reveal: the name is sent exactly now, and the client converges to the filtered state.
+    await engine.onIntent(host, update({ token: token('all') }, 'b'));
+    for (const c of [alice, carol]) {
+      expect(nameIn(clientView(c).state)).toBe('LATER-SECRET-NAME');
+    }
+
+    // Hide again, then rename: replay from before the flip converges and leaks nothing new.
+    await engine.onIntent(host, update({ token: token('dm') }, 'c'));
+    await engine.onIntent(host, update({ name: 'AFTER-HIDE-NAME' }, 'd'));
+    expect(nameIn(clientView(alice).state)).toBe('');
+    expect(alice.wire()).not.toContain('AFTER-HIDE-NAME');
+    expect(carol.wire()).not.toContain('AFTER-HIDE-NAME');
+
+    // Replay for a client that held the pre-flip state (seq 0): applying the replayed patches to
+    // its old view yields exactly the current filtered view, and the late frames carry no hidden name.
+    const held = ofType(alice, 'snapshot');
+    const replay = fakeConnection(T.alice, { lastSeq: 0 });
+    await engine.onConnect(replay);
+    expect(replay.received.every((m) => m.t === 'patch')).toBe(true);
+    const audience: Audience = { kind: 'seat', seatId: T.seatA };
+    expect(clientView(replay, held).state).toEqual(visibleTo(audience, engine.state()));
+    expect(nameIn(clientView(replay, held).state)).toBe('');
+    expect(replay.wire()).not.toContain('AFTER-HIDE-NAME');
+
+    // A fresh snapshot is clean as well.
+    const late = fakeConnection(T.carol);
+    await engine.onConnect(late);
+    expect(late.wire()).not.toContain('AFTER-HIDE-NAME');
+    expect(late.wire()).not.toContain('LATER-SECRET-NAME');
+    // The host and a co-DM still see the real name.
+    expect(host.wire()).toContain('AFTER-HIDE-NAME');
+  });
+});
+
 describe('non-leak (PERM-03)', () => {
   it('player and spectator sockets never receive DM-layer data across a session', async () => {
     const { engine } = setup();
