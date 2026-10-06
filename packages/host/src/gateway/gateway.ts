@@ -12,6 +12,7 @@ import {
 import { noopHandler, type GatewayConnection, type GatewayHandler } from './engine-seam.js';
 import { createMemoryIdentityStore, type IdentityStore } from './identity-store.js';
 import { hashSecret, verifySecret } from './secrets.js';
+import { createHostTokenGate, type HostTokenGate } from './host-token.js';
 
 export const WS_PATH = '/ws';
 
@@ -24,6 +25,8 @@ export interface GatewayOptions {
   heartbeatMs?: number;
   /** Largest accepted frame; larger frames close the socket (1009). */
   maxPayloadBytes?: number;
+  /** D24: one-time host token the first host hello must present. Omit to disable host binding. */
+  hostToken?: string;
 }
 
 export interface Gateway {
@@ -43,6 +46,7 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
   const identities = options.identities ?? createMemoryIdentityStore();
   const helloTimeoutMs = options.helloTimeoutMs ?? 10_000;
   const heartbeatMs = options.heartbeatMs ?? 30_000;
+  const tokenGate: HostTokenGate = createHostTokenGate(options.hostToken);
 
   const app = Fastify({ logger: false });
   const wss = new WebSocketServer({
@@ -193,6 +197,20 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         fail(socket, 'unauthorized', 'identity secret mismatch', true);
         return undefined;
       }
+      if (hello.hostToken !== undefined) {
+        // D24: identical error for wrong, reused or unconfigured tokens, so it reveals nothing.
+        // consume() is synchronous, so two racing hellos cannot both win the single use.
+        if (!tokenGate.consume(hello.hostToken)) {
+          fail(socket, 'unauthorized', 'host token rejected', true);
+          return undefined;
+        }
+        const bound = await identities.bindHostIfAbsent(hello.identityId);
+        if (bound !== hello.identityId) {
+          fail(socket, 'unauthorized', 'host token rejected', true);
+          return undefined;
+        }
+      }
+      const isHost = (await identities.getHostIdentityId()) === hello.identityId;
       await identities.update(hello.identityId, {
         displayName: hello.displayName,
         ...(hello.avatar !== undefined ? { avatar: hello.avatar } : {}),
@@ -203,6 +221,7 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         identityId: hello.identityId,
         displayName: hello.displayName,
         avatar: hello.avatar,
+        isHost,
         lastSeq: hello.lastSeq,
         send: (m) => {
           sendTo(socket, m);

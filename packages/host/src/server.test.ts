@@ -36,3 +36,15 @@ it('startHost creates the host secret and serves /healthz', async () => {
     404,
   );
 });
+
+it('startHost mints a random token per process and honours an injected one', async () => {
+  dir = await mkdtemp(join(tmpdir(), 'mythic-host-'));
+  const config = loadConfig({ MYTHIC_PORT: '0', MYTHIC_DATA_DIR: dir });
+  host = await startHost(config);
+  expect(host.hostToken.length).toBeGreaterThanOrEqual(32);
+  const first = host.hostToken;
+  await host.close();
+  host = await startHost(config, { hostToken: 'fixed' });
+  expect(host.hostToken).toBe('fixed');
+  expect(first).not.toBe('fixed');
+});
