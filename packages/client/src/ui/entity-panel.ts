@@ -56,6 +56,23 @@ export const isValidPropSize = (n: number): boolean =>
 
 export const capitalise = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
+/** M1-30: one tested source of truth for the token form's creation defaults. */
+export const TOKEN_FORM_DEFAULTS = {
+  name: '',
+  size: 'medium',
+  layer: 'tokens',
+  labelVisibility: 'all',
+  ownerId: '',
+  color: DEFAULT_TOKEN_COLOR,
+} as const satisfies {
+  name: string;
+  size: TokenSizeName;
+  layer: LayerId;
+  labelVisibility: LabelVisibility;
+  ownerId: string;
+  color: string;
+};
+
 export interface OwnerOption {
   id: string;
   label: string;

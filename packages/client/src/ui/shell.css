@@ -143,6 +143,22 @@ main > p {
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--ui-border);
 }
+.ui-create-form {
+  row-gap: 0.65rem;
+}
+.ui-create-form .ui-primary-action {
+  flex: 1 0 100%;
+  width: 100%;
+  min-height: 2.5rem;
+  margin-top: 0.25rem;
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+  font-weight: 700;
+}
+.ui-create-form .ui-primary-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-accent) 88%, white);
+}
 
 /* Floating panel over the board (transform fields), bottom-left so it never meets the drawer. */
 .ui-overlay {
@@ -207,6 +223,55 @@ main > p {
   border: 1px solid var(--ui-border);
   border-radius: 3px;
   color: var(--ui-muted);
+}
+.ui-validation {
+  flex-basis: 100%;
+  color: var(--ui-danger);
+  font-size: 0.82rem;
+}
+.ui-file-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ui-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.ui-file-button {
+  min-height: 2rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ui-file-button:hover {
+  background: var(--ui-control-hover);
+}
+.ui-file-input:focus-visible + .ui-file-button {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+.ui-file-input:disabled + .ui-file-button {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ui-file-name {
+  color: var(--ui-muted);
+  font-size: 0.82rem;
 }
 .ui-visually-hidden {
   position: absolute;
