@@ -3,8 +3,10 @@ import { join } from 'node:path';
 import { storeMigrate } from '@mythic/shared';
 import type { HostConfig } from './config.js';
 import {
-  denyAssetUploads,
+  createHttpAuthenticator,
+  createSeatUploadAuthorizer,
   registerAssetRoutes,
+  registerCampaignRoutes,
   registerStaticClient,
   type UploadAuthorizer,
 } from './http/index.js';
@@ -25,7 +27,7 @@ import {
   loadOrCreateHostSecret,
   type Gateway,
 } from './gateway/index.js';
-import { LocalAssetStore, LocalCampaignStore } from './storage/index.js';
+import { LocalAssetStore, LocalCampaignStore, type ImportLimits } from './storage/index.js';
 
 export interface RunningHost {
   readonly gateway: Gateway;
@@ -37,8 +39,10 @@ export interface RunningHost {
 }
 
 export interface StartHostOptions {
-  /** Defaults to denying every upload until a seat-authenticated authorizer is wired. */
+  /** Defaults to the D36 authorizer: host and co-DM identities only. */
   uploadAuthorizer?: UploadAuthorizer;
+  /** Overrides for campaign import limits (defaults: `DEFAULT_IMPORT_LIMITS`). */
+  importLimits?: Partial<ImportLimits>;
   hostToken?: string;
   clock?: Clock;
   random?: RandomSource;
@@ -103,10 +107,23 @@ export async function startHost(
       },
     },
   });
+  // D36: HTTP reuses the SES-02 identity (same hash check as `hello`) and the host binding.
+  const httpAuth = createHttpAuthenticator({
+    identities,
+    state: () => engine.state(),
+    now: clock,
+  });
   registerAssetRoutes(gateway.app, {
     assetStore,
-    uploadAuthorizer: options.uploadAuthorizer ?? denyAssetUploads,
+    uploadAuthorizer:
+      options.uploadAuthorizer ?? createSeatUploadAuthorizer(httpAuth, { now: clock }),
     maxUploadBytes: config.maxImageUploadBytes,
+  });
+  registerCampaignRoutes(gateway.app, {
+    store,
+    auth: httpAuth,
+    now: clock,
+    ...(options.importLimits ? { importLimits: options.importLimits } : {}),
   });
   if (config.testEndpoints) {
     gateway.app.get('/__test/connections', () => ({

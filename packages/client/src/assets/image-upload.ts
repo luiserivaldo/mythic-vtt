@@ -11,6 +11,17 @@ export interface UploadedImage {
 /** Injectable so the UI and tests never need a real host. */
 export type ImageUploader = (file: Blob) => Promise<UploadedImage>;
 
+/** The slice of the SES-02 identity the host's HTTP auth needs (D36). */
+export interface UploadCredential {
+  identityId: string;
+  identitySecret: string;
+}
+
+/** `Authorization: Mythic <identityId>.<secret>`; header only, never in the URL (D36). */
+export function authorizationHeader(credential: UploadCredential): string {
+  return `Mythic ${credential.identityId}.${credential.identitySecret}`;
+}
+
 export class UploadError extends Error {
   constructor(
     message: string,
@@ -21,7 +32,10 @@ export class UploadError extends Error {
 }
 
 export function uploadFailureMessage(error: UploadError): string {
-  if (error.status === 401) return 'The host is not accepting uploads from this client yet.';
+  if (error.status === 401)
+    return 'The host did not recognise this client. Reload the page and try again.';
+  if (error.status === 403) return 'Only the host and co-DMs can upload images.';
+  if (error.status === 429) return 'Too many uploads. Wait a moment and try again.';
   if (error.status === 415) return 'That file is not a supported image (PNG, JPEG or WebP).';
   if (error.status === 413) return 'That image is too large for this host.';
   return `The upload failed (${error.message}).`;
@@ -41,13 +55,19 @@ function readStoredImage(body: unknown): UploadedImage | null {
 export function createHttpUploader(
   baseUrl: string,
   fetchImpl: typeof fetch = (input, init) => fetch(input, init),
+  /** Read per upload so a late-created identity is still picked up. Omitted: no credential. */
+  credential?: () => UploadCredential | undefined,
 ): ImageUploader {
   return async (file) => {
+    const identity = credential?.();
     let response: Response;
     try {
       response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/assets/images`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          ...(identity ? { Authorization: authorizationHeader(identity) } : {}),
+        },
         body: file,
       });
     } catch {
