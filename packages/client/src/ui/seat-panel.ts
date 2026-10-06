@@ -11,14 +11,18 @@ export interface SeatRow {
   occupied: boolean;
   /** From presence; false when unknown or offline. */
   connected: boolean;
+  /** SES-07: the name the seated identity connected with, when the host has told us. */
+  occupantName: string | undefined;
   permissions: Record<PermissionKey, boolean>;
 }
 
 export function seatRows(
   campaign: Campaign,
-  presence: readonly { seatId: string; connected: boolean }[] | null,
+  presence:
+    readonly { seatId: string; connected: boolean; displayName?: string | undefined }[] | null,
 ): SeatRow[] {
   const online = new Set((presence ?? []).filter((p) => p.connected).map((p) => p.seatId));
+  const names = new Map((presence ?? []).map((p) => [p.seatId, p.displayName]));
   return Object.values(campaign.seats)
     .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id))
     .map((seat) => ({
@@ -29,6 +33,7 @@ export function seatRows(
       roleLabel: seat.role === 'codm' ? 'Co-DM' : 'Player',
       occupied: seat.identityId !== null,
       connected: online.has(seat.id),
+      occupantName: names.get(seat.id),
       permissions: {
         view: seat.permissions.view,
         move: seat.permissions.move,
@@ -46,3 +51,19 @@ export const isValidLabel = (text: string): boolean => {
 
 /** `seat.assign` needs an identity id (a ULID); the host sees no roster, so it is typed in. */
 export const isValidIdentityId = (text: string): boolean => Id.safeParse(text.trim()).success;
+
+export interface RosterOption {
+  identityId: string;
+  /** "Name (id tail)" so two people called the same are told apart. */
+  label: string;
+}
+
+/** M1-11: connected identities without a seat, as dropdown options for `seat.assign`. */
+export function rosterOptions(
+  unseated: readonly { identityId: string; displayName: string }[] | undefined,
+): RosterOption[] {
+  return (unseated ?? []).map((u) => ({
+    identityId: u.identityId,
+    label: `${u.displayName} (${u.identityId.slice(-4)})`,
+  }));
+}

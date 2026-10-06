@@ -56,7 +56,7 @@ async function seed(campaign: Campaign = fixtureCampaign()): Promise<void> {
 
 async function connect(
   identityId: string,
-  opts: { hostToken?: string; lastSeq?: number } = {},
+  opts: { hostToken?: string; lastSeq?: number; displayName?: string } = {},
 ): Promise<WireClient> {
   if (!host) throw new Error('host not started');
   const ws = new WebSocket(`ws://127.0.0.1:${String(host.port)}/ws`);
@@ -117,7 +117,7 @@ async function connect(
     v: PROTOCOL_VERSION,
     identityId,
     identitySecret: `secret-${identityId}`,
-    displayName: 'Tester',
+    displayName: opts.displayName ?? 'Tester',
     ...(opts.hostToken !== undefined ? { hostToken: opts.hostToken } : {}),
     ...(opts.lastSeq !== undefined ? { lastSeq: opts.lastSeq } : {}),
   });
@@ -242,6 +242,48 @@ describe('startHost with the engine', () => {
       code: 'seat-unavailable',
       fatal: false,
     });
+  });
+
+  it('shows the DM who is connected but unseated, and nobody else (M1-11, PERM-03)', async () => {
+    await seed();
+    await start();
+    const dm = await connect(HOST_ID, { hostToken: 'test-host-token' });
+    const guest = await connect(GUEST_ID, { displayName: 'Guesty' });
+    const player = await connect(PLAYER_ID, { displayName: 'Alicia' });
+    await Promise.all([
+      dm.waitFor('snapshot'),
+      guest.waitFor('snapshot'),
+      player.waitFor('snapshot'),
+    ]);
+
+    const roster = await dm.waitFor(
+      'presence',
+      (m) =>
+        (m.unseated ?? []).length === 1 && m.seats.some((x) => x.seatId === T.seatA && x.connected),
+    );
+    expect(roster.unseated).toEqual([{ identityId: GUEST_ID, displayName: 'Guesty' }]);
+    expect(roster.seats.find((s) => s.seatId === T.seatA)).toMatchObject({
+      displayName: 'Alicia',
+      connected: true,
+    });
+
+    // The DM seats the guest from the roster; the entry disappears.
+    dm.send({
+      t: 'intent',
+      type: 'seat.assign',
+      payload: { seatId: T.seatB, identityId: GUEST_ID },
+      clientRef: 'assign-1',
+    });
+    await dm.waitFor('presence', (m) => (m.unseated ?? []).length === 0 && m.seats.length > 0);
+
+    // Players and spectators never receive a roster or each other's identity ids.
+    await guest.waitFor('snapshot', (m) => m.seatId === T.seatB);
+    for (const c of [guest, player]) {
+      expect(c.messages.some((m) => m.t === 'presence')).toBe(false);
+      expect(c.frames.join('\n')).not.toContain('unseated');
+    }
+    // (Seat bindings in the state already carry identity ids; the roster adds names, which stay host-only.)
+    expect(player.frames.join('\n')).not.toContain('Guesty');
   });
 
   it('clears per-session bindings, but not persistent bindings, when the Session ends', async () => {

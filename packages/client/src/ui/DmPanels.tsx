@@ -37,7 +37,13 @@ export function DmPanels() {
       {shown === 'layers' && <LayerPanel campaign={campaign} />}
       {shown === 'map' && <MapPanel campaign={campaign} />}
       {shown === 'entities' && <EntityPanel campaign={campaign} />}
-      {shown === 'seats' && <SeatPanel campaign={campaign} presence={presence?.seats ?? null} />}
+      {shown === 'seats' && (
+        <SeatPanel
+          campaign={campaign}
+          presence={presence?.seats ?? null}
+          unseated={presence?.unseated}
+        />
+      )}
     </aside>
   );
 }
