@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useClientStore } from '../store/react.js';
 import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
+import { MapImageMesh } from './MapImage.js';
 import { SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { PrimitiveLights, PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
@@ -70,7 +71,16 @@ export function PickableEntities({
           {rendered?.entities
             .filter((entity) => entity.layer === layer)
             .map((entity: RenderEntity) =>
-              entity.shape ? (
+              entity.mapImage ? (
+                <MapImageMesh
+                  key={entity.id}
+                  entity={entity}
+                  mapImage={entity.mapImage}
+                  renderOrder={order}
+                  selected={selected.includes(entity.id)}
+                  onPick={onClick}
+                />
+              ) : entity.shape ? (
                 <PrimitiveMesh
                   key={entity.id}
                   entity={entity}
