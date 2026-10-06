@@ -7,3 +7,8 @@ export { sceneCreate } from './scene.create.js';
 export { sceneUpdate } from './scene.update.js';
 export { sceneActivate } from './scene.activate.js';
 export { gridUpdate } from './grid.update.js';
+export { seatCreate } from './seat.create.js';
+export { seatUpdate } from './seat.update.js';
+export { seatAssign } from './seat.assign.js';
+export { seatRelease } from './seat.release.js';
+export { sessionJoin } from './session.join.js';
