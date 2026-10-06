@@ -54,6 +54,32 @@ describe('2D ruler maths (MEAS-01)', () => {
     expect(measured.totalLabel).toBe('50 ft');
   });
 
+  it('reports horizontal, vertical and total distance for a vertical 3D segment', () => {
+    const measured = measureRuler(
+      [
+        { x: 2, y: 0, z: 3 },
+        { x: 2, y: 10, z: 3 },
+      ],
+      grid,
+    );
+    expect(measured.segments[0]).toMatchObject({
+      horizontalCells: 0,
+      verticalCells: 10,
+      cells: 10,
+      horizontalLabel: '0 ft',
+      verticalLabel: '50 ft',
+      label: '50 ft',
+    });
+    expect(measured).toMatchObject({
+      horizontalCells: 0,
+      verticalCells: 10,
+      totalCells: 10,
+      horizontalLabel: '0 ft',
+      verticalLabel: '50 ft',
+      totalLabel: '50 ft',
+    });
+  });
+
   it('formats fractional scene units without noisy floating point tails', () => {
     expect(formatRulerDistance(1.25, { unitsPerCell: 5, unitLabel: 'ft' })).toBe('6.25 ft');
     expect(formatRulerDistance(Math.sqrt(2), { unitsPerCell: 1, unitLabel: '' })).toBe('1.41');
