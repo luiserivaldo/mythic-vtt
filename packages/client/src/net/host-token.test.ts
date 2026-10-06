@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createHostTokenTaker, extractHostToken } from './host-token.js';
+import { createHostTokenHolder, extractHostToken } from './host-token.js';
 
 function run(hash: string, search = '') {
   const calls: string[] = [];
@@ -27,10 +27,22 @@ describe('extractHostToken', () => {
   });
 });
 
-describe('createHostTokenTaker', () => {
-  it('returns the token once', () => {
-    const take = createHostTokenTaker('t');
-    expect(take()).toBe('t');
-    expect(take()).toBeUndefined();
+describe('createHostTokenHolder', () => {
+  it('keeps resending until confirmed, then never again', () => {
+    const h = createHostTokenHolder('t');
+    expect(h.take()).toBe('t');
+    expect(h.take()).toBe('t'); // dropped before auth
+    h.confirm();
+    expect(h.take()).toBeUndefined();
+  });
+  it('ignores a confirm that was not preceded by a hello carrying the token', () => {
+    const h = createHostTokenHolder('t');
+    h.confirm();
+    expect(h.take()).toBe('t');
+  });
+  it('is inert without a token', () => {
+    const h = createHostTokenHolder(undefined);
+    expect(h.take()).toBeUndefined();
+    h.confirm();
   });
 });

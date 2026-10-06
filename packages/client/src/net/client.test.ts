@@ -3,7 +3,7 @@ import { PROTOCOL_VERSION } from '@mythic/protocol';
 import { createClientStore } from '../store/store.js';
 import { makeCampaign, socketFactory, tid } from '../testing.js';
 import { createGameClient } from './client.js';
-import { createHostTokenTaker } from './host-token.js';
+import { createHostTokenHolder, type HostTokenHolder } from './host-token.js';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -14,7 +14,7 @@ afterEach(() => {
 
 const backoff = { baseMs: 100, maxMs: 800, factor: 2, jitter: 0 };
 
-function setup(extra: { takeHostToken?: () => string | undefined } = {}) {
+function setup(extra: { hostToken?: HostTokenHolder } = {}) {
   const sockets = socketFactory();
   const store = createClientStore();
   const client = createGameClient({
@@ -81,17 +81,23 @@ describe('game client against a mock host', () => {
     await expect(p).resolves.toEqual({ ok: true, seq: 2 });
   });
 
-  it('sends the host token in the first hello only', () => {
-    const { sockets, client } = setup({ takeHostToken: createHostTokenTaker('tok') });
+  it('resends the host token after a pre-auth drop, not after the first snapshot', () => {
+    const { sockets, client } = setup({ hostToken: createHostTokenHolder('tok') });
     client.start();
     const first = sockets.last();
     first.serverOpen();
     expect(first.sent[0]).toMatchObject({ t: 'hello', hostToken: 'tok' });
-    first.serverClose();
+    first.serverClose(); // dropped before any snapshot
     vi.advanceTimersByTime(100);
     const second = sockets.last();
     second.serverOpen();
-    expect(second.sent[0]).not.toHaveProperty('hostToken');
+    expect(second.sent[0]).toMatchObject({ t: 'hello', hostToken: 'tok' });
+    second.serverSend(snapshot(1));
+    second.serverClose();
+    vi.advanceTimersByTime(1000);
+    const third = sockets.last();
+    third.serverOpen();
+    expect(third.sent[0]).not.toHaveProperty('hostToken');
   });
 
   it('surfaces rejects', async () => {
