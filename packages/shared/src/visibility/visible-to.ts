@@ -46,9 +46,12 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
     if (audience.kind === 'seat' && seat?.permissions.view === false) return null;
     // PERM-02: an entity with view disabled is visible to its owners only.
     if (entity.perms?.view === false && !owner) return null;
+    // D35 / TOK-04 + PERM-03: a name the audience may not see on the label is never sent. The
+    // schema requires a string, so the neutral placeholder is the empty string.
     const label = entity.token?.labelVisibility;
-    const hideName = label === 'dm' || (label === 'owner' && !owner);
-    return hideName ? { ...entity, name: '' } : entity;
+    const coDm = audience.kind === 'seat' && seat?.role === 'codm';
+    const hideName = label === 'dm' ? !coDm : label === 'owner' ? !(owner || coDm) : false;
+    return hideName && entity.name !== '' ? { ...entity, name: '' } : entity;
   });
 }
 
