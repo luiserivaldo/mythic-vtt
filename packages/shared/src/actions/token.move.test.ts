@@ -6,7 +6,7 @@ import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix } from './testi
 import { tokenMove } from './token.move.js';
 
 const T = 'token.move';
-const to = { x: 2.25, y: 1.5, z: -3.75 };
+const to = { x: 2.25, y: 1.5, z: 3.75 };
 const payload = { sceneId: IDS.scene, entityId: IDS.entity, to };
 const envelope = (p: unknown = payload): ActionEnvelope => ({
   id: IDS.action,
@@ -88,6 +88,34 @@ describe(`${T} permissions`, () => {
     const scene = locked.scenes[IDS.scene];
     if (scene) scene.layers.tokens = { locked: true };
     expect(tokenMove.permission(locked, ACTORS.host, payload)).toBe(false);
+  });
+});
+
+describe(`${T} bounds (D37)`, () => {
+  const at = (x: number, z: number) => ({ ...payload, to: { x, y: 0, z } });
+  const withBounds = (width: number, height: number) => {
+    const state = stateWithToken();
+    const scene = state.scenes[IDS.scene];
+    if (scene) scene.bounds = { width, height };
+    return state;
+  };
+
+  it('accepts inside and on the edge, rejects outside', () => {
+    const state = withBounds(8, 6);
+    expect(tokenMove.permission(state, ACTORS.host, at(4, 3))).toBe(true);
+    expect(tokenMove.permission(state, ACTORS.host, at(0, 0))).toBe(true);
+    expect(tokenMove.permission(state, ACTORS.host, at(8, 6))).toBe(true);
+    expect(tokenMove.permission(state, ACTORS.host, at(8.01, 3))).toBe(false);
+    expect(tokenMove.permission(state, ACTORS.host, at(4, -0.01))).toBe(false);
+    expect(tokenMove.permission(state, ACTORS.host, at(-1, 3))).toBe(false);
+    expect(tokenMove.permission(state, ACTORS.host, at(4, 7))).toBe(false);
+  });
+
+  it('uses the 40 x 30 default for scenes without bounds', () => {
+    const state = stateWithToken();
+    expect(tokenMove.permission(state, ACTORS.host, at(40, 30))).toBe(true);
+    expect(tokenMove.permission(state, ACTORS.host, at(41, 30))).toBe(false);
+    expect(tokenMove.permission(state, ACTORS.host, at(40, 31))).toBe(false);
   });
 });
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { Id, Vec3 } from '../schema/index.js';
+import { isWithinBounds } from '../geometry/bounds.js';
+import { Id, resolveSceneBounds, Vec3 } from '../schema/index.js';
 import { defineAction } from './define.js';
 import { canUseEntity, isLayerLocked } from './entity-access.js';
 
@@ -12,6 +13,8 @@ export const tokenMove = defineAction({
     return (
       scene !== undefined &&
       entity?.token !== undefined &&
+      // D37: a move may not leave the canvas.
+      isWithinBounds(resolveSceneBounds(scene), p.to) &&
       !isLayerLocked(scene, entity.layer) &&
       canUseEntity(state, actor, entity, 'move')
     );
