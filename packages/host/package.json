@@ -9,6 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "default": "./dist/storage/index.js"
+    },
+    "./storage/conformance": {
+      "types": "./dist/storage/conformance.d.ts",
+      "default": "./dist/storage/conformance.js"
     }
   },
   "scripts": {
@@ -19,10 +27,16 @@
   "dependencies": {
     "@mythic/protocol": "workspace:*",
     "@mythic/shared": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.3",
     "fastify": "^5.12.5",
-    "ws": "^8.22.0"
+    "immer": "^10.2.0",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/ws": "^8.18.2"
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/ws": "^8.18.2",
+    "vitest": "^5.0.3"
   }
 }
