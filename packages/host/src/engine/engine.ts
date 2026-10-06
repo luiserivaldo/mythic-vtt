@@ -6,6 +6,7 @@ import {
   reduceAction,
   visibleTo,
   type ActionEnvelope,
+  type Actor,
   type Audience,
   type Campaign,
 } from '@mythic/shared';
@@ -50,6 +51,8 @@ export interface Engine extends GatewayHandler {
   readonly sessionId: string;
   state(): Campaign;
   seq(): number;
+  /** Ends this Session, releasing only per-session seat bindings through durable actions. */
+  endSession(): Promise<void>;
   /** Resolves once every queued connect/intent/join has been processed. */
   idle(): Promise<void>;
 }
@@ -180,12 +183,13 @@ export function createEngine(options: EngineOptions): Engine {
 
   /** Pipeline steps 2-8 (§4.2) for one intent from `conn`. */
   async function apply(
-    conn: GatewayConnection,
+    conn: GatewayConnection | undefined,
     type: string,
     payload: unknown,
-    extra: { clientRef?: string; sceneId?: string },
+    extra: { actor?: Actor; clientRef?: string; sceneId?: string },
   ): Promise<Outcome> {
-    const actor = actorFor(state, placeOf(conn));
+    const actor = extra.actor ?? (conn === undefined ? undefined : actorFor(state, placeOf(conn)));
+    if (actor === undefined) return { ok: false, reason: 'forbidden' };
     const check = checkIntent(state, actor, type, payload);
     if (!check.ok) {
       // zod messages echo client input; keep the detail generic.
@@ -242,6 +246,22 @@ export function createEngine(options: EngineOptions): Engine {
     sessionId,
     state: () => state,
     seq: () => seq,
+    endSession() {
+      return serialize(async () => {
+        const seatIds = Object.values(state.seats)
+          .filter((seat) => seat.binding === 'session' && seat.identityId !== null)
+          .map((seat) => seat.id);
+        for (const seatId of seatIds) {
+          const outcome = await apply(
+            undefined,
+            'seat.release',
+            { seatId },
+            { actor: { kind: 'host' } },
+          );
+          if (!outcome.ok) throw new Error(`failed to release per-session seat ${seatId}`);
+        }
+      });
+    },
     idle: () => queue,
 
     onConnect(conn) {
@@ -302,6 +322,8 @@ export function createEngine(options: EngineOptions): Engine {
     onEphemeral: () => undefined,
 
     onDisconnect(conn) {
+      // SES-05/06: a dropped connection is not the end of the Session. Both binding modes remain
+      // seated so the same Identity can reconnect without DM action.
       members.delete(conn.connectionId);
     },
   };

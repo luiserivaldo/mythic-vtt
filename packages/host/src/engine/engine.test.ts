@@ -289,6 +289,19 @@ describe('intent pipeline', () => {
 });
 
 describe('seat changes', () => {
+  it('auto-seats a returning identity without writing another action', async () => {
+    const { engine, log } = setup();
+    const alice = fakeConnection(T.alice);
+
+    await engine.onConnect(alice);
+
+    expect(alice.received).toEqual([
+      expect.objectContaining({ t: 'snapshot', seq: 0, seatId: T.seatA }),
+    ]);
+    expect(log.entries).toEqual([]);
+    expectNoSecrets(alice);
+  });
+
   it('a join switches the joiner to its seat audience with a fresh snapshot', async () => {
     const { engine } = setup();
     const host = fakeConnection(T.host, { isHost: true });
@@ -344,6 +357,52 @@ describe('seat changes', () => {
       expect.objectContaining({ t: 'snapshot', seq: 1, seatId: null }),
     ]);
     expectNoSecrets(alice);
+  });
+
+  it('keeps a per-session seat across disconnect so the identity can reconnect', async () => {
+    const campaign = fixtureCampaign();
+    const seat = campaign.seats[T.seatB];
+    if (seat) seat.binding = 'session';
+    const { engine, log } = setup({ campaign });
+    const bob = fakeConnection(T.bob);
+    await engine.onConnect(bob);
+    await engine.onJoin(bob, { t: 'join', seatId: T.seatB });
+    engine.onDisconnect(bob);
+
+    const back = fakeConnection(T.bob, { lastSeq: 1 });
+    await engine.onConnect(back);
+
+    expect(back.received).toEqual([
+      expect.objectContaining({ t: 'snapshot', seq: 1, seatId: T.seatB }),
+    ]);
+    expect(log.entries.map((entry) => entry.envelope.type)).toEqual(['session.join']);
+    expectNoSecrets(back);
+  });
+});
+
+describe('session end', () => {
+  it('releases only per-session bindings through the action pipeline', async () => {
+    const campaign = fixtureCampaign();
+    const seat = campaign.seats[T.seatB];
+    if (seat) {
+      seat.binding = 'session';
+      seat.identityId = T.bob;
+    }
+    const { engine, log } = setup({ campaign });
+    const bob = fakeConnection(T.bob);
+    await engine.onConnect(bob);
+    bob.clear();
+
+    await engine.endSession();
+
+    expect(engine.state().seats[T.seatA]?.identityId).toBe(T.alice);
+    expect(engine.state().seats[T.seatB]?.identityId).toBeNull();
+    expect(log.entries.map((entry) => entry.envelope.type)).toEqual(['seat.release']);
+    expect(log.entries[0]?.envelope.actor).toEqual({ kind: 'host' });
+    expect(bob.received).toEqual([
+      expect.objectContaining({ t: 'snapshot', seq: 1, seatId: null }),
+    ]);
+    expectNoSecrets(bob);
   });
 });
 
