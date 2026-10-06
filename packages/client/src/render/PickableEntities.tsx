@@ -1,7 +1,7 @@
 import { walkableFromEntity, type Scene, type Seat } from '@mythic/shared';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
-import { useEffect, useMemo } from 'react';
+import { Fragment, useEffect, useMemo } from 'react';
 import { useClientStore } from '../store/react.js';
 import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
@@ -12,6 +12,8 @@ import { DropLines } from './DropLines.js';
 import { TokenStandee } from './TokenStandee.js';
 import { PrimitiveLights, PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
+import { ElevatedSurfaceGrid } from './ElevatedSurfaceGrid.js';
+import type { RenderGrid } from './grid-model.js';
 import { AoEVolume } from './AoEVolume.js';
 import { useUiStore } from '../ui/ui-store.js';
 
@@ -32,12 +34,15 @@ export function PickableEntities({
   scene,
   additiveMode,
   mode = '2d',
+  grid = null,
 }: {
   rendered: RenderScene | null;
   scene: Scene | null;
   additiveMode: boolean;
   /** 3D is only reachable explicitly until the 2D/3D toggle exists (M2-05). */
   mode?: RenderMode;
+  /** GRID-05: scene grid style for walkable tops (3D only). */
+  grid?: RenderGrid | null;
 }) {
   const seatId = useClientStore((state) => state.seatId);
   const seats = useClientStore((state) => state.campaign?.seats ?? NO_SEATS);
@@ -122,15 +127,24 @@ export function PickableEntities({
                   onPick={onClick}
                 />
               ) : entity.shape ? (
-                <PrimitiveMesh
-                  key={entity.id}
-                  entity={entity}
-                  shape={entity.shape}
-                  mode={mode}
-                  selected={selected.includes(entity.id)}
-                  renderOrder={order}
-                  onClick={onClick}
-                />
+                <Fragment key={entity.id}>
+                  <PrimitiveMesh
+                    entity={entity}
+                    shape={entity.shape}
+                    mode={mode}
+                    selected={selected.includes(entity.id)}
+                    renderOrder={order}
+                    onClick={onClick}
+                  />
+                  {mode === '3d' && grid && entity.shape.walkable && entity.shape.showGridOnTop && (
+                    <ElevatedSurfaceGrid
+                      entity={entity}
+                      shape={entity.shape}
+                      grid={grid}
+                      renderOrder={order + 1}
+                    />
+                  )}
+                </Fragment>
               ) : mode === '3d' && entity.token ? (
                 <TokenStandee
                   key={entity.id}

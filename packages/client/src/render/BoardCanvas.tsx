@@ -106,6 +106,7 @@ function BoardScene({
         scene={source}
         additiveMode={additiveMode}
         mode={mode3d ? '3d' : '2d'}
+        grid={grid}
       />
       {/* M1-20: 2D transform handles; the 3D gizmo is M2-08. */}
       {!mode3d && !aoeActive && <TransformGizmo />}

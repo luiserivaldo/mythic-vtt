@@ -182,6 +182,18 @@ export const entityRenameIntent = (
   sceneId,
 });
 
+/** GRID-05: replaces the shape with showGridOnTop set (entity.update merges top-level fields). */
+export const entityShowGridOnTopIntent = (
+  sceneId: string,
+  entityId: string,
+  shape: NonNullable<Entity['shape']>,
+  showGridOnTop: boolean,
+): IntentSpec => ({
+  type: 'entity.update',
+  payload: { sceneId, entityId, changes: { shape: { ...shape, showGridOnTop } } },
+  sceneId,
+});
+
 export const entityDeleteIntent = (sceneId: string, entityId: string): IntentSpec => ({
   type: 'entity.delete',
   payload: { sceneId, entityId },

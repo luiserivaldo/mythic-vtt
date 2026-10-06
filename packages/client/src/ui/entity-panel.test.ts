@@ -4,6 +4,7 @@ import { makeCampaign, tid } from '../testing.js';
 import {
   entityDeleteIntent,
   entityRenameIntent,
+  entityShowGridOnTopIntent,
   entityRows,
   isValidColour,
   isValidPropSize,
@@ -243,5 +244,20 @@ describe('entity panel view model', () => {
     expect(isValidPropSize(2.5)).toBe(true);
     expect(toolbarItems('player').map((i) => i.id)).not.toContain('entities');
     expect(toolbarItems('codm').map((i) => i.id)).toContain('entities');
+  });
+});
+
+describe('entityShowGridOnTopIntent (GRID-05)', () => {
+  it('replaces the shape with showGridOnTop set', () => {
+    const shape = { kind: 'box' as const, color: '#aa5522', walkable: true };
+    expect(entityShowGridOnTopIntent('S', 'E', shape, true)).toEqual({
+      type: 'entity.update',
+      payload: {
+        sceneId: 'S',
+        entityId: 'E',
+        changes: { shape: { ...shape, showGridOnTop: true } },
+      },
+      sceneId: 'S',
+    });
   });
 });
