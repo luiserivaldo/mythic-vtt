@@ -1,5 +1,5 @@
 import { Canvas, useThree } from '@react-three/fiber';
-import type { Scene } from '@mythic/shared';
+import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
 import { OrthographicCamera } from '@react-three/drei';
 import { useEffect, useMemo, useState } from 'react';
 import { useClientStore } from '../store/react.js';
@@ -14,6 +14,7 @@ import { TransformPanel } from '../ui/TransformPanel.js';
 import { OrbitControls3D } from './OrbitControls3D.js';
 import { Skybox } from './Skybox.js';
 import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
+import { outsideColor } from './canvas-style.js';
 import type { GroundBounds } from './camera-3d.js';
 import { useViewMode, type ViewMode } from './view-mode-store.js';
 import { useViewDirector } from './use-view-director.js';
@@ -26,6 +27,8 @@ function BoardScene({
   additiveMode,
   viewMode,
   bounds,
+  canvasSize,
+  frameKey,
   resetToken,
 }: {
   scene: RenderScene | null;
@@ -34,6 +37,8 @@ function BoardScene({
   additiveMode: boolean;
   viewMode: ViewMode;
   bounds: GroundBounds | null;
+  canvasSize: SceneBounds;
+  frameKey: string;
   resetToken: number;
 }) {
   const invalidate = useThree((state) => state.invalidate);
@@ -54,7 +59,8 @@ function BoardScene({
   );
   return (
     <>
-      <color attach="background" args={[scene?.background ?? DEFAULT_BACKGROUND]} />
+      {/* D37: outside the canvas is a darker neutral; GridLines fills the inside. */}
+      <color attach="background" args={[outsideColor(scene?.background)]} />
       {mode3d && backdrop.zenith && <Skybox spec={backdrop} />}
       {mode3d ? (
         <OrbitControls3D
@@ -66,7 +72,7 @@ function BoardScene({
         />
       ) : (
         <>
-          <PanZoomControls />
+          <PanZoomControls bounds={canvasSize} frameKey={frameKey} />
           <OrthographicCamera
             makeDefault
             position={[director.view2d.centerX, 20, director.view2d.centerZ]}
@@ -79,7 +85,9 @@ function BoardScene({
         </>
       )}
       {/* The grid sits under the map layer's order so entities draw over it. */}
-      {grid && <GridLines grid={grid} renderOrder={-1} />}
+      {grid && (
+        <GridLines grid={grid} fill={scene?.background ?? DEFAULT_BACKGROUND} renderOrder={-1} />
+      )}
       {/* TODO(M1-18): PanZoomControls pans on any left-drag past a threshold, even one that
           starts on a selectable token. Token drag will own that arbitration. Plain clicks
           reach picking because only a drag-ending click is swallowed. */}
@@ -95,25 +103,6 @@ function BoardScene({
   );
 }
 
-/** Ground extent of the scene's entities, for framing the 3D default view. */
-function sceneBounds(scene: RenderScene | null): GroundBounds | null {
-  if (!scene || scene.entities.length === 0) return null;
-  let b: GroundBounds | null = null;
-  for (const e of scene.entities) {
-    const [x, , z] = e.position;
-    const r = e.sizeCells / 2;
-    b = b
-      ? {
-          minX: Math.min(b.minX, x - r),
-          maxX: Math.max(b.maxX, x + r),
-          minZ: Math.min(b.minZ, z - r),
-          maxZ: Math.max(b.maxZ, z + r),
-        }
-      : { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r };
-  }
-  return b;
-}
-
 /** Single on-demand Three scene for the active host-filtered Scene. */
 export function BoardCanvas() {
   const viewMode = useViewMode();
@@ -122,9 +111,16 @@ export function BoardCanvas() {
   const [additiveMode, setAdditiveMode] = useState(false);
   const campaign = useClientStore((state) => state.campaign);
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
-  const bounds = useMemo(() => sceneBounds(scene), [scene]);
   const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
   const source = campaign?.activeSceneId ? (campaign.scenes[campaign.activeSceneId] ?? null) : null;
+  // D37: depend on the numbers so unrelated state changes keep the camera where it is.
+  const { width, height } = source ? resolveSceneBounds(source) : resolveSceneBounds({});
+  const canvasSize = useMemo(() => ({ width, height }), [width, height]);
+  const bounds = useMemo<GroundBounds>(
+    () => ({ minX: 0, maxX: width, minZ: 0, maxZ: height }),
+    [width, height],
+  );
+  const frameKey = `${source?.id ?? ''}:${String(width)}x${String(height)}`;
 
   return (
     <div
@@ -183,6 +179,8 @@ export function BoardCanvas() {
           additiveMode={additiveMode}
           viewMode={viewMode}
           bounds={bounds}
+          canvasSize={canvasSize}
+          frameKey={frameKey}
           resetToken={resetToken}
         />
       </Canvas>

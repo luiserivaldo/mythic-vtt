@@ -102,3 +102,23 @@ describe(`${T} reducer and visibility`, () => {
       expect(patchesFor(audience, before, result.state, result.patches)).toEqual([]);
   });
 });
+
+describe(`${T} bounds (D37)`, () => {
+  const to = (x: number, z: number) => ({
+    ...payload,
+    changes: { transform: { ...transform, position: { x, y: 0, z } } },
+  });
+  it('accepts a move onto the edge and rejects one outside', () => {
+    const state = stateWithEntity();
+    const scene = state.scenes[IDS.scene];
+    if (scene) scene.bounds = { width: 8, height: 6 };
+    expect(entityUpdate.permission(state, ACTORS.owner, to(8, 6))).toBe(true);
+    expect(entityUpdate.permission(state, ACTORS.owner, to(8.01, 6))).toBe(false);
+    expect(entityUpdate.permission(state, ACTORS.host, to(0, -0.01))).toBe(false);
+  });
+  it('rejects outside the default 40 x 30 for scenes without bounds', () => {
+    const state = stateWithEntity();
+    expect(entityUpdate.permission(state, ACTORS.owner, to(40, 30))).toBe(true);
+    expect(entityUpdate.permission(state, ACTORS.owner, to(41, 3))).toBe(false);
+  });
+});

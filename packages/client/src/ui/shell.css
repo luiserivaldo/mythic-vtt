@@ -11,6 +11,9 @@
   gap: 0.25rem;
 }
 .ui-panel {
+  /* Tall panels (Entities) would otherwise push the board off screen. */
+  max-height: 45vh;
+  overflow-y: auto;
   border: 1px solid #556;
   border-radius: 4px;
   padding: 0.5rem;

@@ -1,8 +1,9 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { PerspectiveCamera } from '@react-three/drei';
-import { useCallback, useEffect, useRef, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react';
 import type { PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import {
+  clampTargetToGround,
   dampVelocity,
   defaultOrbit,
   dolly,
@@ -19,7 +20,7 @@ import {
 } from './camera-3d.js';
 
 export interface OrbitControls3DProps {
-  /** Ground extent used by the default/reset view. Keep the reference stable (memoise). */
+  /** D37: canvas extent: the default/reset view frames it and the focus is clamped to it. Keep the reference stable (memoise). */
   bounds: GroundBounds | null;
   /** Increment to return to the default view. */
   resetToken?: number;
@@ -39,23 +40,40 @@ export interface OrbitControls3DProps {
  * Maths lives in camera-3d.ts; the camera up vector is always +Y so roll cannot occur.
  */
 export function OrbitControls3D({
-  bounds,
+  bounds: boundsProp,
   resetToken = 0,
   orbitRef,
   applyRef,
   keepInitialOrbit = false,
 }: OrbitControls3DProps) {
+  // Compare bounds by value: a new object with the same extent (e.g. after an entity moves)
+  // must not reset the user's orbit.
+  const bMinX = boundsProp?.minX;
+  const bMaxX = boundsProp?.maxX;
+  const bMinZ = boundsProp?.minZ;
+  const bMaxZ = boundsProp?.maxZ;
+  const bounds = useMemo<GroundBounds | null>(
+    () =>
+      bMinX === undefined || bMaxX === undefined || bMinZ === undefined || bMaxZ === undefined
+        ? null
+        : { minX: bMinX, maxX: bMaxX, minZ: bMinZ, maxZ: bMaxZ },
+    [bMinX, bMaxX, bMinZ, bMaxZ],
+  );
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
   const activeCamera = useThree((s) => s.camera);
+  const boundsRef = useRef(bounds);
+  boundsRef.current = bounds;
   const ownOrbit = useRef<Orbit3D>(defaultOrbit(bounds));
   const orbit = orbitRef ?? ownOrbit;
   // Angular velocity (rad/s) used for post-release damping; only moves the camera while non-zero.
   const velocity = useRef({ az: 0, polar: 0 });
 
   const apply = useCallback(
-    (next: Orbit3D) => {
+    (raw: Orbit3D) => {
+      // D37: the focus stays on the canvas.
+      const next = clampTargetToGround(raw, boundsRef.current);
       orbit.current = next;
       const cam = getState().camera as ThreePerspectiveCamera;
       const p = orbitPosition(next);
