@@ -1,0 +1,194 @@
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { desc } from 'drizzle-orm';
+import { mkdir, open, readFile, readdir } from 'node:fs/promises';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { z } from 'zod';
+import { Id, Scene } from '@mythic/shared';
+import { atomicWrite } from './io.js';
+import { campaigns } from './index-schema.js';
+import {
+  CampaignFile,
+  CURRENT_SCHEMA_VERSION,
+  LogEntry,
+  Snapshot,
+  StorageDataError,
+  type CampaignMeta,
+  type CampaignStore,
+  type LoadedCampaign,
+  type Migration,
+} from './types.js';
+
+const Disk = z.object({ schemaVersion: z.number().int().nonnegative() }).loose();
+const identity: Migration = (_kind, _version, payload) => payload;
+const safeId = (value: string): string => Id.parse(value);
+
+export class LocalCampaignStore implements CampaignStore {
+  private readonly db: Database.Database;
+  private readonly index;
+  private readonly pending = new Map<string, Promise<void>>();
+  private readonly dirty = new Map<string, Promise<void>>();
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  constructor(
+    private readonly root: string,
+    private readonly migrate: Migration = identity,
+  ) {
+    mkdirSync(root, { recursive: true });
+    this.db = new Database(join(root, 'index.sqlite'));
+    this.index = drizzle(this.db);
+    this.db.exec(
+      'CREATE TABLE IF NOT EXISTS campaigns (id TEXT PRIMARY KEY, name TEXT NOT NULL, schema_version INTEGER NOT NULL, updated_at INTEGER NOT NULL)',
+    );
+  }
+  list(): Promise<CampaignMeta[]> {
+    return Promise.resolve(
+      this.index.select().from(campaigns).orderBy(desc(campaigns.updatedAt)).all(),
+    );
+  }
+  private folder(id: string): string {
+    return join(this.root, 'campaigns', safeId(id));
+  }
+  private async read<T>(
+    path: string,
+    kind: 'campaign' | 'scene' | 'snapshot',
+    schema: z.ZodType<T>,
+  ): Promise<T> {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(await readFile(path, 'utf8')) as unknown;
+    } catch (error) {
+      throw new StorageDataError(`Cannot read ${path}: ${String(error)}`, 'corrupt');
+    }
+    const disk = Disk.safeParse(raw);
+    if (!disk.success) throw new StorageDataError(`Invalid envelope: ${path}`, 'corrupt');
+    if (
+      disk.data.schemaVersion !== CURRENT_SCHEMA_VERSION &&
+      (disk.data.schemaVersion > CURRENT_SCHEMA_VERSION || this.migrate === identity)
+    )
+      throw new StorageDataError(
+        `Newer schemaVersion: ${String(disk.data.schemaVersion)}`,
+        'unsupported-version',
+      );
+    try {
+      const payload =
+        kind === 'campaign'
+          ? disk.data
+          : Object.fromEntries(
+              Object.entries(disk.data).filter(([key]) => key !== 'schemaVersion'),
+            );
+      return schema.parse(this.migrate(kind, disk.data.schemaVersion, payload));
+    } catch (error) {
+      throw new StorageDataError(`Invalid ${kind}: ${String(error)}`, 'corrupt');
+    }
+  }
+  async load(campaignId: Id): Promise<LoadedCampaign> {
+    const folder = this.folder(campaignId);
+    const campaign = await this.read(join(folder, 'campaign.json'), 'campaign', CampaignFile);
+    const scenes: Scene[] = [];
+    let names: string[];
+    try {
+      names = await readdir(join(folder, 'scenes'));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') names = [];
+      else throw error;
+    }
+    for (const name of names.filter((n) => n.endsWith('.json')).sort())
+      scenes.push(await this.read(join(folder, 'scenes', name), 'scene', Scene));
+    return { campaign, scenes };
+  }
+  async saveCampaign(campaignId: Id, campaign: CampaignFile): Promise<void> {
+    safeId(campaignId);
+    const parsed = CampaignFile.parse(campaign);
+    if (parsed.id !== campaignId) throw new StorageDataError('Campaign id mismatch', 'corrupt');
+    if (parsed.schemaVersion !== CURRENT_SCHEMA_VERSION)
+      throw new StorageDataError('Unsupported campaign schemaVersion', 'unsupported-version');
+    await atomicWrite(
+      join(this.folder(campaignId), 'campaign.json'),
+      JSON.stringify({ ...parsed, schemaVersion: CURRENT_SCHEMA_VERSION }),
+    );
+    this.index
+      .insert(campaigns)
+      .values({
+        id: parsed.id,
+        name: parsed.name,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        updatedAt: Date.now(),
+      })
+      .onConflictDoUpdate({
+        target: campaigns.id,
+        set: { name: parsed.name, schemaVersion: CURRENT_SCHEMA_VERSION, updatedAt: Date.now() },
+      })
+      .run();
+  }
+  async saveScene(campaignId: Id, scene: Scene): Promise<void> {
+    const parsed = Scene.parse(scene);
+    await atomicWrite(
+      join(this.folder(campaignId), 'scenes', `${safeId(parsed.id)}.json`),
+      JSON.stringify({ ...parsed, schemaVersion: CURRENT_SCHEMA_VERSION }),
+    );
+  }
+  async appendLog(campaignId: Id, sessionId: Id, entries: LogEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    const path = join(this.folder(campaignId), 'sessions', safeId(sessionId), 'log.jsonl');
+    await mkdir(join(this.folder(campaignId), 'sessions', sessionId), { recursive: true });
+    const lines = entries.map((entry) => JSON.stringify(LogEntry.parse(entry)) + '\n').join('');
+    const previous = this.pending.get(path) ?? Promise.resolve();
+    const write = previous.then(async () => {
+      const file = await open(path, 'a');
+      try {
+        await file.writeFile(lines);
+      } finally {
+        await file.close();
+      }
+    });
+    this.pending.set(path, write);
+    try {
+      await write;
+    } finally {
+      if (this.pending.get(path) === write) this.pending.delete(path);
+    }
+    this.dirty.set(path, write);
+    this.timer ??= setTimeout(() => {
+      void this.flushLogs();
+    }, 500);
+  }
+  async flushLogs(): Promise<void> {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
+    const dirty = [...this.dirty];
+    this.dirty.clear();
+    await Promise.all(
+      dirty.map(async ([path, write]) => {
+        await write;
+        const file = await open(path, 'r');
+        try {
+          await file.sync();
+        } finally {
+          await file.close();
+        }
+      }),
+    );
+  }
+  async writeSnapshot(
+    campaignId: Id,
+    sessionId: Id,
+    label: string,
+    snapshot: Snapshot,
+  ): Promise<void> {
+    if (!/^[a-zA-Z0-9_-]+$/.test(label))
+      throw new StorageDataError('Invalid snapshot label', 'corrupt');
+    await atomicWrite(
+      join(this.folder(campaignId), 'sessions', safeId(sessionId), 'snapshots', `${label}.json`),
+      JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION, ...Snapshot.parse(snapshot) }),
+    );
+  }
+  export(campaignId: Id): Promise<import('node:stream').Readable> {
+    safeId(campaignId);
+    return Promise.reject(new Error('not implemented until M1-09'));
+  }
+  async close(): Promise<void> {
+    await this.flushLogs();
+    this.db.close();
+  }
+}
