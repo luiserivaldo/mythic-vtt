@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Id } from '../schema/index.js';
 import { defineAction } from './define.js';
-import { isAdmin } from './entity-access.js';
+import { isAdmin, isAdminOn } from './entity-access.js';
 
 export const entitySetOwners = defineAction({
   type: 'entity.setOwners',
@@ -11,6 +11,7 @@ export const entitySetOwners = defineAction({
     return (
       entity !== undefined &&
       isAdmin(state, actor) &&
+      isAdminOn(state, actor, entity.layer) &&
       new Set(p.owners).size === p.owners.length &&
       p.owners.every((ownerId) => ownerId in state.seats)
     );

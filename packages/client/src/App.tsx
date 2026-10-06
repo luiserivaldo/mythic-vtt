@@ -1,5 +1,10 @@
 import { useClientStore } from './store/react.js';
+import { DmPanels } from './ui/DmPanels.js';
+import './ui/shell.css';
 import { BoardCanvas } from './render/BoardCanvas.js';
+
+// Explicit opt-in until the 2D <-> 3D toggle lands (M2-05): `?camera=3d` mounts the orbit camera.
+const MODE_3D = new URLSearchParams(window.location.search).get('camera') === '3d';
 
 /** Skeleton shell: connection status only. Panels arrive with M1-11/M1-12, the board with M1-13. */
 export function App() {
@@ -17,7 +22,8 @@ export function App() {
           (ready ? `Connected to ${campaign?.name ?? 'table'}` : `Connection: ${connection}`)}
       </p>
       {pending > 0 && <p>{pending} action(s) waiting for the host</p>}
-      <BoardCanvas />
+      <DmPanels />
+      <BoardCanvas mode3d={MODE_3D} />
     </main>
   );
 }

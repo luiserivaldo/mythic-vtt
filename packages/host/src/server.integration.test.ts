@@ -15,6 +15,7 @@ type Of<K extends ServerMessage['t']> = Extract<ServerMessage, { t: K }>;
 const HOST_ID = tid(21);
 const PLAYER_ID = T.alice; // seated in seat A by the fixture
 const GUEST_ID = tid(22);
+const RIVAL_ID = tid(23);
 
 /** A real `ws` client speaking the protocol, recording every raw frame. */
 interface WireClient {
@@ -226,8 +227,51 @@ describe('startHost with the engine', () => {
     const seated = await guest.waitFor('snapshot', (m) => m.seatId === T.seatB);
     expect(seated.seq).toBe(1);
     await dm.waitFor('patch', (m) => m.seq === 1);
-    guest.send({ t: 'join', seatId: T.seatA });
-    expect(await guest.waitFor('error')).toMatchObject({ code: 'seat-unavailable', fatal: false });
+    expect(guest.messages.some((m) => m.t === 'presence')).toBe(false);
+    expect(guest.frames.join('\n')).not.toContain('SECRET-DM');
+
+    await guest.close();
+    const back = await connect(GUEST_ID, { lastSeq: 1 });
+    expect(await back.waitFor('snapshot')).toMatchObject({ seq: 1, seatId: T.seatB });
+    expect(back.frames.join('\n')).not.toContain('SECRET-DM');
+
+    const rival = await connect(RIVAL_ID);
+    await rival.waitFor('snapshot');
+    rival.send({ t: 'join', seatId: T.seatB });
+    expect(await rival.waitFor('error')).toMatchObject({
+      code: 'seat-unavailable',
+      fatal: false,
+    });
+  });
+
+  it('clears per-session bindings, but not persistent bindings, when the Session ends', async () => {
+    const campaign = fixtureCampaign();
+    const sessionSeat = campaign.seats[T.seatB];
+    if (sessionSeat) sessionSeat.binding = 'session';
+    await seed(campaign);
+    await start();
+    const guest = await connect(GUEST_ID);
+    await guest.waitFor('snapshot');
+    guest.send({ t: 'join', seatId: T.seatB });
+    await guest.waitFor('snapshot', (m) => m.seatId === T.seatB);
+
+    await host?.close();
+    host = undefined;
+
+    const sessions = join(dir, 'campaigns', T.campaign, 'sessions');
+    const [session] = await readdir(sessions);
+    const lines = (await readFile(join(sessions, session ?? '', 'log.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            envelope: { type: string; payload: { seatId?: string } };
+          },
+      );
+    expect(lines.map((line) => line.envelope.type)).toEqual(['session.join', 'seat.release']);
+    expect(lines[1]?.envelope.payload).toEqual({ seatId: T.seatB });
+    expect(lines.some((line) => line.envelope.payload.seatId === T.seatA)).toBe(false);
   });
 
   it('replays missed patches on reconnect, else falls back to a snapshot', async () => {

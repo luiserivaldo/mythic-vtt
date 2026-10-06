@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
-/** D24: a fresh random token per host process. Held in memory only; never written to disk. */
+/** D24: a fresh random token per host process. Held in memory only; never written to disk. Using it rebinds host (D29). */
 export function generateHostToken(): string {
   return randomBytes(24).toString('base64url');
 }

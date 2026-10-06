@@ -79,3 +79,28 @@ describe(`${T} reducer and visibility`, () => {
     }
   });
 });
+
+describe(`${T} primitives (ENV-02, D23)`, () => {
+  const shape = (kind: string) =>
+    makeEntity(createdId, {
+      layer: 'props',
+      shape: { kind, color: '#336699', walkable: true },
+    } as never);
+
+  it('accepts every primitive kind and stores the shape component', () => {
+    for (const kind of ['box', 'cylinder', 'cone', 'pyramid', 'sphere', 'plane', 'wedge']) {
+      const p = { sceneId: IDS.scene, entity: shape(kind) };
+      expect(entityCreate.schema.safeParse(p).success).toBe(true);
+      expect(entityCreate.permission(makeCampaign(), ACTORS.host, p)).toBe(true);
+      expect(entityCreate.permission(makeCampaign(), ACTORS.otherSeat, p)).toBe(false);
+    }
+  });
+
+  it('rejects unknown kinds and a missing walkable flag', () => {
+    expect(
+      entityCreate.schema.safeParse({ sceneId: IDS.scene, entity: shape('torus') }).success,
+    ).toBe(false);
+    const bad = { ...shape('box'), shape: { kind: 'box', color: '#fff' } };
+    expect(entityCreate.schema.safeParse({ sceneId: IDS.scene, entity: bad }).success).toBe(false);
+  });
+});

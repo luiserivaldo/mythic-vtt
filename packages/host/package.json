@@ -30,7 +30,9 @@
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.3",
     "fastify": "^5.12.5",
+    "fflate": "^0.8.3",
     "immer": "^10.2.0",
+    "sharp": "^0.35.5",
     "ws": "^8.22.0",
     "zod": "^4.6.5"
   },
@@ -38,5 +40,8 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/ws": "^8.18.2",
     "vitest": "^5.0.3"
+  },
+  "bin": {
+    "mythic-host": "./dist/main.js"
   }
 }
