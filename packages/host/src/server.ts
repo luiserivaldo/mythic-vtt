@@ -113,10 +113,19 @@ export async function startHost(
     port,
     hostToken,
     async close() {
-      await gateway.close();
-      // Let queued intents finish their log append before the store closes (flushes fsync).
-      await engine.idle();
-      await closeStores();
+      try {
+        // Server shutdown is the only Session-end boundary currently exposed. SES-05 requires
+        // per-session Seat bindings to clear; the engine records those releases as actions.
+        await engine.endSession();
+      } finally {
+        try {
+          await gateway.close();
+          // Let queued intents finish their log append before the store closes (flushes fsync).
+          await engine.idle();
+        } finally {
+          await closeStores();
+        }
+      }
     },
   };
 }
