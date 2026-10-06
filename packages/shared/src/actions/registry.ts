@@ -1,4 +1,7 @@
 import type { AnyAction } from './define.js';
+import { aoePlace } from './aoe.place.js';
+import { aoeRemove } from './aoe.remove.js';
+import { aoeUpdate } from './aoe.update.js';
 import { entityCreate } from './entity.create.js';
 import { entityDelete } from './entity.delete.js';
 import { entitySetLayer } from './entity.setLayer.js';
@@ -36,6 +39,9 @@ export const allActions: readonly AnyAction[] = [
   entitySetOwners,
   layerLock,
   permissionUpdate,
+  aoePlace,
+  aoeUpdate,
+  aoeRemove,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

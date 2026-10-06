@@ -19,3 +19,6 @@ export { entitySetLayer } from './entity.setLayer.js';
 export { entitySetOwners } from './entity.setOwners.js';
 export { layerLock } from './layer.lock.js';
 export { permissionUpdate } from './permission.update.js';
+export { aoePlace } from './aoe.place.js';
+export { aoeUpdate } from './aoe.update.js';
+export { aoeRemove } from './aoe.remove.js';
