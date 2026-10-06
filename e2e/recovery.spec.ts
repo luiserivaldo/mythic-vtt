@@ -23,7 +23,10 @@ async function start(
   });
   return new Promise((resolve, reject) => {
     let output = '';
-    const timer = setTimeout(() => reject(new Error(`host startup timed out: ${output}`)), 10_000);
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`host startup timed out: ${output}`));
+    }, 10_000);
     const onData = (chunk: Buffer) => {
       output += chunk.toString();
       const match = /listening on [^\s:]+:(\d+)[\s\S]*DM link: \S+#host=([\w-]+)/.exec(output);
@@ -31,8 +34,8 @@ async function start(
       clearTimeout(timer);
       resolve({ child, hostPort: Number(match[1]), hostToken: match[2] ?? '' });
     };
-    child.stdout?.on('data', onData);
-    child.stderr?.on('data', onData);
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
     child.once('exit', (code) => {
       clearTimeout(timer);
       reject(new Error(`host exited during startup (${String(code)}): ${output}`));
@@ -43,7 +46,9 @@ async function start(
 async function stop(child: ChildProcess, signal: NodeJS.Signals): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) return;
   await new Promise<void>((resolve) => {
-    child.once('exit', () => resolve());
+    child.once('exit', () => {
+      resolve();
+    });
     child.kill(signal);
   });
 }
