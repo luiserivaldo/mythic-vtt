@@ -67,6 +67,19 @@ export function campaignStoreConformance(
         await close();
       }
     });
+    it('exports a zip stream that is always available (HIST-03)', async () => {
+      const { store, close } = create();
+      try {
+        await store.saveCampaign(campaignId, sampleCampaign);
+        await store.saveScene(campaignId, sampleScene);
+        const chunks: Buffer[] = [];
+        for await (const chunk of await store.export(campaignId))
+          chunks.push(Buffer.from(chunk as Uint8Array));
+        expect(Buffer.concat(chunks).subarray(0, 2).toString()).toBe('PK');
+      } finally {
+        await close();
+      }
+    });
     it('accepts logs and snapshots', async () => {
       const { store, close } = create();
       try {

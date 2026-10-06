@@ -100,10 +100,14 @@ describe(`${T} visibility`, () => {
         name: 'SECRET-DM',
       });
     const { state, patches } = reduceAction(before, envelope());
-    for (const audience of [{ kind: 'seat', seatId: IDS.owner }, { kind: 'spectators' }] as const) {
+    for (const audience of [{ kind: 'seat', seatId: IDS.other }, { kind: 'spectators' }] as const) {
       expect(JSON.stringify(patchesFor(audience, before, state, patches))).not.toContain(
         'SECRET-DM',
       );
     }
+    // D32: the seat promoted to co-DM now receives the DM layer (and is sent it as an add).
+    expect(
+      JSON.stringify(patchesFor({ kind: 'seat', seatId: IDS.owner }, before, state, patches)),
+    ).toContain('SECRET-DM');
   });
 });

@@ -1,4 +1,4 @@
-import type { Actor, Audience, Campaign } from '@mythic/shared';
+import { audienceKey, type Actor, type Audience, type Campaign } from '@mythic/shared';
 
 /** What the engine needs to know about a connection to place it. */
 export interface Participant {
@@ -15,8 +15,9 @@ export function seatIdOf(state: Campaign, identityId: string): string | undefine
 
 /**
  * Who this participant may *see* (PERM-03). Host -> unfiltered; seated -> that seat; everyone
- * else (not yet seated, or spectating) -> the shared spectator audience (§7.4). Co-DM seats are
- * seat audiences for now: §7.3 strips the DM layer for "every audience except the host".
+ * else (not yet seated, or spectating) -> the shared spectator audience (§7.4). D32: a co-DM seat
+ * is a seat audience too; `visibleTo` reads the seat's role to include the DM layer, so
+ * `audienceViewKey` below carries the role to force a fresh snapshot when it changes.
  */
 export function audienceFor(state: Campaign, p: Participant): Audience {
   if (p.isHost) return { kind: 'host' };
@@ -35,4 +36,15 @@ export function actorFor(state: Campaign, p: Participant): Actor {
   return seatId === undefined
     ? { kind: 'seat', identityId: p.identityId }
     : { kind: 'seat', seatId, identityId: p.identityId };
+}
+
+/**
+ * Identity of the *view* a participant gets: the audience plus, for seats, the role that decides
+ * DM-layer visibility (D32). Differs from `audienceKey` so promoting or demoting a seat counts as
+ * an audience change (fresh snapshot, no stale replay).
+ */
+export function audienceViewKey(state: Campaign, p: Participant): string {
+  const audience = audienceFor(state, p);
+  if (audience.kind !== 'seat') return audienceKey(audience);
+  return `${audienceKey(audience)}:${state.seats[audience.seatId]?.role ?? 'player'}`;
 }

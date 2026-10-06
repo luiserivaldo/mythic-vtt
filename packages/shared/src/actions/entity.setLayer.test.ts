@@ -46,10 +46,11 @@ describe(`${T} schema and permissions`, () => {
       host: true,
       owner: true,
       otherSeat: false,
-      coDm: true,
+      coDm: false, // D32: only the host may move entities onto the DM layer
       spectator: false,
       mod: false,
     });
+    expect(permissionMatrix(stateWithEntity(), T, { ...payload, layer: 'props' }).coDm).toBe(true);
   });
 
   it('supports an explicit move grant and rejects no-ops or locked layers', () => {

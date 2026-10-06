@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Id, LayerId } from '../schema/index.js';
-import { defineAction } from './define.js';
+import { defineAction, isCoDm } from './define.js';
 import { canUseEntity, isLayerLocked } from './entity-access.js';
 
 export const entitySetLayer = defineAction({
@@ -15,6 +15,8 @@ export const entitySetLayer = defineAction({
       entity.layer !== p.layer &&
       !isLayerLocked(scene, entity.layer) &&
       !isLayerLocked(scene, p.layer) &&
+      // D32: only the host may move entities onto the DM layer among admins.
+      !(p.layer === 'dm' && isCoDm(state, actor)) &&
       canUseEntity(state, actor, entity, 'move')
     );
   },

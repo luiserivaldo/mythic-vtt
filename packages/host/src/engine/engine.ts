@@ -1,18 +1,18 @@
 import type { Patch } from 'immer';
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import {
-  audienceKey,
   checkIntent,
   patchesFor,
   reduceAction,
   visibleTo,
   type ActionEnvelope,
+  type Actor,
   type Audience,
   type Campaign,
 } from '@mythic/shared';
 import type { GatewayConnection, GatewayHandler } from '../gateway/engine-seam.js';
 import type { CampaignStore } from '../storage/types.js';
-import { actorFor, audienceFor } from './audience.js';
+import { actorFor, audienceFor, audienceViewKey } from './audience.js';
 import {
   cryptoRandom,
   randomFloats,
@@ -51,6 +51,8 @@ export interface Engine extends GatewayHandler {
   readonly sessionId: string;
   state(): Campaign;
   seq(): number;
+  /** Ends this Session, releasing only per-session seat bindings through durable actions. */
+  endSession(): Promise<void>;
   /** Resolves once every queued connect/intent/join has been processed. */
   idle(): Promise<void>;
 }
@@ -131,7 +133,7 @@ export function createEngine(options: EngineOptions): Engine {
     const missed = history.slice(lastSeq + 1 - first.seq);
     const startState = missed[0]?.before;
     if (!startState) return undefined;
-    const then = audienceKey(audienceFor(startState, placeOf(member.conn)));
+    const then = audienceViewKey(startState, placeOf(member.conn));
     return then === member.key ? missed : undefined;
   }
 
@@ -147,7 +149,7 @@ export function createEngine(options: EngineOptions): Engine {
     const groups = new Map<string, Member[]>();
     for (const member of members.values()) {
       const next = audienceFor(entry.after, placeOf(member.conn));
-      const nextKey = audienceKey(next);
+      const nextKey = audienceViewKey(entry.after, placeOf(member.conn));
       if (nextKey !== member.key) {
         // Seat changes switch the view wholesale: a fresh filtered snapshot, never a patch that
         // assumes the old audience's state.
@@ -181,12 +183,13 @@ export function createEngine(options: EngineOptions): Engine {
 
   /** Pipeline steps 2-8 (§4.2) for one intent from `conn`. */
   async function apply(
-    conn: GatewayConnection,
+    conn: GatewayConnection | undefined,
     type: string,
     payload: unknown,
-    extra: { clientRef?: string; sceneId?: string },
+    extra: { actor?: Actor; clientRef?: string; sceneId?: string },
   ): Promise<Outcome> {
-    const actor = actorFor(state, placeOf(conn));
+    const actor = extra.actor ?? (conn === undefined ? undefined : actorFor(state, placeOf(conn)));
+    if (actor === undefined) return { ok: false, reason: 'forbidden' };
     const check = checkIntent(state, actor, type, payload);
     if (!check.ok) {
       // zod messages echo client input; keep the detail generic.
@@ -243,12 +246,28 @@ export function createEngine(options: EngineOptions): Engine {
     sessionId,
     state: () => state,
     seq: () => seq,
+    endSession() {
+      return serialize(async () => {
+        const seatIds = Object.values(state.seats)
+          .filter((seat) => seat.binding === 'session' && seat.identityId !== null)
+          .map((seat) => seat.id);
+        for (const seatId of seatIds) {
+          const outcome = await apply(
+            undefined,
+            'seat.release',
+            { seatId },
+            { actor: { kind: 'host' } },
+          );
+          if (!outcome.ok) throw new Error(`failed to release per-session seat ${seatId}`);
+        }
+      });
+    },
     idle: () => queue,
 
     onConnect(conn) {
       return serialize(() => {
         const audience = audienceFor(state, placeOf(conn));
-        const member: Member = { conn, audience, key: audienceKey(audience) };
+        const member: Member = { conn, audience, key: audienceViewKey(state, placeOf(conn)) };
         members.set(conn.connectionId, member);
         greet(member);
       });
@@ -303,6 +322,8 @@ export function createEngine(options: EngineOptions): Engine {
     onEphemeral: () => undefined,
 
     onDisconnect(conn) {
+      // SES-05/06: a dropped connection is not the end of the Session. Both binding modes remain
+      // seated so the same Identity can reconnect without DM action.
       members.delete(conn.connectionId);
     },
   };

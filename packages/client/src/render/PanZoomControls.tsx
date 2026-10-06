@@ -11,6 +11,7 @@ import {
   type Point,
   type View2D,
 } from './camera-2d.js';
+import { pointerClaims } from './pointer-claims.js';
 
 /**
  * Mouse, trackpad and touch pan/zoom for the 2D orthographic camera (CAM-01).
@@ -58,6 +59,8 @@ export function PanZoomControls() {
     const onPointerDown = (e: PointerEvent) => {
       // Left, middle or touch/pen contact pans. Right button is left for context menus.
       if (e.pointerType === 'mouse' && e.button === 2) return;
+      // M1-20: a press that started on a gizmo handle belongs to the gizmo, not the camera.
+      if (pointerClaims.isClaimed(e.pointerId)) return;
       pointers.set(e.pointerId, local(e));
       if (pointers.size === 1) {
         pressStart = local(e);
