@@ -2,6 +2,10 @@ import { Campaign, type Entity, type Grid } from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
 import { makeCampaign, tid } from '../testing.js';
 import {
+  handleAnchors,
+  handlesFor,
+  hitScreenHandle,
+  worldPerPixelAt,
   intersectRayPlane,
   multiplyQuaternions,
   projectRayToAxis,
@@ -109,7 +113,7 @@ describe('resolveGizmo3DTarget', () => {
         entities: {
           [E]: entity(),
           [tid(34)]: entity({ id: tid(34), layer: 'tokens', shape: undefined, owners: [P], token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' } }),
-          [tid(35)]: entity({ id: tid(35), shape: undefined, image: { asset: { kind: 'local', hash: 'a'.repeat(64) }, calibrated: false } }),
+          [tid(35)]: entity({ id: tid(35), shape: undefined, image: { asset: { source: 'local', kind: 'image', hash: 'a'.repeat(64) }, calibrated: false } }),
         },
       },
     },
@@ -120,5 +124,30 @@ describe('resolveGizmo3DTarget', () => {
     expect(resolveGizmo3DTarget(campaign, [tid(34)], { kind: 'seat', seatId: P })?.kind).toBe('token');
     expect(resolveGizmo3DTarget(campaign, [E], { kind: 'seat', seatId: P })).toBeNull();
     expect(resolveGizmo3DTarget(campaign, [tid(35)], { kind: 'host' })).toBeNull();
+  });
+});
+
+describe('3D handle layout and hit-testing', () => {
+  it('keeps handles a constant screen size: world size scales with distance', () => {
+    const near = worldPerPixelAt(10, 45, 800);
+    expect(worldPerPixelAt(20, 45, 800)).toBeCloseTo(near * 2);
+    expect(worldPerPixelAt(10, 45, 0)).toBe(0);
+  });
+
+  it('gives tokens elevation only and props every handle', () => {
+    expect(handlesFor('token')).toEqual(['move-y']);
+    expect(handlesFor('prop')).toHaveLength(5);
+    const anchors = handleAnchors({ x: 1, y: 2, z: 3 }, 2, handlesFor('prop'));
+    expect(anchors.find((a) => a.kind === 'move-y')?.position).toEqual({ x: 1, y: 4, z: 3 });
+  });
+
+  it('picks the nearest handle within the radius', () => {
+    const handles = [
+      { kind: 'move-xz' as const, px: { x: 100, y: 100 } },
+      { kind: 'move-y' as const, px: { x: 100, y: 40 } },
+    ];
+    expect(hitScreenHandle({ x: 103, y: 98 }, handles, 14)).toBe('move-xz');
+    expect(hitScreenHandle({ x: 100, y: 50 }, handles, 14)).toBe('move-y');
+    expect(hitScreenHandle({ x: 300, y: 300 }, handles, 14)).toBeNull();
   });
 });

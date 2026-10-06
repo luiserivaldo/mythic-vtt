@@ -146,3 +146,60 @@ export function resolveGizmo3DTarget(
   if (!allowed) return null;
   return { scene, entity, kind: entity.token ? 'token' : 'prop' };
 }
+
+// ---- Handle layout and hit-testing (screen space) --------------------------------------------
+
+export const HANDLE_LENGTH_PX = 70;
+export const HANDLE_HIT_PX_3D = 14;
+
+/** World size of `px` screen pixels at `distance` from a perspective camera (constant-size handles). */
+export function worldPerPixelAt(distance: number, fovDegrees: number, viewportHeightPx: number): number {
+  if (viewportHeightPx <= 0) return 0;
+  return (2 * Math.max(distance, 0) * Math.tan((fovDegrees * Math.PI) / 360)) / viewportHeightPx;
+}
+
+/** World-space handle anchors around `center`; `reach` is the world length of HANDLE_LENGTH_PX. */
+export function handleAnchors(
+  center: Vec3Like,
+  reach: number,
+  kinds: readonly Gizmo3DHandle[],
+): { kind: Gizmo3DHandle; position: Vec3Like }[] {
+  const at = (dx: number, dy: number, dz: number): Vec3Like => ({
+    x: center.x + dx * reach,
+    y: center.y + dy * reach,
+    z: center.z + dz * reach,
+  });
+  const all: Record<Gizmo3DHandle, Vec3Like> = {
+    'move-xz': center,
+    'move-y': at(0, 1, 0),
+    // Each rotate handle lies in the plane it turns the entity through.
+    'rotate-x': at(0, 0, 1),
+    'rotate-y': at(-1, 0, 0),
+    'rotate-z': at(1, 0, 0),
+  };
+  return kinds.map((kind) => ({ kind, position: all[kind] }));
+}
+
+/** Nearest handle within `radiusPx` of the pointer; null when the press misses every handle. */
+export function hitScreenHandle(
+  pointer: { x: number; y: number },
+  handles: readonly { kind: Gizmo3DHandle; px: { x: number; y: number } }[],
+  radiusPx: number,
+): Gizmo3DHandle | null {
+  let best: Gizmo3DHandle | null = null;
+  let bestDistance = Infinity;
+  for (const h of handles) {
+    const d = Math.hypot(pointer.x - h.px.x, pointer.y - h.px.y);
+    if (d <= radiusPx && d < bestDistance) {
+      best = h.kind;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
+
+export function handlesFor(kind: 'prop' | 'token'): readonly Gizmo3DHandle[] {
+  return kind === 'token'
+    ? ['move-y']
+    : ['move-xz', 'move-y', 'rotate-x', 'rotate-y', 'rotate-z'];
+}
