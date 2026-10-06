@@ -13,6 +13,8 @@ export interface HostConfig {
   campaignId?: string;
   /** Exposes /__test/connections for the e2e harness; never enable on a real table. */
   testEndpoints: boolean;
+  /** Built client to serve (`MYTHIC_CLIENT_DIR`); default: the monorepo's client/dist/app if built. */
+  clientDir?: string;
 }
 
 function parsePort(raw: string | undefined): number {
@@ -45,6 +47,7 @@ export function loadConfig(env: Record<string, string | undefined>): HostConfig 
       DEFAULT_MAX_IMAGE_UPLOAD_BYTES,
     ),
     testEndpoints: env['MYTHIC_TEST_ENDPOINTS'] === '1',
+    ...(env['MYTHIC_CLIENT_DIR'] ? { clientDir: resolve(env['MYTHIC_CLIENT_DIR']) } : {}),
     ...(env['MYTHIC_CAMPAIGN_ID'] ? { campaignId: env['MYTHIC_CAMPAIGN_ID'] } : {}),
   };
 }
