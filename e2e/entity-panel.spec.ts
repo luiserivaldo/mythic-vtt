@@ -74,6 +74,7 @@ test('the host creates a scene, a token and a box from the Entities panel and se
     'aria-pressed',
     'true',
   );
+  await expect(page.getByLabel('X (ft)')).toBeVisible();
 
   const propName = page.getByLabel('Prop name');
   await propName.fill('Crate');
