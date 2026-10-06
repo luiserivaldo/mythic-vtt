@@ -23,6 +23,9 @@ import type { GroundBounds } from './camera-3d.js';
 import { useViewMode, type ViewMode } from './view-mode-store.js';
 import { useViewDirector } from './use-view-director.js';
 import { ViewToggle } from './ViewToggle.js';
+import { AoEToolPanel } from '../ui/AoEToolPanel.js';
+import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
+import { aoeToolStore } from '../tools/aoe-tool-store.js';
 
 function BoardScene({
   scene,
@@ -46,6 +49,7 @@ function BoardScene({
   resetToken: number;
 }) {
   const invalidate = useThree((state) => state.invalidate);
+  const aoeActive = useStore(aoeToolStore, (s) => s.active);
   const localDrag = useStore(tokenDragStore, (state) => state.local);
   const shown = useMemo(() => withLocalDrag(scene, localDrag), [scene, localDrag]);
   useEffect(() => {
@@ -96,7 +100,7 @@ function BoardScene({
       )}
       {/* M1-18: TokenDrag claims a press on a selected, movable token (pointer-claims) so only
           empty board pans. */}
-      <TokenDrag />
+      {!aoeActive && <TokenDrag />}
       <PickableEntities
         rendered={shown}
         scene={source}
@@ -104,7 +108,8 @@ function BoardScene({
         mode={mode3d ? '3d' : '2d'}
       />
       {/* M1-20: 2D transform handles; the 3D gizmo is M2-08. */}
-      {!mode3d && <TransformGizmo />}
+      {!mode3d && !aoeActive && <TransformGizmo />}
+      <AoEPlacementCanvas scene={source} mode={mode3d ? '3d' : '2d'} />
     </>
   );
 }
@@ -112,6 +117,7 @@ function BoardScene({
 /** Single on-demand Three scene for the active host-filtered Scene. */
 export function BoardCanvas() {
   const viewMode = useViewMode();
+  const aoeActive = useStore(aoeToolStore, (s) => s.active);
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
   const [additiveMode, setAdditiveMode] = useState(false);
@@ -168,7 +174,8 @@ export function BoardCanvas() {
           </button>
         )}
       </div>
-      {!mode3d && <TransformPanel />}
+      <AoEToolPanel scene={source} />
+      {!mode3d && !aoeActive && <TransformPanel />}
       <Canvas
         frameloop="demand"
         shadows={false}

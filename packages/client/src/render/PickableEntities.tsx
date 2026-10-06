@@ -80,13 +80,37 @@ export function PickableEntities({
             .map((entity: RenderEntity) =>
               entity.aoe ? (
                 hiddenLayers.has(scene?.entities[entity.id]?.layer ?? 'effects') ? null : (
-                  <AoEVolume
-                    key={entity.id}
-                    volume={entity.aoe}
-                    walkables={walkables}
-                    mode={mode}
-                    renderOrder={order + 1}
-                  />
+                  <group key={entity.id}>
+                    <AoEVolume
+                      volume={entity.aoe}
+                      walkables={walkables}
+                      mode={mode}
+                      renderOrder={order + 1}
+                    />
+                    <mesh
+                      name={entity.id}
+                      position={[entity.position[0], entity.position[1] + 0.06, entity.position[2]]}
+                      rotation={[-Math.PI / 2, 0, 0]}
+                      onClick={onClick}
+                    >
+                      <circleGeometry
+                        args={[
+                          Math.max(
+                            0.25,
+                            entity.aoe.shape.kind === 'sphere' ||
+                              entity.aoe.shape.kind === 'cylinder' ||
+                              entity.aoe.shape.kind === 'cone'
+                              ? entity.aoe.shape.radius
+                              : entity.aoe.shape.kind === 'cube'
+                                ? entity.aoe.shape.size / 2
+                                : entity.aoe.shape.width / 2,
+                          ),
+                          32,
+                        ]}
+                      />
+                      <meshBasicMaterial visible={false} />
+                    </mesh>
+                  </group>
                 )
               ) : entity.mapImage ? (
                 <MapImageMesh
