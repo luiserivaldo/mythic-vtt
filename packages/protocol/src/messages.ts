@@ -16,6 +16,11 @@ export const Hello = z.strictObject({
   avatar: z.string().optional(),
   /** Last `seq` the client applied, for replay or a fresh snapshot on reconnect. */
   lastSeq: z.number().int().nonnegative().optional(),
+  /**
+   * D24: one-time host token from the DM link fragment (`#host=<token>`). Present only on the
+   * hello that claims host authority; additive, so the protocol version is unchanged.
+   */
+  hostToken: z.string().min(1).max(256).optional(),
 });
 
 /** Sit down / start a session: claim a seat, or join as a spectator when no seat is named. */

@@ -17,11 +17,13 @@ test.afterAll(async () => {
   await opened?.close();
 });
 
-test('a DM and N players connect and complete hello', async () => {
+test('a DM and N players connect, complete hello and receive the campaign', async () => {
   const everyone = [table().dm, ...table().players];
 
+  // The engine (M0-10) answers hello with a filtered snapshot of the campaign it serves; a
+  // fresh data dir gets a newly created campaign.
   for (const c of everyone) {
-    await expect(c.page.getByRole('status')).toHaveText('Connection: open');
+    await expect(c.page.getByRole('status')).toHaveText('Connected to New campaign');
   }
   // `authenticated` only counts connections that got past `hello`, not merely open sockets.
   await expect

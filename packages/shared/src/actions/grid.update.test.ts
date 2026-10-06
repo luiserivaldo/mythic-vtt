@@ -36,6 +36,10 @@ describe(`${T} schema`, () => {
     ['empty label', { sceneId: IDS.scene, unitLabel: ' ' }],
     ['bad diagonal', { sceneId: IDS.scene, diagonal: 'knight' }],
     ['wrong snap type', { sceneId: IDS.scene, snap: 'yes' }],
+    ['bad colour', { sceneId: IDS.scene, color: 'red' }],
+    ['short hex colour', { sceneId: IDS.scene, color: '#fff' }],
+    ['opacity above 1', { sceneId: IDS.scene, opacity: 1.5 }],
+    ['negative opacity', { sceneId: IDS.scene, opacity: -0.1 }],
     ['bad id', { sceneId: 'nope', snap: true }],
     ['extra junk', { ...payload, extra: true }],
   ])('rejects %s', (_n, p) => {
@@ -72,6 +76,16 @@ describe(`${T} reducer`, () => {
       diagonal: 'chebyshev',
       snap: false,
     });
+  });
+
+  it('sets colour and opacity, and an inverse patch removes them again', () => {
+    const before = makeCampaign();
+    const { state, inversePatches } = reduceAction(
+      before,
+      envelope({ sceneId: IDS.scene, color: '#ff8800', opacity: 0.6 }),
+    );
+    expect(state.scenes[IDS.scene]?.grid).toMatchObject({ color: '#ff8800', opacity: 0.6 });
+    expect(inversePatches).toHaveLength(2);
   });
 
   it('leaves unspecified fields alone and produces inverse patches', () => {
