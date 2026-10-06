@@ -374,4 +374,69 @@ describe('startHost with the engine', () => {
       for (const secret of SECRETS) expect(c.frames.join('\n')).not.toContain(secret);
     }
   });
+
+  it('relays ephemerals over ws and never leaks DM-layer previews (M1-07, D32)', async () => {
+    const campaign = fixtureCampaign();
+    const coDmSeat = campaign.seats[T.coDm];
+    const secret = campaign.scenes[T.scene]?.entities[T.secret];
+    const token = campaign.scenes[T.scene]?.entities[T.token];
+    if (!coDmSeat || !secret || !token) throw new Error('fixture incomplete');
+    coDmSeat.identityId = RIVAL_ID;
+    secret.token = { sizeCells: 1, heightCells: 1, labelVisibility: 'dm' };
+    token.token = { sizeCells: 1, heightCells: 1, labelVisibility: 'all' };
+    await seed(campaign);
+    await start();
+
+    const dm = await connect(HOST_ID, { hostToken: 'test-host-token' });
+    const coDm = await connect(RIVAL_ID);
+    const player = await connect(PLAYER_ID);
+    const spectator = await connect(GUEST_ID);
+    await Promise.all([
+      dm.waitFor('snapshot'),
+      coDm.waitFor('snapshot'),
+      player.waitFor('snapshot'),
+      spectator.waitFor('snapshot'),
+    ]);
+
+    dm.send({
+      t: 'ephemeral',
+      channel: 'token.drag-preview',
+      data: { sceneId: T.scene, entityId: T.secret, to: { x: 1, y: 0, z: 1 } },
+      from: GUEST_ID,
+    });
+    const hidden = await coDm.waitFor(
+      'ephemeral',
+      (m) =>
+        m.channel === 'token.drag-preview' &&
+        typeof m.data === 'object' &&
+        m.data !== null &&
+        'entityId' in m.data &&
+        m.data.entityId === T.secret,
+    );
+    expect(hidden.from).toBe(HOST_ID);
+    await dm.waitFor('ephemeral', (m) => m.from === HOST_ID);
+
+    player.send({
+      t: 'ephemeral',
+      channel: 'token.drag-preview',
+      data: { sceneId: T.scene, entityId: T.token, to: { x: 2, y: 0, z: 2 } },
+    });
+    const visiblePreview = (m: Of<'ephemeral'>) =>
+      m.from === PLAYER_ID &&
+      typeof m.data === 'object' &&
+      m.data !== null &&
+      'entityId' in m.data &&
+      m.data.entityId === T.token;
+    await Promise.all([
+      dm.waitFor('ephemeral', visiblePreview),
+      coDm.waitFor('ephemeral', visiblePreview),
+      player.waitFor('ephemeral', visiblePreview),
+      spectator.waitFor('ephemeral', visiblePreview),
+    ]);
+
+    for (const audience of [player, spectator]) {
+      expect(audience.frames.join('\n')).not.toContain(T.secret);
+      expect(audience.messages.some((m) => m.t === 'error' || m.t === 'reject')).toBe(false);
+    }
+  });
 });

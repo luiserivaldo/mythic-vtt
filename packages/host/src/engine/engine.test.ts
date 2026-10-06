@@ -277,14 +277,55 @@ describe('intent pipeline', () => {
     expect(log.entries).toHaveLength(1);
   });
 
-  it('ignores ephemerals until the relay exists (M1-07)', async () => {
-    const { engine } = setup();
+  it('relays bounded ephemerals without a seq or log entry and overwrites sender identity', async () => {
+    const { engine, log } = setup();
+    const alice = fakeConnection(T.alice);
+    const bob = fakeConnection(T.bob);
+    for (const c of [alice, bob]) await engine.onConnect(c);
+    for (const c of [alice, bob]) c.clear();
+
+    await engine.onEphemeral(alice, {
+      t: 'ephemeral',
+      channel: 'cursor',
+      data: { sceneId: T.scene, x: 1, z: 2 },
+      from: T.bob,
+    });
+
+    const expected = {
+      t: 'ephemeral',
+      channel: 'cursor',
+      data: { sceneId: T.scene, x: 1, z: 2 },
+      from: T.alice,
+    };
+    expect(ofType(alice, 'ephemeral')).toEqual([expected]);
+    expect(ofType(bob, 'ephemeral')).toEqual([expected]);
+    expect(engine.seq()).toBe(0);
+    expect(log.entries).toEqual([]);
+  });
+
+  it('uses the injected clock for per-connection token buckets and silently drops excess', async () => {
+    let now = 1_000;
+    const { engine } = setup({
+      clock: () => now,
+      ephemeral: {
+        activeRate: { ratePerSecond: 1, burst: 1 },
+        spectatorDeliveryRate: { ratePerSecond: 100, burst: 100 },
+      },
+    });
     const alice = fakeConnection(T.alice);
     const bob = fakeConnection(T.bob);
     for (const c of [alice, bob]) await engine.onConnect(c);
     bob.clear();
-    await engine.onEphemeral(alice, { t: 'ephemeral', channel: 'cursor', data: { x: 1 } });
-    expect(bob.received).toEqual([]);
+
+    const cursor = (x: number) => ({ t: 'ephemeral', channel: 'cursor', data: { x } }) as const;
+    await engine.onEphemeral(alice, cursor(1));
+    await engine.onEphemeral(alice, cursor(2));
+    expect(ofType(bob, 'ephemeral').map((m) => m.data)).toEqual([{ x: 1 }]);
+    expect(engine.ephemeralStats().dropped['rate-limited']).toBe(1);
+
+    now += 1_000;
+    await engine.onEphemeral(alice, cursor(3));
+    expect(ofType(bob, 'ephemeral').map((m) => m.data)).toEqual([{ x: 1 }, { x: 3 }]);
   });
 });
 
