@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { storeMigrate } from '@mythic/shared';
 import type { HostConfig } from './config.js';
+import { denyAssetUploads, registerAssetRoutes, type UploadAuthorizer } from './http/index.js';
 import {
   createEngine,
   cryptoRandom,
@@ -19,7 +20,7 @@ import {
   loadOrCreateHostSecret,
   type Gateway,
 } from './gateway/index.js';
-import { LocalCampaignStore } from './storage/index.js';
+import { LocalAssetStore, LocalCampaignStore } from './storage/index.js';
 
 export interface RunningHost {
   readonly gateway: Gateway;
@@ -31,6 +32,8 @@ export interface RunningHost {
 }
 
 export interface StartHostOptions {
+  /** Defaults to denying every upload until a seat-authenticated authorizer is wired. */
+  uploadAuthorizer?: UploadAuthorizer;
   hostToken?: string;
   clock?: Clock;
   random?: RandomSource;
@@ -50,8 +53,10 @@ export async function startHost(
   await loadOrCreateHostSecret(config.hostSecretPath);
 
   const store = new LocalCampaignStore(config.dataDir, storeMigrate);
+  const assetStore = new LocalAssetStore(config.dataDir);
   const identities = createSqliteIdentityStore(join(config.dataDir, 'index.sqlite'));
   const closeStores = async () => {
+    assetStore.close();
     identities.close();
     await store.close();
   };
@@ -92,6 +97,11 @@ export async function startHost(
         engine.onDisconnect(conn);
       },
     },
+  });
+  registerAssetRoutes(gateway.app, {
+    assetStore,
+    uploadAuthorizer: options.uploadAuthorizer ?? denyAssetUploads,
+    maxUploadBytes: config.maxImageUploadBytes,
   });
   if (config.testEndpoints) {
     gateway.app.get('/__test/connections', () => ({
