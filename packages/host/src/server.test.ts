@@ -24,6 +24,10 @@ it('loadConfig applies defaults and env overrides', () => {
   const c = loadConfig({ MYTHIC_PORT: '0', MYTHIC_DATA_DIR: '/x/y', MYTHIC_TEST_ENDPOINTS: '1' });
   expect(c).toMatchObject({ port: 0, dataDir: '/x/y', testEndpoints: true });
   expect(() => loadConfig({ MYTHIC_PORT: 'abc' })).toThrow();
+  expect(d.campaignId).toBeUndefined();
+  expect(loadConfig({ MYTHIC_CAMPAIGN_ID: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }).campaignId).toBe(
+    '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+  );
 });
 
 it('startHost creates the host secret and serves /healthz', async () => {
