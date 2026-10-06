@@ -6,7 +6,7 @@ Mythic VTT is a lightweight, open-source, browser-based virtual tabletop for TTR
 
 Built by **MythicTomes**. Self-hosting is free and fully featured; optional hosted services (Mythic Cloud) fund development.
 
-> **Status:** early development. The first milestone is a usable table for live sessions. There is nothing to download or run yet.
+> **Status:** pre-alpha. Most of the first release is built (45 of 58 MVP tasks): shared 2D table, 2D/3D toggle, elevation, platforms and AoE rendering. Token dragging, rulers and AoE placement tools are still to come, and little has been tried by hand yet. Expect rough edges and breaking save-format changes. See [docs/HANDOFF.md](docs/HANDOFF.md) for the exact state.
 
 ---
 
@@ -58,6 +58,18 @@ See **[Internet Play Guide](docs/internet-play.md)** for tunnels (recommended), 
 Precedence is flags, then environment, then the config file, then defaults. The config file is `mythic.config.json` in the data directory, or the path given to `--config`.
 
 The host writes an atomic campaign and scene checkpoint every 200 actions by default (set `MYTHIC_AUTOSAVE_ACTIONS` to a positive integer) and on a clean session end. On restart it replays complete log entries after the last checkpoint. Log writes are synced to disk in batches every 500 ms, so a sudden power loss may lose up to 500 ms of recent actions; a clean stop flushes the log.
+
+## Trying the current build
+
+This is a development build. Run it from a separate checkout pinned to a commit, with a throwaway data directory, so ongoing changes and test saves do not mix:
+
+```sh
+git worktree add ../mythic-vtt-test <commit>
+cd ../mythic-vtt-test && pnpm install --frozen-lockfile && pnpm build
+node packages/host/dist/main.js --data-dir ~/mythic-test-data
+```
+
+Open the printed DM link (it works once and makes that browser the host; restart the host for a fresh link). Players open the plain address and join with a name and a seat. What works and what does not is listed in [docs/HANDOFF.md](docs/HANDOFF.md). Do not expose a development build to the internet.
 
 ## Contributing
 

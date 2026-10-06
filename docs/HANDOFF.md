@@ -1,103 +1,107 @@
 # Orchestration hand-off
 
-Snapshot taken 2026-10-06 ~14:10 WIB. `develop` is at the commit that adds this file; the last verified state
-was 641 unit tests and 14 e2e tests passing. Usage limits paused work: Claude resets in about 2 hours, Codex at
-3:50 PM. Hermes is out of scope until its Ollama issues are debugged.
+Snapshot: 2026-10-06 ~18:00 WIB. `develop` = the commit that contains this file. Last verified gate on `develop`:
+800 unit tests and 25 e2e tests passing (`pnpm check` and `pnpm test:e2e`). Claude usage is exhausted, so all
+development is halted. Nothing is in flight: every agent has finished and every finished branch is merged.
 
-## Progress: 36 of 70 MVP tasks done
+## Progress: 45 of 58 MVP tasks done
 
-| Milestone  | Done                                              | Remaining                                    |
-| ---------- | ------------------------------------------------- | -------------------------------------------- |
-| M0 (12/14) | 01-10, 12, 13                                     | M0-11 autosave and recovery, M0-14 exit test |
-| M1 (18/25) | 01, 02, 03, 05, 06, 08, 09, 10, 12-17, 19, 22, 23 | 04, 07, 11, 18, 20 (in flight), 21, 24, 25   |
-| M2 (5/11)  | 02, 03, 04, 06, 09                                | 01, 05, 07, 08, 10, 11                       |
-| M3 (1/8)   | 02                                                | 01, 03-08                                    |
+(Earlier messages said 70 tasks. The MVP is M0-M3 = 14 + 25 + 11 + 8 = 58 tasks.)
 
-(An earlier status message overstated this as 41. This count comes from listing each merged task.)
+| Milestone  | Done                  | Remaining                                                                                            |
+| ---------- | --------------------- | ---------------------------------------------------------------------------------------------------- |
+| M0 (13/14) | 01-13                 | M0-14 exit test (needs nothing else now; write the restart-keeps-state e2e)                          |
+| M1 (21/25) | 01-17, 19, 20, 22, 23 | 18 token drag and snap, 21 2D ruler, 24 load test, 25 playtest                                       |
+| M2 (8/11)  | 01-07, 09             | 08 3D gizmo, 10 lighting and performance pass, 11 exit test and playtest                             |
+| M3 (3/8)   | 01, 02, 03            | 04 AoE placement tool, 05 affected highlight, 06 3D ruler, 07 grid on elevated surfaces, 08 playtest |
 
-## In flight when work paused
+Next up, all unblocked: M1-18 (token drag; also applies the platform surface height on drop via `dropElevation`),
+M1-21 (ruler), M3-04, M3-05, M3-06, M3-07, M2-08, M2-10, then M0-14, M1-24, M2-11, M1-25, M3-08.
 
-Nothing. Every Claude subagent finished and was merged (D36 HTTP auth and M1-20 gizmo were the last two).
-D36 is now in `develop`, so uploads work for the host and co-DM and the host-only export and import routes exist.
+## What works today (checked by tests, plus one live test)
 
-## Codex work waiting for its reset (3:50 PM)
-
-Uncommitted partial work sits in these worktrees. Resume each with a new `codex exec` that tells the agent to continue from the worktree state, read `git status` and `git diff`, finish, then run the checks.
-
-| Task                              | Model         | Worktree              | State                |
-| --------------------------------- | ------------- | --------------------- | -------------------- |
-| M0-11 autosave and crash recovery | `gpt-6-sol`   | `m0-11-recovery`      | partial, uncommitted |
-| M3-01 AoE schema and actions      | `gpt-5.6-sol` | `m3-01-aoe-actions`   | partial, uncommitted |
-| M1-04 token actions               | `gpt-5.6-sol` | `m1-04-token-actions` | partial, uncommitted |
-
-Worktrees all live in `../mythic-vtt-worktrees/<name>`. Launch pattern used so far:
-
-```bash
-codex exec -m gpt-5.6-sol -c model_reasoning_effort=medium -s workspace-write \
-  --add-dir <repo>/.git -C <worktree> "<brief>"
-```
-
-Model slugs: `gpt-6-sol` for higher-risk work, `gpt-5.6-sol` for regular tasks. Codex stopped twice for
-reasons worth remembering: missing docs in a fresh worktree (see "Worktree setup") and the usage limit.
-
-## Ready next (Needs all merged)
-
-- Resume Codex: M0-11, M1-04, M3-01.
-- M1-07 presence and ephemeral relay (engine area, so do it after M0-11 lands).
-- M1-11 join screen. It needs a host-visible list of unseated identities for `seat.assign`.
-- M2-05 2D/3D toggle. M2-07 drop lines and shadows. M3-07 grid on elevated surfaces.
-- After M1-04: M1-18 token drag, M2-01 elevation action. After M3-01: M3-03 and M3-04.
-- After M0-11: M0-14 exit test. M1-24 load test and M1-25 playtest come last.
-
-## Decisions
-
-Recorded in `TECHNICAL.md` §20 (a local, gitignored file): D19-D35. Accepted by the user: D23 (props host-only),
-D24 (host authority), D25 (elevation snaps by default), D26 (AoE centre inclusion), D27 (AGPL-3.0 + DCO),
-D32 (co-DM sees DM layer read-only), D33 (host rebind on a fresh token), D34 (server order wins), D35 (names
-withheld from audiences that may not see them). D29 is partly superseded by D33.
-
-Proposed decisions from agent reports that are **not** yet in the decision log (each agent's final message has the text):
-
-- M2-02 primitive sizing and 2D footprint rules; M2-06 standee proportions; M2-09 `environment.zenith`.
-- D36 HTTP auth scheme and rate limits; M1-20 gizmo snapping rules (rotate 15 degrees, whole-unit scale when `grid.snap`);
-  M1-19 map-image maths; M2-04 default 3D view and the temporary `?camera=3d` flag.
-- M2-03 surface-height step rules (`maxStepUp` default 0.5 cells, dome sphere profile).
-- M1-10 `assetsDir: static`; M1-09 archive layout, conflict policy and identity scrubbing.
-
-## Open questions for the user
-
-1. Per-seat "DM-layer write" grant: needs a `SeatPermissions` schema change. Today a co-DM can only be granted
-   write access per entity.
-2. Should the internet-play guide keep recommending Tailscale Funnel (it contradicts the fleet's own rule)?
-3. A snapshot `role` flag (`host | seat | spectator`) would replace the client's `localStorage` host hint. It is
-   an additive protocol change.
-4. Free-control tables (everyone admin) under server-order-wins: explore in the M1-24 load test.
-5. `pin.text` and `token.image` are sent to every audience that can see an entity. Only names are label-gated.
-
-## Worktree setup (gotchas)
-
-- `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, `TECHNICAL.md`, `TASKS.md` and `.claude/` are gitignored. A fresh worktree
-  has none of them, so symlink them from the main checkout. `.claude` is excluded through `.git/info/exclude`.
-- Run `pnpm install --frozen-lockfile` and `pnpm build` in a new worktree. `pnpm check` needs the built protocol.
-- Merge conflicts so far are almost always `pnpm-lock.yaml` (take develop's, then `pnpm install --no-frozen-lockfile`)
-  and the shared render files (`BoardCanvas.tsx`, `PickableEntities.tsx`, `scene-model.ts`).
-
-## Verification gate for every merge
-
-1. Merge `develop` into the feature branch first and resolve conflicts there. Never merge a conflicted branch into
-   `develop`. If a merge conflicts, abort it.
-2. `pnpm build`, `pnpm check` and `pnpm test:e2e` all pass. The e2e suite is the real gate for client changes:
-   M1-16 once passed every unit test and still blanked the client at runtime, because a store selector returned a
-   fresh object on each call. Always use stable fallbacks in selectors.
-3. Merge with `--no-ff` into `develop` and re-run the same checks.
+Host (`mythic-host`): game engine with per-audience filtering and reconnect replay, autosave and crash recovery,
+join flow with seats, presence and ephemeral relay, host-only DM link with a single-use token, image upload,
+campaign export and import (zip), authenticated HTTP routes, a one-command CLI that also serves the built client.
+Client: connection with reconnect, join screen, DM panels (Scenes, Layers, Map, Seats, Entities), 2D board with a
+finite scene canvas, pan and zoom, picking and selection, transform gizmo, image tokens with labels, battlemap
+calibration, primitives, AoE volume rendering, a 2D/3D toggle with an orbit camera and standee tokens, drop lines,
+skybox gradient, elevation controls and badge.
 
 ## Known gaps and risks
 
-- Almost nothing has been checked by eye in a browser. Rendering, gestures, pan/zoom feel, gizmos and the 3D view
-  rest on unit tests and "mounts without errors" e2e checks. A manual playtest is needed before M1-25.
-- D36 (merged) authenticates uploads with `Authorization: Mythic <identityId>.<secret>`. Failed-auth throttling is per IP,
-  so one NAT'd table shares a budget, and export does not flush a live room first. Still unverified with a real image.
-- `log.jsonl` lines carry no `schemaVersion` (§8.3 says every JSON root should).
-- There is no campaign or session id on the wire. `lastSeq` alone could match the wrong campaign if a client switches
-  campaigns on one host. Adding one would be a protocol change.
-- The engine rate-limits nothing yet (§18).
+- **Almost nothing was verified by eye.** The user ran one live test (the first build had a host-flow crash, fixed in
+  `1058475`). Agents looked at headless screenshots, but real mouse, trackpad and touch behaviour, gizmo feel,
+  3D appearance, uploads with real images and multi-player sessions are unverified. Run a manual playtest first.
+- Token dragging is not built (gizmo and typed values only), so there is no live drag preview yet.
+- `seat.identityId` is included in every audience's snapshot and patches (PERM-03 gap, low severity: ids are not
+  credentials). Redact it in `shared/visibility`.
+- `pin.text` and `token.image` go to every audience that can see an entity; only names are label-gated (D35).
+- `log.jsonl` lines carry no `schemaVersion`. There is no campaign or session id on the wire, so `lastSeq` alone
+  could match the wrong campaign. Both are protocol/save-format decisions.
+- Rate limits: HTTP has in-memory limits; engine intents have none yet (TECHNICAL §18).
+- A single "connection rate limit per IP" is shared by a NAT'd table (D36).
+- The e2e suite is load sensitive: with other heavy jobs running it flakes occasionally (upload rate-limit and
+  other timing tests). Re-run before assuming a regression.
+
+## Decisions
+
+All recorded in `TECHNICAL.md` §20 (a local, gitignored file): D19-D39. Accepted by the user: D23 (props host
+only), D24 and D33 (host authority; a fresh startup token rebinds the host), D25 (elevation snaps by default),
+D26 (AoE centre inclusion), D27 (AGPL-3.0 + DCO), D32 (co-DM sees the DM layer read-only), D34 (server order
+wins), D35 (names withheld), D37 (fixed scene canvas, default 40 x 30 cells), D38 (token colour), D39 (join flow
+and presence roster). D29 is partly superseded by D33.
+
+Proposed by agents but not yet written to the decision log (each is a small local choice; their final reports are
+in the git history and agent logs): M2-02 primitive sizing and footprint rules; M2-06 standee proportions
+(height 1.2x, width 0.9x footprint); M2-09 `environment.zenith`; M1-19 map-image maths; M1-20 gizmo snapping
+(rotate 15 degrees, whole-unit scale when `grid.snap`); M1-09 archive layout and the "never overwrite an existing
+campaign id" rule; D36 HTTP auth scheme (`Authorization: Mythic <identityId>.<secret>`, host and co-DM uploads,
+host-only export/import); M2-03 step rules (`maxStepUp` 0.5 cells); M2-05 tween (250 ms); M3-03 ring sampling
+(0.2 cells); M0-11 autosave interval (200 actions).
+
+## Open questions for the user
+
+1. A per-seat "DM-layer write" grant would be a `SeatPermissions` schema change (co-DMs currently get write
+   access only per entity).
+2. Should the internet guide keep recommending Tailscale Funnel? It contradicts the fleet rule in
+   `Server_Architecture v2.md`.
+3. Add a `role` flag (`host | seat | spectator`) to the snapshot to replace the client's localStorage host hint?
+4. Free-control tables (everyone admin) under server-order-wins: explore in M1-24.
+
+## How to resume
+
+Worktrees live in `../mythic-vtt-worktrees/<name>` (many are finished and can be removed with `git worktree remove`
+once their branch is merged, which all are). The branch for each task is `feature/<slug>`.
+
+1. New worktree: `git worktree add ../mythic-vtt-worktrees/<name> -b feature/<slug> develop`, then symlink the
+   gitignored docs from the main checkout (`AGENTS.md CLAUDE.md DESIGN.md TECHNICAL.md TASKS.md .claude`), then
+   `pnpm install --frozen-lockfile && pnpm build`. `.claude` is excluded via `.git/info/exclude`.
+2. Brief each agent with: the task row, the relevant decisions, "no attribution lines in commits", "run pnpm build,
+   pnpm check and pnpm test:e2e", "use stable fallbacks in store selectors", and for UI work "take a headless
+   screenshot and read it".
+3. Merge gate (always): merge `develop` into the branch and resolve there; then in the main checkout
+   `git merge --no-ff --no-commit feature/<slug>`, abort on conflict, run `pnpm build`, `pnpm check`,
+   `pnpm test:e2e`, and commit only if all pass. Never leave a conflicted merge in the main checkout. Conflicts so far
+   are the action registry (`registry.ts` and `index.ts`: keep both sides), `pnpm-lock.yaml` (take develop's, then
+   `pnpm install --no-frozen-lockfile`), and shared render files (`BoardCanvas.tsx`, `PickableEntities.tsx`,
+   `scene-model.ts`, `GridLines.tsx`, `DmPanels.tsx`).
+4. The e2e suite is the real gate for client work. The first host-flow bug and the picking crash both passed all unit
+   tests and were caught only in a browser.
+
+Sandbox note: Claude's Bash sandbox can only write inside the main repo folder, so worktree work and `pnpm check`
+need `dangerouslyDisableSandbox` (the sandbox puts unreadable placeholder dotfiles in the repo root, which breaks
+prettier and ESLint). Running the commands from a normal terminal has no such limit.
+
+## Codex and Hermes
+
+- Codex CLI (0.157) is logged in. Slugs: `gpt-6-sol` for higher-risk work, `gpt-5.6-sol` for regular tasks, medium
+  reasoning. Launch: `codex exec -m <slug> -c model_reasoning_effort=medium -s workspace-write --add-dir <repo>/.git -C <worktree> "<brief>"`.
+  It stops when its quota runs out (resets about every 5 hours) and sometimes returns "model at capacity": retry.
+  Its sandbox needs the gitignored docs symlinked into the worktree or it stalls asking for them.
+- Hermes on `razer-debian` works (default model `nvidia/nemotron-3-ultra-550b-a55b`; `qwen/qwen3.8-27b:free` through
+  OpenRouter is configured). Its launch with `--yolo` was blocked by the permission classifier; run it yourself or
+  allow it explicitly. `luisepc-debian` is reachable over SSH and its Hermes answers, but its Ollama service is
+  crash-looping (`systemctl status ollama`, `journalctl -u ollama`), so local Qwen3.8-27b is not available until that
+  is fixed. Hermes suits low-difficulty, well-specified tasks: docs, fixtures, small actions that copy an existing
+  pattern, test additions.
