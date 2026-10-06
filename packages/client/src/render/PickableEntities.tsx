@@ -6,7 +6,7 @@ import { useClientStore } from '../store/react.js';
 import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { MapImageMesh } from './MapImage.js';
-import { SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { ElevationBadge, SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { entityFill } from './token-fill.js';
 import { DropLines } from './DropLines.js';
 import { TokenStandee } from './TokenStandee.js';
@@ -113,6 +113,7 @@ export function PickableEntities({
                     <SelectionRing size={entity.sizeCells} />
                   )}
                   <TokenLabel entity={entity} actor={actor} />
+                  <ElevationBadge entity={entity} actor={actor} />
                 </mesh>
               ),
             )}
