@@ -36,6 +36,10 @@ it('loadConfig applies defaults and env overrides', () => {
   });
   expect(() => loadConfig({ MYTHIC_PORT: 'abc' })).toThrow();
   expect(() => loadConfig({ MYTHIC_MAX_IMAGE_UPLOAD_BYTES: '0' })).toThrow();
+  expect(d.campaignId).toBeUndefined();
+  expect(loadConfig({ MYTHIC_CAMPAIGN_ID: '01ARZ3NDEKTSV4RRFFQ69G5FAV' }).campaignId).toBe(
+    '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+  );
 });
 
 it('startHost creates the host secret and serves /healthz', async () => {
@@ -53,4 +57,16 @@ it('startHost creates the host secret and serves /healthz', async () => {
   expect((await fetch(`http://127.0.0.1:${String(host.port)}/__test/connections`)).status).toBe(
     404,
   );
+});
+
+it('startHost mints a random token per process and honours an injected one', async () => {
+  dir = await mkdtemp(join(tmpdir(), 'mythic-host-'));
+  const config = loadConfig({ MYTHIC_PORT: '0', MYTHIC_DATA_DIR: dir });
+  host = await startHost(config);
+  expect(host.hostToken.length).toBeGreaterThanOrEqual(32);
+  const first = host.hostToken;
+  await host.close();
+  host = await startHost(config, { hostToken: 'fixed' });
+  expect(host.hostToken).toBe('fixed');
+  expect(first).not.toBe('fixed');
 });

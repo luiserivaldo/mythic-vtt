@@ -5,3 +5,4 @@ export type { HostConfig } from './config.js';
 export { startHost } from './server.js';
 export type { RunningHost, StartHostOptions } from './server.js';
 export type { AuthenticatedSeat, UploadAuthorizer } from './http/index.js';
+export * from './engine/index.js';

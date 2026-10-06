@@ -8,6 +8,8 @@ export interface GatewayConnection {
   readonly identityId: string;
   readonly displayName: string;
   readonly avatar: string | undefined;
+  /** D24: true when this identity is the host's bound identity (bound via the one-time host token). */
+  readonly isHost: boolean;
   /** Last `seq` the client reported in `hello`, for replay or snapshot (TECHNICAL.md §7.1). */
   readonly lastSeq: number | undefined;
   /** Validated and encoded by the gateway; a no-op once the socket is closed. */

@@ -28,7 +28,10 @@ let gw: Gateway;
 let port: number;
 const open: WebSocket[] = [];
 
-async function start(handler?: GatewayHandler, opts: { helloTimeoutMs?: number } = {}) {
+async function start(
+  handler?: GatewayHandler,
+  opts: { helloTimeoutMs?: number; hostToken?: string } = {},
+) {
   gw = createGateway({ ...(handler ? { handler } : {}), ...opts, heartbeatMs: 0 });
   port = await gw.listen();
 }
@@ -246,5 +249,111 @@ describe('gateway', () => {
     c.send(hello());
     c.send({ t: 'intent', type: 'x', payload: {}, clientRef: 'r9' });
     expect(await c.next()).toMatchObject({ t: 'reject', clientRef: 'r9' });
+  });
+});
+
+describe('host token (D24)', () => {
+  const TOKEN = 'host-token-value';
+  const ok = async (c: Client) => {
+    c.send({ t: 'ping', n: 1 });
+    expect(await c.next()).toEqual({ t: 'pong', n: 1 });
+  };
+  const rejected = async (c: Client) => {
+    expect(await c.next()).toMatchObject({
+      t: 'error',
+      code: 'unauthorized',
+      message: 'host token rejected',
+      fatal: true,
+    });
+    await c.closed;
+  };
+
+  it('binds the identity as host with a valid token and recognises it on reconnect', async () => {
+    const r = recorder();
+    await start(r.handler, { hostToken: TOKEN });
+    const c1 = await connect();
+    c1.send(hello({ hostToken: TOKEN }));
+    await ok(c1);
+    expect(r.conns[0]?.isHost).toBe(true);
+    c1.ws.close();
+    await c1.closed;
+    const c2 = await connect();
+    c2.send(hello()); // own identity secret, no token
+    await ok(c2);
+    expect(r.conns[1]?.isHost).toBe(true);
+  });
+
+  it('treats ordinary identities as non-host', async () => {
+    const r = recorder();
+    await start(r.handler, { hostToken: TOKEN });
+    const c = await connect();
+    c.send(hello());
+    await ok(c);
+    expect(r.conns[0]?.isHost).toBe(false);
+  });
+
+  it('rejects a wrong token without consuming the real one', async () => {
+    const r = recorder();
+    await start(r.handler, { hostToken: TOKEN });
+    const bad = await connect();
+    bad.send(hello({ hostToken: 'nope' }));
+    await rejected(bad);
+    const good = await connect();
+    good.send(hello({ hostToken: TOKEN }));
+    await ok(good);
+    expect(r.conns.at(-1)?.isHost).toBe(true);
+  });
+
+  it('rejects a reused token with the same error, and the other identity stays non-host', async () => {
+    const r = recorder();
+    await start(r.handler, { hostToken: TOKEN });
+    const a = await connect();
+    a.send(hello({ hostToken: TOKEN }));
+    await ok(a);
+    const b = await connect();
+    b.send(hello({ identityId: ID_B, identitySecret: 'secret-two', hostToken: TOKEN }));
+    await rejected(b);
+    const b2 = await connect();
+    b2.send(hello({ identityId: ID_B, identitySecret: 'secret-two' }));
+    await ok(b2);
+    expect(r.conns.at(-1)?.isHost).toBe(false);
+  });
+
+  it('gives the same error when no token is configured', async () => {
+    await start(undefined);
+    const c = await connect();
+    c.send(hello({ hostToken: TOKEN }));
+    await rejected(c);
+  });
+
+  it('does not consume the token when the identity secret is wrong', async () => {
+    const r = recorder();
+    await start(r.handler, { hostToken: TOKEN });
+    const first = await connect();
+    first.send(hello());
+    await ok(first);
+    const attacker = await connect();
+    attacker.send(hello({ identitySecret: 'wrong', hostToken: TOKEN }));
+    expect(await attacker.next()).toMatchObject({ t: 'error', code: 'unauthorized' });
+    await attacker.closed;
+    const real = await connect();
+    real.send(hello({ hostToken: TOKEN }));
+    await ok(real);
+    expect(r.conns.at(-1)?.isHost).toBe(true);
+  });
+
+  it('lets only one of two racing hellos win the token', async () => {
+    const r = recorder();
+    await start(r.handler, { hostToken: TOKEN });
+    const a = await connect();
+    const b = await connect();
+    a.send(hello({ hostToken: TOKEN }));
+    b.send(hello({ identityId: ID_B, identitySecret: 's2', hostToken: TOKEN }));
+    a.send({ t: 'ping', n: 1 });
+    b.send({ t: 'ping', n: 1 });
+    const [ma, mb] = await Promise.all([a.next(), b.next()]);
+    expect([ma, mb].filter((m) => m.t === 'error')).toHaveLength(1);
+    expect([ma, mb].filter((m) => m.t === 'pong')).toHaveLength(1);
+    expect(r.conns.filter((c) => c.isHost)).toHaveLength(1);
   });
 });

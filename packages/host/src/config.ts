@@ -9,6 +9,8 @@ export interface HostConfig {
   dataDir: string;
   hostSecretPath: string;
   maxImageUploadBytes: number;
+  /** Campaign to open (`MYTHIC_CAMPAIGN_ID`); default: most recently updated, else a new one. */
+  campaignId?: string;
   /** Exposes /__test/connections for the e2e harness; never enable on a real table. */
   testEndpoints: boolean;
 }
@@ -43,5 +45,6 @@ export function loadConfig(env: Record<string, string | undefined>): HostConfig 
       DEFAULT_MAX_IMAGE_UPLOAD_BYTES,
     ),
     testEndpoints: env['MYTHIC_TEST_ENDPOINTS'] === '1',
+    ...(env['MYTHIC_CAMPAIGN_ID'] ? { campaignId: env['MYTHIC_CAMPAIGN_ID'] } : {}),
   };
 }
