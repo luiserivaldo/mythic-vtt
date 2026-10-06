@@ -29,7 +29,8 @@ function ownsEntity(audience: Audience, entity: Entity): boolean {
 }
 
 function viewKey(audience: Audience, seat?: Seat): string {
-  return `${audienceKey(audience)}:view=${seat?.permissions.view === false ? 'off' : 'on'}`;
+  const role = seat?.role === 'codm' ? 'codm' : 'player';
+  return `${audienceKey(audience)}:view=${seat?.permissions.view === false ? 'off' : 'on'}:${role}`;
 }
 
 /** The audience's view of one entity, or null if it must not be sent at all. */
@@ -38,8 +39,9 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
   const key = viewKey(audience, seat);
   return memo(entityCache, entity, key, () => {
     const owner = ownsEntity(audience, entity);
-    // LAY-04: the DM layer is host-only, even for owners of an entity moved onto it.
-    if (entity.layer === 'dm') return null;
+    // LAY-04 + D32: the DM layer is visible to the host and co-DM seats only, never to players
+    // (not even owners of an entity moved onto it) or spectators.
+    if (entity.layer === 'dm' && !(audience.kind === 'seat' && seat?.role === 'codm')) return null;
     // PERM-02: the seat-level toggle is the campaign-wide gate for entity visibility.
     if (audience.kind === 'seat' && seat?.permissions.view === false) return null;
     // PERM-02: an entity with view disabled is visible to its owners only.
