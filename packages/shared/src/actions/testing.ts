@@ -17,6 +17,8 @@ export const IDS = {
   session: testId(6),
   entity: testId(7),
   action: testId(8),
+  identity: testId(9),
+  otherIdentity: testId(10),
 } as const;
 
 const perms = { view: true, move: true, edit: false, delete: false };
