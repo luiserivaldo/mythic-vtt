@@ -9,6 +9,8 @@ import { selectionStore } from '../tools/selection-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
+import { TransformGizmo } from './TransformGizmo.js';
+import { TransformPanel } from '../ui/TransformPanel.js';
 import { OrbitControls3D } from './OrbitControls3D.js';
 import type { GroundBounds } from './camera-3d.js';
 
@@ -59,6 +61,8 @@ function BoardScene({
           starts on a selectable token. Token drag will own that arbitration. Plain clicks
           reach picking because only a drag-ending click is swallowed. */}
       <PickableEntities rendered={scene} scene={source} additiveMode={additiveMode} />
+      {/* M1-20: 2D transform handles; the 3D gizmo is M2-08. */}
+      {!mode3d && <TransformGizmo />}
     </>
   );
 }
@@ -131,6 +135,7 @@ export function BoardCanvas({ mode3d = false }: { mode3d?: boolean } = {}) {
           </button>
         )}
       </div>
+      {!mode3d && <TransformPanel />}
       <Canvas
         frameloop="demand"
         shadows={false}
