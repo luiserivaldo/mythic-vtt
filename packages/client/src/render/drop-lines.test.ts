@@ -80,7 +80,7 @@ describe('dropLinesFor', () => {
         name: 't',
         owners: [],
         entityLayer: 'tokens',
-        perms: {} as never,
+        perms: {},
         labelVisibility: 'all',
       },
     };

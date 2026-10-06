@@ -49,7 +49,7 @@ test('elevated tokens render in 3D with drop lines and no page errors', async ({
       entity: {
         id: testUlid('TOKEN', i + 1),
         layer: 'tokens',
-        name: `Flyer ${i + 1}`,
+        name: `Flyer ${String(i + 1)}`,
         owners: [],
         transform: transform(x ?? 0, y ?? 0, 15),
         token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
