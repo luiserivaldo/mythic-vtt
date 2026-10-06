@@ -154,6 +154,26 @@ main > p {
   max-width: calc(100% - 1rem);
   box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
 }
+.ui-aoe-affected {
+  right: 0.5rem;
+  left: auto;
+  min-width: 9rem;
+  max-width: min(16rem, calc(100% - 1rem));
+  font-size: 0.82rem;
+}
+.ui-aoe-affected strong,
+.ui-aoe-affected-count,
+.ui-aoe-affected-empty {
+  display: block;
+}
+.ui-aoe-affected-count,
+.ui-aoe-affected-empty {
+  color: var(--ui-muted);
+}
+.ui-aoe-affected ul {
+  margin: 0.3rem 0 0;
+  padding-left: 1.1rem;
+}
 .ui-field {
   display: block;
   margin-bottom: 0.35rem;

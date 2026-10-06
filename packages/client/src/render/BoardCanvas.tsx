@@ -30,6 +30,8 @@ import { ViewToggle } from './ViewToggle.js';
 import { AoEToolPanel } from '../ui/AoEToolPanel.js';
 import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
+import { AoEHighlights } from './AoEHighlights.js';
+import { AoEAffectedPanel } from '../ui/AoEAffectedPanel.js';
 
 function BoardScene({
   scene,
@@ -114,6 +116,7 @@ function BoardScene({
         mode={mode3d ? '3d' : '2d'}
         grid={grid}
       />
+      <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       {/* M1-20 / M2-08: 2D handles, or the 3D gizmo; both are off while the AoE tool is active. */}
       {!aoeActive && (mode3d ? <TransformGizmo3D /> : <TransformGizmo />)}
       <AoEPlacementCanvas scene={source} mode={mode3d ? '3d' : '2d'} />
@@ -183,6 +186,7 @@ export function BoardCanvas() {
         )}
       </div>
       <AoEToolPanel scene={source} />
+      <AoEAffectedPanel scene={source} />
       {!aoeActive && (mode3d ? <TransformPanel3D /> : <TransformPanel />)}
       <Canvas
         frameloop="demand"
