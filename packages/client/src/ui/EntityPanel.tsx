@@ -1,5 +1,5 @@
 import type { Campaign, LayerId, Scene } from '@mythic/shared';
-import { useMemo, useState, type SyntheticEvent } from 'react';
+import { useId, useMemo, useState, type SyntheticEvent } from 'react';
 import { useStore } from 'zustand';
 import { UploadError, uploadFailureMessage, type ImageUploader } from '../assets/image-upload.js';
 import { selectionStore } from '../tools/selection-store.js';
@@ -90,6 +90,7 @@ function TokenForm({
   const [file, setFile] = useState<File | null>(null);
   const [color, setColor] = useState(TOKEN_FORM_DEFAULTS.color);
   const [busy, setBusy] = useState(false);
+  const imageInputId = useId();
   const owners = useMemo(() => ownerOptions(campaign), [campaign]);
 
   async function submit(event: SyntheticEvent) {
@@ -200,16 +201,23 @@ function TokenForm({
           ))}
         </select>
       </label>
-      <label>
-        Image (optional){' '}
+      <div className="ui-file-field" role="group" aria-labelledby={`${imageInputId}-title`}>
+        <span id={`${imageInputId}-title`}>Image (optional)</span>
         <input
+          id={imageInputId}
+          className="ui-file-input"
           type="file"
           accept="image/png,image/jpeg,image/webp"
+          aria-labelledby={`${imageInputId}-title ${imageInputId}-button`}
           onChange={(e) => {
             setFile(e.target.files?.[0] ?? null);
           }}
         />
-      </label>
+        <label id={`${imageInputId}-button`} className="ui-file-button" htmlFor={imageInputId}>
+          Choose file
+        </label>
+        <span className="ui-file-name">{file?.name ?? 'No file chosen'}</span>
+      </div>
       <label>
         Colour (no image){' '}
         <input

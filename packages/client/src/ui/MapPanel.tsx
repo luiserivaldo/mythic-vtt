@@ -1,5 +1,5 @@
 import type { Campaign } from '@mythic/shared';
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useId, useMemo, useState, type ChangeEvent } from 'react';
 import { useStore } from 'zustand';
 import { UploadError, uploadFailureMessage, type ImageUploader } from '../assets/image-upload.js';
 import { solveCalibration, type CalibrationUnit } from '../tools/battlemap-calibration.js';
@@ -31,6 +31,7 @@ export function MapPanel({
   const [snap, setSnap] = useState(true);
   const [busy, setBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const imageInputId = useId();
 
   const scene = campaign.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;
   const rows = useMemo(() => (scene ? mapRows(scene) : []), [scene]);
@@ -108,17 +109,27 @@ export function MapPanel({
   return (
     <section aria-labelledby="ui-map-h" className="ui-panel">
       <h2 id="ui-map-h">Battlemap</h2>
-      <label className="ui-row">
-        <span>Upload image</span>
+      <div
+        className="ui-row ui-file-field"
+        role="group"
+        aria-labelledby={`${imageInputId}-title`}
+      >
+        <span id={`${imageInputId}-title`}>Upload image</span>
         <input
+          id={imageInputId}
+          className="ui-file-input"
           type="file"
           accept="image/png,image/jpeg,image/webp"
           disabled={busy}
+          aria-labelledby={`${imageInputId}-title ${imageInputId}-button`}
           onChange={(e) => {
             void onFile(e);
           }}
         />
-      </label>
+        <label id={`${imageInputId}-button`} className="ui-file-button" htmlFor={imageInputId}>
+          Choose file
+        </label>
+      </div>
       {uploadError && <p role="alert">{uploadError}</p>}
       {rows.length === 0 && <p>No battlemap in this scene yet.</p>}
       <ul className="ui-list">
