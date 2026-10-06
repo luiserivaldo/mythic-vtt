@@ -109,11 +109,7 @@ export function MapPanel({
   return (
     <section aria-labelledby="ui-map-h" className="ui-panel">
       <h2 id="ui-map-h">Battlemap</h2>
-      <div
-        className="ui-row ui-file-field"
-        role="group"
-        aria-labelledby={`${imageInputId}-title`}
-      >
+      <div className="ui-row ui-file-field" role="group" aria-labelledby={`${imageInputId}-title`}>
         <span id={`${imageInputId}-title`}>Upload image</span>
         <input
           id={imageInputId}

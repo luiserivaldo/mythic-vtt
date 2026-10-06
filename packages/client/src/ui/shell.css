@@ -143,6 +143,22 @@ main > p {
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--ui-border);
 }
+.ui-create-form {
+  row-gap: 0.65rem;
+}
+.ui-create-form .ui-primary-action {
+  flex: 1 0 100%;
+  width: 100%;
+  min-height: 2.5rem;
+  margin-top: 0.25rem;
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+  font-weight: 700;
+}
+.ui-create-form .ui-primary-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-accent) 88%, white);
+}
 
 /* Floating panel over the board (transform fields), bottom-left so it never meets the drawer. */
 .ui-overlay {

@@ -1,5 +1,5 @@
 import type { Campaign, LayerId, Scene } from '@mythic/shared';
-import { useId, useMemo, useState, type SyntheticEvent } from 'react';
+import { useId, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { useStore } from 'zustand';
 import { UploadError, uploadFailureMessage, type ImageUploader } from '../assets/image-upload.js';
 import { selectionStore } from '../tools/selection-store.js';
@@ -91,6 +91,7 @@ function TokenForm({
   const [color, setColor] = useState(TOKEN_FORM_DEFAULTS.color);
   const [busy, setBusy] = useState(false);
   const imageInputId = useId();
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const owners = useMemo(() => ownerOptions(campaign), [campaign]);
 
   async function submit(event: SyntheticEvent) {
@@ -98,11 +99,12 @@ function TokenForm({
     setBusy(true);
     onError(null);
     try {
+      const entityId = newId();
       const uploaded = file ? await uploader(file) : null;
       const ok = await send(
         tokenCreateIntent(scene, {
           sceneId: scene.id,
-          entityId: newId(),
+          entityId,
           name,
           size,
           layer,
@@ -116,6 +118,8 @@ function TokenForm({
       if (ok) {
         setName('');
         setFile(null);
+        selectionStore.getState().pick(scene.id, entityId, false);
+        nameInputRef.current?.focus();
       }
     } catch (e) {
       onError(
@@ -128,7 +132,7 @@ function TokenForm({
 
   return (
     <form
-      className="ui-row"
+      className="ui-row ui-create-form"
       aria-label="Create token"
       onSubmit={(e) => {
         void submit(e);
@@ -137,11 +141,12 @@ function TokenForm({
       <label>
         Token name{' '}
         <input
+          ref={nameInputRef}
           type="text"
           value={name}
           required
           maxLength={120}
-          aria-describedby="token-name-requirement"
+          aria-describedby={!isValidEntityName(name) ? 'token-name-requirement' : undefined}
           onChange={(e) => {
             setName(e.target.value);
           }}
@@ -229,7 +234,11 @@ function TokenForm({
           }}
         />
       </label>
-      <button type="submit" disabled={busy || !isValidEntityName(name)}>
+      <button
+        className="ui-primary-action"
+        type="submit"
+        disabled={busy || !isValidEntityName(name)}
+      >
         Create token
       </button>
     </form>
@@ -256,6 +265,7 @@ function PropForm({
   const [walkable, setWalkable] = useState(false);
   const [layer, setLayer] = useState<LayerId>('props');
   const [busy, setBusy] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const size = { x: Number(sx), y: Number(sy), z: Number(sz) };
   const valid =
     isValidEntityName(name) &&
@@ -281,16 +291,17 @@ function PropForm({
 
   return (
     <form
-      className="ui-row"
+      className="ui-row ui-create-form"
       aria-label="Create prop"
       onSubmit={(e) => {
         e.preventDefault();
         setBusy(true);
         onError(null);
+        const entityId = newId();
         void send(
           propCreateIntent(scene, {
             sceneId: scene.id,
-            entityId: newId(),
+            entityId,
             name,
             kind,
             color,
@@ -300,7 +311,11 @@ function PropForm({
           }),
         )
           .then((ok) => {
-            if (ok) setName('');
+            if (ok) {
+              setName('');
+              selectionStore.getState().pick(scene.id, entityId, false);
+              nameInputRef.current?.focus();
+            }
           })
           .finally(() => {
             setBusy(false);
@@ -310,6 +325,7 @@ function PropForm({
       <label>
         Prop name{' '}
         <input
+          ref={nameInputRef}
           type="text"
           value={name}
           maxLength={120}
@@ -358,7 +374,7 @@ function PropForm({
         Walkable
       </label>
       <LayerSelect value={layer} layers={createLayers(isHost)} onChange={setLayer} />
-      <button type="submit" disabled={busy || !valid}>
+      <button className="ui-primary-action" type="submit" disabled={busy || !valid}>
         Create prop
       </button>
     </form>

@@ -31,14 +31,61 @@ test('the host creates a scene, a token and a box from the Entities panel and se
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
-  await page.getByLabel('Token name').fill('Goblin');
-  await page.getByRole('button', { name: 'Create token' }).click();
-  await page.getByLabel('Prop name').fill('Crate');
-  await page.getByRole('button', { name: 'Create prop' }).click();
+  const tokenForm = page.getByRole('form', { name: 'Create token' });
+  const tokenFile = tokenForm.locator('input[type="file"]');
+  const tokenFileButton = tokenForm.locator('.ui-file-button');
+  expect(await tokenFile.boundingBox()).toMatchObject({ width: 1, height: 1 });
+  await expect(tokenFileButton).toBeVisible();
+
+  let chooserCount = 0;
+  page.on('filechooser', () => {
+    chooserCount += 1;
+  });
+  await tokenForm.getByText('No file chosen').click();
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  expect(chooserCount).toBe(0);
+  const chooserPromise = page.waitForEvent('filechooser');
+  await tokenFileButton.click();
+  const chooser = await chooserPromise;
+  await chooser.setFiles([]);
+  expect(chooserCount).toBe(1);
+
+  await page.getByRole('button', { name: 'Map', exact: true }).click();
+  const mapFile = page.getByRole('group', { name: 'Upload image' }).locator('input[type="file"]');
+  expect(await mapFile.boundingBox()).toMatchObject({ width: 1, height: 1 });
+  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+
+  const primary = page.getByRole('button', { name: 'Create token' });
+  await expect(primary).toHaveCSS('background-color', 'rgb(240, 174, 85)');
+  await expect(primary).toHaveCSS('color', 'rgb(20, 17, 11)');
+  const primaryBox = await primary.boundingBox();
+  const formBox = await tokenForm.boundingBox();
+  expect(primaryBox?.width).toBeGreaterThan((formBox?.width ?? 0) * 0.9);
+
+  const tokenName = page.getByLabel('Token name');
+  await tokenName.fill('Goblin');
+  await tokenName.press('Enter');
+  await expect(tokenName).toHaveValue('');
+  await expect(tokenName).toBeFocused();
+  await expect(page.getByTestId('token-label')).toHaveText('Goblin');
 
   const list = page.getByRole('list', { name: 'Entities in this scene' });
+  await expect(list.getByRole('button', { name: 'Goblin', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  const propName = page.getByLabel('Prop name');
+  await propName.fill('Crate');
+  await page.getByRole('button', { name: 'Create prop' }).click();
+  await expect(propName).toHaveValue('');
+  await expect(propName).toBeFocused();
+
   await expect(list.getByRole('button', { name: 'Goblin', exact: true })).toBeVisible();
-  await expect(list.getByRole('button', { name: 'Crate', exact: true })).toBeVisible();
+  await expect(list.getByRole('button', { name: 'Crate', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 
   await list.getByRole('button', { name: 'Goblin', exact: true }).click();
   await expect(list.getByRole('button', { name: 'Goblin', exact: true })).toHaveAttribute(
