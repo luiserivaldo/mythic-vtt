@@ -1,7 +1,6 @@
 import type { Patch } from 'immer';
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import {
-  audienceKey,
   checkIntent,
   patchesFor,
   reduceAction,
@@ -12,7 +11,7 @@ import {
 } from '@mythic/shared';
 import type { GatewayConnection, GatewayHandler } from '../gateway/engine-seam.js';
 import type { CampaignStore } from '../storage/types.js';
-import { actorFor, audienceFor } from './audience.js';
+import { actorFor, audienceFor, audienceViewKey } from './audience.js';
 import {
   cryptoRandom,
   randomFloats,
@@ -131,7 +130,7 @@ export function createEngine(options: EngineOptions): Engine {
     const missed = history.slice(lastSeq + 1 - first.seq);
     const startState = missed[0]?.before;
     if (!startState) return undefined;
-    const then = audienceKey(audienceFor(startState, placeOf(member.conn)));
+    const then = audienceViewKey(startState, placeOf(member.conn));
     return then === member.key ? missed : undefined;
   }
 
@@ -147,7 +146,7 @@ export function createEngine(options: EngineOptions): Engine {
     const groups = new Map<string, Member[]>();
     for (const member of members.values()) {
       const next = audienceFor(entry.after, placeOf(member.conn));
-      const nextKey = audienceKey(next);
+      const nextKey = audienceViewKey(entry.after, placeOf(member.conn));
       if (nextKey !== member.key) {
         // Seat changes switch the view wholesale: a fresh filtered snapshot, never a patch that
         // assumes the old audience's state.
@@ -248,7 +247,7 @@ export function createEngine(options: EngineOptions): Engine {
     onConnect(conn) {
       return serialize(() => {
         const audience = audienceFor(state, placeOf(conn));
-        const member: Member = { conn, audience, key: audienceKey(audience) };
+        const member: Member = { conn, audience, key: audienceViewKey(state, placeOf(conn)) };
         members.set(conn.connectionId, member);
         greet(member);
       });
