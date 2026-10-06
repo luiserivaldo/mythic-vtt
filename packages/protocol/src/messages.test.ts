@@ -6,6 +6,7 @@ import {
   encodeServerMessage,
   isSupportedVersion,
   PROTOCOL_VERSION,
+  TokenDragPreview,
   type ClientMessage,
   type ServerMessage,
 } from './index.js';
@@ -33,6 +34,11 @@ const client: ClientMessage[] = [
   { t: 'join' },
   { t: 'intent', type: 'scene.rename', payload: { sceneId: id, name: 'x' }, clientRef: 'c1' },
   { t: 'ephemeral', channel: 'cursor', data: { x: 1, y: 2 } },
+  {
+    t: 'ephemeral',
+    channel: 'token.drag-preview',
+    data: { sceneId: id, entityId: id, to: { x: 1.25, y: 0, z: -2.5 } },
+  },
   { t: 'ping', n: 1 },
 ];
 
@@ -102,5 +108,30 @@ describe('protocol version', () => {
   it('is carried by hello and checked explicitly', () => {
     expect(isSupportedVersion(PROTOCOL_VERSION)).toBe(true);
     expect(isSupportedVersion(PROTOCOL_VERSION + 1)).toBe(false);
+  });
+});
+
+describe('token drag preview', () => {
+  it('validates the additive TOK-02 ephemeral shape', () => {
+    const message = {
+      t: 'ephemeral',
+      channel: 'token.drag-preview',
+      data: { sceneId: id, entityId: id, to: { x: 1.25, y: 0, z: -2.5 } },
+    };
+    expect(TokenDragPreview.safeParse(message).success).toBe(true);
+    expect(
+      TokenDragPreview.safeParse({ ...message, data: { ...message.data, entityId: 'bad' } })
+        .success,
+    ).toBe(false);
+    expect(
+      TokenDragPreview.safeParse({ ...message, data: { ...message.data, to: { x: 1, y: 2 } } })
+        .success,
+    ).toBe(false);
+    expect(TokenDragPreview.safeParse({ ...message, extra: true }).success).toBe(false);
+    expect(
+      decodeClientMessage(
+        JSON.stringify({ ...message, data: { ...message.data, entityId: 'bad' } }),
+      ).ok,
+    ).toBe(false);
   });
 });

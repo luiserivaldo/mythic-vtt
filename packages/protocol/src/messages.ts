@@ -40,14 +40,38 @@ export const Intent = z.strictObject({
   sceneId: Ulid.optional(),
 });
 
-/** Ephemeral (not logged, not persisted; §4.3): cursors, pings, drag previews, live rulers. */
-export const Ephemeral = z.strictObject({
+/** TOK-02 live token position while dragging; dropping commits one durable `token.move`. */
+export const TokenDragPreview = z.strictObject({
   t: z.literal('ephemeral'),
-  channel: z.string().min(1),
-  data: z.unknown(),
-  /** Set by the host when relaying; ignored if a client supplies it. */
+  channel: z.literal('token.drag-preview'),
+  data: z.strictObject({
+    sceneId: Ulid,
+    entityId: Ulid,
+    to: z.strictObject({ x: z.number(), y: z.number(), z: z.number() }),
+  }),
+  /** Set by the host when relaying; clients omit it. */
   from: Ulid.optional(),
 });
+export type TokenDragPreview = z.infer<typeof TokenDragPreview>;
+
+/** Ephemeral (not logged, not persisted; §4.3): cursors, pings, drag previews, live rulers. */
+export const Ephemeral = z
+  .strictObject({
+    t: z.literal('ephemeral'),
+    channel: z.string().min(1),
+    data: z.unknown(),
+    /** Set by the host when relaying; ignored if a client supplies it. */
+    from: Ulid.optional(),
+  })
+  .superRefine((message, context) => {
+    if (message.channel !== 'token.drag-preview') return;
+    const parsed = TokenDragPreview.safeParse(message);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        context.addIssue({ code: 'custom', path: issue.path, message: issue.message });
+      }
+    }
+  });
 
 export const Ping = z.strictObject({ t: z.literal('ping'), n: z.number().int().nonnegative() });
 
