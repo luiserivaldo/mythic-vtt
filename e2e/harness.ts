@@ -154,9 +154,33 @@ export async function startTable(): Promise<Table> {
   }
 }
 
-/** One isolated browser context (own localStorage, so its own identity) on the client. */
-export async function openClient(browser: Browser, table: Table, name: string): Promise<Client> {
+/**
+ * M1-11: a visitor with a saved profile skips the join screen and connects at once as a
+ * spectator. Most specs are about the table, not the join flow, so they start from this.
+ */
+export async function seedProfile(context: BrowserContext, displayName = 'Player'): Promise<void> {
+  await context.addInitScript((name) => {
+    if (localStorage.getItem('mythic.profile.v1') === null) {
+      localStorage.setItem(
+        'mythic.profile.v1',
+        JSON.stringify({ displayName: name, spectator: true }),
+      );
+    }
+  }, displayName);
+}
+
+/**
+ * One isolated browser context (own localStorage, so its own identity) on the client. Pass
+ * `joinScreen: true` to start as a first-time visitor who sees the join screen.
+ */
+export async function openClient(
+  browser: Browser,
+  table: Table,
+  name: string,
+  opts: { joinScreen?: boolean } = {},
+): Promise<Client> {
   const context = await browser.newContext();
+  if (opts.joinScreen !== true) await seedProfile(context, name);
   const page = await context.newPage();
   await page.goto(table.clientUrl);
   return { name, context, page };

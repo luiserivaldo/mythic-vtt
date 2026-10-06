@@ -1,5 +1,6 @@
 import { useClientStore } from './store/react.js';
 import { DmPanels } from './ui/DmPanels.js';
+import { JoinScreen } from './ui/JoinScreen.js';
 import './ui/shell.css';
 import { BoardCanvas } from './render/BoardCanvas.js';
 
@@ -21,6 +22,7 @@ export function App() {
       {pending > 0 && <p>{pending} action(s) waiting for the host</p>}
       <DmPanels />
       <BoardCanvas />
+      <JoinScreen />
     </main>
   );
 }
