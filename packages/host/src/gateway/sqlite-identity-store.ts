@@ -17,7 +17,8 @@ const toIdentity = (row: IdentityRow): StoredIdentity => ({
 
 /**
  * `IdentityStore` in the host's SQLite index (§8.2: "identities (hashed secrets)"), so returning
- * players keep their identity and the D24 host binding survives a restart. Uses its own
+ * players keep their identity and the D24 host binding survives a restart. The binding is
+ * replaced when a fresh startup token is presented (D29 rebind). Uses its own
  * connection and tables; better-sqlite3 is synchronous, so each method is atomic in-process.
  */
 export function createSqliteIdentityStore(path: string): IdentityStore & { close(): void } {
@@ -50,9 +51,15 @@ export function createSqliteIdentityStore(path: string): IdentityStore & { close
   const selectHost = db.prepare<[], { identity_id: string }>(
     'SELECT identity_id FROM host_binding WHERE id = 1',
   );
-  const insertHost = db.prepare<[string]>(
-    'INSERT OR IGNORE INTO host_binding (id, identity_id) VALUES (1, ?)',
+  const upsertHost = db.prepare<[string]>(
+    'INSERT INTO host_binding (id, identity_id) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET identity_id = excluded.identity_id',
   );
+  // Read-then-replace in one transaction so the returned previous host is exact.
+  const rebind = db.transaction((identityId: string) => {
+    const previous = hostId();
+    upsertHost.run(identityId);
+    return previous;
+  });
 
   const hostId = () => selectHost.get()?.identity_id;
 
@@ -74,13 +81,7 @@ export function createSqliteIdentityStore(path: string): IdentityStore & { close
       return Promise.resolve();
     },
     getHostIdentityId: () => Promise.resolve(hostId()),
-    bindHostIfAbsent(identityId) {
-      insertHost.run(identityId);
-      const bound = hostId();
-      return bound === undefined
-        ? Promise.reject(new Error('host binding not stored'))
-        : Promise.resolve(bound);
-    },
+    rebindHost: (identityId) => Promise.resolve(rebind(identityId)),
     close() {
       db.close();
     },

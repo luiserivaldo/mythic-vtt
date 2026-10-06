@@ -1,11 +1,20 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { desc } from 'drizzle-orm';
-import { mkdir, open, readFile, readdir } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, stat } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { Id, Scene } from '@mythic/shared';
+import type { Readable } from 'node:stream';
+import {
+  exportCampaign,
+  importCampaign,
+  type ArchiveHost,
+  type AssetSource,
+  type ImportLimits,
+  type ImportResult,
+} from './campaign-archive.js';
 import { atomicWrite } from './io.js';
 import { campaigns } from './index-schema.js';
 import {
@@ -30,15 +39,17 @@ const SessionMeta = z.object({
 });
 export type SessionMeta = z.infer<typeof SessionMeta>;
 
-export class LocalCampaignStore implements CampaignStore {
+export class LocalCampaignStore implements CampaignStore, ArchiveHost {
   private readonly db: Database.Database;
   private readonly index;
   private readonly pending = new Map<string, Promise<void>>();
   private readonly dirty = new Map<string, Promise<void>>();
   private timer: ReturnType<typeof setTimeout> | undefined;
   constructor(
-    private readonly root: string,
+    readonly root: string,
     private readonly migrate: Migration = identity,
+    /** Needed to export/import the assets a campaign references (HIST-03). */
+    readonly assets?: AssetSource,
   ) {
     mkdirSync(root, { recursive: true });
     this.db = new Database(join(root, 'index.sqlite'));
@@ -52,8 +63,29 @@ export class LocalCampaignStore implements CampaignStore {
       this.index.select().from(campaigns).orderBy(desc(campaigns.updatedAt)).all(),
     );
   }
-  private folder(id: string): string {
+  /** @internal used by campaign-archive */
+  folder(id: string): string {
     return join(this.root, 'campaigns', safeId(id));
+  }
+  /** @internal used by campaign-archive */
+  async exists(id: string): Promise<boolean> {
+    if (
+      this.index
+        .select()
+        .from(campaigns)
+        .all()
+        .some((row) => row.id === id)
+    )
+      return true;
+    return (await stat(this.folder(id)).catch(() => undefined)) !== undefined;
+  }
+  /** @internal used by campaign-archive */
+  readFile<T>(
+    path: string,
+    kind: 'campaign' | 'scene' | 'snapshot',
+    schema: z.ZodType<T>,
+  ): Promise<T> {
+    return this.read(path, kind, schema);
   }
   private async read<T>(
     path: string,
@@ -270,9 +302,17 @@ export class LocalCampaignStore implements CampaignStore {
       }
     });
   }
-  export(campaignId: Id): Promise<import('node:stream').Readable> {
+  /** Zip stream of the campaign and referenced assets. Local only: never needs cloud/entitlements. */
+  export(campaignId: Id): Promise<Readable> {
     safeId(campaignId);
-    return Promise.reject(new Error('not implemented until M1-09'));
+    return Promise.resolve(exportCampaign(this, campaignId, () => this.load(campaignId)));
+  }
+  /**
+   * Imports an export zip. An id that already exists is never overwritten: rejects with
+   * `ArchiveError` code `conflict` (the caller may delete the old campaign first).
+   */
+  import(source: Readable, limits?: Partial<ImportLimits>): Promise<ImportResult> {
+    return importCampaign(this, source, limits);
   }
   async close(): Promise<void> {
     await this.flushLogs();

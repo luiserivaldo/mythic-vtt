@@ -68,6 +68,13 @@ export class LocalAssetStore implements AssetStore {
     if (!row) throw new StorageDataError('Asset not found', 'not-found');
     return Promise.resolve(createReadStream(join(this.root, 'assets', `${key}.${row.ext}`)));
   }
+  /** Stored metadata (mime/size/ext) for export; undefined when the asset is unknown. */
+  meta(hash: string): Promise<AssetMeta | undefined> {
+    const row = this.db
+      .prepare('SELECT mime, size, ext FROM assets WHERE hash = ?')
+      .get(digest(hash)) as AssetMeta | undefined;
+    return Promise.resolve(row);
+  }
   close(): void {
     this.db.close();
   }
