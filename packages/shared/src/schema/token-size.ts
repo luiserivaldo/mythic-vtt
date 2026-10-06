@@ -22,6 +22,21 @@ export const TOKEN_SIZE_DIMENSIONS = {
   gargantuan: { sizeCells: 4, heightCells: 4 },
 } as const satisfies Readonly<Record<TokenSize, TokenDimensions>>;
 
+/** Canonical TOK-09 square-footprint edges, in scene grid cells. */
+export const TOKEN_SIZE_CELLS = {
+  tiny: TOKEN_SIZE_DIMENSIONS.tiny.sizeCells,
+  small: TOKEN_SIZE_DIMENSIONS.small.sizeCells,
+  medium: TOKEN_SIZE_DIMENSIONS.medium.sizeCells,
+  large: TOKEN_SIZE_DIMENSIONS.large.sizeCells,
+  huge: TOKEN_SIZE_DIMENSIONS.huge.sizeCells,
+  gargantuan: TOKEN_SIZE_DIMENSIONS.gargantuan.sizeCells,
+} as const satisfies Readonly<Record<TokenSize, number>>;
+
 export function tokenDimensionsForSize(size: TokenSize): TokenDimensions {
   return { ...TOKEN_SIZE_DIMENSIONS[size] };
+}
+
+/** A malformed footprint falls back to one cell rather than making a token disappear. */
+export function tokenFootprintCells(sizeCells: number | undefined): number {
+  return sizeCells !== undefined && Number.isFinite(sizeCells) && sizeCells > 0 ? sizeCells : 1;
 }

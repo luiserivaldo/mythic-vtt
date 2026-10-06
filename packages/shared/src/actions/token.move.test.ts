@@ -38,6 +38,7 @@ describe(`${T} schema`, () => {
     expect(tokenMove.schema.safeParse({ sceneId: IDS.scene, entityId: IDS.entity }).success).toBe(
       false,
     );
+    expect(tokenMove.schema.safeParse({ ...payload, entityId: 7 }).success).toBe(false);
     expect(tokenMove.schema.safeParse({ ...payload, to: { x: 1, y: 2 } }).success).toBe(false);
     expect(tokenMove.schema.safeParse({ ...payload, to: { ...to, x: Infinity } }).success).toBe(
       false,
