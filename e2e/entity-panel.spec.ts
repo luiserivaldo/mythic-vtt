@@ -42,7 +42,6 @@ test('the host creates a scene, a token and a box from the Entities panel and se
     chooserCount += 1;
   });
   await tokenForm.getByText('No file chosen').click();
-  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   expect(chooserCount).toBe(0);
   const chooserPromise = page.waitForEvent('filechooser');
   await tokenFileButton.click();
