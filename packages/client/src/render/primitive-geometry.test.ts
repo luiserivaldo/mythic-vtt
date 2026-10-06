@@ -21,6 +21,7 @@ describe('unit primitive geometries', () => {
       kind: 'box' as const,
       color: '#fff',
       walkable: true,
+      showGridOnTop: false,
       width: 2,
       height: 1,
       depth: 2,

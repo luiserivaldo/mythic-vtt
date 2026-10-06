@@ -18,7 +18,10 @@ export function ElevatedSurfaceGrid({
 }) {
   const geometry = useMemo(() => {
     const next = new BufferGeometry();
-    next.setAttribute('position', new BufferAttribute(elevatedGridSegments(shape, entity.position), 3));
+    next.setAttribute(
+      'position',
+      new BufferAttribute(elevatedGridSegments(shape, entity.position), 3),
+    );
     next.computeBoundingSphere();
     return next;
   }, [entity.position, shape]);

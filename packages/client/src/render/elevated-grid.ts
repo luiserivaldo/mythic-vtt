@@ -52,13 +52,8 @@ function quadraticSpan(
   const du = -alongRotation;
   const dv = constantRotation;
   const a = (du * du) / (halfConstant * halfConstant) + (dv * dv) / (halfAlong * halfAlong);
-  const b =
-    (2 * u0 * du) / (halfConstant * halfConstant) +
-    (2 * v0 * dv) / (halfAlong * halfAlong);
-  const c =
-    (u0 * u0) / (halfConstant * halfConstant) +
-    (v0 * v0) / (halfAlong * halfAlong) -
-    1;
+  const b = (2 * u0 * du) / (halfConstant * halfConstant) + (2 * v0 * dv) / (halfAlong * halfAlong);
+  const c = (u0 * u0) / (halfConstant * halfConstant) + (v0 * v0) / (halfAlong * halfAlong) - 1;
   const discriminant = b * b - 4 * a * c;
   if (discriminant < -1e-9) return null;
   const root = Math.sqrt(Math.max(discriminant, 0));
@@ -77,25 +72,11 @@ function ellipseSpan(
   const cosine = Math.cos(shape.yaw);
   const sine = Math.sin(shape.yaw);
   if (axis === 'x') {
-    return quadraticSpan(
-      value - cx,
-      shape.width / 2,
-      shape.depth / 2,
-      cosine,
-      sine,
-      cz,
-    );
+    return quadraticSpan(value - cx, shape.width / 2, shape.depth / 2, cosine, sine, cz);
   }
   // Swapping world axes changes the local coefficients to u=-sin(z-cz)+cos(x-cx),
   // v=cos(z-cz)+sin(x-cx).
-  return quadraticSpan(
-    value - cz,
-    shape.depth / 2,
-    shape.width / 2,
-    cosine,
-    -sine,
-    cx,
-  );
+  return quadraticSpan(value - cz, shape.depth / 2, shape.width / 2, cosine, -sine, cx);
 }
 
 function surfaceY(

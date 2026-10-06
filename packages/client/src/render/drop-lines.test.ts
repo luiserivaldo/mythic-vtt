@@ -62,6 +62,7 @@ describe('dropLinesFor', () => {
         kind: 'box',
         color: '#fff',
         walkable,
+        showGridOnTop: false,
         width: 4,
         height: 2,
         depth: 4,
