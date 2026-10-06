@@ -11,6 +11,8 @@ export interface GameClientOptions {
   identity: Identity;
   displayName: string;
   avatar?: string;
+  /** D24: returns the host token for the first hello only, then undefined. */
+  takeHostToken?: () => string | undefined;
   store: StoreApi<ClientStore>;
   createSocket(url: string): SocketLike;
   random?: () => number;
@@ -46,12 +48,16 @@ export function createGameClient(options: GameClientOptions) {
   const conn = createConnection({
     url: options.url,
     createSocket: (url) => options.createSocket(url),
-    hello: () => ({
-      identityId: options.identity.identityId,
-      identitySecret: options.identity.identitySecret,
-      displayName: options.displayName,
-      ...(options.avatar !== undefined ? { avatar: options.avatar } : {}),
-    }),
+    hello: () => {
+      const hostToken = options.takeHostToken?.();
+      return {
+        identityId: options.identity.identityId,
+        identitySecret: options.identity.identitySecret,
+        displayName: options.displayName,
+        ...(options.avatar !== undefined ? { avatar: options.avatar } : {}),
+        ...(hostToken !== undefined ? { hostToken } : {}),
+      };
+    },
     lastSeq: () => store.getState().seq ?? undefined,
     random: options.random,
     backoff: options.backoff,
