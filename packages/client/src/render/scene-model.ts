@@ -51,6 +51,8 @@ export interface RenderShape {
   kind: PrimitiveKind;
   color: string;
   walkable: boolean;
+  /** GRID-05: show the scene grid on the walkable top in 3D. */
+  showGridOnTop: boolean;
   /** Bounding size in cells; the footprint centre is `position`, the base is `position[1]`. */
   width: number;
   height: number;
@@ -103,6 +105,7 @@ function renderShape(entity: Entity, shape: NonNullable<Entity['shape']>): Rende
     kind: shape.kind,
     color: shape.color,
     walkable: shape.walkable,
+    showGridOnTop: shape.showGridOnTop === true,
     width,
     height,
     depth,

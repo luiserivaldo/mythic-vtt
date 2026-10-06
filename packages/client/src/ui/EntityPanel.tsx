@@ -10,6 +10,7 @@ import {
   DEFAULT_TOKEN_COLOR,
   entityDeleteIntent,
   entityRenameIntent,
+  entityShowGridOnTopIntent,
   entityRows,
   isValidColour,
   isValidEntityName,
@@ -416,6 +417,21 @@ function EntityRowView({
               ))}
             </select>
           </label>
+          {entity.shape?.walkable && (
+            <label>
+              <input
+                type="checkbox"
+                checked={entity.shape.showGridOnTop === true}
+                onChange={(e) => {
+                  if (entity.shape)
+                    void send(
+                      entityShowGridOnTopIntent(scene.id, entityId, entity.shape, e.target.checked),
+                    );
+                }}
+              />{' '}
+              Show grid on top of {entity.name}
+            </label>
+          )}
           {confirming ? (
             <>
               <button
