@@ -1,0 +1,121 @@
+import { Html } from '@react-three/drei';
+import { useThree } from '@react-three/fiber';
+import { useEffect, useSyncExternalStore } from 'react';
+import { DoubleSide, SRGBColorSpace, TextureLoader, type Texture } from 'three';
+import { assetUrl } from '../assets/asset-url.js';
+import { createTextureCache } from '../assets/texture-cache.js';
+import type { SelectionActor } from '../tools/selection.js';
+import type { RenderEntity } from './scene-model.js';
+import { labelVisible } from './token-labels.js';
+
+/** Host origin for assets. '' = same origin (dev server proxies `/assets` to the host). */
+const ASSET_BASE_URL = '';
+
+const loader = new TextureLoader();
+const textures = createTextureCache<Texture>(
+  (url) =>
+    new Promise((resolve, reject) => {
+      loader.load(
+        url,
+        (texture) => {
+          texture.colorSpace = SRGBColorSpace;
+          resolve(texture);
+        },
+        undefined,
+        reject,
+      );
+    }),
+  (texture) => {
+    texture.dispose();
+  },
+);
+
+const NONE = { status: 'error' } as const;
+
+function useTexture(url: string | null) {
+  const invalidate = useThree((state) => state.invalidate);
+  const entry = useSyncExternalStore(
+    (listener) => textures.subscribe(listener),
+    () => (url ? textures.get(url) : NONE),
+    () => NONE,
+  );
+  useEffect(() => {
+    invalidate();
+  }, [entry, invalidate]);
+  return entry;
+}
+
+/**
+ * Material for a token: its image when loaded; otherwise the placeholder colour (while loading,
+ * on error, or for library assets that have no URL yet).
+ */
+export function TokenMaterial({ entity, color }: { entity: RenderEntity; color: string }) {
+  const entry = useTexture(assetUrl(ASSET_BASE_URL, entity.token?.image));
+  const map = entry.status === 'ready' ? entry.texture : null;
+  return (
+    <meshBasicMaterial
+      key={map ? 'textured' : 'flat'}
+      color={map ? '#ffffff' : color}
+      {...(map ? { map } : {})}
+      transparent={map !== null}
+      side={DoubleSide}
+      depthTest={false}
+      depthWrite={false}
+    />
+  );
+}
+
+/** Selection highlight that keeps a textured token visible (the flat fill is only a placeholder). */
+export function SelectionRing({ size }: { size: number }) {
+  const half = size / 2;
+  return (
+    // Not pickable: it must never intercept clicks meant for the token mesh.
+    <mesh raycast={() => null} position={[0, 0, 0.001]}>
+      <ringGeometry args={[half * 0.94, half, 4, 1, Math.PI / 4, Math.PI * 2]} />
+      <meshBasicMaterial color="#ffe066" side={DoubleSide} depthTest={false} depthWrite={false} />
+    </mesh>
+  );
+}
+
+/**
+ * TOK-04 / CAM-04: an HTML label projected to the screen, so it is always upright and faces the
+ * camera; never world-space text. Rendered only if this viewer may see it.
+ */
+export function TokenLabel({ entity, actor }: { entity: RenderEntity; actor: SelectionActor }) {
+  const token = entity.token;
+  if (!token) return null;
+  const shown = labelVisible(
+    {
+      name: token.name,
+      layer: token.entityLayer,
+      owners: token.owners,
+      perms: token.perms,
+      labelVisibility: token.labelVisibility,
+    },
+    actor,
+  );
+  if (!shown) return null;
+  return (
+    <Html
+      center
+      position={[0, -entity.sizeCells / 2 - 0.2, 0]}
+      zIndexRange={[5, 0]}
+      style={{ pointerEvents: 'none' }}
+    >
+      <div
+        data-testid="token-label"
+        style={{
+          padding: '1px 6px',
+          borderRadius: 4,
+          background: 'rgba(16,25,35,0.8)',
+          color: '#fff',
+          fontSize: 12,
+          whiteSpace: 'nowrap',
+          userSelect: 'none',
+        }}
+      >
+        {token.name}
+      </div>
+    </Html>
+  );
+}
