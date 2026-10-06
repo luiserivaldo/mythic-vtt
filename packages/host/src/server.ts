@@ -52,8 +52,8 @@ export async function startHost(
   await mkdir(config.dataDir, { recursive: true });
   await loadOrCreateHostSecret(config.hostSecretPath);
 
-  const store = new LocalCampaignStore(config.dataDir, storeMigrate);
   const assetStore = new LocalAssetStore(config.dataDir);
+  const store = new LocalCampaignStore(config.dataDir, storeMigrate, assetStore);
   const identities = createSqliteIdentityStore(join(config.dataDir, 'index.sqlite'));
   const closeStores = async () => {
     assetStore.close();
