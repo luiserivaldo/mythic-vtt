@@ -6,6 +6,7 @@ import {
   encodeServerMessage,
   isSupportedVersion,
   PROTOCOL_VERSION,
+  RulerPreview,
   TokenDragPreview,
   type ClientMessage,
   type ServerMessage,
@@ -38,6 +39,18 @@ const client: ClientMessage[] = [
     t: 'ephemeral',
     channel: 'token.drag-preview',
     data: { sceneId: id, entityId: id, to: { x: 1.25, y: 0, z: -2.5 } },
+  },
+  {
+    t: 'ephemeral',
+    channel: 'ruler.preview',
+    data: {
+      sceneId: id,
+      points: [
+        { x: 0.5, y: 0, z: 0.5 },
+        { x: 3.5, y: 0, z: 4.5 },
+      ],
+      phase: 'active',
+    },
   },
   { t: 'ping', n: 1 },
 ];
@@ -131,6 +144,29 @@ describe('token drag preview', () => {
     expect(
       decodeClientMessage(
         JSON.stringify({ ...message, data: { ...message.data, entityId: 'bad' } }),
+      ).ok,
+    ).toBe(false);
+  });
+});
+
+describe('ruler preview', () => {
+  it('validates the additive MEAS-01 ephemeral shape', () => {
+    const message = {
+      t: 'ephemeral',
+      channel: 'ruler.preview',
+      data: {
+        sceneId: id,
+        points: [{ x: 0.5, y: 0, z: 0.5 }],
+        phase: 'active',
+      },
+    } as const;
+    expect(RulerPreview.safeParse(message).success).toBe(true);
+    expect(
+      RulerPreview.safeParse({ ...message, data: { ...message.data, phase: 'stored' } }).success,
+    ).toBe(false);
+    expect(
+      decodeClientMessage(
+        JSON.stringify({ ...message, data: { ...message.data, points: [{ x: 1, z: 2 }] } }),
       ).ok,
     ).toBe(false);
   });
