@@ -33,14 +33,14 @@ const remembered = (() => {
 if (remembered) store.getState().setHost(true);
 if (hostToken !== undefined) {
   const unsubscribe = store.subscribe((s) => {
-    if (s.ready) {
-      s.setHost(true);
-      try {
-        localStorage.setItem(HOST_HINT, '1');
-      } catch {
-        // Private mode: the hint just won't survive a reload.
-      }
-      unsubscribe();
+    if (!s.ready) return;
+    // Unsubscribe first: setHost changes the store, which would re-enter this callback forever.
+    unsubscribe();
+    s.setHost(true);
+    try {
+      localStorage.setItem(HOST_HINT, '1');
+    } catch {
+      // Private mode: the hint just won't survive a reload.
     }
   });
 }
