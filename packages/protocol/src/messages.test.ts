@@ -21,6 +21,14 @@ const client: ClientMessage[] = [
     displayName: 'Ana',
     lastSeq: 4,
   },
+  {
+    t: 'hello',
+    v: PROTOCOL_VERSION,
+    identityId: id,
+    identitySecret: 'secret',
+    displayName: 'Ana',
+    hostToken: 'tok',
+  },
   { t: 'join', seatId: id },
   { t: 'join' },
   { t: 'intent', type: 'scene.rename', payload: { sceneId: id, name: 'x' }, clientRef: 'c1' },
@@ -76,6 +84,12 @@ describe('rejections', () => {
     expect(
       bad({ t: 'hello', v: 1, identityId: 'bad', identitySecret: 's', displayName: 'a' }),
     ).toBe(false);
+    const h = { t: 'hello', v: 1, identityId: id, identitySecret: 's', displayName: 'a' };
+    expect(bad(h)).toBe(true); // hostToken is optional (backwards compatible)
+    expect(bad({ ...h, hostToken: 'tok' })).toBe(true);
+    expect(bad({ ...h, hostToken: '' })).toBe(false);
+    expect(bad({ ...h, hostToken: 5 })).toBe(false);
+    expect(bad({ ...h, hostToken: 'x'.repeat(257) })).toBe(false);
     expect(bad({ t: 'ping', n: -1 })).toBe(false);
     expect(bad({ t: 'ping', n: 1, extra: true })).toBe(false);
   });

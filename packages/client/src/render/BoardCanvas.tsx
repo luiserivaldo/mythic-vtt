@@ -6,14 +6,19 @@ import { useClientStore } from '../store/react.js';
 import { activeRenderScene, type RenderScene } from './scene-model.js';
 import { PickableEntities } from './PickableEntities.js';
 import { selectionStore } from '../tools/selection-store.js';
+import { GridLines } from './GridLines.js';
+import { activeRenderGrid, type RenderGrid } from './grid-model.js';
+import { PanZoomControls } from './PanZoomControls.js';
 
 function BoardScene({
   scene,
   source,
+  grid,
   additiveMode,
 }: {
   scene: RenderScene | null;
   source: Scene | null;
+  grid: RenderGrid | null;
   additiveMode: boolean;
 }) {
   const invalidate = useThree((state) => state.invalidate);
@@ -24,6 +29,7 @@ function BoardScene({
   return (
     <>
       <color attach="background" args={[scene?.background ?? '#101923']} />
+      <PanZoomControls />
       <OrthographicCamera
         makeDefault
         position={[0, 20, 0]}
@@ -33,6 +39,11 @@ function BoardScene({
         near={0.1}
         far={1000}
       />
+      {/* The grid sits under the map layer's order so entities draw over it. */}
+      {grid && <GridLines grid={grid} renderOrder={-1} />}
+      {/* TODO(M1-18): PanZoomControls pans on any left-drag past a threshold, even one that
+          starts on a selectable token. Token drag will own that arbitration. Plain clicks
+          reach picking because only a drag-ending click is swallowed. */}
       <PickableEntities rendered={scene} scene={source} additiveMode={additiveMode} />
     </>
   );
@@ -43,6 +54,7 @@ export function BoardCanvas() {
   const [additiveMode, setAdditiveMode] = useState(false);
   const campaign = useClientStore((state) => state.campaign);
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
+  const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
   const source = campaign?.activeSceneId ? (campaign.scenes[campaign.activeSceneId] ?? null) : null;
 
   return (
@@ -82,7 +94,7 @@ export function BoardCanvas() {
             selectionStore.getState().clear();
         }}
       >
-        <BoardScene scene={scene} source={source} additiveMode={additiveMode} />
+        <BoardScene scene={scene} source={source} grid={grid} additiveMode={additiveMode} />
       </Canvas>
     </div>
   );
