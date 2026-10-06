@@ -302,3 +302,84 @@ main [tabindex]:focus-visible {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+.ui-toast-stack {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  width: min(34rem, calc(100vw - 1.5rem));
+  flex-direction: column;
+  gap: 0.45rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.ui-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  color: #fff4f2;
+  background: #611f24;
+  border: 1px solid #ff9b8f;
+  border-radius: 6px;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 55%);
+  pointer-events: auto;
+}
+.ui-toast button {
+  min-width: 2rem;
+  padding: 0;
+  color: #fff4f2;
+  background: #421317;
+  border-color: #ff9b8f;
+}
+
+.ui-dev-overlay {
+  position: fixed;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 50;
+  width: min(35rem, calc(100vw - 1rem));
+  max-height: min(70dvh, 42rem);
+  box-sizing: border-box;
+  padding: 0.65rem;
+  overflow: auto;
+  color: #eff7ff;
+  background: rgb(10 20 30 / 96%);
+  border: 1px solid #7d91a5;
+  border-radius: 6px;
+  box-shadow: 0 5px 22px rgb(0 0 0 / 60%);
+  font-size: 0.78rem;
+}
+.ui-dev-overlay header,
+.ui-dev-overlay dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.ui-dev-overlay dl {
+  margin: 0.5rem 0;
+}
+.ui-dev-overlay dt {
+  flex: 0 0 7rem;
+  color: #b7c8d9;
+}
+.ui-dev-overlay dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.ui-dev-overlay h2 {
+  margin: 0.65rem 0 0.25rem;
+  font-size: 0.85rem;
+}
+.ui-dev-overlay ol,
+.ui-dev-overlay p {
+  margin: 0;
+}
+.ui-dev-overlay li {
+  margin-bottom: 0.25rem;
+  overflow-wrap: anywhere;
+}

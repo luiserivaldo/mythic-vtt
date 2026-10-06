@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { allActions } from '@mythic/shared';
 import { HELP, resolveConfig } from './cli.js';
 import { lanUrls } from './lan.js';
 import { startHost } from './server.js';
@@ -25,6 +26,8 @@ if (!config.clientDir) {
 }
 const running = await startHost(config);
 const port = String(running.port);
+const buildCommit = process.env['MYTHIC_BUILD_COMMIT']?.slice(0, 12) || 'unknown';
+console.log(`mythic-host build 0.0.0+${buildCommit}; shared actions=${String(allActions.length)}`);
 // Machine-readable line: the e2e harness and dev:table wait for it.
 console.log(`mythic-host listening on ${config.host}:${port}`);
 if (!config.clientDir)

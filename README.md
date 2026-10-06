@@ -32,6 +32,8 @@ node packages/host/dist/main.js --lan   # or: mythic-host --lan
 
 The command serves the built client and the game host on one port (default 8787) and prints the address players open and your single-use DM link (`#host=...`). By default it only listens on this machine (`127.0.0.1`); `--lan` listens on your network so players on the same Wi-Fi can join.
 
+Re-run `pnpm build` after pulling or changing source before starting the built host. For local development, `pnpm dev:table` rebuilds the host and its workspace dependencies automatically before it starts.
+
 ### Local play (same Wi-Fi)
 
 ```sh

@@ -178,7 +178,7 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
       if (!rulerStore.getState().tool || e.target !== el) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (pointerClaims.isClaimed(e.pointerId)) return;
-      pointerClaims.claim(e.pointerId);
+      pointerClaims.claim(e.pointerId, 'ruler');
       down = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
     };
 
