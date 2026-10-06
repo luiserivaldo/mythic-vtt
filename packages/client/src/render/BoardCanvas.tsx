@@ -9,6 +9,7 @@ import {
   type RenderEntity,
   type RenderScene,
 } from './scene-model.js';
+import { PanZoomControls } from './PanZoomControls.js';
 
 const COLORS = {
   map: '#51637a',
@@ -42,6 +43,7 @@ function BoardScene({ scene }: { scene: RenderScene | null }) {
   return (
     <>
       <color attach="background" args={[scene?.background ?? '#101923']} />
+      <PanZoomControls />
       <OrthographicCamera
         makeDefault
         position={[0, 20, 0]}
