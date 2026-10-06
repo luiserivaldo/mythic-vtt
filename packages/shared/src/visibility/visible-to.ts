@@ -1,4 +1,4 @@
-import type { Campaign, Entity, Scene } from '../schema/index.js';
+import type { Campaign, Entity, Scene, Seat } from '../schema/index.js';
 import { audienceKey, type Audience } from './audience.js';
 
 // PERM-03: filtering happens on the host before serialization. Anything an audience may not see
@@ -28,13 +28,20 @@ function ownsEntity(audience: Audience, entity: Entity): boolean {
   return audience.kind === 'seat' && entity.owners.includes(audience.seatId);
 }
 
+function viewKey(audience: Audience, seat?: Seat): string {
+  return `${audienceKey(audience)}:view=${seat?.permissions.view === false ? 'off' : 'on'}`;
+}
+
 /** The audience's view of one entity, or null if it must not be sent at all. */
-export function viewEntity(audience: Audience, entity: Entity): Entity | null {
+export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Entity | null {
   if (audience.kind === 'host') return entity;
-  return memo(entityCache, entity, audienceKey(audience), () => {
+  const key = viewKey(audience, seat);
+  return memo(entityCache, entity, key, () => {
     const owner = ownsEntity(audience, entity);
     // LAY-04: the DM layer is host-only, even for owners of an entity moved onto it.
     if (entity.layer === 'dm') return null;
+    // PERM-02: the seat-level toggle is the campaign-wide gate for entity visibility.
+    if (audience.kind === 'seat' && seat?.permissions.view === false) return null;
     // PERM-02: an entity with view disabled is visible to its owners only.
     if (entity.perms?.view === false && !owner) return null;
     const label = entity.token?.labelVisibility;
@@ -43,12 +50,13 @@ export function viewEntity(audience: Audience, entity: Entity): Entity | null {
   });
 }
 
-function viewScene(audience: Audience, scene: Scene): Scene {
-  return memo(sceneCache, scene, audienceKey(audience), () => {
+function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
+  const key = viewKey(audience, seat);
+  return memo(sceneCache, scene, key, () => {
     const entities: Scene['entities'] = {};
     let changed = false;
     for (const [id, entity] of Object.entries(scene.entities)) {
-      const view = viewEntity(audience, entity);
+      const view = viewEntity(audience, entity, seat);
       if (view === null) changed = true;
       else {
         entities[id] = view;
@@ -62,10 +70,11 @@ function viewScene(audience: Audience, scene: Scene): Scene {
 export function visibleTo(audience: Audience, state: Campaign): Campaign {
   if (audience.kind === 'host') return state;
   return memo(campaignCache, state, audienceKey(audience), () => {
+    const seat = audience.kind === 'seat' ? state.seats[audience.seatId] : undefined;
     const scenes: Campaign['scenes'] = {};
     let changed = false;
     for (const [id, scene] of Object.entries(state.scenes)) {
-      const view = viewScene(audience, scene);
+      const view = viewScene(audience, scene, seat);
       scenes[id] = view;
       if (view !== scene) changed = true;
     }

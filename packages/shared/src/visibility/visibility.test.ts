@@ -54,6 +54,14 @@ describe('visibleTo', () => {
     expect(owner[pubId]?.name).toBe('Visible orc');
   });
 
+  it('hides all entities when a seat-level view permission is disabled', () => {
+    const s = produce(withEntities(), (d) => {
+      const seat = d.seats[IDS.other];
+      if (seat) seat.permissions.view = false;
+    });
+    expect(visibleTo(audiences.other as Audience, s).scenes[IDS.scene]?.entities).toEqual({});
+  });
+
   it('masks owner-only token labels for non-owners', () => {
     const s = produce(withEntities(), (d) => {
       const e = d.scenes[IDS.scene]?.entities[pubId];
