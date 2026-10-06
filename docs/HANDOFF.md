@@ -147,3 +147,19 @@ Findings: `docs/playtests/2026-10-06-alpha.md` (PT1-01 to PT1-17). Fixes are que
 queue" (M0-15, M1-26 to M1-32, M2-12, M2-13); pick them up after in-flight MVP work. Design questions Q18-Q23 are open
 in `DESIGN.md` §14 and gate M1-28 and any palette, marquee, scaling or direct-manipulation work. Do M0-15 first: AoE
 placement failed with `unknown-action` because `pnpm dev:table` does not rebuild `@mythic/shared`.
+
+## Update 2026-10-06 ~22:45: playtest fixes wave A merged; Codex paused until 2:27 AM
+
+`develop` = `2e7be1b` plus later docs commits; gate: 849 unit tests, 32 e2e tests. Merged: M3-05 (AoE highlight), M3-06
+(3D ruler; hold-and-drag quick measure is NOT done, see M1-32), M0-15 (`dev:table` rebuilds workspace deps), M1-26 (reject
+toasts and dev overlay: toggle with backtick or `?dev=1`), M1-29 (file input hit area), M1-30 (token labels on create),
+M1-31 (prominent create button, Enter creates). **54 of 58 MVP tasks and 5 of 10 playtest fixes done.**
+
+Remaining MVP: M0-14 (exit test), M1-24 (load test), M2-10 (performance pass), M1-25, M2-11, M3-08 (human playtests).
+Remaining playtest fixes (single thread, in this order): M1-27 token drag snap-back (re-test first with the dev overlay;
+a stale build explained PT1-01 and may explain part of it), M2-12 camera FOV and framing, M2-13 3D orbit stutter, M1-32
+press-drag ruler (2D and 3D), palette change (light grey board, light blue surround: the playtester's request for Q18).
+Blocked on design questions Q18-Q23 in DESIGN.md: M1-28 and anything on marquee select, axis labels, non-uniform scale and
+direct manipulation.
+
+Working rule agreed with the user: run ONE Codex task at a time; Codex had 5% quota left and resets at 2:27 AM.
