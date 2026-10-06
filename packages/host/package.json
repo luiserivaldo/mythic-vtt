@@ -17,7 +17,12 @@
     "dev": "echo \"dev:table: host and client not implemented yet (M0-09, M0-12)\""
   },
   "dependencies": {
+    "@mythic/protocol": "workspace:*",
     "@mythic/shared": "workspace:*",
-    "@mythic/protocol": "workspace:*"
+    "fastify": "^5.12.5",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
   }
 }
