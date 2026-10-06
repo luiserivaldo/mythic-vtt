@@ -1,11 +1,13 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
-import { createGameClient } from './net/client.js';
 import { createHostTokenHolder, extractHostToken } from './net/host-token.js';
 import { loadOrCreateIdentity } from './net/identity.js';
 import { ClientStoreContext } from './store/react.js';
 import { createClientStore } from './store/store.js';
+import { JoinContext } from './ui/join-context.js';
+import { loadProfile } from './ui/join-screen.js';
+import { createSession } from './ui/session.js';
 import { SubmitContext } from './ui/submit.js';
 import { createUiStore, UiStoreContext } from './ui/ui-store.js';
 
@@ -45,15 +47,19 @@ if (hostToken !== undefined) {
   });
 }
 const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-const client = createGameClient({
+// SES-01: a visitor chooses a name (and seat) on the join screen before the socket opens, because
+// `hello` carries the display name. The DM link (and a remembered host) skips the screen.
+const session = createSession({
   url: `${wsProtocol}//${location.host}/ws`,
   identity,
-  displayName: 'Player',
   hostToken: hostTokenHolder,
   store,
   createSocket: (url) => new WebSocket(url),
 });
-client.start();
+const hostVisitor = hostToken !== undefined || remembered;
+const initialProfile = loadProfile(localStorage);
+if (hostVisitor) session.start({ displayName: initialProfile?.displayName ?? 'DM' });
+else if (initialProfile) session.start(initialProfile);
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('missing #root');
@@ -61,8 +67,18 @@ createRoot(rootEl).render(
   <StrictMode>
     <ClientStoreContext.Provider value={store}>
       <UiStoreContext.Provider value={uiStore}>
-        <SubmitContext.Provider value={client.submitIntent}>
-          <App />
+        <SubmitContext.Provider value={session.submitIntent}>
+          <JoinContext.Provider
+            value={{
+              session,
+              storage: localStorage,
+              identityId: identity.identityId,
+              hostVisitor,
+              initialProfile,
+            }}
+          >
+            <App />
+          </JoinContext.Provider>
         </SubmitContext.Provider>
       </UiStoreContext.Provider>
     </ClientStoreContext.Provider>

@@ -25,7 +25,12 @@ export interface ClientState {
    * UI hint only; the host still checks every intent. Hides DM panels, grants nothing.
    */
   isHost: boolean;
-  presence: { seats: Of<'presence'>['seats']; spectators: number } | null;
+  presence: {
+    seats: Of<'presence'>['seats'];
+    spectators: number;
+    /** M1-11: host-only roster of connected identities without a seat; absent for everyone else. */
+    unseated?: Of<'presence'>['unseated'];
+  } | null;
   notices: Notice[];
   /** Fatal host error, e.g. protocol mismatch; shown instead of the table. */
   fatalError: string | null;
@@ -106,7 +111,13 @@ export function createClientStore(): StoreApi<ClientStore> {
           return outcome.kind === 'stale' ? 'ok' : 'resync';
         }
         case 'presence':
-          set({ presence: { seats: message.seats, spectators: message.spectators } });
+          set({
+            presence: {
+              seats: message.seats,
+              spectators: message.spectators,
+              ...(message.unseated !== undefined ? { unseated: message.unseated } : {}),
+            },
+          });
           return 'ok';
         case 'notice':
           set({

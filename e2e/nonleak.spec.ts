@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   RawClient,
   recordPageFrames,
+  seedProfile,
   startTable,
   testUlid,
   type Reply,
@@ -375,6 +376,7 @@ test('a real browser client (spectator) never receives DM-layer frames either', 
 }) => {
   const secret = secretFor(7);
   const context = await browser.newContext();
+  await seedProfile(context);
   const page = await context.newPage();
   const frames = recordPageFrames(page);
   await page.goto(table.clientUrl);
