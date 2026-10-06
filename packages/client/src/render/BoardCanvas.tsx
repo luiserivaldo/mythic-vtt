@@ -12,6 +12,8 @@ import { selectionStore } from '../tools/selection-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
+import { RulerTool } from './RulerTool.js';
+import { RulerToggle } from './RulerToggle.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
 import { TransformPanel } from '../ui/TransformPanel.js';
@@ -96,6 +98,8 @@ function BoardScene({
       )}
       {/* M1-18: TokenDrag claims a press on a selected, movable token (pointer-claims) so only
           empty board pans. */}
+      {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
+      <RulerTool />
       <TokenDrag />
       <PickableEntities
         rendered={shown}
@@ -157,6 +161,7 @@ export function BoardCanvas() {
           Clear selection
         </button>
         <ViewToggle />
+        <RulerToggle />
         {mode3d && (
           <button
             type="button"
