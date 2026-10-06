@@ -4,7 +4,11 @@ import { defineAction } from './define.js';
 import { canUseEntity, isLayerLocked } from './entity-access.js';
 
 const AoEChanges = z
-  .strictObject({ name: z.string().optional(), transform: Transform.optional(), aoe: AoEShape.optional() })
+  .strictObject({
+    name: z.string().optional(),
+    transform: Transform.optional(),
+    aoe: AoEShape.optional(),
+  })
   .refine((changes) => Object.keys(changes).length > 0, {
     message: 'at least one field to update is required',
   });

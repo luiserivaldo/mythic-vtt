@@ -201,8 +201,8 @@ describe('AoE schemas (MEAS-03)', () => {
   });
 
   it('keeps the pre-M3 placeholder component parseable', () => {
-    expect(Entity.safeParse({ ...entity, aoe: { kind: 'sphere', size: 3, color: '#fff' } }).success).toBe(
-      true,
-    );
+    expect(
+      Entity.safeParse({ ...entity, aoe: { kind: 'sphere', size: 3, color: '#fff' } }).success,
+    ).toBe(true);
   });
 });

@@ -12,7 +12,11 @@ const moved = {
   scale: { x: 1, y: 1, z: 1 },
 };
 const shape = { kind: 'cone' as const, radius: 3, length: 6, color: '#ff0000' };
-const payload = { sceneId: IDS.scene, entityId: IDS.entity, changes: { transform: moved, aoe: shape } };
+const payload = {
+  sceneId: IDS.scene,
+  entityId: IDS.entity,
+  changes: { transform: moved, aoe: shape },
+};
 const envelope = (p: unknown = payload): ActionEnvelope => ({
   id: IDS.action,
   type: T,
