@@ -46,15 +46,18 @@ See **[Internet Play Guide](docs/internet-play.md)** for tunnels (recommended), 
 
 ### Configuration
 
-| Setting                    | Flag         | Env var             | Config file key |
-| -------------------------- | ------------ | ------------------- | --------------- |
-| Port                       | `--port`     | `MYTHIC_PORT`       | `port`          |
-| Bind address               | `--host`     | `MYTHIC_HOST`       | `host`          |
-| Listen on LAN              | `--lan`      | `MYTHIC_LAN=1`      | `lan`           |
-| Data directory             | `--data-dir` | `MYTHIC_DATA_DIR`   | n/a             |
-| Public URL for the DM link | n/a          | `MYTHIC_PUBLIC_URL` | `publicUrl`     |
+| Setting                     | Flag         | Env var                   | Config file key |
+| --------------------------- | ------------ | ------------------------- | --------------- |
+| Port                        | `--port`     | `MYTHIC_PORT`             | `port`          |
+| Bind address                | `--host`     | `MYTHIC_HOST`             | `host`          |
+| Listen on LAN               | `--lan`      | `MYTHIC_LAN=1`            | `lan`           |
+| Data directory              | `--data-dir` | `MYTHIC_DATA_DIR`         | n/a             |
+| Autosave interval (actions) | n/a          | `MYTHIC_AUTOSAVE_ACTIONS` | n/a             |
+| Public URL for the DM link  | n/a          | `MYTHIC_PUBLIC_URL`       | `publicUrl`     |
 
 Precedence is flags, then environment, then the config file, then defaults. The config file is `mythic.config.json` in the data directory, or the path given to `--config`.
+
+The host writes an atomic campaign and scene checkpoint every 200 actions by default (set `MYTHIC_AUTOSAVE_ACTIONS` to a positive integer) and on a clean session end. On restart it replays complete log entries after the last checkpoint. Log writes are synced to disk in batches every 500 ms, so a sudden power loss may lose up to 500 ms of recent actions; a clean stop flushes the log.
 
 ## Contributing
 

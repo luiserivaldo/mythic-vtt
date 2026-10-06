@@ -32,6 +32,12 @@ import {
 const Disk = z.object({ schemaVersion: z.number().int().nonnegative() }).loose();
 const identity: Migration = (_kind, _version, payload) => payload;
 const safeId = (value: string): string => Id.parse(value);
+const SessionMeta = z.object({
+  schemaVersion: z.number().int().positive(),
+  sessionId: Id,
+  startedAt: z.number().int().nonnegative(),
+});
+export type SessionMeta = z.infer<typeof SessionMeta>;
 
 export class LocalCampaignStore implements CampaignStore, ArchiveHost {
   private readonly db: Database.Database;
@@ -214,6 +220,87 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       join(this.folder(campaignId), 'sessions', safeId(sessionId), 'snapshots', `${label}.json`),
       JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION, ...Snapshot.parse(snapshot) }),
     );
+  }
+  async startSession(campaignId: Id, meta: SessionMeta, snapshot: Snapshot): Promise<void> {
+    const dir = join(this.folder(campaignId), 'sessions', safeId(meta.sessionId));
+    await atomicWrite(
+      join(dir, 'start.snapshot.json'),
+      JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION, ...Snapshot.parse(snapshot) }),
+    );
+    await atomicWrite(join(dir, 'meta.json'), JSON.stringify(SessionMeta.parse(meta)));
+  }
+  async readSessions(campaignId: Id): Promise<SessionMeta[]> {
+    const dir = join(this.folder(campaignId), 'sessions');
+    let names: string[];
+    try {
+      names = await readdir(dir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    }
+    const sessions: SessionMeta[] = [];
+    for (const name of names) {
+      if (!Id.safeParse(name).success) continue;
+      const path = join(dir, name, 'meta.json');
+      let raw: string;
+      try {
+        raw = await readFile(path, 'utf8');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        throw error;
+      }
+      const meta = SessionMeta.parse(JSON.parse(raw) as unknown);
+      if (meta.sessionId !== name || meta.schemaVersion !== CURRENT_SCHEMA_VERSION)
+        throw new StorageDataError(`Invalid session metadata: ${path}`, 'corrupt');
+      sessions.push(meta);
+    }
+    return sessions.sort(
+      (a, b) => a.startedAt - b.startedAt || a.sessionId.localeCompare(b.sessionId),
+    );
+  }
+  async readSessionSnapshot(
+    campaignId: Id,
+    sessionId: Id,
+    label: 'start' | 'autosave' | 'end',
+  ): Promise<Snapshot | undefined> {
+    const path =
+      label === 'start'
+        ? join(this.folder(campaignId), 'sessions', safeId(sessionId), 'start.snapshot.json')
+        : join(
+            this.folder(campaignId),
+            'sessions',
+            safeId(sessionId),
+            'snapshots',
+            `${label}.json`,
+          );
+    try {
+      return await this.read(path, 'snapshot', Snapshot);
+    } catch (error) {
+      if (error instanceof StorageDataError && error.message.includes('ENOENT')) return undefined;
+      throw error;
+    }
+  }
+  async readSessionLog(campaignId: Id, sessionId: Id): Promise<LogEntry[]> {
+    const path = join(this.folder(campaignId), 'sessions', safeId(sessionId), 'log.jsonl');
+    let raw: string;
+    try {
+      raw = await readFile(path, 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    }
+    // An interrupted append leaves an unterminated final line; it was never a complete entry.
+    const lines = raw.endsWith('\n') ? raw.slice(0, -1).split('\n') : raw.split('\n').slice(0, -1);
+    return lines.filter(Boolean).map((line, index) => {
+      try {
+        return LogEntry.parse(JSON.parse(line) as unknown);
+      } catch (error) {
+        throw new StorageDataError(
+          `Invalid log entry ${String(index + 1)} in ${path}: ${String(error)}`,
+          'corrupt',
+        );
+      }
+    });
   }
   /** Zip stream of the campaign and referenced assets. Local only: never needs cloud/entitlements. */
   export(campaignId: Id): Promise<Readable> {

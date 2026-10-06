@@ -293,7 +293,7 @@ export class RawClient {
     });
   }
 
-  static async connect(table: Table, opts: RawClientOptions): Promise<RawClient> {
+  static async connect(table: Pick<Table, 'hostPort'>, opts: RawClientOptions): Promise<RawClient> {
     const ws = new WebSocket(`ws://127.0.0.1:${String(table.hostPort)}/ws`);
     const client = new RawClient(opts, ws);
     await new Promise<void>((resolve, reject) => {

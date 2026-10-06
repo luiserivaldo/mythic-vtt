@@ -11,6 +11,8 @@ export interface HostConfig {
   maxImageUploadBytes: number;
   /** Campaign to open (`MYTHIC_CAMPAIGN_ID`); default: most recently updated, else a new one. */
   campaignId?: string;
+  /** Atomic checkpoint interval before initiative exists (T5). */
+  autosaveEvery: number;
   /** Exposes /__test/connections for the e2e harness; never enable on a real table. */
   testEndpoints: boolean;
   /** Built client to serve (`MYTHIC_CLIENT_DIR`); default: the monorepo's client/dist/app if built. */
@@ -38,6 +40,11 @@ export function loadConfig(env: Record<string, string | undefined>): HostConfig 
     port: parsePort(env['MYTHIC_PORT']),
     host: env['MYTHIC_HOST'] || '127.0.0.1',
     dataDir,
+    autosaveEvery: parsePositiveInteger(
+      env['MYTHIC_AUTOSAVE_ACTIONS'],
+      'MYTHIC_AUTOSAVE_ACTIONS',
+      200,
+    ),
     hostSecretPath: env['MYTHIC_HOST_SECRET_PATH']
       ? resolve(env['MYTHIC_HOST_SECRET_PATH'])
       : join(dataDir, 'host-secret'),
