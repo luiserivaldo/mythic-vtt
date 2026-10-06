@@ -68,11 +68,28 @@ test('SIGKILL recovers the autosave plus log tail and keeps sequence increasing'
     await dm.waitFor('initial snapshot', () => dm.state !== undefined);
     const campaignId = (dm.state as { id: string }).id;
     const sceneId = testUlid('SCENE', 1);
+    const entityId = testUlid('TOKEN', 1);
     expect(await dm.intent('scene.create', { sceneId, name: 'First' })).toMatchObject({
       t: 'ack',
       seq: 1,
     });
-    expect(await dm.intent('scene.rename', { sceneId, name: 'Saved' })).toMatchObject({
+    expect(
+      await dm.intent('entity.create', {
+        sceneId,
+        entity: {
+          id: entityId,
+          layer: 'tokens',
+          name: 'Crash survivor',
+          owners: [],
+          transform: {
+            position: { x: 2, y: 0, z: 3 },
+            rotation: { x: 0, y: 0, z: 0, w: 1 },
+            scale: { x: 1, y: 1, z: 1 },
+          },
+          token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+        },
+      }),
+    ).toMatchObject({
       t: 'ack',
       seq: 2,
     });
@@ -104,6 +121,10 @@ test('SIGKILL recovers the autosave plus log tail and keeps sequence increasing'
     expect(
       (restored.state as { scenes: Record<string, { name: string }> }).scenes[sceneId]?.name,
     ).toBe('Tail');
+    expect(
+      (restored.state as { scenes: Record<string, { entities: Record<string, { name: string }> }> })
+        .scenes[sceneId]?.entities[entityId]?.name,
+    ).toBe('Crash survivor');
     expect(await restored.intent('scene.rename', { sceneId, name: 'After restart' })).toMatchObject(
       { t: 'ack', seq: 4 },
     );
@@ -114,6 +135,26 @@ test('SIGKILL recovers the autosave plus log tail and keeps sequence increasing'
     expect(
       JSON.parse(await readFile(join(sessions, secondSession, 'snapshots/end.json'), 'utf8')),
     ).toMatchObject({ seq: 4 });
+
+    const third = await start(dataDir);
+    children.push(third.child);
+    const clean = await RawClient.connect(third, {
+      name: 'clean-dm',
+      identityId: testUlid('HOST', 3),
+      identitySecret: 'crash-test-secret-3',
+      hostToken: third.hostToken,
+    });
+    await clean.waitFor('clean restart snapshot', () => clean.state !== undefined);
+    expect(clean.lastSeq).toBe(4);
+    const scenes = (
+      clean.state as {
+        scenes: Record<string, { name: string; entities: Record<string, { name: string }> }>;
+      }
+    ).scenes;
+    expect(scenes[sceneId]?.name).toBe('After restart');
+    expect(scenes[sceneId]?.entities[entityId]?.name).toBe('Crash survivor');
+    await clean.close();
+    await stop(third.child, 'SIGTERM');
   } finally {
     await Promise.all(children.map((child) => stop(child, 'SIGKILL')));
     await rm(dataDir, { recursive: true, force: true });
