@@ -155,7 +155,7 @@ export function AoEToolPanel({ scene }: { scene: Scene | null }) {
             type="button"
             onClick={() => {
               aoeToolStore.getState().setDraft(draftFromAoE(entity));
-              aoeToolStore.getState().setActive(false);
+              aoeToolStore.getState().setEditingEntityId(entity.id);
             }}
           >
             Edit selected AoE
