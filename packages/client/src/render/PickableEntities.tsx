@@ -1,7 +1,7 @@
-import type { Scene, Seat } from '@mythic/shared';
+import { walkableFromEntity, type Scene, type Seat } from '@mythic/shared';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useClientStore } from '../store/react.js';
 import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
@@ -11,6 +11,8 @@ import { entityFill } from './token-fill.js';
 import { TokenStandee } from './TokenStandee.js';
 import { PrimitiveLights, PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
+import { AoEVolume } from './AoEVolume.js';
+import { useUiStore } from '../ui/ui-store.js';
 
 function actorFor(seatId: string | null, seats: SceneSelectionSeats): SelectionActor {
   if (seatId === null) return { kind: 'host' };
@@ -39,7 +41,17 @@ export function PickableEntities({
   const seatId = useClientStore((state) => state.seatId);
   const seats = useClientStore((state) => state.campaign?.seats ?? NO_SEATS);
   const selected = useStore(selectionStore, (state) => state.ids);
+  const hiddenLayers = useUiStore((state) => state.hiddenLayers);
   const actor = actorFor(seatId, seats);
+  const walkables = useMemo(
+    () =>
+      Object.values(scene?.entities ?? {}).flatMap((entity) => {
+        if (hiddenLayers.has(entity.layer)) return [];
+        const surface = walkableFromEntity(entity);
+        return surface ? [surface] : [];
+      }),
+    [scene, hiddenLayers],
+  );
 
   useEffect(() => {
     const state = selectionStore.getState();
@@ -64,7 +76,17 @@ export function PickableEntities({
           {rendered?.entities
             .filter((entity) => entity.layer === layer)
             .map((entity: RenderEntity) =>
-              entity.mapImage ? (
+              entity.aoe ? (
+                hiddenLayers.has(scene?.entities[entity.id]?.layer ?? 'effects') ? null : (
+                  <AoEVolume
+                    key={entity.id}
+                    volume={entity.aoe}
+                    walkables={walkables}
+                    mode={mode}
+                    renderOrder={order + 1}
+                  />
+                )
+              ) : entity.mapImage ? (
                 <MapImageMesh
                   key={entity.id}
                   entity={entity}
