@@ -124,3 +124,19 @@ Resume after the Codex reset (8:55 PM): run at most **two or three Codex agents 
 each to commit WIP early, then `git merge develop`, then run the gates once. Do not run five at a time: the docs
 reading and parallel build/e2e runs use up a window before anything lands. After these, M3-05 (needs M3-04) and
 M3-06 (needs M1-21), then M0-14, M1-24 and the alpha build.
+
+## Update 2026-10-06 ~20:30: alpha candidate reached
+
+`develop` = `dee3d01` and later docs commits. Merged since the previous update: M1-18 token drag, M1-21 2D ruler,
+M2-08 3D gizmo, M3-04 AoE placement tool, M3-07 grid on elevated surfaces (the partial Codex work was finished by Claude
+agents; nothing from the stalled Codex worktrees is still pending). Combined gate: 837 unit tests, 30 e2e tests.
+
+**Progress: 50 of 58 MVP tasks done.** Remaining 8: M0-14 (exit test), M1-24 (load test), M1-25 (playtest), M2-10
+(lighting and performance pass), M2-11 (exit test and playtest), M3-05 (AoE affected highlight), M3-06 (3D ruler),
+M3-08 (final playtest). The sections above that list older "remaining" work are superseded by this one.
+
+Alpha caveats (nothing below was verified by eye or on real devices): drag, ruler, AoE tool, gizmos, grid-on-tops and the
+3D view are covered by unit tests and "mounts without page errors" e2e checks only; the 3D mesh renderer applies yaw only,
+so a pitch or roll set with the 3D gizmo is stored but not drawn; AoE affected-token highlighting (M3-05) and the 3D
+ruler (M3-06) are not built, so an AoE does not yet show who is inside it; ghosts for remote token drags fade 1.5 s after
+the last preview (no "drag ended" message).

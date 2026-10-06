@@ -6,7 +6,7 @@ Mythic VTT is a lightweight, open-source, browser-based virtual tabletop for TTR
 
 Built by **MythicTomes**. Self-hosting is free and fully featured; optional hosted services (Mythic Cloud) fund development.
 
-> **Status:** pre-alpha. Most of the first release is built (45 of 58 MVP tasks): shared 2D table, 2D/3D toggle, elevation, platforms and AoE rendering. Token dragging, rulers and AoE placement tools are still to come, and little has been tried by hand yet. Expect rough edges and breaking save-format changes. See [docs/HANDOFF.md](docs/HANDOFF.md) for the exact state.
+> **Status:** pre-alpha. Most of the first release is built (50 of 58 MVP tasks): shared 2D table, 2D/3D toggle, elevation, platforms and AoE rendering. The AoE affected-token highlight and the 3D ruler are still to come, and little has been tried by hand yet. Expect rough edges and breaking save-format changes. See [docs/HANDOFF.md](docs/HANDOFF.md) for the exact state.
 
 ---
 
