@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import { createGateway, WS_PATH, type Gateway } from './gateway.js';
+import type { IdentityStore } from './identity-store.js';
+import { createMemoryIdentityStore } from './identity-store.js';
 import type { GatewayConnection, GatewayHandler } from './engine-seam.js';
 
 const ID_A = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
@@ -30,7 +32,7 @@ const open: WebSocket[] = [];
 
 async function start(
   handler?: GatewayHandler,
-  opts: { helloTimeoutMs?: number; hostToken?: string } = {},
+  opts: { helloTimeoutMs?: number; hostToken?: string; identities?: IdentityStore } = {},
 ) {
   gw = createGateway({ ...(handler ? { handler } : {}), ...opts, heartbeatMs: 0 });
   port = await gw.listen();
@@ -317,6 +319,63 @@ describe('host token (D24)', () => {
     b2.send(hello({ identityId: ID_B, identitySecret: 'secret-two' }));
     await ok(b2);
     expect(r.conns.at(-1)?.isHost).toBe(false);
+  });
+
+  it('rebinds host to a new identity with a fresh token; the old host loses it immediately', async () => {
+    const identities = createMemoryIdentityStore();
+    const r1 = recorder();
+    await start(r1.handler, { hostToken: TOKEN, identities });
+    const a = await connect();
+    a.send(hello({ hostToken: TOKEN }));
+    await ok(a);
+    expect(r1.conns[0]?.isHost).toBe(true);
+    await gw.close();
+
+    // New process (new token), same persisted identities: the DM cleared storage, so new identity.
+    const r2 = recorder();
+    await start(r2.handler, { hostToken: 'second-token', identities });
+    const b = await connect();
+    b.send(hello({ identityId: ID_B, identitySecret: 'secret-two', hostToken: 'second-token' }));
+    await ok(b);
+    expect(r2.conns[0]?.isHost).toBe(true);
+    const old = await connect();
+    old.send(hello());
+    await ok(old);
+    expect(r2.conns[1]?.isHost).toBe(false);
+    expect(await identities.getHostIdentityId()).toBe(ID_B);
+    // The consumed token cannot be reused, even by the old identity to take host back.
+    const again = await connect();
+    again.send(hello({ hostToken: 'second-token' }));
+    await rejected(again);
+  });
+
+  it('closes stale open connections of the identity that gains host, so they reconnect as host', async () => {
+    const r = recorder();
+    await start(r.handler, { hostToken: TOKEN });
+    const tab1 = await connect();
+    tab1.send(hello());
+    await ok(tab1);
+    expect(r.conns[0]?.isHost).toBe(false);
+    const tab2 = await connect();
+    tab2.send(hello({ hostToken: TOKEN }));
+    await ok(tab2);
+    expect(await tab1.closed).toBe(1008);
+    expect(r.conns[1]?.isHost).toBe(true);
+  });
+
+  it("closes the previous host's open connection when another identity rebinds host", async () => {
+    const identities = createMemoryIdentityStore();
+    await identities.rebindHost(ID_A);
+    const r = recorder();
+    await start(r.handler, { hostToken: TOKEN, identities });
+    const oldHost = await connect();
+    oldHost.send(hello());
+    await ok(oldHost);
+    expect(r.conns[0]?.isHost).toBe(true);
+    const dm = await connect();
+    dm.send(hello({ identityId: ID_B, identitySecret: 'secret-two', hostToken: TOKEN }));
+    await ok(dm);
+    expect(await oldHost.closed).toBe(1008);
   });
 
   it('gives the same error when no token is configured', async () => {

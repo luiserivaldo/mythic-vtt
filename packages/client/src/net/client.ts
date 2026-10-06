@@ -4,6 +4,7 @@ import type { ClientStore } from '../store/store.js';
 import type { BackoffOptions } from './backoff.js';
 import { createConnection, type SocketLike } from './connection.js';
 import type { Identity } from './identity.js';
+import type { HostTokenHolder } from './host-token.js';
 import { createIntentQueue, type IntentResult } from './intents.js';
 
 export interface GameClientOptions {
@@ -11,8 +12,8 @@ export interface GameClientOptions {
   identity: Identity;
   displayName: string;
   avatar?: string;
-  /** D24: returns the host token for the first hello only, then undefined. */
-  takeHostToken?: () => string | undefined;
+  /** D24/D29: host token, resent in hello until the first snapshot confirms the bind. */
+  hostToken?: HostTokenHolder;
   store: StoreApi<ClientStore>;
   createSocket(url: string): SocketLike;
   random?: () => number;
@@ -49,7 +50,7 @@ export function createGameClient(options: GameClientOptions) {
     url: options.url,
     createSocket: (url) => options.createSocket(url),
     hello: () => {
-      const hostToken = options.takeHostToken?.();
+      const hostToken = options.hostToken?.take();
       return {
         identityId: options.identity.identityId,
         identitySecret: options.identity.identitySecret,
@@ -85,6 +86,8 @@ export function createGameClient(options: GameClientOptions) {
             conn.reconnectNow();
             return;
           }
+          // A snapshot is only sent to an authenticated connection, so the token is spent.
+          if (msg.t === 'snapshot') options.hostToken?.confirm();
           // Intents wait for the first valid state so the host has a seat for us.
           if (store.getState().ready) intents.setConnected(true);
         }
