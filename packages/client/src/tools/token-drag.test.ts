@@ -182,9 +182,10 @@ describe('render helpers', () => {
     expect(visibleGhosts({ a: fresh }, null, 1100)).toHaveLength(0);
   });
   it('prunes stale remote previews from the store', () => {
-    const { setRemote, pruneRemote } = tokenDragStore.getState();
-    setRemote('a', { sceneId: S, entityId: E, to: { x: 1, y: 0, z: 1 }, at: 0 });
-    pruneRemote(10_000, 1500);
+    tokenDragStore
+      .getState()
+      .setRemote('a', { sceneId: S, entityId: E, to: { x: 1, y: 0, z: 1 }, at: 0 });
+    tokenDragStore.getState().pruneRemote(10_000, 1500);
     expect(tokenDragStore.getState().remote).toEqual({});
   });
 });

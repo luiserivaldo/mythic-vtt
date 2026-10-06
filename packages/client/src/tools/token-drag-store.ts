@@ -35,9 +35,8 @@ export const tokenDragStore = createStore<DragState>()((set) => ({
   },
   setRemote: (from, preview) => {
     set((state) => {
-      const remote = { ...state.remote };
-      if (preview) remote[from] = preview;
-      else delete remote[from];
+      const others = Object.entries(state.remote).filter(([key]) => key !== from);
+      const remote = Object.fromEntries(preview ? [...others, [from, preview]] : others);
       return { remote };
     });
   },
