@@ -8,6 +8,7 @@ import { selectionStore } from '../tools/selection-store.js';
 import { MapImageMesh } from './MapImage.js';
 import { SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { entityFill } from './token-fill.js';
+import { DropLines } from './DropLines.js';
 import { TokenStandee } from './TokenStandee.js';
 import { PrimitiveLights, PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
@@ -59,6 +60,7 @@ export function PickableEntities({
   return (
     <>
       {mode === '3d' && <PrimitiveLights />}
+      {mode === '3d' && <DropLines rendered={rendered} />}
       {RENDER_LAYERS.map((layer, order) => (
         <group key={layer} name={layer}>
           {rendered?.entities
