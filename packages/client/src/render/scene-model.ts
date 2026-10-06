@@ -1,6 +1,7 @@
 import {
   primitiveDimensions,
   yawFromQuaternion,
+  AoEShape,
   type AssetRef,
   type Campaign,
   type Entity,
@@ -8,6 +9,7 @@ import {
   type Scene,
 } from '@mythic/shared';
 import { footprintCells } from './token-footprint.js';
+import type { Volume } from './aoe-geometry.js';
 
 // TECHNICAL.md §6.4: these slots also reserve space for later prop overlays and UI.
 export const RENDER_LAYERS = [
@@ -26,6 +28,7 @@ export interface RenderEntity {
   position: readonly [number, number, number];
   sizeCells: number;
   secret: boolean;
+  aoe?: Volume | undefined;
   /** Present only for primitive entities (ENV-02). */
   shape?: RenderShape;
   /** ENV-01: present for map-layer entities with an image; `scale` is the image height in cells. */
@@ -108,6 +111,17 @@ function renderShape(entity: Entity, shape: NonNullable<Entity['shape']>): Rende
   };
 }
 
+function renderAoE(entity: Entity): Volume | undefined {
+  if (!entity.aoe) return undefined;
+  const parsed = AoEShape.safeParse(entity.aoe);
+  if (!parsed.success) return undefined; // Pre-M3 placeholder has no defined volume dimensions.
+  return {
+    shape: parsed.data,
+    position: entity.transform.position,
+    rotation: entity.transform.rotation,
+  };
+}
+
 /** A malformed scale falls back to one cell rather than hiding or exploding the image. */
 export function mapImageScale(scale: number): number {
   return Number.isFinite(scale) && scale > 0 ? scale : 1;
@@ -129,6 +143,7 @@ export function mapScene(scene: Scene): RenderScene {
         ),
         sizeCells: footprintCells(entity.token?.sizeCells),
         secret: entity.layer === 'dm',
+        ...(renderAoE(entity) ? { aoe: renderAoE(entity) } : {}),
         ...(entity.shape ? { shape: renderShape(entity, entity.shape) } : {}),
         ...(entity.layer === 'map' && entity.image
           ? {
