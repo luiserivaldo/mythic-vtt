@@ -1,10 +1,18 @@
 import { z } from 'zod';
-import { Id } from '../schema/index.js';
+import { GridColor, Id } from '../schema/index.js';
 import { defineAction, isCoDm, isHost } from './define.js';
 
-const FIELDS = ['sizePx', 'unitsPerCell', 'unitLabel', 'diagonal', 'snap'] as const;
+const FIELDS = [
+  'sizePx',
+  'unitsPerCell',
+  'unitLabel',
+  'diagonal',
+  'snap',
+  'color',
+  'opacity',
+] as const;
 
-// GRID-01..03. Grid colour/opacity are not in the Grid schema yet; adding them is a contract change.
+// GRID-01..03. Colour and opacity are optional Grid fields (see schema/scene.ts).
 export const gridUpdate = defineAction({
   type: 'grid.update',
   schema: z
@@ -15,6 +23,8 @@ export const gridUpdate = defineAction({
       unitLabel: z.string().trim().min(1).max(16).optional(),
       diagonal: z.enum(['chebyshev', 'alternating', 'euclidean', 'manhattan']).optional(),
       snap: z.boolean().optional(),
+      color: GridColor.optional(),
+      opacity: z.number().min(0).max(1).optional(),
     })
     .refine((p) => FIELDS.some((f) => p[f] !== undefined), {
       message: 'at least one grid field is required',
@@ -30,6 +40,8 @@ export const gridUpdate = defineAction({
     if (p.unitLabel !== undefined) scene.grid.unitLabel = p.unitLabel;
     if (p.diagonal !== undefined) scene.grid.diagonal = p.diagonal;
     if (p.snap !== undefined) scene.grid.snap = p.snap;
+    if (p.color !== undefined) scene.grid.color = p.color;
+    if (p.opacity !== undefined) scene.grid.opacity = p.opacity;
   },
   modExposed: false,
 });

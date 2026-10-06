@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { AssetRef, Campaign, Entity, Id, Quat, Scene, Seat, Vec3 } from './index.js';
+import {
+  AssetRef,
+  DEFAULT_GRID_COLOR,
+  DEFAULT_GRID_OPACITY,
+  Grid,
+  resolveGridStyle,
+  Campaign,
+  Entity,
+  Id,
+  Quat,
+  Scene,
+  Seat,
+  Vec3,
+} from './index.js';
 
 const id = (c: string) => c.repeat(26);
 const A = id('A');
@@ -117,4 +130,25 @@ describe('rejections', () => {
     expect(Seat.safeParse({ ...seat, id: 'x' }).success).toBe(false);
     expect(Seat.safeParse({ ...seat, permissions: { view: true } }).success).toBe(false);
   });
+});
+
+describe('grid colour and opacity (GRID-01)', () => {
+  it('accepts a legacy grid without colour or opacity and resolves defaults', () => {
+    const parsed = Grid.parse(scene.grid);
+    expect(parsed.color).toBeUndefined();
+    expect(resolveGridStyle(parsed)).toEqual({
+      color: DEFAULT_GRID_COLOR,
+      opacity: DEFAULT_GRID_OPACITY,
+    });
+  });
+  it('keeps explicit values, including opacity 0', () => {
+    const parsed = Grid.parse({ ...scene.grid, color: '#FF8800', opacity: 0 });
+    expect(resolveGridStyle(parsed)).toEqual({ color: '#FF8800', opacity: 0 });
+  });
+  it.each([{ color: 'red' }, { color: '#fff' }, { opacity: 1.01 }, { opacity: -1 }])(
+    'rejects %o',
+    (extra) => {
+      expect(Grid.safeParse({ ...scene.grid, ...extra }).success).toBe(false);
+    },
+  );
 });

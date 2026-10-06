@@ -9,6 +9,8 @@ import {
   type RenderEntity,
   type RenderScene,
 } from './scene-model.js';
+import { GridLines } from './GridLines.js';
+import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
 
 const COLORS = {
@@ -34,7 +36,7 @@ function FoundationMarker({ entity, order }: { entity: RenderEntity; order: numb
   );
 }
 
-function BoardScene({ scene }: { scene: RenderScene | null }) {
+function BoardScene({ scene, grid }: { scene: RenderScene | null; grid: RenderGrid | null }) {
   const invalidate = useThree((state) => state.invalidate);
   useEffect(() => {
     invalidate();
@@ -53,6 +55,8 @@ function BoardScene({ scene }: { scene: RenderScene | null }) {
         near={0.1}
         far={1000}
       />
+      {/* The grid sits under the map layer's order so entities draw over it. */}
+      {grid && <GridLines grid={grid} renderOrder={-1} />}
       {scene &&
         RENDER_LAYERS.map((layer, order) => (
           <group key={layer} name={layer}>
@@ -71,11 +75,12 @@ function BoardScene({ scene }: { scene: RenderScene | null }) {
 export function BoardCanvas() {
   const campaign = useClientStore((state) => state.campaign);
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
+  const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
 
   return (
     <div aria-label="Scene board" style={{ width: '100%', height: 'min(70vh, 720px)' }}>
       <Canvas frameloop="demand" shadows={false} gl={{ antialias: true }}>
-        <BoardScene scene={scene} />
+        <BoardScene scene={scene} grid={grid} />
       </Canvas>
     </div>
   );
