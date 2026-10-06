@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useClientStore } from '../store/react.js';
 import { LayerPanel } from './LayerPanel.js';
+import { MapPanel } from './MapPanel.js';
 import { ScenePanel } from './ScenePanel.js';
 import { SeatPanel } from './SeatPanel.js';
 import { Toolbar } from './Toolbar.js';
@@ -33,6 +34,7 @@ export function DmPanels() {
       />
       {shown === 'scenes' && <ScenePanel campaign={campaign} />}
       {shown === 'layers' && <LayerPanel campaign={campaign} />}
+      {shown === 'map' && <MapPanel campaign={campaign} />}
       {shown === 'seats' && <SeatPanel campaign={campaign} presence={presence?.seats ?? null} />}
     </aside>
   );

@@ -1,6 +1,6 @@
 import type { ViewerRole } from './viewer.js';
 
-export type PanelId = 'scenes' | 'layers' | 'seats';
+export type PanelId = 'scenes' | 'layers' | 'map' | 'seats';
 
 export interface ToolbarItem {
   id: PanelId;
@@ -11,7 +11,11 @@ export interface ToolbarItem {
 export function toolbarItems(role: ViewerRole): ToolbarItem[] {
   const items: ToolbarItem[] = [];
   if (role === 'host' || role === 'codm') {
-    items.push({ id: 'scenes', label: 'Scenes' }, { id: 'layers', label: 'Layers' });
+    items.push(
+      { id: 'scenes', label: 'Scenes' },
+      { id: 'layers', label: 'Layers' },
+      { id: 'map', label: 'Map' },
+    );
   }
   if (role === 'host') items.push({ id: 'seats', label: 'Seats' });
   return items;
