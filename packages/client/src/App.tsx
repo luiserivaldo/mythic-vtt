@@ -1,0 +1,21 @@
+import { useClientStore } from './store/react.js';
+
+/** Skeleton shell: connection status only. Panels arrive with M1-11/M1-12, the board with M1-13. */
+export function App() {
+  const connection = useClientStore((s) => s.connection);
+  const ready = useClientStore((s) => s.ready);
+  const campaign = useClientStore((s) => s.campaign);
+  const fatalError = useClientStore((s) => s.fatalError);
+  const pending = useClientStore((s) => s.pendingIntents);
+
+  return (
+    <main>
+      <h1>Mythic VTT</h1>
+      <p role="status">
+        {fatalError ??
+          (ready ? `Connected to ${campaign?.name ?? 'table'}` : `Connection: ${connection}`)}
+      </p>
+      {pending > 0 && <p>{pending} action(s) waiting for the host</p>}
+    </main>
+  );
+}
