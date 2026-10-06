@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useClientStore } from '../store/react.js';
 import { EntityPanel } from './EntityPanel.js';
 import { LayerPanel } from './LayerPanel.js';
@@ -17,6 +17,22 @@ export function DmPanels() {
   const seatId = useClientStore((s) => s.seatId);
   const presence = useClientStore((s) => s.presence);
   const [open, setOpen] = useState<PanelId | null>(null);
+  const shellRef = useRef<HTMLElement>(null);
+  const [drawerTop, setDrawerTop] = useState(0);
+
+  // The drawer is anchored just under the header (which wraps differently per viewport), so it
+  // overlays the board instead of pushing it down in page flow.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const bottom = shellRef.current?.getBoundingClientRect().bottom ?? 0;
+      setDrawerTop((prev) => (Math.abs(prev - bottom) < 0.5 ? prev : bottom));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+    };
+  });
 
   if (!campaign) return null;
   const items = toolbarItems(viewerRole({ isHost, seatId, campaign }));
@@ -24,8 +40,13 @@ export function DmPanels() {
   // A panel the viewer lost access to (role change) must not stay open.
   const shown = items.some((i) => i.id === open) ? open : null;
 
+  const title = items.find((i) => i.id === shown)?.label;
+  const close = () => {
+    setOpen(null);
+  };
+
   return (
-    <aside aria-label="DM tools" className="ui-shell" aria-busy={!ready}>
+    <aside ref={shellRef} aria-label="DM tools" className="ui-shell" aria-busy={!ready}>
       <Toolbar
         items={items}
         open={shown}
@@ -33,11 +54,28 @@ export function DmPanels() {
           setOpen(shown === id ? null : id);
         }}
       />
-      {shown === 'scenes' && <ScenePanel campaign={campaign} />}
-      {shown === 'layers' && <LayerPanel campaign={campaign} />}
-      {shown === 'map' && <MapPanel campaign={campaign} />}
-      {shown === 'entities' && <EntityPanel campaign={campaign} />}
-      {shown === 'seats' && <SeatPanel campaign={campaign} presence={presence?.seats ?? null} />}
+      {shown && (
+        <div
+          className="ui-drawer"
+          style={{ top: drawerTop }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') close();
+          }}
+        >
+          <div className="ui-drawer-head">
+            <button type="button" onClick={close} aria-label={`Close ${title ?? 'panel'} panel`}>
+              Close
+            </button>
+          </div>
+          {shown === 'scenes' && <ScenePanel campaign={campaign} />}
+          {shown === 'layers' && <LayerPanel campaign={campaign} />}
+          {shown === 'map' && <MapPanel campaign={campaign} />}
+          {shown === 'entities' && <EntityPanel campaign={campaign} />}
+          {shown === 'seats' && (
+            <SeatPanel campaign={campaign} presence={presence?.seats ?? null} />
+          )}
+        </div>
+      )}
     </aside>
   );
 }

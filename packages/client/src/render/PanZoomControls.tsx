@@ -31,14 +31,19 @@ export function PanZoomControls({ bounds, frameKey }: { bounds: CanvasSize; fram
   const boundsRef = useRef(bounds);
   boundsRef.current = bounds;
   const framed = useRef<{ camera: unknown; key: string } | null>(null);
+  // Until the user pans or zooms, a resize (e.g. the header changing height) keeps the whole
+  // canvas framed instead of leaving the camera at its old zoom.
+  const touched = useRef(false);
 
   // D37: frame the whole canvas when the scene (or its size) changes and once the
   // orthographic camera has replaced R3F's default camera.
   useEffect(() => {
     const cam = camera as OrthographicCamera;
     if (!cam.isOrthographicCamera || size.width <= 0 || size.height <= 0) return;
-    if (framed.current?.camera === cam && framed.current.key === frameKey) return;
+    const same = framed.current?.camera === cam && framed.current.key === frameKey;
+    if (same && touched.current) return;
     framed.current = { camera: cam, key: frameKey };
+    touched.current = false;
     const v = frameBounds({ width: size.width, height: size.height }, boundsRef.current);
     cam.position.x = v.centerX;
     cam.position.z = v.centerZ;
@@ -66,6 +71,7 @@ export function PanZoomControls({ bounds, frameKey }: { bounds: CanvasSize; fram
       return { centerX: c.position.x, centerZ: c.position.z, zoom: c.zoom };
     };
     const write = (raw: View2D) => {
+      touched.current = true;
       const v = clampViewToBounds(raw, boundsRef.current);
       const c = getCamera();
       c.position.x = v.centerX;

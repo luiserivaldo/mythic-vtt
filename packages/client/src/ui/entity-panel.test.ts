@@ -9,6 +9,7 @@ import {
   isValidPropSize,
   ownerOptions,
   placementPosition,
+  SPAWN_STEPS,
   propCreateIntent,
   tokenCreateIntent,
   TOKEN_SIZE_NAMES,
@@ -91,16 +92,24 @@ describe('entity panel intents', () => {
         name: 'Goblin',
         owners: [P],
         token: { sizeCells: 1, image: { source: 'local', hash, kind: 'image' } },
-        transform: { position: { x: 0.5, y: 0, z: 0.5 } },
+        transform: { position: { x: 20.5, y: 0, z: 15.5 } },
       },
     });
   });
 
-  it('a large token snaps to a grid intersection', () => {
+  it('a large token snaps to a grid intersection at the scene centre', () => {
     const spec = tokenCreateIntent(scene, { ...draft, size: 'large' });
     expect(spec.payload).toMatchObject({
-      entity: { transform: { position: { x: 0, y: 0, z: 0 } } },
+      entity: { transform: { position: { x: 20, y: 0, z: 15 } } },
     });
+  });
+
+  it('D38: an image-less token carries a valid colour, an invalid one is dropped', () => {
+    const ok = tokenCreateIntent(scene, { ...draft, color: '#aa3300' });
+    expect(canPerform(state, host, ok.type, ok.payload)).toBe(true);
+    expect(ok.payload).toMatchObject({ entity: { token: { color: '#aa3300' } } });
+    const bad = tokenCreateIntent(scene, { ...draft, color: 'red' });
+    expect((bad.payload as { entity: { token: object } }).entity.token).not.toHaveProperty('color');
   });
 
   it('every primitive kind is accepted, at base elevation 0', () => {
@@ -147,7 +156,51 @@ describe('entity panel intents', () => {
   });
 
   it('a non-snapping grid keeps the origin', () => {
-    expect(placementPosition(sceneOf(world(false)), 1)).toEqual({ x: 0, y: 0, z: 0 });
+    expect(placementPosition(sceneOf(world(false)), 1)).toEqual({ x: 20, y: 0, z: 15 });
+  });
+
+  it('centres on the scene bounds, snapped for the footprint (D37)', () => {
+    const small = { ...scene, bounds: { width: 10, height: 6 } };
+    expect(placementPosition(small, 1)).toEqual({ x: 5.5, y: 0, z: 3.5 });
+    expect(placementPosition(small, 2)).toEqual({ x: 5, y: 0, z: 3 });
+  });
+
+  it('offsets successive spawns, wraps, and stays inside the canvas', () => {
+    const a = placementPosition(scene, 1, 0);
+    const b = placementPosition(scene, 1, 1);
+    expect({ x: b.x - a.x, z: b.z - a.z }).toEqual({ x: 1, z: 1 });
+    expect(placementPosition(scene, 1, SPAWN_STEPS)).toEqual(a);
+    const tiny = { ...scene, bounds: { width: 1, height: 1 } };
+    for (let i = 0; i < SPAWN_STEPS; i++) {
+      const p = placementPosition(tiny, 1, i);
+      expect(p.x).toBeGreaterThanOrEqual(0);
+      expect(p.x).toBeLessThanOrEqual(1);
+      expect(p.z).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('every spawn position is accepted by the host', () => {
+    for (let i = 0; i < SPAWN_STEPS; i++) {
+      const spec = propCreateIntent(
+        {
+          ...scene,
+          entities: Object.fromEntries(
+            Array.from({ length: i }, (_, k) => [`k${String(k)}`, {} as never]),
+          ),
+        },
+        {
+          sceneId: S,
+          entityId: tid(31),
+          name: 'p',
+          kind: 'box',
+          color: '#aa5500',
+          size: { x: 1, y: 1, z: 1 },
+          walkable: false,
+          layer: 'props',
+        },
+      );
+      expect(canPerform(state, host, spec.type, spec.payload)).toBe(true);
+    }
   });
 });
 

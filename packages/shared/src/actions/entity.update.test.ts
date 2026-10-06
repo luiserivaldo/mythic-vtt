@@ -49,6 +49,15 @@ describe(`${T} schema`, () => {
   });
 });
 
+describe(`${T} token colour (D38)`, () => {
+  it('accepts a valid token colour change and rejects a malformed one', () => {
+    const token = { sizeCells: 1, heightCells: 1, labelVisibility: 'all' };
+    const changes = (color: string) => ({ ...payload, changes: { token: { ...token, color } } });
+    expect(entityUpdate.schema.safeParse(changes('#336699')).success).toBe(true);
+    expect(entityUpdate.schema.safeParse(changes('blue')).success).toBe(false);
+  });
+});
+
 describe(`${T} permissions`, () => {
   it('lets admins and an owner with move permission transform an entity', () => {
     expect(permissionMatrix(stateWithEntity(), T, payload)).toEqual({

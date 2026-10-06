@@ -7,28 +7,15 @@ import { pickEntity, validSelection, type SelectionActor } from '../tools/select
 import { selectionStore } from '../tools/selection-store.js';
 import { MapImageMesh } from './MapImage.js';
 import { SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { entityFill } from './token-fill.js';
 import { TokenStandee } from './TokenStandee.js';
 import { PrimitiveLights, PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
-
-const COLORS = {
-  map: '#51637a',
-  'props-under': '#8a96a5',
-  tokens: '#46b6cf',
-  'props-over': '#a8b5c3',
-  effects: '#f0ae55',
-  ui: '#ffffff',
-} as const;
 
 function actorFor(seatId: string | null, seats: SceneSelectionSeats): SelectionActor {
   if (seatId === null) return { kind: 'host' };
   const seat = seats[seatId];
   return seat ? { kind: 'seat', seat } : { kind: 'spectator' };
-}
-
-function standeeColor(entity: RenderEntity, selected: boolean): string {
-  if (entity.token?.image) return COLORS.tokens;
-  return selected ? '#ffe066' : entity.secret ? '#a577ce' : COLORS[entity.layer];
 }
 
 type SceneSelectionSeats = Record<string, Seat>;
@@ -100,7 +87,7 @@ export function PickableEntities({
                 <TokenStandee
                   key={entity.id}
                   entity={entity}
-                  color={standeeColor(entity, selected.includes(entity.id))}
+                  color={entityFill(entity, selected.includes(entity.id)).color}
                   selected={selected.includes(entity.id)}
                   actor={actor}
                   renderOrder={order}
@@ -118,17 +105,9 @@ export function PickableEntities({
                   <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
                   <TokenMaterial
                     entity={entity}
-                    color={
-                      entity.token?.image
-                        ? COLORS.tokens
-                        : selected.includes(entity.id)
-                          ? '#ffe066'
-                          : entity.secret
-                            ? '#a577ce'
-                            : COLORS[entity.layer]
-                    }
+                    color={entityFill(entity, selected.includes(entity.id)).color}
                   />
-                  {entity.token?.image && selected.includes(entity.id) && (
+                  {entityFill(entity, selected.includes(entity.id)).ring && (
                     <SelectionRing size={entity.sizeCells} />
                   )}
                   <TokenLabel entity={entity} actor={actor} />

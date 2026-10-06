@@ -129,6 +129,19 @@ describe('AssetRef (D16)', () => {
   });
 });
 
+describe('token colour (D38)', () => {
+  it('is optional: tokens without a colour still parse, with none invented', () => {
+    const parsed = Entity.parse(entity);
+    expect(parsed.token?.color).toBeUndefined();
+  });
+  it('accepts #rrggbb and rejects anything else', () => {
+    const withColor = (color: unknown) => ({ ...entity, token: { ...entity.token, color } });
+    expect(Entity.safeParse(withColor('#A1b2C3')).success).toBe(true);
+    for (const bad of ['red', '#fff', '#12345g', 'a1b2c3', '#a1b2c3d', 3])
+      expect(Entity.safeParse(withColor(bad)).success).toBe(false);
+  });
+});
+
 describe('rejections', () => {
   it('rejects NaN/Infinity coordinates', () => {
     expect(Vec3.safeParse({ x: Number.NaN, y: 0, z: 0 }).success).toBe(false);

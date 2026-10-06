@@ -7,6 +7,7 @@ import { useClientStore } from '../store/react.js';
 import { defaultUploader } from './default-uploader.js';
 import {
   capitalise,
+  DEFAULT_TOKEN_COLOR,
   entityDeleteIntent,
   entityRenameIntent,
   entityRows,
@@ -85,6 +86,7 @@ function TokenForm({
   const [labels, setLabels] = useState<LabelVisibility>('all');
   const [owner, setOwner] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [color, setColor] = useState(DEFAULT_TOKEN_COLOR);
   const [busy, setBusy] = useState(false);
   const owners = useMemo(() => ownerOptions(campaign), [campaign]);
 
@@ -104,7 +106,8 @@ function TokenForm({
           labelVisibility: labels,
           ownerId: owner || null,
           imageHash: uploaded?.hash ?? null,
-          ...(file ? { imageName: name.trim() } : {}),
+          // The colour is only a placeholder for tokens without an image (D38).
+          ...(file ? { imageName: name.trim() } : { color }),
         }),
       );
       if (ok) {
@@ -195,6 +198,17 @@ function TokenForm({
           accept="image/png,image/jpeg,image/webp"
           onChange={(e) => {
             setFile(e.target.files?.[0] ?? null);
+          }}
+        />
+      </label>
+      <label>
+        Colour (no image){' '}
+        <input
+          type="color"
+          value={isValidColour(color) ? color : DEFAULT_TOKEN_COLOR}
+          disabled={file !== null}
+          onChange={(e) => {
+            setColor(e.target.value);
           }}
         />
       </label>
