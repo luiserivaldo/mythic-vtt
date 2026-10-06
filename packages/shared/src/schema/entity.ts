@@ -6,10 +6,14 @@ import { Transform } from './math.js';
 
 // Components over inheritance (TECHNICAL.md §5): an entity is defined by which components it has.
 // MVP components only; later ones (trigger, wall, light, anim, fx, modData) are added as optional fields.
+// D38: optional additive placeholder colour for tokens without an image (no schemaVersion bump).
+export const TokenColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
 const TokenComponent = z.object({
   sizeCells: z.number().positive(),
   heightCells: z.number().positive(),
   image: AssetRef.optional(),
+  color: TokenColor.optional(),
   labelVisibility: z.enum(['all', 'owner', 'dm']),
   facing: z.number().optional(),
   characterInstanceId: Id.optional(),

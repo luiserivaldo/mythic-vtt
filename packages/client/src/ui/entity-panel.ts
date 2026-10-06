@@ -1,4 +1,6 @@
 import {
+  clampToBounds,
+  resolveSceneBounds,
   snapToGrid,
   type AssetRef,
   type Campaign,
@@ -39,6 +41,7 @@ export const LAYER_LABELS: Record<LayerId, string> = {
   effects: 'Effects',
 };
 
+export const DEFAULT_TOKEN_COLOR = '#46b6cf';
 export const MAX_PROP_CELLS = 50;
 const UNIT_ROTATION = { x: 0, y: 0, z: 0, w: 1 } as const;
 const COLOUR = /^#[0-9a-fA-F]{6}$/;
@@ -65,18 +68,38 @@ export function ownerOptions(campaign: Campaign): OwnerOption[] {
     .map((s) => ({ id: s.id, label: s.label }));
 }
 
+/** Successive spawns step diagonally by one cell and wrap, so they never stack exactly. */
+export const SPAWN_STEPS = 5;
+
 /**
- * New entities land at the scene origin snapped to the grid (scene bounds are not on develop
- * yet). A hex grid is unsupported by snapToGrid, so it keeps the raw origin.
+ * New entities land at the centre of the scene canvas (D37), snapped to the grid for their
+ * footprint. `spawnIndex` (how many entities the scene already holds) offsets successive spawns.
+ * A hex grid is unsupported by snapToGrid, so it keeps the unsnapped centre.
  */
-export function placementPosition(scene: Scene, footprint: number) {
-  const origin = { x: 0, y: 0, z: 0 };
+export function placementPosition(scene: Scene, footprint: number, spawnIndex = 0) {
+  const bounds = resolveSceneBounds(scene);
+  const step = Math.max(0, Math.floor(spawnIndex)) % SPAWN_STEPS;
+  const raw = clampToBounds(bounds, {
+    x: bounds.width / 2 + step,
+    y: 0,
+    z: bounds.height / 2 + step,
+  });
+  let position = raw;
   try {
-    return snapToGrid(origin, scene.grid, { footprint: Math.max(1, Math.round(footprint)) });
+    position = snapToGrid(raw, scene.grid, { footprint: Math.max(1, Math.round(footprint)) });
   } catch {
-    return origin;
+    // Unsupported grid: keep the unsnapped position.
   }
+  // Snapping an odd footprint to a cell centre can land half a cell past the edge (D37).
+  return {
+    ...position,
+    x: position.x > bounds.width ? position.x - 1 : position.x,
+    z: position.z > bounds.height ? position.z - 1 : position.z,
+  };
 }
+
+/** Number of entities already in the scene, used as the spawn offset index. */
+export const spawnIndexOf = (scene: Scene): number => Object.keys(scene.entities).length;
 
 export interface TokenDraft {
   sceneId: string;
@@ -88,13 +111,15 @@ export interface TokenDraft {
   ownerId: string | null;
   imageHash: string | null;
   imageName?: string;
+  /** D38: placeholder colour for a token without an image (#rrggbb). */
+  color?: string;
 }
 
 function createSpec(sceneId: string, entity: Entity): IntentSpec {
   return { type: 'entity.create', payload: { sceneId, entity }, sceneId };
 }
 
-/** TOK-01. Token colour has no schema field yet: image-less tokens use the renderer placeholder. */
+/** TOK-01. D38: `color` is the placeholder fill for a token without an image. */
 export function tokenCreateIntent(scene: Scene, d: TokenDraft): IntentSpec {
   const cells = SIZE_CELLS[d.size];
   const image: AssetRef | undefined = d.imageHash
@@ -106,7 +131,7 @@ export function tokenCreateIntent(scene: Scene, d: TokenDraft): IntentSpec {
     name: d.name.trim(),
     owners: d.ownerId ? [d.ownerId] : [],
     transform: {
-      position: placementPosition(scene, cells),
+      position: placementPosition(scene, cells, spawnIndexOf(scene)),
       rotation: UNIT_ROTATION,
       scale: { x: 1, y: 1, z: 1 },
     },
@@ -115,6 +140,7 @@ export function tokenCreateIntent(scene: Scene, d: TokenDraft): IntentSpec {
       heightCells: cells,
       labelVisibility: d.labelVisibility,
       ...(image ? { image } : {}),
+      ...(d.color && isValidColour(d.color) ? { color: d.color } : {}),
     },
   });
 }
@@ -138,7 +164,7 @@ export function propCreateIntent(scene: Scene, d: PropDraft): IntentSpec {
     name: d.name.trim(),
     owners: [],
     transform: {
-      position: placementPosition(scene, d.size.x),
+      position: placementPosition(scene, d.size.x, spawnIndexOf(scene)),
       rotation: UNIT_ROTATION,
       scale: { ...d.size },
     },

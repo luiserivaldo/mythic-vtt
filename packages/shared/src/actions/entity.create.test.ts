@@ -31,6 +31,18 @@ describe(`${T} schema`, () => {
   });
 });
 
+describe(`${T} token colour (D38)`, () => {
+  it('accepts a token with a colour and keeps it in state', () => {
+    const entity = makeEntity(createdId, {
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all', color: '#336699' },
+    });
+    const p = { sceneId: IDS.scene, entity };
+    expect(entityCreate.schema.safeParse(p).success).toBe(true);
+    const { state } = reduceAction(makeCampaign(), envelope(p));
+    expect(state.scenes[IDS.scene]?.entities[createdId]?.token?.color).toBe('#336699');
+  });
+});
+
 describe(`${T} permissions`, () => {
   it('allows only host and co-DM by default', () => {
     expect(permissionMatrix(makeCampaign(), T, payload)).toEqual({

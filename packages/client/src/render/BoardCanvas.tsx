@@ -130,9 +130,9 @@ export function BoardCanvas() {
         if (event.key === 'Escape') selectionStore.getState().clear();
         if (mode3d && event.key === 'Home') setResetToken((n) => n + 1);
       }}
-      style={{ width: '100%', height: 'min(70vh, 720px)', position: 'relative' }}
+      className="ui-board"
     >
-      <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>
+      <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
         <button
           type="button"
           aria-pressed={additiveMode}
