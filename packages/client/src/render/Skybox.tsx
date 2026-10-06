@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
-import { BackSide, BufferAttribute, SphereGeometry, type Mesh } from 'three';
+import { BackSide, BufferAttribute, Color, SphereGeometry, SRGBColorSpace, type Mesh } from 'three';
 import { domeColors, type BackgroundSpec } from './skybox-model.js';
 
 // Inside the 3D camera's far plane (2000) so the dome is never clipped.
@@ -16,7 +16,17 @@ export function Skybox({ spec }: { spec: BackgroundSpec }) {
     const g = new SphereGeometry(DOME_RADIUS, 32, 16);
     const pos = g.getAttribute('position');
     const ys = Array.from({ length: pos.count }, (_, i) => pos.getY(i) / DOME_RADIUS);
-    g.setAttribute('color', new BufferAttribute(domeColors(spec, ys), 3));
+    const colors = domeColors(spec, ys);
+    // The material skips tone mapping, and three outputs linear values through the sRGB curve,
+    // so the sRGB picker colours must be linearised or the sky renders washed out.
+    const c = new Color();
+    for (let i = 0; i < colors.length; i += 3) {
+      c.setRGB(colors[i] ?? 0, colors[i + 1] ?? 0, colors[i + 2] ?? 0, SRGBColorSpace);
+      colors[i] = c.r;
+      colors[i + 1] = c.g;
+      colors[i + 2] = c.b;
+    }
+    g.setAttribute('color', new BufferAttribute(colors, 3));
     return g;
   }, [spec]);
   useEffect(

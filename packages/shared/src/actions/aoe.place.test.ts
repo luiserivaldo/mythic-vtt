@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { patchesFor } from '../visibility/index.js';
 import type { ActionEnvelope } from './envelope.js';
+import { AoEShape } from '../schema/index.js';
+import { tokensInAoE } from '../geometry/index.js';
 import { aoePlace } from './aoe.place.js';
 import { reduceAction } from './run.js';
 import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix, testId } from './testing.js';
@@ -108,5 +110,33 @@ describe(`${T} reducer and visibility`, () => {
     const result = reduceAction(before, envelope(hidden));
     for (const audience of [{ kind: 'seat', seatId: IDS.owner }, { kind: 'spectators' }] as const)
       expect(patchesFor(audience, before, result.state, result.patches)).toEqual([]);
+  });
+});
+
+describe(`${T} geometry mapping (MEAS-03, D37)`, () => {
+  it('feeds the stored shape straight into tokensInAoE, even beyond scene bounds', () => {
+    const placed = {
+      ...entity,
+      transform: { ...entity.transform, position: { x: 500, y: 0, z: -500 } },
+    };
+    const result = reduceAction(makeCampaign(), envelope({ ...payload, entity: placed }));
+    const stored = result.state.scenes[IDS.scene]?.entities[aoeId];
+    const shape = AoEShape.parse(stored?.aoe);
+    const aoe = {
+      position: placed.transform.position,
+      rotation: placed.transform.rotation,
+      ...shape,
+    };
+    const near = { id: 'near', position: { x: 502, y: 0, z: -500 }, sizeCells: 1, heightCells: 1 };
+    const far = { id: 'far', position: { x: 520, y: 0, z: -500 }, sizeCells: 1, heightCells: 1 };
+    expect(tokensInAoE(aoe, [near, far]).map((t) => t.id)).toEqual(['near']);
+  });
+
+  it('requires a finite origin', () => {
+    const bad = {
+      ...entity,
+      transform: { ...entity.transform, position: { x: Infinity, y: 0, z: 0 } },
+    };
+    expect(aoePlace.schema.safeParse({ ...payload, entity: bad }).success).toBe(false);
   });
 });

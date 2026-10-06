@@ -112,3 +112,23 @@ describe(`${T} visibility`, () => {
     }
   });
 });
+
+describe(`${T} bounds (D37)`, () => {
+  it('accepts bounds alone and rejects invalid ones', () => {
+    const ok = (b: unknown) =>
+      sceneUpdate.schema.safeParse({ sceneId: IDS.scene, bounds: b }).success;
+    expect(ok({ width: 30, height: 20 })).toBe(true);
+    expect(ok({ width: 0, height: 20 })).toBe(false);
+    expect(ok({ width: 30, height: 201 })).toBe(false);
+  });
+  it('sets bounds and keeps host/co-DM-only permission', () => {
+    const p = { sceneId: IDS.scene, bounds: { width: 30, height: 20 } };
+    expect(permissionMatrix(makeCampaign(), T, p)).toMatchObject({
+      host: true,
+      coDm: true,
+      owner: false,
+    });
+    const { state } = reduceAction(makeCampaign(), envelope(p));
+    expect(state.scenes[IDS.scene]?.bounds).toEqual({ width: 30, height: 20 });
+  });
+});

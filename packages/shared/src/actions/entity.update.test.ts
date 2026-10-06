@@ -49,6 +49,15 @@ describe(`${T} schema`, () => {
   });
 });
 
+describe(`${T} token colour (D38)`, () => {
+  it('accepts a valid token colour change and rejects a malformed one', () => {
+    const token = { sizeCells: 1, heightCells: 1, labelVisibility: 'all' };
+    const changes = (color: string) => ({ ...payload, changes: { token: { ...token, color } } });
+    expect(entityUpdate.schema.safeParse(changes('#336699')).success).toBe(true);
+    expect(entityUpdate.schema.safeParse(changes('blue')).success).toBe(false);
+  });
+});
+
 describe(`${T} permissions`, () => {
   it('lets admins and an owner with move permission transform an entity', () => {
     expect(permissionMatrix(stateWithEntity(), T, payload)).toEqual({
@@ -100,5 +109,25 @@ describe(`${T} reducer and visibility`, () => {
     const result = reduceAction(before, { ...envelope(), actor: ACTORS.host });
     for (const audience of [{ kind: 'seat', seatId: IDS.owner }, { kind: 'spectators' }] as const)
       expect(patchesFor(audience, before, result.state, result.patches)).toEqual([]);
+  });
+});
+
+describe(`${T} bounds (D37)`, () => {
+  const to = (x: number, z: number) => ({
+    ...payload,
+    changes: { transform: { ...transform, position: { x, y: 0, z } } },
+  });
+  it('accepts a move onto the edge and rejects one outside', () => {
+    const state = stateWithEntity();
+    const scene = state.scenes[IDS.scene];
+    if (scene) scene.bounds = { width: 8, height: 6 };
+    expect(entityUpdate.permission(state, ACTORS.owner, to(8, 6))).toBe(true);
+    expect(entityUpdate.permission(state, ACTORS.owner, to(8.01, 6))).toBe(false);
+    expect(entityUpdate.permission(state, ACTORS.host, to(0, -0.01))).toBe(false);
+  });
+  it('rejects outside the default 40 x 30 for scenes without bounds', () => {
+    const state = stateWithEntity();
+    expect(entityUpdate.permission(state, ACTORS.owner, to(40, 30))).toBe(true);
+    expect(entityUpdate.permission(state, ACTORS.owner, to(41, 3))).toBe(false);
   });
 });

@@ -15,6 +15,8 @@ export function describeFailure(result: Extract<IntentResult, { ok: false }>): s
   return `The host did not accept that (${result.reason}${detail}).`;
 }
 
+export type SendIntent = (spec: IntentSpec) => Promise<boolean>;
+
 /** Sends an intent and reports only the outcome; the visible state changes when the patch lands. */
 export function useSubmit(): {
   send: (spec: IntentSpec) => Promise<boolean>;

@@ -9,15 +9,25 @@ import {
   seatRoleIntent,
 } from './intent-specs.js';
 import { NameForm } from './NameForm.js';
-import { isValidIdentityId, isValidLabel, PERMISSION_KEYS, seatRows } from './seat-panel.js';
+import {
+  isValidIdentityId,
+  isValidLabel,
+  PERMISSION_KEYS,
+  rosterOptions,
+  seatRows,
+} from './seat-panel.js';
 import { useSubmit } from './submit.js';
 
 interface Props {
   campaign: Campaign;
-  presence: readonly { seatId: string; connected: boolean }[] | null;
+  presence:
+    readonly { seatId: string; connected: boolean; displayName?: string | undefined }[] | null;
+  /** M1-11: connected identities without a seat (host only), offered as a dropdown. */
+  unseated?: readonly { identityId: string; displayName: string }[] | undefined;
 }
 
-export function SeatPanel({ campaign, presence }: Props) {
+export function SeatPanel({ campaign, presence, unseated }: Props) {
+  const roster = rosterOptions(unseated);
   const { send, error } = useSubmit();
   const [identity, setIdentity] = useState<Record<string, string>>({});
   return (
@@ -33,6 +43,7 @@ export function SeatPanel({ campaign, presence }: Props) {
                 <span className="ui-badge">
                   {row.occupied ? (row.connected ? 'Online' : 'Offline') : 'Empty'}
                 </span>
+                {row.occupantName !== undefined && <span>{row.occupantName}</span>}
                 <label>
                   Role{' '}
                   <select
@@ -66,6 +77,24 @@ export function SeatPanel({ campaign, presence }: Props) {
                     void send(seatAssignIntent(row.id, typed));
                   }}
                 >
+                  {roster.length > 0 && (
+                    <label>
+                      <span className="ui-visually-hidden">Connected player for {row.label}</span>
+                      <select
+                        value={isValidIdentityId(typed) ? typed : ''}
+                        onChange={(e) => {
+                          setIdentity({ ...identity, [row.id]: e.target.value });
+                        }}
+                      >
+                        <option value="">Connected player...</option>
+                        {roster.map((o) => (
+                          <option key={o.identityId} value={o.identityId}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <label>
                     <span className="ui-visually-hidden">Player identity id for {row.label}</span>
                     <input

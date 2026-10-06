@@ -7,6 +7,7 @@ import {
   DEFAULT_GRID_OPACITY,
   Grid,
   resolveGridStyle,
+  resolveSceneBounds,
   Campaign,
   Entity,
   Id,
@@ -130,6 +131,19 @@ describe('AssetRef (D16)', () => {
   });
 });
 
+describe('token colour (D38)', () => {
+  it('is optional: tokens without a colour still parse, with none invented', () => {
+    const parsed = Entity.parse(entity);
+    expect(parsed.token?.color).toBeUndefined();
+  });
+  it('accepts #rrggbb and rejects anything else', () => {
+    const withColor = (color: unknown) => ({ ...entity, token: { ...entity.token, color } });
+    expect(Entity.safeParse(withColor('#A1b2C3')).success).toBe(true);
+    for (const bad of ['red', '#fff', '#12345g', 'a1b2c3', '#a1b2c3d', 3])
+      expect(Entity.safeParse(withColor(bad)).success).toBe(false);
+  });
+});
+
 describe('rejections', () => {
   it('rejects NaN/Infinity coordinates', () => {
     expect(Vec3.safeParse({ x: Number.NaN, y: 0, z: 0 }).success).toBe(false);
@@ -204,5 +218,22 @@ describe('AoE schemas (MEAS-03)', () => {
     expect(
       Entity.safeParse({ ...entity, aoe: { kind: 'sphere', size: 3, color: '#fff' } }).success,
     ).toBe(true);
+  });
+});
+
+describe('scene bounds (D37)', () => {
+  it('is optional, whole cells 1..200, and defaults to 40 x 30 at read time', () => {
+    expect(Scene.safeParse(scene).success).toBe(true);
+    expect(resolveSceneBounds(Scene.parse(scene))).toEqual({ width: 40, height: 30 });
+    const withBounds = Scene.parse({ ...scene, bounds: { width: 200, height: 1 } });
+    expect(resolveSceneBounds(withBounds)).toEqual({ width: 200, height: 1 });
+    for (const bounds of [
+      { width: 0, height: 5 },
+      { width: 5, height: 201 },
+      { width: 2.5, height: 5 },
+      { width: 5 },
+    ]) {
+      expect(Scene.safeParse({ ...scene, bounds }).success).toBe(false);
+    }
   });
 });

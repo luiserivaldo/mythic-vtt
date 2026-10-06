@@ -81,7 +81,7 @@ describe('connect', () => {
     const bob = fakeConnection(T.bob);
     for (const c of [host, alice, bob]) await engine.onConnect(c);
 
-    expect(host.received).toEqual([
+    expect(host.received.filter((m) => m.t !== 'presence')).toEqual([
       { t: 'snapshot', seq: 0, state: fixtureCampaign(), seatId: null },
     ]);
     expect(ofType(alice, 'snapshot')[0]?.seatId).toBe(T.seatA);
@@ -109,7 +109,7 @@ describe('intent pipeline', () => {
       intent('scene.rename', { sceneId: T.scene, name: 'Lair' }, 'r1', T.scene),
     );
 
-    expect(host.received).toEqual([
+    expect(host.received.filter((m) => m.t !== 'presence')).toEqual([
       {
         t: 'patch',
         seq: 1,

@@ -31,6 +31,18 @@ describe(`${T} schema`, () => {
   });
 });
 
+describe(`${T} token colour (D38)`, () => {
+  it('accepts a token with a colour and keeps it in state', () => {
+    const entity = makeEntity(createdId, {
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all', color: '#336699' },
+    });
+    const p = { sceneId: IDS.scene, entity };
+    expect(entityCreate.schema.safeParse(p).success).toBe(true);
+    const { state } = reduceAction(makeCampaign(), envelope(p));
+    expect(state.scenes[IDS.scene]?.entities[createdId]?.token?.color).toBe('#336699');
+  });
+});
+
 describe(`${T} permissions`, () => {
   it('allows only host and co-DM by default', () => {
     expect(permissionMatrix(makeCampaign(), T, payload)).toEqual({
@@ -102,5 +114,31 @@ describe(`${T} primitives (ENV-02, D23)`, () => {
     ).toBe(false);
     const bad = { ...shape('box'), shape: { kind: 'box', color: '#fff' } };
     expect(entityCreate.schema.safeParse({ sceneId: IDS.scene, entity: bad }).success).toBe(false);
+  });
+});
+
+describe(`${T} bounds (D37)`, () => {
+  const at = (x: number, z: number) => ({
+    ...payload,
+    entity: makeEntity(createdId, {
+      transform: {
+        position: { x, y: 0, z },
+        rotation: { x: 0, y: 0, z: 0, w: 1 },
+        scale: { x: 1, y: 1, z: 1 },
+      },
+    }),
+  });
+  it('accepts the default-bounds edge and rejects just outside it', () => {
+    expect(entityCreate.permission(makeCampaign(), ACTORS.host, at(40, 30))).toBe(true);
+    expect(entityCreate.permission(makeCampaign(), ACTORS.host, at(0, 0))).toBe(true);
+    expect(entityCreate.permission(makeCampaign(), ACTORS.host, at(40.5, 3))).toBe(false);
+    expect(entityCreate.permission(makeCampaign(), ACTORS.host, at(3, -1))).toBe(false);
+  });
+  it('uses the scene bounds when set', () => {
+    const state = makeCampaign();
+    const scene = state.scenes[IDS.scene];
+    if (scene) scene.bounds = { width: 10, height: 5 };
+    expect(entityCreate.permission(state, ACTORS.host, at(10, 5))).toBe(true);
+    expect(entityCreate.permission(state, ACTORS.host, at(11, 5))).toBe(false);
   });
 });
