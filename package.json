@@ -13,6 +13,7 @@
     "build": "pnpm -r --filter './packages/*' build",
     "test": "vitest run",
     "test:e2e": "pnpm --filter @mythic/e2e test",
+    "test:load": "pnpm --filter @mythic/e2e test:load",
     "lint": "eslint . && prettier --check .",
     "typecheck": "pnpm -r typecheck",
     "check": "pnpm lint && pnpm typecheck && pnpm test"

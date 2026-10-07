@@ -106,6 +106,7 @@ test('M0 exit: browser sync survives clean and SIGKILL host restarts', async ({ 
       (entity) => entity.name === 'Persistent knight',
     );
     const mage = Object.values(scene.entities).find((entity) => entity.name === 'Persistent mage');
+    if (!knight || !mage) throw new Error('persistent entities missing after clean restart');
     expect(knight?.transform.position).toEqual({ x: 22.5, y: 0, z: 16.5 });
     expect(mage?.transform.position).toEqual({ x: 21.5, y: 0, z: 16.5 });
 
