@@ -21,10 +21,11 @@ import {
 } from '../tools/transform-gizmo.js';
 import { useGizmoTarget } from '../tools/use-gizmo-target.js';
 import { screenToWorld, type View2D } from './camera-2d.js';
+import { GIZMO_MOVE_COLOR, GIZMO_ROTATE_COLOR, GIZMO_SCALE_COLOR } from './canvas-style.js';
 import { pointerClaims } from './pointer-claims.js';
 
 const SQUARE = new Float32Array([-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5]);
-const COLOR = '#ffe066';
+const COLOR = GIZMO_MOVE_COLOR;
 
 interface Drag {
   kind: HandleKind;
@@ -297,7 +298,7 @@ export function TransformGizmo() {
         raycast={noRaycast}
       >
         <circleGeometry args={[7, 24]} />
-        <meshBasicMaterial color="#7fd1ff" depthTest={false} />
+        <meshBasicMaterial color={GIZMO_ROTATE_COLOR} depthTest={false} />
       </mesh>
       <mesh
         position={[layout.scale.x, 0, layout.scale.z]}
@@ -307,7 +308,7 @@ export function TransformGizmo() {
         raycast={noRaycast}
       >
         <planeGeometry args={[12, 12]} />
-        <meshBasicMaterial color="#9be07a" depthTest={false} />
+        <meshBasicMaterial color={GIZMO_SCALE_COLOR} depthTest={false} />
       </mesh>
     </group>
   );

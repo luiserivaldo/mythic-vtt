@@ -34,12 +34,12 @@ describe('entityFill', () => {
     });
   });
   it('keeps the legacy placeholder when no colour is set', () => {
-    expect(entityFill(base, false).color).toBe('#46b6cf');
-    expect(entityFill(base, true)).toEqual({ color: '#ffe066', ring: false });
+    expect(entityFill(base, false).color).toBe('#0e7490');
+    expect(entityFill(base, true)).toEqual({ color: '#9f1239', ring: false });
   });
   it('ignores a malformed colour and ignores colour when an image exists', () => {
-    expect(entityFill(withToken({ color: 'red' }), false).color).toBe('#46b6cf');
+    expect(entityFill(withToken({ color: 'red' }), false).color).toBe('#0e7490');
     const image = { source: 'local', hash: 'h', kind: 'image', name: 'n' } as const;
-    expect(entityFill(withToken({ color: '#aa3300', image }), false).color).toBe('#46b6cf');
+    expect(entityFill(withToken({ color: '#aa3300', image }), false).color).toBe('#0e7490');
   });
 });

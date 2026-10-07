@@ -3,7 +3,7 @@ import { DoubleSide } from 'three';
 import { dropLinesFor, DISC_LIFT } from './drop-lines.js';
 import type { RenderScene } from './scene-model.js';
 
-const LINE_COLOR = '#e8eef5';
+const LINE_COLOR = '#334155';
 const LINE_WIDTH = 0.025;
 
 /**

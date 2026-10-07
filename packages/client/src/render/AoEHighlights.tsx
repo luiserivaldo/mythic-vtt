@@ -5,8 +5,9 @@ import type { Scene } from '@mythic/shared';
 import type { RenderMode } from './PrimitiveMesh.js';
 import type { RenderScene } from './scene-model.js';
 import { useAoEHighlights } from './use-aoe-highlights.js';
+import { AOE_HIGHLIGHT_COLOR } from './canvas-style.js';
 
-const HIGHLIGHT = '#ffb347';
+const HIGHLIGHT = AOE_HIGHLIGHT_COLOR;
 
 function CellHighlights({
   cells,
@@ -45,7 +46,7 @@ function CellHighlights({
       <meshBasicMaterial
         color={HIGHLIGHT}
         transparent
-        opacity={0.3}
+        opacity={0.45}
         side={DoubleSide}
         depthTest={mode === '3d'}
         depthWrite={false}

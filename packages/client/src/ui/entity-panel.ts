@@ -9,6 +9,7 @@ import {
   type Scene,
 } from '@mythic/shared';
 import { SIZE_CELLS } from '../render/token-footprint.js';
+import { DEFAULT_TOKEN_COLOR as DEFAULT_BOARD_TOKEN_COLOR } from '../render/canvas-style.js';
 import { LAYER_ORDER } from './layer-panel.js';
 import type { IntentSpec } from './intent-specs.js';
 
@@ -41,7 +42,7 @@ export const LAYER_LABELS: Record<LayerId, string> = {
   effects: 'Effects',
 };
 
-export const DEFAULT_TOKEN_COLOR = '#46b6cf';
+export const DEFAULT_TOKEN_COLOR = DEFAULT_BOARD_TOKEN_COLOR;
 export const MAX_PROP_CELLS = 50;
 const UNIT_ROTATION = { x: 0, y: 0, z: 0, w: 1 } as const;
 const COLOUR = /^#[0-9a-fA-F]{6}$/;

@@ -27,7 +27,7 @@ export const DEFAULT_AOE_DRAFT: AoEDraft = {
   x: 5,
   z: 5,
 };
-const COLOR = '#ff7744';
+const COLOR = '#9f1239';
 
 export function aoeShape(kind: AoEKind, size: number): AoEShape {
   switch (kind) {

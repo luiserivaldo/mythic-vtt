@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id, SceneBounds } from '../schema/index.js';
+import { DEFAULT_SCENE_BACKGROUND, Id, SceneBounds } from '../schema/index.js';
 import { defineAction, isCoDm, isHost } from './define.js';
 
 // GRID-02: default 5 ft per square. Ids come from the payload (not generated here) so the
@@ -27,7 +27,7 @@ export const sceneCreate = defineAction({
         snap: true,
       },
       ...(a.payload.bounds ? { bounds: a.payload.bounds } : {}),
-      environment: { background: a.payload.background ?? '#000000' },
+      environment: { background: a.payload.background ?? DEFAULT_SCENE_BACKGROUND },
       layers: {},
       entities: {},
     };

@@ -31,14 +31,15 @@ import {
   type Vec3Like,
 } from '../tools/transform-gizmo-3d.js';
 import { useGizmoTarget3D } from '../tools/use-gizmo-target-3d.js';
+import { GIZMO_MOVE_COLOR, GIZMO_ROTATE_COLOR, GIZMO_SCALE_COLOR } from './canvas-style.js';
 import { pointerClaims } from './pointer-claims.js';
 
 const COLORS: Record<Gizmo3DHandle, string> = {
-  'move-xz': '#ffe066',
-  'move-y': '#9be07a',
-  'rotate-x': '#ff7a7a',
-  'rotate-y': '#c79bff',
-  'rotate-z': '#7fd1ff',
+  'move-xz': GIZMO_MOVE_COLOR,
+  'move-y': GIZMO_SCALE_COLOR,
+  'rotate-x': '#b91c1c',
+  'rotate-y': '#6d28d9',
+  'rotate-z': GIZMO_ROTATE_COLOR,
 };
 /** Handle blob radius in unit-reach space (HANDLE_LENGTH_PX = 1). */
 const BLOB = 7 / HANDLE_LENGTH_PX;

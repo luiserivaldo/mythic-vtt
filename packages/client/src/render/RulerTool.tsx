@@ -22,10 +22,9 @@ import { prepareRulerPoint3d } from '../tools/ruler-3d.js';
 import { EphemeralContext } from '../ui/ephemeral-context.js';
 import { pointerClaims } from './pointer-claims.js';
 import { RulerPath } from './RulerPath.js';
+import { RULER_LOCAL_COLOR, RULER_REMOTE_COLOR } from './canvas-style.js';
 import type { ViewMode } from './view-mode-store.js';
 
-const LOCAL_COLOR = '#38bdf8';
-const REMOTE_COLOR = '#f59e0b';
 const NO_REMOTE: readonly never[] = [];
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -331,13 +330,19 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
   if (!scene) return null;
   return (
     <group name="rulers">
-      <RulerPath points={localPoints} scene={scene} color={LOCAL_COLOR} owner={null} mode={mode} />
+      <RulerPath
+        points={localPoints}
+        scene={scene}
+        color={RULER_LOCAL_COLOR}
+        owner={null}
+        mode={mode}
+      />
       {remotes.map(([from, r]) => (
         <RulerPath
           key={from}
           points={r.points}
           scene={scene}
-          color={REMOTE_COLOR}
+          color={RULER_REMOTE_COLOR}
           owner={rulerOwnerName(seats ?? {}, from)}
           mode={mode}
         />
