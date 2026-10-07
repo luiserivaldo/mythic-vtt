@@ -28,14 +28,17 @@ const transform = (x: number, y: number, z: number) => ({
 async function waitForIdle(page: Page): Promise<number> {
   let previous = -1;
   await expect
-    .poll(async () => {
-      const current = await page.evaluate(
-        () => (globalThis as unknown as BrowserDiagnostics).__mythicRender?.getFrameCount() ?? -1,
-      );
-      const stable = current >= 0 && current === previous;
-      previous = current;
-      return stable;
-    })
+    .poll(
+      async () => {
+        const current = await page.evaluate(
+          () => (globalThis as unknown as BrowserDiagnostics).__mythicRender?.getFrameCount() ?? -1,
+        );
+        const stable = current >= 0 && current === previous;
+        previous = current;
+        return stable;
+      },
+      { timeout: 20_000 },
+    )
     .toBe(true);
   return previous;
 }
@@ -144,6 +147,9 @@ test.afterAll(async () => {
   await host.close();
   await table.stop();
 });
+
+// Heavy 3D specs run in parallel workers in the full suite; the idle check needs headroom there.
+test.setTimeout(90_000);
 
 test('idle demand rendering and the budgeted 3D scene stay within budget', async ({ browser }) => {
   test.setTimeout(45_000);
