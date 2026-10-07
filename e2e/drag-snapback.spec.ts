@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid, type Table } from './harness.js';
 
-let table: Table;
+let table: Table | undefined;
 
 test.beforeAll(async () => {
   table = await startTable();
 });
 
 test.afterAll(async () => {
-  await table.stop();
+  await table?.stop();
 });
 
 interface Snapshot {
@@ -24,6 +24,7 @@ interface Position {
 const cases = [
   { size: 0.5, elevation: 0, layer: 'tokens', owned: false, at: { x: 5.5, z: 5.5 } },
   { size: 1, elevation: 0, layer: 'tokens', owned: true, at: { x: 7.5, z: 7.5 } },
+  { size: 1, elevation: 10, layer: 'tokens', owned: false, at: { x: 8.5, z: 8.5 } },
   { size: 2, elevation: 10, layer: 'props', owned: false, at: { x: 10, z: 10 } },
   { size: 3, elevation: 0, layer: 'map', owned: true, at: { x: 13.5, z: 13.5 } },
   { size: 4, elevation: 10, layer: 'dm', owned: false, at: { x: 18, z: 18 } },
@@ -35,12 +36,15 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
   browser,
 }) => {
   test.setTimeout(120_000);
+  if (!table) throw new Error('table not started');
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/?dev=1#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
+  await expect(page.getByRole('complementary', { name: 'Developer diagnostics' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close developer diagnostics' }).click();
   const identity = await page.evaluate(
     () =>
       JSON.parse(localStorage.getItem('mythic.identity.v1') ?? '{}') as {
@@ -67,8 +71,30 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
 
   for (const [index, entry] of cases.entries()) {
     const id = testUlid('TOKEN', index + 27);
+    const platformId = testUlid('PLATFORM', index + 27);
     const from = { x: entry.at.x, y: entry.elevation, z: entry.at.z };
     const name = `Matrix ${String(index)}`;
+    if (entry.layer === 'map' || entry.layer === 'props') {
+      expect(
+        (
+          await host.intent('entity.create', {
+            sceneId,
+            entity: {
+              id: platformId,
+              layer: 'props',
+              name: 'Overlapping platform',
+              owners: [],
+              transform: {
+                position: { x: from.x, y: 0, z: from.z },
+                rotation: { x: 0, y: 0, z: 0, w: 1 },
+                scale: { x: 4, y: 2, z: 4 },
+              },
+              shape: { kind: 'box', color: '#888888', walkable: true },
+            },
+          })
+        ).t,
+      ).toBe('ack');
+    }
     const created = await host.intent('entity.create', {
       sceneId,
       entity: {
@@ -87,7 +113,7 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
     expect(created.t, `${name} create: ${created.reason ?? ''}`).toBe('ack');
     await expect(page.getByTestId('token-label').filter({ hasText: name })).toBeVisible();
     const start = screen(from.x, from.z);
-    const panel = page.getByRole('region', { name: /Transform/ });
+    const panel = page.getByRole('region', { name: `Transform: ${name}` });
     await expect(async () => {
       await page.mouse.click(start.x, start.y);
       await expect(panel).toBeVisible({ timeout: 1000 });
@@ -97,11 +123,18 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
     await page.mouse.move(start.x - zoom, start.y, { steps: 5 });
     await page.mouse.move(start.x - 2 * zoom, start.y, { steps: 5 });
     await page.mouse.up();
-    const position = () => (host.state as Snapshot).scenes[sceneId]?.entities[id]?.transform.position;
-    await expect.poll(() => position()?.x, { message: name, timeout: 5_000 }).toBeCloseTo(from.x - 2);
+    const position = () =>
+      (host.state as Snapshot).scenes[sceneId]?.entities[id]?.transform.position;
+    await expect
+      .poll(() => position()?.x, { message: name, timeout: 5_000 })
+      .toBeCloseTo(from.x - 2);
     expect(position()?.z, name).toBeCloseTo(from.z);
+    expect(position()?.y, name).toBe(entry.layer === 'props' ? 2 : 0);
     expect(errors, name).toEqual([]);
     expect((await host.intent('entity.delete', { sceneId, entityId: id })).t).toBe('ack');
+    if (entry.layer === 'map' || entry.layer === 'props') {
+      expect((await host.intent('entity.delete', { sceneId, entityId: platformId })).t).toBe('ack');
+    }
     await expect(page.getByTestId('token-label').filter({ hasText: name })).toHaveCount(0);
   }
   await host.close();

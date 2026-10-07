@@ -80,6 +80,9 @@ export function gridToWorld(
 }
 
 export function renderLayer(entity: Entity): RenderLayer {
+  // TOK-02: component determines the visual surface. A token authored on map/props still needs
+  // to be visible and pickable above primitive footprints in the 2D table.
+  if (entity.token) return 'tokens';
   switch (entity.layer) {
     case 'map':
       return 'map';
@@ -88,7 +91,7 @@ export function renderLayer(entity: Entity): RenderLayer {
     case 'tokens':
       return 'tokens';
     case 'dm':
-      return entity.token ? 'tokens' : 'props-under';
+      return 'props-under';
     case 'effects':
       return 'effects';
   }

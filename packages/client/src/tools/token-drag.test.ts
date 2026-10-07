@@ -81,6 +81,12 @@ describe('tokenDrop', () => {
     expect(to.x).toBeLessThanOrEqual(10);
     expect(to.z).toBeGreaterThanOrEqual(0);
   });
+  it('clamps a Tiny token by its half-cell footprint when snap is off', () => {
+    const sc = scene(false);
+    const tiny = entity({ token: { sizeCells: 0.5, heightCells: 0.5, labelVisibility: 'all' } });
+    expect(tokenDrop(sc, tiny, { x: -2, y: 0, z: -2 })).toMatchObject({ x: 0.25, z: 0.25 });
+    expect(tokenDrop(sc, tiny, { x: 20, y: 0, z: 20 })).toMatchObject({ x: 9.75, z: 7.75 });
+  });
   it('takes the exact surface height over a walkable platform (D25)', () => {
     const sc = scene(true, { [PLATFORM]: platform() });
     const e = sc.entities[E] as Entity;

@@ -115,6 +115,24 @@ describe('raycast picking', () => {
     ).toBe(token.id);
   });
 
+  it('picks a token authored on the map layer over an overlapping prop', () => {
+    const mapToken = Entity.parse({
+      ...entity(11, 'map'),
+      token: { sizeCells: 3, heightCells: 1, labelVisibility: 'all' },
+    });
+    const overlaid = { ...scene, entities: { ...scene.entities, [mapToken.id]: mapToken } };
+    expect(
+      pickEntity(
+        [
+          { id: prop.id, distance: 1 },
+          { id: mapToken.id, distance: 3 },
+        ],
+        overlaid,
+        host,
+      ),
+    ).toBe(mapToken.id);
+  });
+
   it('skips locked layers and enforces owner or explicit entity permission', () => {
     const locked = { ...scene, layers: { tokens: { locked: true }, effects: { locked: true } } };
     expect(

@@ -70,6 +70,18 @@ describe('render layer ordering', () => {
     });
     expect(renderLayer(hidden)).toBe('tokens');
   });
+
+  it('places tokens from every authored layer above props in the token slot', () => {
+    for (const layer of ['map', 'props', 'tokens', 'dm'] as const) {
+      const subject = Entity.parse({
+        ...entity(7, layer),
+        token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+      });
+      expect(renderLayer(subject)).toBe('tokens');
+    }
+    expect(renderLayer(entity(8, 'map'))).toBe('map');
+    expect(renderLayer(entity(9, 'props'))).toBe('props-under');
+  });
 });
 
 describe('store to scene mapping', () => {
