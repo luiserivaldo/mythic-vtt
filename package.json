@@ -15,7 +15,7 @@
     "test:e2e": "pnpm --filter @mythic/e2e test",
     "lint": "eslint . && prettier --check .",
     "typecheck": "pnpm -r typecheck",
-    "check": "pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm build && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

@@ -13,15 +13,15 @@ pnpm install
 pnpm dev:table      # game host + client dev server for local testing
 ```
 
-| Command          | What it does                                    |
-| ---------------- | ----------------------------------------------- |
-| `pnpm dev:table` | Rebuilds the host, then starts host and client  |
-| `pnpm build`     | Builds all packages                             |
-| `pnpm test`      | Unit tests (Vitest)                             |
-| `pnpm test:e2e`  | Multi-client end-to-end tests (Playwright)      |
-| `pnpm lint`      | ESLint and Prettier                             |
-| `pnpm typecheck` | TypeScript                                      |
-| `pnpm check`     | lint + typecheck + test. Run it before every PR |
+| Command          | What it does                                     |
+| ---------------- | ------------------------------------------------ |
+| `pnpm dev:table` | Rebuilds the host, then starts host and client   |
+| `pnpm build`     | Builds all packages                              |
+| `pnpm test`      | Unit tests (Vitest)                              |
+| `pnpm test:e2e`  | Multi-client end-to-end tests (Playwright)       |
+| `pnpm lint`      | ESLint and Prettier                              |
+| `pnpm typecheck` | TypeScript                                       |
+| `pnpm check`     | build + lint + typecheck + test. Run before a PR |
 
 ## Repository layout
 
@@ -69,4 +69,28 @@ These keep the project correct, so changes that break them will be sent back:
 4. Run `pnpm check`, and `pnpm test:e2e` if you touched sync, permissions or rendering.
 5. Open a PR against `develop` and fill in the template.
 
-Be kind in reviews and issues. Report security problems privately to the maintainers rather than in a public issue.
+### Why `pnpm build` comes first
+
+Workspace packages expose their types from `dist/`, so the type-aware lint needs them built. On a fresh clone, `pnpm check` and CI both build first. If you run `pnpm lint` alone on a fresh clone, run `pnpm build` before it.
+
+### Branches, reviews and CI
+
+- **Everyone works on branches and opens pull requests.** Fork the repository, or push a branch if you have write access. Feature branches are free-form; they are deleted automatically when merged.
+- **`develop`** is the integration branch. Changes arrive by pull request and must pass the `check` CI job. No approvals are required, so automated and remote contributors are not blocked waiting on a person.
+- **`main`** only receives playable releases, by pull request from `develop`. It needs the `check` job to pass and a maintainer review.
+- **Force-pushes and deleting `develop` or `main` are blocked.**
+- Paths that define contracts or touch security (`.github/`, `packages/protocol/`, the schema, actions, visibility and migrations folders, the host gateway, and `fixtures/saves/`) list the maintainer as code owner, who will be asked to review.
+- CI runs on pull requests from forks with a read-only token and no secrets. The first run from a new contributor needs a maintainer to approve it.
+
+### Automated and AI-assisted contributions
+
+Agents and bots are welcome, and follow the same rules as people:
+
+- Work on a branch and open a pull request. Do not push directly to `develop` or `main`.
+- Use a separate account or token per host or agent, with the minimum access needed (write access to this repository, not admin). Never share a maintainer token.
+- You are responsible for what your tool submits: review the diff, keep it small and focused, and make sure `pnpm check` passes.
+- Do not add credentials, tokens or personal data to the repository, and do not disable CI, linting or tests to get a change through.
+
+### Security and conduct
+
+Report security problems privately as described in [SECURITY.md](SECURITY.md), never in a public issue. Be kind in reviews and issues.

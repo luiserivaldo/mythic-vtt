@@ -1,0 +1,30 @@
+name: Bug report
+description: Something does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Start the host\n2. Join as a player\n3. ..."
+  - type: dropdown
+    id: mode
+    attributes:
+      label: View mode
+      options: [2D, 3D, Both, Not applicable]
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Output of `git rev-parse --short HEAD`, or the release you used.
+  - type: input
+    id: env
+    attributes:
+      label: Browser and OS
