@@ -6,6 +6,7 @@ import {
   dropElevation,
   resolveSceneBounds,
   snapToGrid,
+  tokenFootprintCells,
   walkableFromEntity,
   type Actor,
   type Campaign,
@@ -43,7 +44,7 @@ export function movableToken(
 
 /** TOK-02: snap the footprint centre, clamp its whole footprint, then take exact surface height (D25). */
 export function tokenDrop(scene: Scene, entity: Entity, raw: Vec3): Vec3 {
-  const footprint = Math.max(1, Math.round(entity.token?.sizeCells ?? 1));
+  const footprint = tokenFootprintCells(entity.token?.sizeCells);
   const snapped =
     scene.grid.snap && scene.grid.type === 'square'
       ? snapToGrid(raw, scene.grid, { footprint })
