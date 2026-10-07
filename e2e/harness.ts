@@ -21,6 +21,10 @@ export interface Table {
   readonly hostToken: string;
   /** Connections the host currently holds: `open` sockets and those past `hello`. */
   connections(): Promise<{ open: number; authenticated: number }>;
+  /** Restarts only the host, retaining this table's data directory, port and client server. */
+  restart(signal?: 'SIGTERM' | 'SIGKILL'): Promise<void>;
+  /** Linux-only process counters used by the opt-in load test. */
+  hostProcessMetrics(): Promise<{ cpuTimeMs: number; rssBytes: number } | undefined>;
   stop(): Promise<void>;
 }
 
@@ -93,6 +97,41 @@ function killChild(child: ChildProcess): Promise<void> {
   });
 }
 
+function stopChild(child: ChildProcess, signal: 'SIGTERM' | 'SIGKILL'): Promise<void> {
+  return new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+      return;
+    }
+    child.once('exit', () => {
+      resolve();
+    });
+    child.kill(signal);
+    if (signal === 'SIGTERM') setTimeout(() => child.kill('SIGKILL'), 3000).unref();
+  });
+}
+
+async function linuxProcessMetrics(
+  child: ChildProcess,
+): Promise<{ cpuTimeMs: number; rssBytes: number } | undefined> {
+  if (process.platform !== 'linux' || child.pid === undefined) return undefined;
+  const { readFile } = await import('node:fs/promises');
+  try {
+    const [stat, status] = await Promise.all([
+      readFile(`/proc/${String(child.pid)}/stat`, 'utf8'),
+      readFile(`/proc/${String(child.pid)}/status`, 'utf8'),
+    ]);
+    // Linux exposes process CPU ticks at USER_HZ, which is 100 on supported CI/dev hosts.
+    const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+    const userTicks = Number(fields[11]);
+    const systemTicks = Number(fields[12]);
+    const rssKb = Number(/^VmRSS:\s+(\d+)\s+kB$/m.exec(status)?.[1] ?? 0);
+    return { cpuTimeMs: (userTicks + systemTicks) * 10, rssBytes: rssKb * 1024 };
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Starts a fresh host on a free port with a temporary data dir, then the Vite client pointed at
  * it. Needs `pnpm build` first: the host runs from `packages/host/dist`.
@@ -100,29 +139,36 @@ function killChild(child: ChildProcess): Promise<void> {
 export async function startTable(): Promise<Table> {
   const dataDir = await mkdtemp(join(tmpdir(), 'mythic-e2e-'));
   const children: ChildProcess[] = [];
+  let host: ChildProcess | undefined;
+  let hostPort = 0;
+  let hostToken = '';
   const stop = async () => {
     await Promise.all(children.map(killChild));
     await rm(dataDir, { recursive: true, force: true });
   };
-  try {
-    const host = spawn('node', ['dist/main.js'], {
+  const startHost = async (port: number) => {
+    const next = spawn('node', ['dist/main.js'], {
       cwd: join(ROOT, 'packages/host'),
       env: {
         ...process.env,
-        MYTHIC_PORT: '0',
+        MYTHIC_PORT: String(port),
         MYTHIC_DATA_DIR: dataDir,
         MYTHIC_TEST_ENDPOINTS: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    children.push(host);
+    children.push(next);
     const match = await waitForLine(
-      host,
+      next,
       /listening on [^\s:]+:(\d+)[\s\S]*DM link: \S+#host=([\w-]+)/,
       'game host',
     );
-    const hostPort = Number(match[1]);
-    const hostToken = match[2] ?? '';
+    host = next;
+    hostPort = Number(match[1]);
+    hostToken = match[2] ?? '';
+  };
+  try {
+    await startHost(0);
 
     const clientPort = await freePort();
     const vite = spawn(
@@ -138,13 +184,26 @@ export async function startTable(): Promise<Table> {
     await waitForLine(vite, /127\.0\.0\.1:\d+/, 'client dev server');
 
     return {
-      hostPort,
+      get hostPort() {
+        return hostPort;
+      },
       clientUrl: `http://127.0.0.1:${String(clientPort)}`,
       dataDir,
-      hostToken,
+      get hostToken() {
+        return hostToken;
+      },
       async connections() {
         const res = await fetch(`http://127.0.0.1:${String(hostPort)}/__test/connections`);
         return (await res.json()) as { open: number; authenticated: number };
+      },
+      async restart(signal = 'SIGTERM') {
+        const previous = host;
+        if (!previous) throw new Error('game host not started');
+        await stopChild(previous, signal);
+        await startHost(hostPort);
+      },
+      async hostProcessMetrics() {
+        return host ? linuxProcessMetrics(host) : undefined;
       },
       stop,
     };
@@ -272,6 +331,8 @@ export class RawClient {
   lastSeq = -1;
   /** Local mirror of the filtered state this client was sent (snapshot + applied patches). */
   state: unknown = undefined;
+  /** Snapshot/patch sequence numbers received, with their local arrival timestamp. */
+  readonly durableFrames: { seq: number; receivedAt: number; type: 'snapshot' | 'patch' }[] = [];
   private readonly ws: WebSocket;
   private readonly replies = new Map<string, (r: Reply) => void>();
   private refs = 0;
@@ -330,9 +391,13 @@ export class RawClient {
     if (m.t === 'snapshot') {
       this.state = m.state;
       this.lastSeq = m.seq ?? this.lastSeq;
+      if (m.seq !== undefined)
+        this.durableFrames.push({ seq: m.seq, receivedAt: performance.now(), type: 'snapshot' });
     } else if (m.t === 'patch') {
       for (const p of m.patches ?? []) this.state = applyWirePatch(this.state, p);
       this.lastSeq = m.seq ?? this.lastSeq;
+      if (m.seq !== undefined)
+        this.durableFrames.push({ seq: m.seq, receivedAt: performance.now(), type: 'patch' });
     }
     if ((m.t === 'ack' || m.t === 'reject') && m.clientRef !== undefined) {
       const done = this.replies.get(m.clientRef);
@@ -385,6 +450,10 @@ export class RawClient {
 
   join(seatId: string): void {
     this.ws.send(JSON.stringify({ t: 'join', seatId }));
+  }
+
+  ephemeral(channel: string, data: unknown): void {
+    this.ws.send(JSON.stringify({ t: 'ephemeral', channel, data }));
   }
 
   close(): Promise<void> {
