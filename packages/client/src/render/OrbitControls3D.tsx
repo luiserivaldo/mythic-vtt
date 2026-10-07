@@ -69,6 +69,7 @@ export function OrbitControls3D({
   const orbit = orbitRef ?? ownOrbit;
   // Angular velocity (rad/s) used for post-release damping; only moves the camera while non-zero.
   const velocity = useRef({ az: 0, polar: 0 });
+  const gestureActive = useRef(false);
 
   const apply = useCallback(
     (raw: Orbit3D) => {
@@ -129,9 +130,11 @@ export function OrbitControls3D({
   // Continue damped rotation; frames are only requested while velocity is non-zero.
   useFrame((_, delta) => {
     const v = velocity.current;
-    if (v.az === 0 && v.polar === 0) return;
+    if (gestureActive.current || (v.az === 0 && v.polar === 0)) return;
     const dt = Math.min(delta, 0.05);
-    apply(orbitByPixels(orbit.current, (v.az * dt) / ROTATE_SPEED, (v.polar * dt) / ROTATE_SPEED));
+    apply(
+      orbitByPixels(orbit.current, (-v.az * dt) / ROTATE_SPEED, (-v.polar * dt) / ROTATE_SPEED),
+    );
     v.az = dampVelocity(v.az, dt);
     v.polar = dampVelocity(v.polar, dt);
   });
@@ -158,6 +161,7 @@ export function OrbitControls3D({
       velocity.current = { az: 0, polar: 0 };
       pointers.set(e.pointerId, local(e));
       modes.set(e.pointerId, isMouse && e.shiftKey ? 'pan' : 'orbit');
+      gestureActive.current = true;
       el.setPointerCapture(e.pointerId);
       lastMoveTime = e.timeStamp;
     };
@@ -192,6 +196,7 @@ export function OrbitControls3D({
       const wasOnlyPointer = pointers.size === 1;
       pointers.delete(e.pointerId);
       modes.delete(e.pointerId);
+      gestureActive.current = pointers.size > 0;
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
       // Only a quick flick keeps spinning; a held-then-released drag stops dead.
       if (!wasOnlyPointer || e.timeStamp - lastMoveTime > 60)

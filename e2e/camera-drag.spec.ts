@@ -49,7 +49,9 @@ test.afterAll(async () => {
   await table?.stop();
 });
 
-test('held right drag changes the 3D camera monotonically', async ({ browser }) => {
+test('held right/middle orbit and Shift-pan change the 3D camera monotonically', async ({
+  browser,
+}) => {
   if (!table) throw new Error('table not started');
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -57,6 +59,7 @@ test('held right drag changes the 3D camera monotonically', async ({ browser }) 
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
   await page.getByRole('button', { name: '3D view' }).click();
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
+  await expect(page.getByText('right or middle drag orbit')).toBeVisible();
   await waitForCameraToRest(page);
 
   const canvas = page.locator('canvas');
@@ -64,18 +67,40 @@ test('held right drag changes the 3D camera monotonically', async ({ browser }) 
   if (!box) throw new Error('canvas has no box');
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
-  await page.mouse.move(x, y);
-  await page.mouse.down({ button: 'right' });
+  for (const button of ['right', 'middle'] as const) {
+    await page.mouse.move(x, y);
+    await page.mouse.down({ button });
+    const poses: CameraPose[] = [await cameraPose(page)];
+    for (const dx of [20, 40, 60, 80, 100]) {
+      await page.mouse.move(x + dx, y, { steps: 2 });
+      poses.push(await cameraPose(page));
+    }
+    await page.mouse.up({ button });
+    for (let i = 1; i < poses.length; i++) {
+      expect(poses[i]?.azimuth).toBeLessThan(poses[i - 1]?.azimuth ?? Number.NEGATIVE_INFINITY);
+    }
+    await page.getByRole('button', { name: 'Reset view' }).click();
+    await waitForCameraToRest(page);
+  }
 
-  const poses: CameraPose[] = [await cameraPose(page)];
+  await page.mouse.move(x, y);
+  await page.keyboard.down('Shift');
+  await page.mouse.down({ button: 'right' });
+  const panPoses: CameraPose[] = [await cameraPose(page)];
   for (const dx of [20, 40, 60, 80, 100]) {
     await page.mouse.move(x + dx, y, { steps: 2 });
-    poses.push(await cameraPose(page));
+    panPoses.push(await cameraPose(page));
   }
   await page.mouse.up({ button: 'right' });
-
-  for (let i = 1; i < poses.length; i++) {
-    expect(poses[i]?.azimuth).toBeLessThan(poses[i - 1]?.azimuth ?? Number.NEGATIVE_INFINITY);
+  await page.keyboard.up('Shift');
+  const panStart = panPoses[0];
+  if (!panStart) throw new Error('camera pan was not sampled');
+  let previousDistance = 0;
+  for (const pose of panPoses.slice(1)) {
+    const distance = Math.hypot(pose.targetX - panStart.targetX, pose.targetZ - panStart.targetZ);
+    expect(distance).toBeGreaterThan(previousDistance);
+    expect(pose.azimuth).toBeCloseTo(panStart.azimuth, 8);
+    previousDistance = distance;
   }
   await context.close();
 });
