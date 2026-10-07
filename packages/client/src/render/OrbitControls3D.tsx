@@ -94,6 +94,17 @@ export function OrbitControls3D({
     };
   }, [applyRef, apply]);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const diagnostics = {
+      getPose: () => ({ ...orbit.current }),
+    };
+    window.__mythicCamera = diagnostics;
+    return () => {
+      if (window.__mythicCamera === diagnostics) delete window.__mythicCamera;
+    };
+  }, [orbit]);
+
   // Reset on mount, on token change and when the scene bounds change. A view switch keeps the
   // pose it was given; the check is by value so a StrictMode re-run does not reset it either.
   const seen = useRef({ bounds, resetToken });
