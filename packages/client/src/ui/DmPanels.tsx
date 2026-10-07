@@ -24,6 +24,10 @@ const SeatPanel = lazy(async () => {
   const module = await import('./SeatPanel.js');
   return { default: module.SeatPanel };
 });
+const SharePanel = lazy(async () => {
+  const module = await import('./SharePanel.js');
+  return { default: module.SharePanel };
+});
 
 /** Toolbar plus the DM panels. Renders nothing for players and observers (D24, PERM-02). */
 export function DmPanels() {
@@ -95,6 +99,7 @@ export function DmPanels() {
                 unseated={presence?.unseated}
               />
             )}
+            {shown === 'share' && <SharePanel joinUrls={presence?.joinUrls ?? []} />}
           </Suspense>
         </div>
       )}

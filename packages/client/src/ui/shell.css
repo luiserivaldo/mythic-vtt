@@ -224,6 +224,16 @@ main > p {
   align-items: center;
   gap: 0.5rem;
 }
+.ui-share-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ui-share-row a {
+  overflow-wrap: anywhere;
+  color: var(--ui-fg);
+}
 .ui-badge {
   font-size: 0.8em;
   padding: 0 0.4em;

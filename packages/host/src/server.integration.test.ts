@@ -137,6 +137,20 @@ const rename = (name: string, clientRef: string): ClientMessage => ({
 });
 
 describe('startHost with the engine', () => {
+  it('reports fragment-free join URLs to the host only and never sends its host token', async () => {
+    host = await startHost(config, { publicUrl: 'https://table.example/play/#section' });
+    const dm = await connect(HOST_ID, { hostToken: host.hostToken });
+    const player = await connect(GUEST_ID);
+    const roster = await dm.waitFor('presence', (message) => message.joinUrls?.length === 1);
+    await player.waitFor('snapshot');
+
+    expect(roster.joinUrls).toEqual([{ kind: 'public', url: 'https://table.example/play' }]);
+    expect(JSON.stringify(roster)).not.toContain(host.hostToken);
+    expect(player.messages.some((message) => message.t === 'presence')).toBe(false);
+    expect(player.frames.join('\n')).not.toContain('table.example');
+    expect(player.frames.join('\n')).not.toContain(host.hostToken);
+  });
+
   it('creates and persists a new campaign on first run and serves it as a snapshot', async () => {
     await start();
     const dm = await connect(HOST_ID, { hostToken: 'test-host-token' });

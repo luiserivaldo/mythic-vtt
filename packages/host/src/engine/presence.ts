@@ -16,7 +16,11 @@ export interface PresenceConn {
  * SES-07 + M1-11: who is connected, per seat, plus the connected identities with no seat so the DM
  * can seat them. The result carries identity ids, so the engine sends it to the host only (PERM-03).
  */
-export function buildHostPresence(state: Campaign, conns: Iterable<PresenceConn>): PresenceMessage {
+export function buildHostPresence(
+  state: Campaign,
+  conns: Iterable<PresenceConn>,
+  joinUrls?: PresenceMessage['joinUrls'],
+): PresenceMessage {
   const byIdentity = new Map<string, PresenceConn>();
   for (const c of conns) if (!byIdentity.has(c.identityId)) byIdentity.set(c.identityId, c);
 
@@ -42,5 +46,11 @@ export function buildHostPresence(state: Campaign, conns: Iterable<PresenceConn>
     (a, b) =>
       a.displayName.localeCompare(b.displayName) || a.identityId.localeCompare(b.identityId),
   );
-  return { t: 'presence', seats, spectators: unseated.length, unseated };
+  return {
+    t: 'presence',
+    seats,
+    spectators: unseated.length,
+    unseated,
+    ...(joinUrls !== undefined ? { joinUrls } : {}),
+  };
 }

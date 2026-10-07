@@ -30,6 +30,8 @@ export interface ClientState {
     spectators: number;
     /** M1-11: host-only roster of connected identities without a seat; absent for everyone else. */
     unseated?: Of<'presence'>['unseated'];
+    /** M1-38: fragment-free player links, delivered by the host-only presence path. */
+    joinUrls?: Of<'presence'>['joinUrls'];
   } | null;
   notices: Notice[];
   /** Fatal host error, e.g. protocol mismatch; shown instead of the table. */
@@ -116,6 +118,7 @@ export function createClientStore(): StoreApi<ClientStore> {
               seats: message.seats,
               spectators: message.spectators,
               ...(message.unseated !== undefined ? { unseated: message.unseated } : {}),
+              ...(message.joinUrls !== undefined ? { joinUrls: message.joinUrls } : {}),
             },
           });
           return 'ok';

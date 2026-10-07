@@ -156,6 +156,19 @@ export const Presence = z.strictObject({
       }),
     )
     .optional(),
+  /** M1-38: host-reported player links. This host-only message must never carry URL fragments. */
+  joinUrls: z
+    .array(
+      z.strictObject({
+        kind: z.enum(['lan', 'public']),
+        url: z
+          .url()
+          .max(2048)
+          .refine((url) => !url.includes('#'), 'fragments are forbidden'),
+      }),
+    )
+    .max(32)
+    .optional(),
 });
 
 export const Pong = z.strictObject({ t: z.literal('pong'), n: z.number().int().nonnegative() });

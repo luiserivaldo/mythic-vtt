@@ -7,7 +7,7 @@ import { openClient, RawClient, startTable, testUlid, type Table } from './harne
 let table: Table | undefined;
 
 test.beforeAll(async () => {
-  table = await startTable();
+  table = await startTable({ publicUrl: 'https://table.example/play/#section' });
 });
 
 test.afterAll(async () => {
@@ -30,6 +30,12 @@ test('the DM link makes the browser host: panels appear, the token leaves the UR
   }
   expect(page.url()).not.toContain('host=');
   expect(await page.evaluate(() => localStorage.getItem('mythic.host'))).toBe('1');
+
+  await page.getByRole('button', { name: 'Invite' }).click();
+  const invitePanel = page.getByRole('region', { name: 'Invite players' });
+  await expect(invitePanel).toContainText('https://table.example/play');
+  await expect(invitePanel.getByRole('button', { name: 'Copy' })).toBeVisible();
+  await expect(invitePanel).not.toContainText('host=');
 
   // M1-26: use the identity authenticated by the DM link to prepare a real player seat, then
   // submit a host-only action from that player's dev overlay. The shared submit boundary must
@@ -80,6 +86,7 @@ test('the DM link makes the browser host: panels appear, the token leaves the UR
   const viewer = await openClient(browser, table, 'viewer');
   await expect(viewer.page.getByRole('status')).toHaveText('Connected to New campaign');
   await expect(viewer.page.getByText('Seats', { exact: true })).toHaveCount(0);
+  await expect(viewer.page.getByText('Invite', { exact: true })).toHaveCount(0);
 
   expect(errors).toEqual([]);
   await setup.close();

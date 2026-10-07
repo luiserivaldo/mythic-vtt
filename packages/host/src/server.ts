@@ -28,6 +28,7 @@ import {
   type Gateway,
 } from './gateway/index.js';
 import { recoverCampaign, saveCampaignCheckpoint } from './engine/recovery.js';
+import { playerJoinUrls, type PlayerJoinUrl } from './lan.js';
 import { LocalAssetStore, LocalCampaignStore, type ImportLimits } from './storage/index.js';
 
 export interface RunningHost {
@@ -36,6 +37,8 @@ export interface RunningHost {
   readonly port: number;
   /** D24: one-time host token (memory only). Callers may print it only in the DM link fragment. */
   readonly hostToken: string;
+  /** M1-38: fragment-free player links reported to the CLI and authenticated host client. */
+  readonly joinUrls: readonly PlayerJoinUrl[];
   close(): Promise<void>;
 }
 
@@ -45,6 +48,7 @@ export interface StartHostOptions {
   /** Overrides for campaign import limits (defaults: `DEFAULT_IMPORT_LIMITS`). */
   importLimits?: Partial<ImportLimits>;
   hostToken?: string;
+  publicUrl?: string;
   clock?: Clock;
   random?: RandomSource;
 }
@@ -72,6 +76,7 @@ export async function startHost(
   };
 
   let engine: Engine;
+  let reportedJoinUrls: PlayerJoinUrl[] = [];
   try {
     const savedFiles = await loadOrCreateCampaign(store, {
       clock,
@@ -97,6 +102,7 @@ export async function startHost(
       clock,
       random,
       initialSeq: seq,
+      hostJoinUrls: () => reportedJoinUrls,
       onApplied: async (state, appliedSeq) => {
         if (appliedSeq % config.autosaveEvery === 0)
           await saveCampaignCheckpoint(store, state, sessionId, appliedSeq, 'autosave');
@@ -159,11 +165,16 @@ export async function startHost(
     await closeStores();
     throw error;
   }
+  const joinUrls = playerJoinUrls(config.host, port, options.publicUrl);
+  // The actual port is not known until after listen. Connections created after startHost returns
+  // receive this resolved list through the closure above.
+  reportedJoinUrls = joinUrls;
   return {
     gateway,
     engine,
     port,
     hostToken,
+    joinUrls,
     async close() {
       try {
         // Server shutdown is the only Session-end boundary currently exposed. SES-05 requires

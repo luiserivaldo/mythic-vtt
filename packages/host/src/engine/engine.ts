@@ -53,6 +53,8 @@ export interface EngineOptions {
   onError?: (error: unknown) => void;
   /** Size and token-bucket limits for the non-durable ephemeral path. */
   ephemeral?: EphemeralRelayOptions;
+  /** M1-38: resolved after listen, then included only in host presence frames. */
+  hostJoinUrls?: () => Extract<ServerMessage, { t: 'presence' }>['joinUrls'];
 }
 
 /** One room per campaign (§4.2): owns the authoritative state, `seq` and the connections. */
@@ -199,6 +201,7 @@ export function createEngine(options: EngineOptions): Engine {
       message ??= buildHostPresence(
         state,
         Array.from(members.values(), (m) => m.conn),
+        options.hostJoinUrls?.(),
       );
       member.conn.send(message);
     }

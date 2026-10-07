@@ -112,6 +112,7 @@ describe('viewerRole', () => {
       'map',
       'entities',
       'seats',
+      'share',
     ]);
   });
 });
