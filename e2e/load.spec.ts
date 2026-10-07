@@ -7,17 +7,6 @@ const BURST_SECONDS = 10;
 const MOVE_COUNT = MOVES_PER_SECOND * BURST_SECONDS;
 const DIRECT_P95_BUDGET_MS = 150;
 
-interface LoadResult {
-  ack: { p50: number; p95: number; p99: number };
-  broadcast: { p50: number; p95: number; p99: number };
-  seqGaps: number;
-  droppedPatches: number;
-  rejectedMoves: number;
-  previewFrames: number;
-  cpuPercent?: number;
-  peakRssMb?: number;
-}
-
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function percentiles(values: readonly number[]) {
@@ -233,17 +222,6 @@ test('@load M1-24: one DM and ten seated players sustain move bursts', async () 
     const previewFrames = dm.frames.filter(
       (frame) => frame.includes('"t":"ephemeral"') && frame.includes('token.drag-preview'),
     ).length;
-    const result: LoadResult = {
-      ack,
-      broadcast,
-      seqGaps,
-      droppedPatches,
-      rejectedMoves,
-      previewFrames,
-      ...(cpuPercent === undefined ? {} : { cpuPercent }),
-      ...(peakRssMb === undefined ? {} : { peakRssMb }),
-    };
-
     expect(ack.p95).toBeLessThanOrEqual(DIRECT_P95_BUDGET_MS);
     expect(broadcast.p95).toBeLessThanOrEqual(DIRECT_P95_BUDGET_MS);
     expect(seqGaps).toBe(0);

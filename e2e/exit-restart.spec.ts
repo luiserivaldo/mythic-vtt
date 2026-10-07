@@ -98,17 +98,18 @@ test('M0 exit: browser sync survives clean and SIGKILL host restarts', async ({ 
     const clean = snapshots(playerFrames).at(-1);
     if (!clean) throw new Error('player did not receive a clean-restart snapshot');
     expect(clean.seq).toBeGreaterThanOrEqual(beforeCleanSeq);
-    const [sceneId, scene] = Object.entries(clean.state.scenes).find(
+    const foundScene = Object.entries(clean.state.scenes).find(
       ([, candidate]) => candidate.name === 'M0 persistent scene',
-    ) ?? [undefined, undefined];
-    if (!sceneId || !scene) throw new Error('persistent scene missing after clean restart');
+    );
+    if (!foundScene) throw new Error('persistent scene missing after clean restart');
+    const [sceneId, scene] = foundScene;
     const knight = Object.values(scene.entities).find(
       (entity) => entity.name === 'Persistent knight',
     );
     const mage = Object.values(scene.entities).find((entity) => entity.name === 'Persistent mage');
     if (!knight || !mage) throw new Error('persistent entities missing after clean restart');
-    expect(knight?.transform.position).toEqual({ x: 22.5, y: 0, z: 16.5 });
-    expect(mage?.transform.position).toEqual({ x: 21.5, y: 0, z: 16.5 });
+    expect(knight.transform.position).toEqual({ x: 22.5, y: 0, z: 16.5 });
+    expect(mage.transform.position).toEqual({ x: 21.5, y: 0, z: 16.5 });
 
     await dragToken(dm, knight.transform.position, { x: 2, z: 0 });
     await expect.poll(() => highestSeq(playerFrames)).toBeGreaterThan(clean.seq);
