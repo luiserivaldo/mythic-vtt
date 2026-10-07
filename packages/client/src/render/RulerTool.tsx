@@ -12,6 +12,7 @@ import {
   prepareRulerPoint,
   RULER_HEARTBEAT_MS,
   rulerExpired,
+  rulerDragStarted,
   rulerOwnerName,
   shouldSendRuler,
   withCursor,
@@ -19,7 +20,6 @@ import {
 } from '../tools/ruler.js';
 import { prepareRulerPoint3d } from '../tools/ruler-3d.js';
 import { EphemeralContext } from '../ui/ephemeral-context.js';
-import { DRAG_THRESHOLD_PX } from './camera-2d.js';
 import { pointerClaims } from './pointer-claims.js';
 import { RulerPath } from './RulerPath.js';
 import type { ViewMode } from './view-mode-store.js';
@@ -36,8 +36,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
 /**
  * MEAS-01/02: the multi-waypoint ruler uses the ground plane in 2D and ray-hit surfaces in 3D.
  * While the tool is armed a press claims its pointer (pointer-claims) so the camera does not
- * pan and TokenDrag does not start; a click adds a waypoint, double-click or Enter finishes,
- * Esc cancels. The path is render-local plus an ephemeral relay; nothing is an action.
+ * pan and TokenDrag does not start. A drag measures from press to release; a short press retains
+ * click-to-add waypoints. Double-click or Enter finishes and Esc cancels. The path is render-local
+ * plus an ephemeral relay; nothing is an action.
  */
 function entityIdForObject(object: Object3D, scene: Scene): string | undefined {
   let current: Object3D | null = object;
@@ -103,7 +104,14 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
   useEffect(() => {
     const el = gl.domElement;
     const raycaster = new Raycaster();
-    let down: { pointerId: number; x: number; y: number } | null = null;
+    let down: {
+      pointerId: number;
+      x: number;
+      y: number;
+      point: Vec3;
+      beganMeasurement: boolean;
+      dragging: boolean;
+    } | null = null;
     let lastSentAt: number | null = null;
 
     const publish = (kind: RulerPhase, force: boolean) => {
@@ -178,8 +186,24 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
       if (!rulerStore.getState().tool || e.target !== el) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (pointerClaims.isClaimed(e.pointerId)) return;
+      const sc = latest.current.scene;
+      const point = pointAt(e);
+      if (!sc || !point) return;
+      const beganMeasurement = rulerStore.getState().phase !== 'active';
       pointerClaims.claim(e.pointerId, 'ruler');
-      down = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+      el.setPointerCapture(e.pointerId);
+      down = {
+        pointerId: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
+        point,
+        beganMeasurement,
+        dragging: false,
+      };
+      if (beganMeasurement) {
+        rulerStore.getState().begin(sc.id, point);
+        publish('active', true);
+      }
     };
 
     const onUp = (e: PointerEvent) => {
@@ -187,29 +211,52 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
       const start = down;
       down = null;
       pointerClaims.release(start.pointerId);
-      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > DRAG_THRESHOLD_PX) return;
+      if (el.hasPointerCapture(start.pointerId)) el.releasePointerCapture(start.pointerId);
       const sc = latest.current.scene;
       const point = pointAt(e);
       if (!sc || !point) return;
+      if (start.dragging) {
+        rulerStore.getState().setCursor(point);
+        finish();
+        return;
+      }
       const s = rulerStore.getState();
-      if (s.phase === 'active') s.setPoints(appendWaypoint(s.points, point));
-      else s.begin(sc.id, point);
+      if (start.beganMeasurement) s.setPoints([point]);
+      else s.setPoints(appendWaypoint(s.points, point));
+      s.setCursor(point);
       publish('active', true);
     };
 
     const onCancelPointer = (e: PointerEvent) => {
       if (down && e.pointerId === down.pointerId) {
-        pointerClaims.release(down.pointerId);
+        const interrupted = down;
+        pointerClaims.release(interrupted.pointerId);
+        if (el.hasPointerCapture(interrupted.pointerId))
+          el.releasePointerCapture(interrupted.pointerId);
         down = null;
+        if (interrupted.beganMeasurement || interrupted.dragging) cancel();
       }
     };
 
     const onMove = (e: PointerEvent) => {
       const s = rulerStore.getState();
-      if (!s.tool || s.phase !== 'active') return;
+      if (!s.tool) return;
+      if (down && e.pointerId === down.pointerId) {
+        if (!down.dragging && !rulerDragStarted(down, e)) return;
+        if (!down.dragging) {
+          down.dragging = true;
+          if (!down.beganMeasurement) {
+            const sc = latest.current.scene;
+            if (!sc) return;
+            s.begin(sc.id, down.point);
+          }
+        }
+      } else if (s.phase !== 'active') {
+        return;
+      }
       const point = pointAt(e);
       if (!point) return;
-      s.setCursor(point);
+      rulerStore.getState().setCursor(point);
       publish('active', false);
     };
 
@@ -230,6 +277,11 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
         e.preventDefault();
         finish();
       } else if (e.key === 'Escape') {
+        if (down) {
+          pointerClaims.release(down.pointerId);
+          if (el.hasPointerCapture(down.pointerId)) el.releasePointerCapture(down.pointerId);
+          down = null;
+        }
         if (s.phase === 'idle') s.setTool(false);
         else cancel();
       }
@@ -255,7 +307,10 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
     window.addEventListener('dblclick', onDoubleClick, true);
     window.addEventListener('keydown', onKey);
     return () => {
-      if (down) pointerClaims.release(down.pointerId);
+      if (down) {
+        pointerClaims.release(down.pointerId);
+        if (el.hasPointerCapture(down.pointerId)) el.releasePointerCapture(down.pointerId);
+      }
       clearInterval(heartbeat);
       unsubscribe();
       window.removeEventListener('pointerdown', onDown, true);

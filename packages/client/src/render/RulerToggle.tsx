@@ -25,7 +25,7 @@ export function RulerToggle() {
     <button
       type="button"
       aria-pressed={armed}
-      title="Measure distance (R). Click for waypoints, double-click or Enter to finish, Esc to cancel"
+      title="Measure distance (R). Drag for a quick measure; click for waypoints; Esc clears"
       onClick={() => {
         rulerStore.getState().setTool(!armed);
       }}
