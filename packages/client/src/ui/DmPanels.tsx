@@ -1,13 +1,29 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
 import { useClientStore } from '../store/react.js';
-import { EntityPanel } from './EntityPanel.js';
-import { LayerPanel } from './LayerPanel.js';
-import { MapPanel } from './MapPanel.js';
-import { ScenePanel } from './ScenePanel.js';
-import { SeatPanel } from './SeatPanel.js';
 import { Toolbar } from './Toolbar.js';
 import { toolbarItems, type PanelId } from './toolbar-items.js';
 import { viewerRole } from './viewer.js';
+
+const ScenePanel = lazy(async () => {
+  const module = await import('./ScenePanel.js');
+  return { default: module.ScenePanel };
+});
+const LayerPanel = lazy(async () => {
+  const module = await import('./LayerPanel.js');
+  return { default: module.LayerPanel };
+});
+const MapPanel = lazy(async () => {
+  const module = await import('./MapPanel.js');
+  return { default: module.MapPanel };
+});
+const EntityPanel = lazy(async () => {
+  const module = await import('./EntityPanel.js');
+  return { default: module.EntityPanel };
+});
+const SeatPanel = lazy(async () => {
+  const module = await import('./SeatPanel.js');
+  return { default: module.SeatPanel };
+});
 
 /** Toolbar plus the DM panels. Renders nothing for players and observers (D24, PERM-02). */
 export function DmPanels() {
@@ -67,17 +83,19 @@ export function DmPanels() {
               Close
             </button>
           </div>
-          {shown === 'scenes' && <ScenePanel campaign={campaign} />}
-          {shown === 'layers' && <LayerPanel campaign={campaign} />}
-          {shown === 'map' && <MapPanel campaign={campaign} />}
-          {shown === 'entities' && <EntityPanel campaign={campaign} />}
-          {shown === 'seats' && (
-            <SeatPanel
-              campaign={campaign}
-              presence={presence?.seats ?? null}
-              unseated={presence?.unseated}
-            />
-          )}
+          <Suspense fallback={<p role="status">Loading panel…</p>}>
+            {shown === 'scenes' && <ScenePanel campaign={campaign} />}
+            {shown === 'layers' && <LayerPanel campaign={campaign} />}
+            {shown === 'map' && <MapPanel campaign={campaign} />}
+            {shown === 'entities' && <EntityPanel campaign={campaign} />}
+            {shown === 'seats' && (
+              <SeatPanel
+                campaign={campaign}
+                presence={presence?.seats ?? null}
+                unseated={presence?.unseated}
+              />
+            )}
+          </Suspense>
         </div>
       )}
     </aside>

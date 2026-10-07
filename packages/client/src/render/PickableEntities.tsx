@@ -1,22 +1,35 @@
 import { walkableFromEntity, type Scene, type Seat } from '@mythic/shared';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
-import { Fragment, useEffect, useMemo } from 'react';
+import { Fragment, lazy, Suspense, useEffect, useMemo } from 'react';
 import { useClientStore } from '../store/react.js';
 import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { MapImageMesh } from './MapImage.js';
 import { ElevationBadge, SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { entityFill } from './token-fill.js';
-import { DropLines } from './DropLines.js';
-import { TokenStandee } from './TokenStandee.js';
 import { PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
-import { Lighting3D } from './Lighting3D.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
-import { ElevatedSurfaceGrid } from './ElevatedSurfaceGrid.js';
 import type { RenderGrid } from './grid-model.js';
 import { AoEVolume } from './AoEVolume.js';
 import { useUiStore } from '../ui/ui-store.js';
+
+const Lighting3D = lazy(async () => {
+  const module = await import('./Lighting3D.js');
+  return { default: module.Lighting3D };
+});
+const DropLines = lazy(async () => {
+  const module = await import('./DropLines.js');
+  return { default: module.DropLines };
+});
+const TokenStandee = lazy(async () => {
+  const module = await import('./TokenStandee.js');
+  return { default: module.TokenStandee };
+});
+const ElevatedSurfaceGrid = lazy(async () => {
+  const module = await import('./ElevatedSurfaceGrid.js');
+  return { default: module.ElevatedSurfaceGrid };
+});
 
 function actorFor(seatId: string | null, seats: SceneSelectionSeats): SelectionActor {
   if (seatId === null) return { kind: 'host' };
@@ -77,8 +90,12 @@ export function PickableEntities({
 
   return (
     <>
-      {mode === '3d' && <Lighting3D />}
-      {mode === '3d' && <DropLines rendered={rendered} />}
+      {mode === '3d' && (
+        <Suspense fallback={null}>
+          <Lighting3D />
+          <DropLines rendered={rendered} />
+        </Suspense>
+      )}
       {RENDER_LAYERS.map((layer, order) => (
         <group key={layer} name={layer}>
           {rendered?.entities
@@ -138,24 +155,27 @@ export function PickableEntities({
                     onClick={onClick}
                   />
                   {mode === '3d' && grid && entity.shape.walkable && entity.shape.showGridOnTop && (
-                    <ElevatedSurfaceGrid
-                      entity={entity}
-                      shape={entity.shape}
-                      grid={grid}
-                      renderOrder={order + 1}
-                    />
+                    <Suspense fallback={null}>
+                      <ElevatedSurfaceGrid
+                        entity={entity}
+                        shape={entity.shape}
+                        grid={grid}
+                        renderOrder={order + 1}
+                      />
+                    </Suspense>
                   )}
                 </Fragment>
               ) : mode === '3d' && entity.token ? (
-                <TokenStandee
-                  key={entity.id}
-                  entity={entity}
-                  color={entityFill(entity, selected.includes(entity.id)).color}
-                  selected={selected.includes(entity.id)}
-                  actor={actor}
-                  renderOrder={order}
-                  onClick={onClick}
-                />
+                <Suspense key={entity.id} fallback={null}>
+                  <TokenStandee
+                    entity={entity}
+                    color={entityFill(entity, selected.includes(entity.id)).color}
+                    selected={selected.includes(entity.id)}
+                    actor={actor}
+                    renderOrder={order}
+                    onClick={onClick}
+                  />
+                </Suspense>
               ) : (
                 <mesh
                   key={entity.id}
