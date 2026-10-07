@@ -141,12 +141,12 @@ describe('startHost with the engine', () => {
     host = await startHost(config, { publicUrl: 'https://table.example/play/#section' });
     const dm = await connect(HOST_ID, { hostToken: host.hostToken });
     const player = await connect(GUEST_ID);
-    const roster = await dm.waitFor('presence', (message) => message.joinUrls?.length === 1);
+    const report = await dm.waitFor('notice', (message) => message.code === 'join-url-public');
     await player.waitFor('snapshot');
 
-    expect(roster.joinUrls).toEqual([{ kind: 'public', url: 'https://table.example/play' }]);
-    expect(JSON.stringify(roster)).not.toContain(host.hostToken);
-    expect(player.messages.some((message) => message.t === 'presence')).toBe(false);
+    expect(report.message).toBe('https://table.example/play');
+    expect(JSON.stringify(report)).not.toContain(host.hostToken);
+    expect(player.messages.some((message) => message.t === 'notice')).toBe(false);
     expect(player.frames.join('\n')).not.toContain('table.example');
     expect(player.frames.join('\n')).not.toContain(host.hostToken);
   });

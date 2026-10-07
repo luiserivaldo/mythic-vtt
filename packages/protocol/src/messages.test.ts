@@ -70,15 +70,7 @@ const server: ServerMessage[] = [
   { t: 'ack', clientRef: 'c1', seq: 4 },
   { t: 'reject', clientRef: 'c1', reason: 'forbidden', detail: 'nope' },
   { t: 'ephemeral', channel: 'cursor', data: [1, 2], from: id },
-  {
-    t: 'presence',
-    seats: [{ seatId: id, connected: true }],
-    spectators: 2,
-    joinUrls: [
-      { kind: 'lan', url: 'http://192.168.1.2:8787' },
-      { kind: 'public', url: 'https://table.example/play' },
-    ],
-  },
+  { t: 'presence', seats: [{ seatId: id, connected: true }], spectators: 2 },
   { t: 'pong', n: 1 },
   { t: 'notice', level: 'warning', code: 'quota', message: 'almost full' },
   {
@@ -122,28 +114,6 @@ describe('rejections', () => {
   });
   it('refuses to encode a malformed frame', () => {
     expect(() => encodeClientMessage({ t: 'ping', n: -1 })).toThrow();
-  });
-  it('validates fragment-free join URLs on the additive host presence field', () => {
-    const presence = {
-      t: 'presence',
-      seats: [],
-      spectators: 0,
-      joinUrls: [{ kind: 'public', url: 'https://table.example/play' }],
-    };
-    expect(decodeServerMessage(JSON.stringify(presence)).ok).toBe(true);
-    expect(
-      decodeServerMessage(
-        JSON.stringify({ ...presence, joinUrls: [{ kind: 'public', url: 'not a URL' }] }),
-      ).ok,
-    ).toBe(false);
-    expect(
-      decodeServerMessage(
-        JSON.stringify({
-          ...presence,
-          joinUrls: [{ kind: 'public', url: 'https://table.example/play#private' }],
-        }),
-      ).ok,
-    ).toBe(false);
   });
 });
 

@@ -18,8 +18,10 @@ const named = (id: string, name: string, opts: { isHost?: boolean } = {}): FakeC
 
 const presenceOf = (c: FakeConnection) =>
   c.received.filter((m): m is Extract<ServerMessage, { t: 'presence' }> => m.t === 'presence');
+const noticesOf = (c: FakeConnection) =>
+  c.received.filter((m): m is Extract<ServerMessage, { t: 'notice' }> => m.t === 'notice');
 
-function setup(joinUrls?: Extract<ServerMessage, { t: 'presence' }>['joinUrls']) {
+function setup(joinUrls?: readonly { kind: 'lan' | 'public'; url: string }[]) {
   return createEngine({
     campaign: fixtureCampaign(),
     sessionId: tid(20),
@@ -82,9 +84,16 @@ describe('engine roster (M1-11, PERM-03)', () => {
     await engine.onConnect(spectator);
     await engine.idle();
 
-    expect(presenceOf(host).at(-1)?.joinUrls).toEqual(joinUrls);
+    expect(noticesOf(host)).toEqual([
+      {
+        t: 'notice',
+        level: 'info',
+        code: 'join-url-public',
+        message: 'https://table.example/play',
+      },
+    ]);
     for (const connection of [player, spectator]) {
-      expect(presenceOf(connection)).toEqual([]);
+      expect(noticesOf(connection)).toEqual([]);
       expect(connection.wire()).not.toContain('table.example');
     }
   });

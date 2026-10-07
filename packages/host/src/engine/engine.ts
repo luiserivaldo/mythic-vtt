@@ -53,8 +53,8 @@ export interface EngineOptions {
   onError?: (error: unknown) => void;
   /** Size and token-bucket limits for the non-durable ephemeral path. */
   ephemeral?: EphemeralRelayOptions;
-  /** M1-38: resolved after listen, then included only in host presence frames. */
-  hostJoinUrls?: () => Extract<ServerMessage, { t: 'presence' }>['joinUrls'];
+  /** M1-38: fragment-free player links reported to authenticated host connections only. */
+  hostJoinUrls?: () => readonly { kind: 'lan' | 'public'; url: string }[];
 }
 
 /** One room per campaign (§4.2): owns the authoritative state, `seq` and the connections. */
@@ -156,6 +156,16 @@ export function createEngine(options: EngineOptions): Engine {
     const missed = lastSeq === undefined ? undefined : replayFrom(member, lastSeq);
     if (missed) for (const entry of missed) member.conn.send(patchMessage(member.audience, entry));
     else member.conn.send(snapshotFor(member.audience));
+    if (member.conn.isHost) {
+      for (const entry of options.hostJoinUrls?.() ?? []) {
+        member.conn.send({
+          t: 'notice',
+          level: 'info',
+          code: `join-url-${entry.kind}`,
+          message: entry.url,
+        });
+      }
+    }
   }
 
   /** Pipeline steps 7-8 for one applied action. */
@@ -201,7 +211,6 @@ export function createEngine(options: EngineOptions): Engine {
       message ??= buildHostPresence(
         state,
         Array.from(members.values(), (m) => m.conn),
-        options.hostJoinUrls?.(),
       );
       member.conn.send(message);
     }

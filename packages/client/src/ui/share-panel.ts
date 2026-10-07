@@ -1,14 +1,36 @@
-import type { ServerMessage } from '@mythic/protocol';
+import type { Notice } from '../store/store.js';
 
-export type JoinUrl = NonNullable<Extract<ServerMessage, { t: 'presence' }>['joinUrls']>[number];
+export interface JoinUrl {
+  kind: 'lan' | 'public';
+  url: string;
+}
 
 export interface ClipboardWriter {
   writeText(text: string): Promise<void>;
 }
 
-/** The protocol forbids fragments; this final guard also protects copy output from future callers. */
+/** The game host strips fragments; this final guard also protects output from future callers. */
 export function playerVisibleUrl(url: string): string {
   return url.split('#', 1)[0] ?? '';
+}
+
+/** Decode only the two M1-38 notice codes and reject unsafe or malformed link text. */
+export function joinUrlsFromNotices(notices: readonly Notice[]): JoinUrl[] {
+  const unique = new Map<string, JoinUrl>();
+  for (const notice of notices) {
+    const kind =
+      notice.code === 'join-url-lan' ? 'lan' : notice.code === 'join-url-public' ? 'public' : null;
+    if (kind === null) continue;
+    try {
+      const parsed = new URL(notice.message);
+      if (!['http:', 'https:'].includes(parsed.protocol) || parsed.hash !== '') continue;
+      const url = parsed.href.replace(/\/$/, notice.message.endsWith('/') ? '/' : '');
+      unique.set(`${kind}:${url}`, { kind, url });
+    } catch {
+      // A malformed host report cannot become a clickable or copyable URL.
+    }
+  }
+  return [...unique.values()];
 }
 
 function legacyCopy(text: string): Promise<void> {

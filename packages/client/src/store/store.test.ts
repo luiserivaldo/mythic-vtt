@@ -72,12 +72,7 @@ describe('client store', () => {
 
   it('records presence, notices and fatal errors', () => {
     const s = createClientStore();
-    s.getState().applyServerMessage({
-      t: 'presence',
-      seats: [],
-      spectators: 2,
-      joinUrls: [{ kind: 'public', url: 'https://table.example/play' }],
-    });
+    s.getState().applyServerMessage({ t: 'presence', seats: [], spectators: 2 });
     s.getState().applyServerMessage({ t: 'notice', level: 'info', code: 'q', message: 'hi' });
     s.getState().applyServerMessage({
       t: 'error',
@@ -86,9 +81,6 @@ describe('client store', () => {
       fatal: true,
     });
     expect(s.getState().presence?.spectators).toBe(2);
-    expect(s.getState().presence?.joinUrls).toEqual([
-      { kind: 'public', url: 'https://table.example/play' },
-    ]);
     expect(s.getState().notices).toHaveLength(1);
     expect(s.getState().fatalError).toContain('unauthorized');
     s.getState().dismissNotice(0);
