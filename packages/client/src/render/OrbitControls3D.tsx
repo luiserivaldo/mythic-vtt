@@ -7,7 +7,7 @@ import {
   dampVelocity,
   defaultOrbit,
   dolly,
-  FOV_DEGREES,
+  DEFAULT_FOV_DEGREES,
   orbitByPixels,
   orbitPosition,
   panOnGround,
@@ -112,9 +112,14 @@ export function OrbitControls3D({
     velocity.current = { az: 0, polar: 0 };
     const unchanged = seen.current.bounds === bounds && seen.current.resetToken === resetToken;
     seen.current = { bounds, resetToken };
-    apply(keepInitialOrbit && unchanged ? orbit.current : defaultOrbit(bounds));
+    const { width, height } = getState().size;
+    apply(
+      keepInitialOrbit && unchanged
+        ? orbit.current
+        : defaultOrbit(bounds, width / Math.max(height, 1)),
+    );
     // keepInitialOrbit only decides this application; it must not re-trigger a reset.
-  }, [bounds, resetToken, apply]);
+  }, [bounds, resetToken, apply, getState]);
 
   // The drei camera replaces the default one after mount: pose it as soon as it is active.
   useEffect(() => {
@@ -218,5 +223,5 @@ export function OrbitControls3D({
     };
   }, [gl, apply, invalidate]);
 
-  return <PerspectiveCamera makeDefault fov={FOV_DEGREES} near={0.1} far={2000} />;
+  return <PerspectiveCamera makeDefault fov={DEFAULT_FOV_DEGREES} near={0.1} far={2000} />;
 }

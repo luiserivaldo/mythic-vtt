@@ -49,7 +49,10 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
   const getState = useThree((s) => s.get);
   const [rendered, setRendered] = useState<ViewMode>(target);
   const [view2d, setView2d] = useState<View2D>(DEFAULT_VIEW);
-  const orbitRef = useRef<Orbit3D>(defaultOrbit(bounds));
+  const initialSize = getState().size;
+  const orbitRef = useRef<Orbit3D>(
+    defaultOrbit(bounds, initialSize.width / Math.max(initialSize.height, 1)),
+  );
   const applyRef = useRef<((o: Orbit3D) => void) | null>(null);
   const tween = useRef<Tween | null>(null);
   const resting3d = useRef<Orbit3D | null>(null);
@@ -62,6 +65,7 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
     lastTarget.current = target;
     const { camera, size } = getState();
     const height = size.height;
+    const default3d = () => defaultOrbit(bounds, size.width / Math.max(height, 1));
     if (target === '3d') {
       if (rendered === '2d') {
         const ortho = camera as OrthographicCamera;
@@ -70,7 +74,7 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
           centerZ: ortho.position.z,
           zoom: ortho.zoom,
         };
-        const dest = { ...defaultOrbit(bounds), targetX: view.centerX, targetZ: view.centerZ };
+        const dest = { ...default3d(), targetX: view.centerX, targetZ: view.centerZ };
         const from = view2dToOrbit(view, height);
         orbitRef.current = from;
         resting3d.current = dest;
@@ -82,7 +86,7 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
         // Reversed mid-way through the 'out' tween: head back to the pose we left.
         tween.current = {
           from: orbitRef.current,
-          to: resting3d.current ?? defaultOrbit(bounds),
+          to: resting3d.current ?? default3d(),
           startedAt: null,
           direction: 'in',
         };

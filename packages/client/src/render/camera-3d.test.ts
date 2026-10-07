@@ -4,7 +4,9 @@ import {
   clampOrbit,
   clampTargetToGround,
   dampVelocity,
+  DEFAULT_FOV_DEGREES,
   defaultOrbit,
+  distanceToFrameGround,
   dolly,
   GROUND_EPSILON,
   groundAxes,
@@ -220,6 +222,17 @@ describe('camera-3d', () => {
       defaultOrbit({ minX: 0, maxX: 4, minZ: 0, maxZ: 4 }).distance,
     );
     invariants(defaultOrbit(null));
+  });
+
+  it('uses a wide perspective lens and the nearest padded distance that frames the canvas', () => {
+    const bounds = { minX: 0, maxX: 40, minZ: 0, maxZ: 30 };
+    const wide = distanceToFrameGround(bounds, 16 / 9);
+    const square = distanceToFrameGround(bounds, 1);
+    expect(DEFAULT_FOV_DEGREES).toBe(60);
+    expect(defaultOrbit(bounds, 16 / 9).distance).toBeCloseTo(wide, 8);
+    expect(wide).toBeLessThan(square);
+    expect(wide).toBeGreaterThan(30);
+    expect(wide).toBeLessThan(50);
   });
 
   it('damping decays to exactly zero', () => {

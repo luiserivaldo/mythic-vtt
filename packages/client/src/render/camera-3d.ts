@@ -46,7 +46,10 @@ export const MAX_DISTANCE = 400;
 export const GROUND_EPSILON = 0.05;
 /** Sanity bound on pan so a runaway gesture cannot fly the focus to infinity. */
 export const MAX_PAN_EXTENT = 10_000;
-export const FOV_DEGREES = 45;
+/** M2-12: a wider lens makes depth legible instead of flattening the board. */
+export const DEFAULT_FOV_DEGREES = 60;
+/** Small edge allowance without pulling back far enough to flatten the scene again. */
+export const DEFAULT_FRAME_PADDING = 1.04;
 export const DEFAULT_AZIMUTH = Math.PI / 4;
 export const DEFAULT_POLAR = 55 * DEG;
 /** Radians of rotation per pixel dragged. */
@@ -141,7 +144,7 @@ export function groundAxes(azimuth: number): { right: Point; forward: Point } {
 /** World units covered by one screen pixel at the focus distance. */
 export function worldPerPixel(distance: number, viewportHeightPx: number): number {
   const h = Math.max(1, viewportHeightPx);
-  return (2 * distance * Math.tan((FOV_DEGREES * DEG) / 2)) / h;
+  return (2 * distance * Math.tan((DEFAULT_FOV_DEGREES * DEG) / 2)) / h;
 }
 
 /**
@@ -204,20 +207,53 @@ export function clampTargetToGround(o: Orbit3D, ground: GroundBounds | null): Or
   };
 }
 
+/**
+ * Nearest distance from which the default camera contains every canvas corner. The calculation
+ * accounts for perspective depth and the viewport aspect ratio instead of framing a padded
+ * bounding circle, which used to pull the camera unnecessarily far back.
+ */
+export function distanceToFrameGround(bounds: GroundBounds, aspectRatio = 1): number {
+  const aspect = Math.max(finiteOr(aspectRatio, 1), 1e-3);
+  const tanVertical = Math.tan((DEFAULT_FOV_DEGREES * DEG) / 2);
+  const tanHorizontal = tanVertical * aspect;
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cz = (bounds.minZ + bounds.maxZ) / 2;
+  const sinAzimuth = Math.sin(DEFAULT_AZIMUTH);
+  const cosAzimuth = Math.cos(DEFAULT_AZIMUTH);
+  const sinPolar = Math.sin(DEFAULT_POLAR);
+  const cosPolar = Math.cos(DEFAULT_POLAR);
+  let distance = MIN_DISTANCE;
+
+  for (const x of [bounds.minX, bounds.maxX]) {
+    for (const z of [bounds.minZ, bounds.maxZ]) {
+      const dx = x - cx;
+      const dz = z - cz;
+      const alongGround = dx * sinAzimuth + dz * cosAzimuth;
+      const depthOffset = sinPolar * alongGround;
+      const cameraX = dx * cosAzimuth - dz * sinAzimuth;
+      const cameraY = -cosPolar * alongGround;
+      distance = Math.max(
+        distance,
+        depthOffset + Math.abs(cameraX) / tanHorizontal,
+        depthOffset + Math.abs(cameraY) / tanVertical,
+      );
+    }
+  }
+  return distance * DEFAULT_FRAME_PADDING;
+}
+
 /** Default isometric-ish view framing the given ground bounds (or a 20x20 area when empty). */
-export function defaultOrbit(bounds: GroundBounds | null): Orbit3D {
+export function defaultOrbit(bounds: GroundBounds | null, aspectRatio = 1): Orbit3D {
   const b = bounds ?? { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
   const cx = (b.minX + b.maxX) / 2;
   const cz = (b.minZ + b.maxZ) / 2;
-  const radius = Math.max(Math.hypot(b.maxX - b.minX, b.maxZ - b.minZ) / 2, 4);
-  const distance = (radius * 1.15) / Math.sin((FOV_DEGREES * DEG) / 2);
   return clampOrbit({
     targetX: cx,
     targetY: GROUND_EPSILON,
     targetZ: cz,
     azimuth: DEFAULT_AZIMUTH,
     polar: DEFAULT_POLAR,
-    distance,
+    distance: distanceToFrameGround(b, aspectRatio),
   });
 }
 

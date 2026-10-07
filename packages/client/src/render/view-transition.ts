@@ -6,7 +6,7 @@
  * extent, so swapping cameras at either end of the tween is invisible.
  */
 import {
-  FOV_DEGREES,
+  DEFAULT_FOV_DEGREES,
   GROUND_EPSILON,
   MIN_POLAR,
   normalizeAngle,
@@ -20,7 +20,7 @@ export const TWEEN_MS = 250;
 /** 2D screen-up is world -Z, which is azimuth 0 for the orbit camera (see camera-3d.ts). */
 export const TOP_DOWN_AZIMUTH = 0;
 
-const HALF_FOV_TAN = Math.tan((FOV_DEGREES * Math.PI) / 360);
+const HALF_FOV_TAN = Math.tan((DEFAULT_FOV_DEGREES * Math.PI) / 360);
 
 /** Smoothstep: monotonic, exact at 0 and 1, zero slope at both ends so there is no jolt. */
 export function easeInOut(t: number): number {
