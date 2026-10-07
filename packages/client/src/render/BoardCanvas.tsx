@@ -175,14 +175,19 @@ export function BoardCanvas() {
         <ViewToggle />
         <RulerToggle />
         {mode3d && (
-          <button
-            type="button"
-            onClick={() => {
-              setResetToken((n) => n + 1);
-            }}
-          >
-            Reset view
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setResetToken((n) => n + 1);
+              }}
+            >
+              Reset view
+            </button>
+            <span className="ui-camera-hint">
+              3D mouse: right or middle drag orbit · Shift+drag pan · wheel zoom · left select/tools
+            </span>
+          </>
         )}
       </div>
       <AoEToolPanel scene={source} />

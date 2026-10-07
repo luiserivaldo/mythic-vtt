@@ -7,7 +7,7 @@ import {
   dampVelocity,
   defaultOrbit,
   dolly,
-  FOV_DEGREES,
+  DEFAULT_FOV_DEGREES,
   orbitByPixels,
   orbitPosition,
   panOnGround,
@@ -69,6 +69,7 @@ export function OrbitControls3D({
   const orbit = orbitRef ?? ownOrbit;
   // Angular velocity (rad/s) used for post-release damping; only moves the camera while non-zero.
   const velocity = useRef({ az: 0, polar: 0 });
+  const gestureActive = useRef(false);
 
   const apply = useCallback(
     (raw: Orbit3D) => {
@@ -94,6 +95,17 @@ export function OrbitControls3D({
     };
   }, [applyRef, apply]);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const diagnostics = {
+      getPose: () => ({ ...orbit.current }),
+    };
+    window.__mythicCamera = diagnostics;
+    return () => {
+      if (window.__mythicCamera === diagnostics) delete window.__mythicCamera;
+    };
+  }, [orbit]);
+
   // Reset on mount, on token change and when the scene bounds change. A view switch keeps the
   // pose it was given; the check is by value so a StrictMode re-run does not reset it either.
   const seen = useRef({ bounds, resetToken });
@@ -101,9 +113,14 @@ export function OrbitControls3D({
     velocity.current = { az: 0, polar: 0 };
     const unchanged = seen.current.bounds === bounds && seen.current.resetToken === resetToken;
     seen.current = { bounds, resetToken };
-    apply(keepInitialOrbit && unchanged ? orbit.current : defaultOrbit(bounds));
+    const { width, height } = getState().size;
+    apply(
+      keepInitialOrbit && unchanged
+        ? orbit.current
+        : defaultOrbit(bounds, width / Math.max(height, 1)),
+    );
     // keepInitialOrbit only decides this application; it must not re-trigger a reset.
-  }, [bounds, resetToken, apply]);
+  }, [bounds, resetToken, apply, getState]);
 
   // The drei camera replaces the default one after mount: pose it as soon as it is active.
   useEffect(() => {
@@ -113,9 +130,11 @@ export function OrbitControls3D({
   // Continue damped rotation; frames are only requested while velocity is non-zero.
   useFrame((_, delta) => {
     const v = velocity.current;
-    if (v.az === 0 && v.polar === 0) return;
+    if (gestureActive.current || (v.az === 0 && v.polar === 0)) return;
     const dt = Math.min(delta, 0.05);
-    apply(orbitByPixels(orbit.current, (v.az * dt) / ROTATE_SPEED, (v.polar * dt) / ROTATE_SPEED));
+    apply(
+      orbitByPixels(orbit.current, (-v.az * dt) / ROTATE_SPEED, (-v.polar * dt) / ROTATE_SPEED),
+    );
     v.az = dampVelocity(v.az, dt);
     v.polar = dampVelocity(v.polar, dt);
   });
@@ -142,6 +161,7 @@ export function OrbitControls3D({
       velocity.current = { az: 0, polar: 0 };
       pointers.set(e.pointerId, local(e));
       modes.set(e.pointerId, isMouse && e.shiftKey ? 'pan' : 'orbit');
+      gestureActive.current = true;
       el.setPointerCapture(e.pointerId);
       lastMoveTime = e.timeStamp;
     };
@@ -176,6 +196,7 @@ export function OrbitControls3D({
       const wasOnlyPointer = pointers.size === 1;
       pointers.delete(e.pointerId);
       modes.delete(e.pointerId);
+      gestureActive.current = pointers.size > 0;
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
       // Only a quick flick keeps spinning; a held-then-released drag stops dead.
       if (!wasOnlyPointer || e.timeStamp - lastMoveTime > 60)
@@ -207,5 +228,5 @@ export function OrbitControls3D({
     };
   }, [gl, apply, invalidate]);
 
-  return <PerspectiveCamera makeDefault fov={FOV_DEGREES} near={0.1} far={2000} />;
+  return <PerspectiveCamera makeDefault fov={DEFAULT_FOV_DEGREES} near={0.1} far={2000} />;
 }
