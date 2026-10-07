@@ -98,8 +98,10 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   await page.getByRole('button', { name: 'Ruler' }).click();
   // The platform spawns at scene centre. Project known world points through the live pose so this
   // regression remains about surface measurement rather than one particular camera framing.
-  await page.mouse.click(ground.x, ground.y);
+  await page.mouse.move(ground.x, ground.y);
+  await page.mouse.down();
   await page.mouse.move(platformTop.x, platformTop.y, { steps: 8 });
+  await page.mouse.up();
 
   const detailed = /^H .+ · V (?!0(?:\.0+)? ft).+ · T .+$/;
   await expect(page.getByTestId('ruler-total')).toHaveText(detailed);

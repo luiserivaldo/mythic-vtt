@@ -10,10 +10,11 @@ import {
   unitGeometry,
 } from './primitive-geometry.js';
 import type { RenderEntity, RenderShape } from './scene-model.js';
+import { SELECTION_COLOR } from './canvas-style.js';
 
 export type RenderMode = '2d' | '3d';
 
-const SELECTED = '#ffe066';
+const SELECTED = SELECTION_COLOR;
 const SECRET = '#a577ce';
 
 /**

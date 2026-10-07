@@ -8,6 +8,7 @@ import {
   type Scene,
   type Vec3,
 } from '@mythic/shared';
+import { DRAG_THRESHOLD_PX } from '../render/camera-2d.js';
 
 export interface RulerSegment {
   readonly from: Vec3;
@@ -99,6 +100,14 @@ export function prepareRulerPoint(raw: Pick<Vec3, 'x' | 'z'>, scene: Scene): Vec
 
 export function sameRulerPoint(a: Vec3 | undefined, b: Vec3): boolean {
   return a?.x === b.x && a.y === b.y && a.z === b.z;
+}
+
+/** Screen-space threshold keeps a short press available for click-to-add waypoint mode. */
+export function rulerDragStarted(
+  start: { x: number; y: number },
+  current: { x: number; y: number },
+): boolean {
+  return Math.hypot(current.x - start.x, current.y - start.y) >= DRAG_THRESHOLD_PX;
 }
 
 /** Minimum gap between ruler broadcasts (under the host's 30/s ephemeral rate limit, M1-07). */

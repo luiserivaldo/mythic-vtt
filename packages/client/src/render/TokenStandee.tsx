@@ -6,8 +6,9 @@ import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
 import { TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { billboardYaw, standeeDimensions, labelAnchor3d } from './token-standee.js';
+import { SELECTION_COLOR } from './canvas-style.js';
 
-const SELECTED = '#ffe066';
+const SELECTED = SELECTION_COLOR;
 
 /**
  * M2-06 / TOK-03: a 3D token. Base disc at `position` (feet, y = elevation) plus an

@@ -21,10 +21,10 @@ import { tokenDragStore } from '../tools/token-drag-store.js';
 import { EphemeralContext } from '../ui/ephemeral-context.js';
 import { SubmitContext } from '../ui/submit.js';
 import { useViewMode } from './view-mode-store.js';
+import { GHOST_COLOR } from './canvas-style.js';
 import { pointerClaims } from './pointer-claims.js';
 import type { OrthographicCamera } from 'three';
 
-const GHOST_COLOR = '#ffe066';
 const SETTLE_TIMEOUT_MS = 2000;
 
 interface Press {
@@ -300,7 +300,7 @@ export function TokenDrag() {
           raycast={() => null}
         >
           <planeGeometry args={[g.sizeCells, g.sizeCells]} />
-          <meshBasicMaterial color={GHOST_COLOR} transparent opacity={0.4} depthTest={false} />
+          <meshBasicMaterial color={GHOST_COLOR} transparent opacity={0.6} depthTest={false} />
         </mesh>
       ))}
     </group>

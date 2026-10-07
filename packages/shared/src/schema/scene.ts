@@ -7,8 +7,9 @@ import { Id, LayerId } from './ids.js';
 export const GridColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 /** Defaults applied at read time, so saves written before colour/opacity existed stay valid. */
-export const DEFAULT_GRID_COLOR = '#ffffff';
-export const DEFAULT_GRID_OPACITY = 0.25;
+export const DEFAULT_GRID_COLOR = '#1e293b';
+export const DEFAULT_GRID_OPACITY = 0.6;
+export const DEFAULT_SCENE_BACKGROUND = '#d9dde3';
 
 export const Grid = z.object({
   type: z.enum(['square', 'hex']),

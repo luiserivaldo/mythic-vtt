@@ -13,7 +13,7 @@ const campaign = {
 describe('background form', () => {
   it('derives drafts with fallbacks', () => {
     expect(backgroundDraft(campaign, 's1')).toEqual({ background: '#aabbcc', zenith: '#123456' });
-    expect(backgroundDraft(campaign, 's2')).toEqual({ background: '#101923', zenith: '' });
+    expect(backgroundDraft(campaign, 's2')).toEqual({ background: '#d9dde3', zenith: '' });
     expect(backgroundDraft(campaign, 'none').zenith).toBe('');
   });
   it('validates and builds intent', () => {

@@ -17,8 +17,8 @@ function campaign(grid: Record<string, unknown>, activeSceneId: string | null = 
 describe('activeRenderGrid', () => {
   it('applies defaults for a grid without colour or opacity', () => {
     expect(activeRenderGrid(campaign({}))).toEqual({
-      color: '#ffffff',
-      opacity: 0.25,
+      color: '#1e293b',
+      opacity: 0.6,
       bounds: { width: 40, height: 30 },
     });
   });

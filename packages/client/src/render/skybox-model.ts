@@ -1,6 +1,9 @@
 // ENV-07: pure background/skybox model. No Three.js; Skybox.tsx turns this into a dome.
 
-export const DEFAULT_BACKGROUND = '#101923';
+import { DEFAULT_BOARD_COLOR, OUTSIDE_FALLBACK } from './canvas-style.js';
+
+export const DEFAULT_BACKGROUND = DEFAULT_BOARD_COLOR;
+export const DEFAULT_ZENITH = OUTSIDE_FALLBACK;
 
 export type Rgb = readonly [number, number, number];
 
@@ -46,7 +49,8 @@ export function resolveBackground(
 ): BackgroundSpec {
   const horizon = resolveColor(background);
   const top = parseColor(zenith);
-  return { horizon, zenith: top ? toHex(top) : null };
+  const usesDefault = parseColor(background) === null || horizon === DEFAULT_BACKGROUND;
+  return { horizon, zenith: top ? toHex(top) : usesDefault ? DEFAULT_ZENITH : null };
 }
 
 /** Colour at elevation t in [-1, 1]: below the horizon stays the horizon colour. */

@@ -6,6 +6,7 @@ import {
   measureRuler,
   MAX_RULER_POINTS,
   prepareRulerPoint,
+  rulerDragStarted,
   rulerExpired,
   rulerOwnerName,
   shouldSendRuler,
@@ -101,6 +102,11 @@ describe('ruler path helpers (MEAS-01)', () => {
     expect(withCursor([a], b)).toEqual([a, b]);
     expect(withCursor([a], a)).toEqual([a]);
     expect(withCursor([a], null)).toEqual([a]);
+  });
+
+  it('distinguishes a short waypoint press from a ruler drag in screen pixels', () => {
+    expect(rulerDragStarted({ x: 10, y: 10 }, { x: 12, y: 12 })).toBe(false);
+    expect(rulerDragStarted({ x: 10, y: 10 }, { x: 14, y: 10 })).toBe(true);
   });
 
   it('rate-limits previews but always sends forced ones', () => {

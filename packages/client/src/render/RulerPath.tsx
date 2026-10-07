@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type { Scene, Vec3 } from '@mythic/shared';
 import { measureRuler } from '../tools/ruler.js';
 import { rulerGuideCorner } from '../tools/ruler-3d.js';
+import { LABEL_BACKGROUND_COLOR, LABEL_TEXT_COLOR } from './canvas-style.js';
 import type { ViewMode } from './view-mode-store.js';
 
 const LIFT = 0.05;
@@ -10,8 +11,8 @@ const LIFT = 0.05;
 const pillStyle = {
   padding: '1px 6px',
   borderRadius: 4,
-  background: 'rgba(16,25,35,0.85)',
-  color: '#fff',
+  background: LABEL_BACKGROUND_COLOR,
+  color: LABEL_TEXT_COLOR,
   whiteSpace: 'nowrap',
   userSelect: 'none',
 } as const;

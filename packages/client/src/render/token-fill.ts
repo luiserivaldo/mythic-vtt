@@ -1,9 +1,10 @@
 import type { RenderEntity } from './scene-model.js';
+import { DEFAULT_TOKEN_COLOR, SELECTION_COLOR } from './canvas-style.js';
 
 const FILL = {
-  token: '#46b6cf',
+  token: DEFAULT_TOKEN_COLOR,
   secret: '#a577ce',
-  selected: '#ffe066',
+  selected: SELECTION_COLOR,
   layers: {
     map: '#51637a',
     'props-under': '#8a96a5',

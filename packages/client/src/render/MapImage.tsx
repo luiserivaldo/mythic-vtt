@@ -7,6 +7,7 @@ import { worldToLocal } from '../tools/battlemap-calibration.js';
 import { calibrationStore } from '../tools/battlemap-store.js';
 import { useMapTexture } from './use-texture.js';
 import type { RenderEntity } from './scene-model.js';
+import { SELECTION_COLOR } from './canvas-style.js';
 
 /** Host origin for assets. '' = same origin (dev server proxies `/assets` to the host). */
 const ASSET_BASE_URL = '';
@@ -66,7 +67,7 @@ export function MapImageMesh({
       <planeGeometry args={[scale * aspect, scale]} />
       <meshBasicMaterial
         key={entry.status === 'ready' ? 'textured' : 'flat'}
-        color={entry.status === 'ready' ? '#ffffff' : selected ? '#ffe066' : '#51637a'}
+        color={entry.status === 'ready' ? '#ffffff' : selected ? SELECTION_COLOR : '#51637a'}
         {...(entry.status === 'ready' ? { map: entry.texture } : {})}
         side={DoubleSide}
         depthTest={false}

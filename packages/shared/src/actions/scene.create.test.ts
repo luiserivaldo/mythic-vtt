@@ -3,6 +3,7 @@ import { patchesFor } from '../visibility/index.js';
 import type { ActionEnvelope } from './envelope.js';
 import { sceneCreate } from './scene.create.js';
 import { reduceAction } from './run.js';
+import { DEFAULT_SCENE_BACKGROUND } from '../schema/index.js';
 import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix, testId } from './testing.js';
 
 const T = 'scene.create';
@@ -59,6 +60,7 @@ describe(`${T} reducer`, () => {
     expect(scene).toMatchObject({
       name: 'Dragon Lair',
       grid: { sizePx: 70, unitsPerCell: 5, unitLabel: 'ft', diagonal: 'alternating', snap: true },
+      environment: { background: DEFAULT_SCENE_BACKGROUND },
       entities: {},
     });
     expect(state.activeSceneId).toBe(IDS.scene);
