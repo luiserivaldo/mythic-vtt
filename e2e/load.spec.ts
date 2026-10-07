@@ -245,6 +245,7 @@ test('@load M1-24: one DM and ten seated players sustain move bursts', async () 
     };
 
     expect(ack.p95).toBeLessThanOrEqual(DIRECT_P95_BUDGET_MS);
+    expect(broadcast.p95).toBeLessThanOrEqual(DIRECT_P95_BUDGET_MS);
     expect(seqGaps).toBe(0);
     expect(droppedPatches).toBe(0);
     expect(rejectedMoves).toBe(0);
