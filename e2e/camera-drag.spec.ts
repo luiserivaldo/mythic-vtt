@@ -3,13 +3,21 @@ import { startTable, type Table } from './harness.js';
 
 interface CameraPose {
   targetX: number;
+  targetY: number;
   targetZ: number;
   azimuth: number;
+  polar: number;
+  distance: number;
+}
+
+interface CameraDiagnostics {
+  __mythicCamera?: { getPose(): CameraPose };
+  __mythicCameraRest?: { azimuth: number; polar: number; distance: number; stable: number };
 }
 
 async function cameraPose(page: Page): Promise<CameraPose> {
   return page.evaluate(() => {
-    const camera = window.__mythicCamera;
+    const camera = (globalThis as typeof globalThis & CameraDiagnostics).__mythicCamera;
     if (!camera) throw new Error('3D camera diagnostics are not mounted');
     return camera.getPose();
   });
@@ -17,12 +25,10 @@ async function cameraPose(page: Page): Promise<CameraPose> {
 
 async function waitForCameraToRest(page: Page): Promise<void> {
   await page.waitForFunction(() => {
-    const camera = window.__mythicCamera;
+    const state = globalThis as typeof globalThis & CameraDiagnostics;
+    const camera = state.__mythicCamera;
     if (!camera) return false;
     const current = camera.getPose();
-    const state = window as Window & {
-      __mythicCameraRest?: { azimuth: number; polar: number; distance: number; stable: number };
-    };
     const previous = state.__mythicCameraRest;
     const unchanged =
       previous !== undefined &&
