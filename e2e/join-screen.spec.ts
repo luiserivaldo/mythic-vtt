@@ -31,6 +31,8 @@ test('a new visitor joins by name and seat; the DM sees them and seats a spectat
   dm.on('pageerror', (e) => errors.push(e.message));
   await dm.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
+  await expect(dm.getByLabel('Current identity')).toContainText('DM');
+  await expect(dm.getByLabel('Current identity')).toContainText('Host');
   // The DM link skips the join screen.
   await expect(dm.getByRole('dialog')).toHaveCount(0);
   await dm.getByRole('button', { name: 'Seats' }).click();
@@ -70,7 +72,12 @@ test('a new visitor joins by name and seat; the DM sees them and seats a spectat
   await zara.page.getByRole('button', { name: 'Join seat' }).click();
   await expect(zara.page.getByRole('dialog')).toHaveCount(0);
   await expect(zara.page.getByRole('status')).toHaveText('Connected to New campaign');
-  await expect(dm.getByText('Zara the Bold')).toBeVisible();
+  await expect(zara.page.getByLabel('Current identity')).toContainText('Zara the Bold');
+  await expect(zara.page.getByLabel('Current identity')).toContainText('Player');
+  await expect(zara.page.getByLabel('Current identity')).toContainText('Wizard');
+  await expect(
+    dm.getByRole('list', { name: 'Connected identities' }).getByText('Zara the Bold'),
+  ).toBeVisible();
   await expect(
     dm.getByRole('listitem').filter({ hasText: 'Wizard' }).getByText('Online'),
   ).toBeVisible();
@@ -89,15 +96,24 @@ test('a new visitor joins by name and seat; the DM sees them and seats a spectat
   await expect(quinn.page.getByText('Taken')).toBeVisible();
   await quinn.page.getByRole('button', { name: 'Join as spectator' }).click();
   await expect(quinn.page.getByRole('dialog')).toHaveCount(0);
+  await expect(quinn.page.getByLabel('Current identity')).toContainText('Quinn');
+  await expect(quinn.page.getByLabel('Current identity')).toContainText('Spectator');
+  await expect(dm.getByRole('list', { name: 'Connected identities' })).toContainText('Quinn');
+  await expect(dm.getByRole('list', { name: 'Connected identities' })).toContainText('Unseated');
 
   // The DM seats the spectator from the dropdown, not by typing an identity id.
-  const rogue = dm.getByRole('listitem').filter({ hasText: 'Rogue' });
+  const rogue = dm
+    .getByRole('list', { name: 'Seats' })
+    .getByRole('listitem')
+    .filter({ hasText: 'Rogue' });
   const picker = rogue.getByLabel('Connected player for Rogue');
   const value = await picker.locator('option', { hasText: 'Quinn' }).getAttribute('value');
   await picker.selectOption(value ?? '');
   await rogue.getByRole('button', { name: 'Assign' }).click();
   await expect(rogue.getByText('Quinn', { exact: true })).toBeVisible();
   await expect(rogue.getByText('Online')).toBeVisible();
+  await expect(quinn.page.getByLabel('Current identity')).toContainText('Player');
+  await expect(quinn.page.getByLabel('Current identity')).toContainText('Rogue');
 
   // PERM-03: no roster or other names ever reach player or spectator sockets.
   for (const frames of [zaraFrames, quinnFrames]) {
