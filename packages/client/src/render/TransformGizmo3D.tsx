@@ -74,6 +74,7 @@ export function TransformGizmo3D() {
   const submit = useContext(SubmitContext);
   const preview = useStore(gizmoStore, (s) => s.preview);
   const groupRef = useRef<Group>(null);
+  const draftPosition = useMemo(() => new Vector3(), []);
 
   const entity = target?.entity ?? null;
   const live = preview && entity && preview.entityId === entity.id ? preview.draft : null;
@@ -88,7 +89,7 @@ export function TransformGizmo3D() {
     const g = groupRef.current;
     const d = latest.current.draft;
     if (!g || !d) return;
-    const distance = camera.position.distanceTo(new Vector3(d.x, d.y ?? 0, d.z));
+    const distance = camera.position.distanceTo(draftPosition.set(d.x, d.y ?? 0, d.z));
     const fov = (camera as PerspectiveCamera).fov;
     g.scale.setScalar(worldPerPixelAt(distance, fov, size.height) * HANDLE_LENGTH_PX);
   });

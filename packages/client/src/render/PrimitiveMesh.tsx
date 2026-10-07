@@ -119,13 +119,3 @@ function Footprint2D({
     </group>
   );
 }
-
-/** Lit only in 3D mode. */
-export function PrimitiveLights() {
-  return (
-    <>
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[6, 12, 4]} intensity={1.2} />
-    </>
-  );
-}

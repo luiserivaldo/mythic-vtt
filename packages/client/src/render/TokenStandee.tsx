@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { DoubleSide, type Group } from 'three';
 import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
@@ -34,12 +34,13 @@ export function TokenStandee({
   const pivot = useRef<Group>(null);
   const [x, y, z] = entity.position;
   const dims = standeeDimensions(entity.sizeCells);
+  const groundPosition = useMemo(() => ({ x, z }), [x, z]);
 
   // Runs on every rendered frame; camera motion already triggers frames in demand mode.
   useFrame(({ camera }) => {
     const g = pivot.current;
     if (!g) return;
-    g.rotation.y = billboardYaw({ x, z }, camera.position, g.rotation.y);
+    g.rotation.y = billboardYaw(groundPosition, camera.position, g.rotation.y);
   });
 
   return (

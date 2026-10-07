@@ -1,7 +1,7 @@
 import { Canvas, useThree } from '@react-three/fiber';
 import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
 import { OrthographicCamera } from '@react-three/drei';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useStore } from 'zustand';
 import { tokenDragStore } from '../tools/token-drag-store.js';
 import { withLocalDrag } from '../tools/token-drag.js';
@@ -16,11 +16,7 @@ import { RulerTool } from './RulerTool.js';
 import { RulerToggle } from './RulerToggle.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
-import { TransformGizmo3D } from './TransformGizmo3D.js';
-import { TransformPanel3D } from '../ui/TransformPanel3D.js';
 import { TransformPanel } from '../ui/TransformPanel.js';
-import { OrbitControls3D } from './OrbitControls3D.js';
-import { Skybox } from './Skybox.js';
 import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
 import { outsideColor } from './canvas-style.js';
 import type { GroundBounds } from './camera-3d.js';
@@ -32,6 +28,24 @@ import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
 import { AoEAffectedPanel } from '../ui/AoEAffectedPanel.js';
+import { RenderDiagnostics } from './RenderDiagnostics.js';
+
+const OrbitControls3D = lazy(async () => {
+  const module = await import('./OrbitControls3D.js');
+  return { default: module.OrbitControls3D };
+});
+const Skybox = lazy(async () => {
+  const module = await import('./Skybox.js');
+  return { default: module.Skybox };
+});
+const TransformGizmo3D = lazy(async () => {
+  const module = await import('./TransformGizmo3D.js');
+  return { default: module.TransformGizmo3D };
+});
+const TransformPanel3D = lazy(async () => {
+  const module = await import('../ui/TransformPanel3D.js');
+  return { default: module.TransformPanel3D };
+});
 
 function BoardScene({
   scene,
@@ -77,15 +91,21 @@ function BoardScene({
     <>
       {/* D37: outside the canvas is a darker neutral; GridLines fills the inside. */}
       <color attach="background" args={[outsideColor(scene?.background)]} />
-      {mode3d && backdrop.zenith && <Skybox spec={backdrop} />}
+      {mode3d && backdrop.zenith && (
+        <Suspense fallback={null}>
+          <Skybox spec={backdrop} />
+        </Suspense>
+      )}
       {mode3d ? (
-        <OrbitControls3D
-          bounds={bounds}
-          resetToken={resetToken}
-          orbitRef={director.orbitRef}
-          applyRef={director.applyRef}
-          keepInitialOrbit={director.keepInitialOrbit}
-        />
+        <Suspense fallback={null}>
+          <OrbitControls3D
+            bounds={bounds}
+            resetToken={resetToken}
+            orbitRef={director.orbitRef}
+            applyRef={director.applyRef}
+            keepInitialOrbit={director.keepInitialOrbit}
+          />
+        </Suspense>
       ) : (
         <>
           <PanZoomControls bounds={canvasSize} frameKey={frameKey} />
@@ -118,7 +138,14 @@ function BoardScene({
       />
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       {/* M1-20 / M2-08: 2D handles, or the 3D gizmo; both are off while the AoE tool is active. */}
-      {!aoeActive && (mode3d ? <TransformGizmo3D /> : <TransformGizmo />)}
+      {!aoeActive &&
+        (mode3d ? (
+          <Suspense fallback={null}>
+            <TransformGizmo3D />
+          </Suspense>
+        ) : (
+          <TransformGizmo />
+        ))}
       <AoEPlacementCanvas scene={source} mode={mode3d ? '3d' : '2d'} />
     </>
   );
@@ -192,7 +219,14 @@ export function BoardCanvas() {
       </div>
       <AoEToolPanel scene={source} />
       <AoEAffectedPanel scene={source} />
-      {!aoeActive && (mode3d ? <TransformPanel3D /> : <TransformPanel />)}
+      {!aoeActive &&
+        (mode3d ? (
+          <Suspense fallback={<span role="status">Loading 3D tools…</span>}>
+            <TransformPanel3D />
+          </Suspense>
+        ) : (
+          <TransformPanel />
+        ))}
       <Canvas
         frameloop="demand"
         shadows={false}
@@ -202,6 +236,7 @@ export function BoardCanvas() {
             selectionStore.getState().clear();
         }}
       >
+        <RenderDiagnostics />
         <BoardScene
           scene={scene}
           source={source}
