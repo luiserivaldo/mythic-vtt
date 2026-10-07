@@ -161,13 +161,13 @@ test('@load M1-24: one DM and ten seated players sustain move bursts', async () 
             player.ephemeral('token.drag-preview', {
               sceneId,
               entityId: identity.tokenId,
-              position,
+              to: position,
             });
           }
           const sentAt = performance.now();
           pending.push(
             player
-              .intent('token.move', { sceneId, entityId: identity.tokenId, position })
+              .intent('token.move', { sceneId, entityId: identity.tokenId, to: position })
               .then((reply) => {
                 ackLatencies.push(performance.now() - sentAt);
                 if (reply.t === 'reject' || reply.seq === undefined) rejectedMoves += 1;
