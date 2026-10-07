@@ -8,6 +8,8 @@ export interface GizmoPreview {
   draft: GizmoDraft;
   /** The stored transform when the preview began; a different one means the host's patch landed. */
   base: Transform;
+  /** M1-35: token size is stored outside the transform and must also settle from the host patch. */
+  baseTokenSize: number | undefined;
   /** Committed and waiting for the host's patch; the preview stays so the entity does not flick back. */
   settling: boolean;
 }

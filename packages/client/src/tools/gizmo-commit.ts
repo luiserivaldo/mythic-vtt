@@ -9,9 +9,10 @@ type GizmoStore = StoreApi<ReturnType<typeof gizmoStore.getState>>;
 export type Submit = (type: string, payload: unknown, sceneId?: string) => Promise<IntentResult>;
 
 /**
- * Commit a transform as ONE `entity.update` intent (release or Enter). Nothing is applied
- * optimistically: on reject the preview is dropped so the entity shows the
- * host's state again (D34: server order wins).
+ * Commit a transform as ONE `entity.update` intent (release or Enter). M1-35 keeps token sizing
+ * in `token.sizeCells`; transform scale remains the source for every other entity. Nothing is
+ * applied optimistically: on reject the preview is dropped so the entity shows the host's state
+ * again (D34: server order wins).
  */
 export async function commitTransform(args: {
   submit: Submit;
@@ -23,17 +24,26 @@ export async function commitTransform(args: {
   const { submit, store, sceneId, entity, draft } = args;
   const state = store.getState();
   if (state.busy) return false;
-  const transform = buildTransform(entity.transform, draft);
-  if (sameTransform(transform, entity.transform)) {
+  const transform = buildTransform(
+    entity.transform,
+    entity.token ? { ...draft, scale: entity.transform.scale.x } : draft,
+  );
+  const transformChanged = !sameTransform(transform, entity.transform);
+  const tokenChanged = entity.token !== undefined && draft.scale !== entity.token.sizeCells;
+  if (!transformChanged && !tokenChanged) {
     state.clear();
     return true;
   }
+  const changes = {
+    ...(transformChanged ? { transform } : {}),
+    ...(tokenChanged && entity.token ? { token: { ...entity.token, sizeCells: draft.scale } } : {}),
+  };
   state.setBusy(true);
   state.setError(null);
   try {
     const result = await submit(
       'entity.update',
-      { sceneId, entityId: entity.id, changes: { transform } },
+      { sceneId, entityId: entity.id, changes },
       sceneId,
     );
     if (result.ok) {

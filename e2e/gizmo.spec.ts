@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid, type Table } from './harness.js';
 
-// M1-20 (ENV-03): the 2D transform gizmo mounts for the host, a handle drag commits one snapped
-// entity.update without panning the camera, and typed values validate before they are sent.
+// M1-20 / M1-35 (ENV-03, TOK-09): the 2D transform gizmo moves and uniformly resizes a token
+// without panning the camera; typed values validate and use token.sizeCells as the size source.
 
 let table: Table;
 
@@ -19,7 +19,16 @@ interface Snapshot {
     string,
     {
       grid: { unitsPerCell: number };
-      entities: Record<string, { transform: { position: { x: number; z: number } } }>;
+      entities: Record<
+        string,
+        {
+          transform: {
+            position: { x: number; z: number };
+            scale: { x: number; y: number; z: number };
+          };
+          token?: { sizeCells: number };
+        }
+      >;
     }
   >;
 }
@@ -111,6 +120,21 @@ test('host selects a token, drags its move handle and types values', async ({ br
   // The token is still selected (the drag's click was swallowed) and the gizmo follows it.
   await expect(panel).toBeVisible();
 
+  // M1-35: the corner handle resizes token.sizeCells, not transform.scale.
+  const movedCenter = at(4.5, 3.5);
+  const handleOffset = zoom / 2 + 14;
+  const scaleHandle = { x: movedCenter.x + handleOffset, y: movedCenter.y + handleOffset };
+  await page.mouse.move(scaleHandle.x, scaleHandle.y);
+  await page.mouse.down();
+  await page.mouse.move(movedCenter.x + handleOffset * 2, movedCenter.y + handleOffset * 2, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  const resized = () => (reader.state as Snapshot).scenes[scene]?.entities[token];
+  await expect.poll(() => resized()?.token?.sizeCells, { timeout: 10_000 }).toBe(2);
+  expect(resized()?.transform.scale).toEqual({ x: 1, y: 1, z: 1 });
+  await expect(panel.getByLabel('Size (cells)')).toHaveValue('2');
+
   // Dragging empty board still pans (the label moves on screen).
   const empty = at(10, 8);
   await page.mouse.move(empty.x, empty.y);
@@ -129,6 +153,16 @@ test('host selects a token, drags its move handle and types values', async ({ br
   await xField.fill(String(7.5 * unitsPerCell));
   await xField.press('Enter');
   await expect.poll(() => position()?.x, { timeout: 10_000 }).toBeCloseTo(7.5);
+
+  // Typed size uses the same source of truth and remains available to 3D rendering.
+  const sizeField = panel.getByLabel('Size (cells)');
+  const applyButton = panel.getByRole('button', { name: 'Apply' });
+  await expect(applyButton).toBeEnabled();
+  await sizeField.fill('3');
+  await expect(sizeField).toHaveValue('3');
+  await applyButton.click();
+  await expect.poll(() => resized()?.token?.sizeCells, { timeout: 10_000 }).toBe(3);
+  expect(resized()?.transform.scale).toEqual({ x: 1, y: 1, z: 1 });
 
   expect(errors).toEqual([]);
   await reader.close();
