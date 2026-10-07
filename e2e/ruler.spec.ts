@@ -70,13 +70,19 @@ test('the ruler measures in scene units and a second client sees it with the sen
 
   await dm.getByRole('button', { name: 'Ruler' }).click();
   await expect(dm.getByRole('button', { name: 'Ruler' })).toHaveAttribute('aria-pressed', 'true');
-  await dm.mouse.click(a.x, a.y);
+  await dm.mouse.move(a.x, a.y);
+  await dm.mouse.down();
   await dm.mouse.move(b.x, b.y, { steps: 5 });
+  await dm.mouse.up();
+  await expect(dm.getByTestId('ruler-total')).toHaveText('30 ft');
+  // Release finishes a quick measurement, which remains readable until the next press.
   await expect(dm.getByTestId('ruler-total')).toHaveText('30 ft');
   // The second client sees the live ruler, named after the sender (a seatless DM).
   await expect(player.getByTestId('remote-ruler-total')).toHaveText('DM: 30 ft');
 
-  // A second waypoint, then a double-click finishes: 6 + 3 cells.
+  // A short press starts a fresh click-path, then click and double-click build 6 + 3 cells.
+  await dm.mouse.click(a.x, a.y);
+  await dm.mouse.move(b.x, b.y, { steps: 5 });
   await dm.mouse.click(b.x, b.y);
   await dm.mouse.dblclick(c.x, c.y);
   await expect(dm.getByTestId('ruler-total')).toHaveText('45 ft');
