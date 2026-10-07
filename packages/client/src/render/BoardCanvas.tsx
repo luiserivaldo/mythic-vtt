@@ -32,6 +32,7 @@ import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
 import { AoEAffectedPanel } from '../ui/AoEAffectedPanel.js';
+import { RenderDiagnostics } from './RenderDiagnostics.js';
 
 function BoardScene({
   scene,
@@ -202,6 +203,7 @@ export function BoardCanvas() {
             selectionStore.getState().clear();
         }}
       >
+        <RenderDiagnostics />
         <BoardScene
           scene={scene}
           source={source}

@@ -10,7 +10,8 @@ import { ElevationBadge, SelectionRing, TokenLabel, TokenMaterial } from './Toke
 import { entityFill } from './token-fill.js';
 import { DropLines } from './DropLines.js';
 import { TokenStandee } from './TokenStandee.js';
-import { PrimitiveLights, PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
+import { PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
+import { Lighting3D } from './Lighting3D.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
 import { ElevatedSurfaceGrid } from './ElevatedSurfaceGrid.js';
 import type { RenderGrid } from './grid-model.js';
@@ -76,7 +77,7 @@ export function PickableEntities({
 
   return (
     <>
-      {mode === '3d' && <PrimitiveLights />}
+      {mode === '3d' && <Lighting3D />}
       {mode === '3d' && <DropLines rendered={rendered} />}
       {RENDER_LAYERS.map((layer, order) => (
         <group key={layer} name={layer}>
