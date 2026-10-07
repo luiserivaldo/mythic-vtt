@@ -2,7 +2,7 @@
 
 Thanks for helping. This page covers how the project is laid out and how to get a change merged. If you only want to run the program, see the [README](README.md).
 
-> **Contributor terms:** the project is still deciding its contributor agreement (CLA or DCO). Until it is announced, please open an issue to discuss a change before sending a pull request.
+> **Contributor terms:** contributions are accepted under the project's licence (AGPL-3.0) and the [Developer Certificate of Origin](DCO). Sign off every commit; see [Signing off your commits](#signing-off-your-commits).
 
 ## Setup
 
@@ -76,8 +76,8 @@ Workspace packages expose their types from `dist/`, so the type-aware lint needs
 ### Branches, reviews and CI
 
 - **Everyone works on branches and opens pull requests.** Fork the repository, or push a branch if you have write access. Feature branches are free-form; they are deleted automatically when merged.
-- **`develop`** is the integration branch. Changes arrive by pull request and must pass the `check` CI job. No approvals are required, so automated and remote contributors are not blocked waiting on a person.
-- **`main`** only receives playable releases, by pull request from `develop`. It needs the `check` job to pass and a maintainer review.
+- **`develop`** is the integration branch, where features are merged and collaborated on. Changes arrive by pull request and must pass the `check` CI job. Reviews are done by the project's reviewer, and they are deliberately lighter here: experimental work is welcome as long as it is stable (CI green, no regressions, nothing half-broken).
+- **`main`** only receives playable releases, by pull request from `develop`. It needs the `check` job to pass and a deep review by a maintainer or a high-capability reviewer.
 - **Force-pushes and deleting `develop` or `main` are blocked.**
 - Paths that define contracts or touch security (`.github/`, `packages/protocol/`, the schema, actions, visibility and migrations folders, the host gateway, and `fixtures/saves/`) list the maintainer as code owner, who will be asked to review.
 - CI runs on pull requests from forks with a read-only token and no secrets. The first run from a new contributor needs a maintainer to approve it.
@@ -87,9 +87,24 @@ Workspace packages expose their types from `dist/`, so the type-aware lint needs
 Agents and bots are welcome, and follow the same rules as people:
 
 - Work on a branch and open a pull request. Do not push directly to `develop` or `main`.
-- Use a separate account or token per host or agent, with the minimum access needed (write access to this repository, not admin). Never share a maintainer token.
+- Use a separate, repository-scoped token per host or agent, with the minimum permissions it needs. Never share a maintainer or admin token, and never give a worker the permission to set commit statuses (that is how reviews are recorded).
+- Sign off your commits like anyone else. The maintainer who runs the agent is the responsible contributor.
 - You are responsible for what your tool submits: review the diff, keep it small and focused, and make sure `pnpm check` passes.
 - Do not add credentials, tokens or personal data to the repository, and do not disable CI, linting or tests to get a change through.
+
+### Signing off your commits
+
+Mythic VTT uses the [Developer Certificate of Origin](DCO) (DCO) instead of a contributor agreement. By signing off a commit you certify that you wrote the change or otherwise have the right to submit it under the project's licence. Your contribution stays under AGPL-3.0.
+
+Add a `Signed-off-by` line to every commit, with the same name and email as the commit's author:
+
+```sh
+git commit -s -m "fix: describe the change"
+```
+
+To sign off commits you have already made on a branch, run `git rebase --signoff origin/develop` and push again. To have git add the line for you, run `git config core.hooksPath .githooks` once in your clone.
+
+A `dco` check runs on every pull request and fails if a commit is not signed off. Merge commits and pull requests opened by bots such as Dependabot are exempt.
 
 ### Security and conduct
 
