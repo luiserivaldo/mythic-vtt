@@ -70,7 +70,11 @@ createRoot(rootEl).render(
       <UiStoreContext.Provider value={uiStore}>
         <SubmitProvider submit={session.submitIntent}>
           <EphemeralContext.Provider
-            value={{ send: session.sendEphemeral, on: session.onEphemeral }}
+            value={{
+              identityId: identity.identityId,
+              send: session.sendEphemeral,
+              on: session.onEphemeral,
+            }}
           >
             <JoinContext.Provider
               value={{

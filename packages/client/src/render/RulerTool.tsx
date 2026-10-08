@@ -19,7 +19,7 @@ import {
   type RulerPhase,
 } from '../tools/ruler.js';
 import { prepareRulerPoint3d } from '../tools/ruler-3d.js';
-import { EphemeralContext } from '../ui/ephemeral-context.js';
+import { EphemeralContext, isRemoteEphemeralSender } from '../ui/ephemeral-context.js';
 import { pointerClaims } from './pointer-claims.js';
 import { RulerPath } from './RulerPath.js';
 import { RULER_LOCAL_COLOR, RULER_REMOTE_COLOR } from './canvas-style.js';
@@ -80,7 +80,9 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
   // Other clients' rulers; expire them when their heartbeat stops.
   useEffect(() => {
     const off = ephemeral?.on((m) => {
-      if (m.channel !== 'ruler.preview' || !m.from) return;
+      if (m.channel !== 'ruler.preview' || !isRemoteEphemeralSender(m.from, ephemeral.identityId)) {
+        return;
+      }
       const parsed = RulerPreview.shape.data.safeParse(m.data);
       if (!parsed.success) return;
       const { sceneId: sid, points: pts, phase: ph } = parsed.data;

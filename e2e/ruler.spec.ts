@@ -77,6 +77,8 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await expect(dm.getByTestId('ruler-total')).toHaveText('30 ft');
   // Release finishes a quick measurement, which remains readable until the next press.
   await expect(dm.getByTestId('ruler-total')).toHaveText('30 ft');
+  // M1-33: the echoed preview is not also drawn as an off-colour remote ruler on its sender.
+  await expect(dm.getByTestId('remote-ruler-total')).toHaveCount(0);
   // The second client sees the live ruler, named after the sender (a seatless DM).
   await expect(player.getByTestId('remote-ruler-total')).toHaveText('DM: 30 ft');
 
@@ -100,6 +102,7 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await player.mouse.move(b.x, b.y, { steps: 5 });
   await player.keyboard.press('Enter');
   await expect(player.getByTestId('ruler-total')).toHaveText('30 ft');
+  await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
   await expect(dm.getByTestId('remote-ruler-total')).toHaveText('Aria: 30 ft');
 
   expect(errors).toEqual([]);

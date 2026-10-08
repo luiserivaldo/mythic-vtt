@@ -105,6 +105,8 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
 
   const detailed = /^H .+ · V (?!0(?:\.0+)? ft).+ · T .+$/;
   await expect(page.getByTestId('ruler-total')).toHaveText(detailed);
+  // M1-33: 3D also keeps the host echo out of the sender's remote-ruler layer.
+  await expect(page.getByTestId('remote-ruler-total')).toHaveCount(0);
   await expect(viewer.page.getByTestId('remote-ruler-total')).toHaveText(
     /^DM: H .+ · V (?!0(?:\.0+)? ft).+ · T .+$/,
   );
