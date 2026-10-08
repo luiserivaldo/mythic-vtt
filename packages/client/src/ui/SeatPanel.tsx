@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Campaign } from '@mythic/shared';
+import { SEAT_TEMPLATES, type Campaign } from '@mythic/shared';
 import { newId } from './ids.js';
 import {
   seatAssignIntent,
@@ -32,12 +32,12 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
   const [identity, setIdentity] = useState<Record<string, string>>({});
   return (
     <section aria-labelledby="ui-seats-h" className="ui-panel">
-      <h2 id="ui-seats-h">Seats and permissions</h2>
+      <h2 id="ui-seats-h">Participants and permissions</h2>
       <ul className="ui-list">
         {seatRows(campaign, presence).map((row) => {
           const typed = identity[row.id] ?? '';
           return (
-            <li key={row.id}>
+            <li key={row.id} aria-label={`${row.label} participant`}>
               <div className="ui-row">
                 <strong>{row.label}</strong>
                 <span className="ui-badge">
@@ -45,7 +45,7 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
                 </span>
                 {row.occupantName !== undefined && <span>{row.occupantName}</span>}
                 <label>
-                  Role{' '}
+                  Access role{' '}
                   <select
                     value={row.role}
                     onChange={(e) => {
@@ -65,7 +65,7 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
                       void send(seatReleaseIntent(row.id));
                     }}
                   >
-                    Release seat
+                    Release participant
                   </button>
                 )}
               </div>
@@ -79,14 +79,16 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
                 >
                   {roster.length > 0 && (
                     <label>
-                      <span className="ui-visually-hidden">Connected player for {row.label}</span>
+                      <span className="ui-visually-hidden">
+                        Connected participant for {row.label}
+                      </span>
                       <select
                         value={isValidIdentityId(typed) ? typed : ''}
                         onChange={(e) => {
                           setIdentity({ ...identity, [row.id]: e.target.value });
                         }}
                       >
-                        <option value="">Connected player...</option>
+                        <option value="">Connected participant...</option>
                         {roster.map((o) => (
                           <option key={o.identityId} value={o.identityId}>
                             {o.label}
@@ -96,10 +98,12 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
                     </label>
                   )}
                   <label>
-                    <span className="ui-visually-hidden">Player identity id for {row.label}</span>
+                    <span className="ui-visually-hidden">
+                      Participant identity id for {row.label}
+                    </span>
                     <input
                       type="text"
-                      placeholder="Player identity id"
+                      placeholder="Participant identity id"
                       value={typed}
                       onChange={(e) => {
                         setIdentity({ ...identity, [row.id]: e.target.value });
@@ -130,9 +134,29 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
           );
         })}
       </ul>
+      <fieldset>
+        <legend>Add a participant template</legend>
+        <div className="ui-row">
+          {SEAT_TEMPLATES.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              title={template.description}
+              onClick={() => {
+                void send(
+                  seatCreateIntent(newId(), template.label, template.role, template.permissions),
+                );
+              }}
+            >
+              Add {template.label}
+            </button>
+          ))}
+        </div>
+        <p>Templates are presets. You can adjust access and permissions after adding one.</p>
+      </fieldset>
       <NameForm
-        label="New seat name"
-        submitLabel="Add seat"
+        label="Custom participant name"
+        submitLabel="Add custom participant"
         validate={isValidLabel}
         onSubmit={(t) => send(seatCreateIntent(newId(), t, 'player'))}
       />

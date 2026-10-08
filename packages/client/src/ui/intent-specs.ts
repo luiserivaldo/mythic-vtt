@@ -1,4 +1,4 @@
-import type { LayerId } from '@mythic/shared';
+import type { LayerId, Seat } from '@mythic/shared';
 
 /** One intent to submit through the client queue; the UI never builds state itself. */
 export interface IntentSpec {
@@ -56,9 +56,15 @@ export const seatCreateIntent = (
   seatId: string,
   label: string,
   role: 'player' | 'codm',
+  permissions?: Seat['permissions'],
 ): IntentSpec => ({
   type: 'seat.create',
-  payload: { seatId, label: label.trim(), role },
+  payload: {
+    seatId,
+    label: label.trim(),
+    role,
+    ...(permissions ? { permissions } : {}),
+  },
 });
 
 export const seatAssignIntent = (seatId: string, identityId: string): IntentSpec => ({
