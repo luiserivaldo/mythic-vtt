@@ -65,3 +65,5 @@ Found a bug or have an idea? Please open an issue. If you want to help build Myt
 ## Licence
 
 Mythic VTT is licensed under the [GNU Affero General Public License v3.0](LICENSE). "Mythic VTT" and "MythicTomes" are trademarks of MythicTomes.
+
+In 3D, select a token to fade primitives blocking its sightline from your camera. They return to normal when the camera moves clear or selection changes. This view setting is local to each browser; 2D footprints stay unchanged.
