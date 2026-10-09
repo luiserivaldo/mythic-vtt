@@ -15,6 +15,7 @@ Built by **MythicTomes**. Self-hosting is free and fully featured; optional host
 - **Join by link.** Players enter a name and sit down. No accounts, no installs.
 - **Seats and permissions.** One DM and up to 10 players, with per-token control over who can move what.
 - **Grid and measuring.** Square grid, custom units, diagonal rules, and a ruler that reports horizontal, vertical and total distance.
+- **Status markers.** Select a token and open its Token panel to add condition icons or custom text. Editing follows token permissions; markers share the token label’s visibility.
 - **Battlemaps.** Upload an image, calibrate it to the grid and place tokens.
 - **Layers and secrets.** Map, token and DM-only layers. Hidden information is never sent to players.
 - **Safe by default.** Every change is recorded: autosave, crash recovery and JSON export.

@@ -1,3 +1,4 @@
+import { canReadTokenLabel } from './token-label.js';
 import type { Campaign, Entity, Scene, Seat } from '../schema/index.js';
 import { audienceKey, type Audience } from './audience.js';
 
@@ -48,10 +49,15 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
     if (entity.perms?.view === false && !owner) return null;
     // D35 / TOK-04 + PERM-03: a name the audience may not see on the label is never sent. The
     // schema requires a string, so the neutral placeholder is the empty string.
-    const label = entity.token?.labelVisibility;
-    const coDm = audience.kind === 'seat' && seat?.role === 'codm';
-    const hideName = label === 'dm' ? !coDm : label === 'owner' ? !(owner || coDm) : false;
-    return hideName && entity.name !== '' ? { ...entity, name: '' } : entity;
+    const hideName = !canReadTokenLabel(audience, entity, seat);
+    if (!hideName) return entity;
+    // TOK-06 / PERM-03: status markers share the label's audience, even for unnamed tokens.
+    if (entity.token?.statusMarkers !== undefined) {
+      const token = { ...entity.token };
+      delete token.statusMarkers;
+      return { ...entity, name: '', token };
+    }
+    return entity.name !== '' ? { ...entity, name: '' } : entity;
   });
 }
 
