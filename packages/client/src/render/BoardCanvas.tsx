@@ -1,3 +1,4 @@
+import { SceneOverlay } from './SceneOverlay.js';
 import { Canvas, useThree } from '@react-three/fiber';
 import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
 import { OrthographicCamera } from '@react-three/drei';
@@ -134,6 +135,7 @@ function BoardScene({
         grid={grid}
       />
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
+      <SceneOverlay overlay={source?.overlay} />
       {/* M1-20 / M2-08: 2D handles, or the 3D gizmo; both are off while the AoE tool is active. */}
       {!aoeActive &&
         (mode3d ? (
