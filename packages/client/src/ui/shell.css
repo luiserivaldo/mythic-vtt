@@ -167,7 +167,7 @@ main > p {
   background: color-mix(in srgb, var(--ui-accent) 88%, white);
 }
 
-/* Floating panel over the board (transform fields), bottom-left so it never meets the drawer. */
+/* Legacy panel positioning is neutralised inside the ordered tool dock below. */
 .ui-overlay {
   position: absolute;
   left: 0.5rem;
@@ -175,6 +175,62 @@ main > p {
   z-index: 1;
   min-width: 11rem;
   max-width: calc(100% - 1rem);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+}
+
+/* M1-37: tool panels share one scrollable dock in Entity, Transform, AoE order. */
+.ui-tool-dock {
+  position: absolute;
+  top: 3.25rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 2;
+  width: min(22rem, calc(100% - 1rem));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  overflow-y: auto;
+  pointer-events: none;
+}
+.ui-tool-panel,
+.ui-tool-peek {
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+.ui-tool-panel {
+  overflow: hidden;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+}
+.ui-tool-panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--ui-bg-raised);
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-tool-panel-content > .ui-panel {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.ui-tool-peek {
+  align-self: flex-end;
+  min-width: 7rem;
   box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
 }
 .ui-aoe-affected {
@@ -365,6 +421,15 @@ main [tabindex]:focus-visible {
   .ui-overlay .ui-field {
     display: inline-block;
     width: 48%;
+  }
+  .ui-tool-dock {
+    top: auto;
+    left: 0.5rem;
+    max-height: 62%;
+    width: calc(100% - 1rem);
+  }
+  .ui-tool-dock .ui-overlay {
+    width: 100%;
   }
 }
 

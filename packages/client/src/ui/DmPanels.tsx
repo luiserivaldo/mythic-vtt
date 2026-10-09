@@ -1,7 +1,9 @@
 import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
+import { useStore } from 'zustand';
 import { useClientStore } from '../store/react.js';
 import { Toolbar } from './Toolbar.js';
 import { toolbarItems, type PanelId } from './toolbar-items.js';
+import { toolPanelLayoutStore } from './tool-panel-layout.js';
 import { viewerRole } from './viewer.js';
 
 const ScenePanel = lazy(async () => {
@@ -16,10 +18,6 @@ const MapPanel = lazy(async () => {
   const module = await import('./MapPanel.js');
   return { default: module.MapPanel };
 });
-const EntityPanel = lazy(async () => {
-  const module = await import('./EntityPanel.js');
-  return { default: module.EntityPanel };
-});
 const SeatPanel = lazy(async () => {
   const module = await import('./SeatPanel.js');
   return { default: module.SeatPanel };
@@ -33,6 +31,7 @@ export function DmPanels() {
   const seatId = useClientStore((s) => s.seatId);
   const presence = useClientStore((s) => s.presence);
   const [open, setOpen] = useState<PanelId | null>(null);
+  const entityPanel = useStore(toolPanelLayoutStore, (state) => state.entities);
   const shellRef = useRef<HTMLElement>(null);
   const [drawerTop, setDrawerTop] = useState(0);
 
@@ -54,7 +53,7 @@ export function DmPanels() {
   const items = toolbarItems(viewerRole({ isHost, seatId, campaign }));
   if (items.length === 0) return null;
   // A panel the viewer lost access to (role change) must not stay open.
-  const shown = items.some((i) => i.id === open) ? open : null;
+  const shown = items.some((i) => i.id === open && i.id !== 'entities') ? open : null;
 
   const title = items.find((i) => i.id === shown)?.label;
   const close = () => {
@@ -65,8 +64,14 @@ export function DmPanels() {
     <aside ref={shellRef} aria-label="DM tools" className="ui-shell" aria-busy={!ready}>
       <Toolbar
         items={items}
-        open={shown}
+        open={entityPanel === 'open' ? 'entities' : shown}
         onToggle={(id) => {
+          if (id === 'entities') {
+            setOpen(null);
+            toolPanelLayoutStore.getState().toggleEntities();
+            return;
+          }
+          toolPanelLayoutStore.getState().hideEntities();
           setOpen(shown === id ? null : id);
         }}
       />
@@ -87,7 +92,6 @@ export function DmPanels() {
             {shown === 'scenes' && <ScenePanel campaign={campaign} />}
             {shown === 'layers' && <LayerPanel campaign={campaign} />}
             {shown === 'map' && <MapPanel campaign={campaign} />}
-            {shown === 'entities' && <EntityPanel campaign={campaign} />}
             {shown === 'seats' && (
               <SeatPanel
                 campaign={campaign}
