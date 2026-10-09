@@ -67,3 +67,5 @@ Found a bug or have an idea? Please open an issue. If you want to help build Myt
 Mythic VTT is licensed under the [GNU Affero General Public License v3.0](LICENSE). "Mythic VTT" and "MythicTomes" are trademarks of MythicTomes.
 
 Identity backup and transfer is available on the join screen and while connected. Download the JSON backup and import it in another browser to keep the same identity and campaign seat. The file contains your identity secret: keep it private. Import replaces this browser’s identity and reloads; the file is handled locally and never uploaded.
+
+Prefab library: DM/co-DM tools save entity configurations per campaign and place independent copies across scenes, including their referenced assets in campaign exports.

@@ -83,6 +83,15 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
       scenes[id] = view;
       if (view !== scene) changed = true;
     }
-    return changed ? { ...state, scenes } : state;
+    // PERM-03: prefab blueprints may contain DM-layer content and private labels.
+    const mayReadPrefabs =
+      audience.kind === 'seat' && seat?.role === 'codm' && seat.permissions.view;
+    const view = changed ? { ...state, scenes } : state;
+    if (state.prefabs && !mayReadPrefabs) {
+      const withoutPrefabs = { ...view };
+      delete withoutPrefabs.prefabs;
+      return withoutPrefabs;
+    }
+    return view;
   });
 }

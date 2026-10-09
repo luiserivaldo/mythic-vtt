@@ -7,3 +7,4 @@ export * from './permissions.js';
 export * from './scene.js';
 export * from './seat.js';
 export * from './token-size.js';
+export * from './prefab.js';

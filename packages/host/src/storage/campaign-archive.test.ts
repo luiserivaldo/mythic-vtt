@@ -119,6 +119,48 @@ describe('campaign export/import (HIST-03)', () => {
     );
   });
 
+  it('retains assets referenced only by a campaign prefab after export and import', async () => {
+    const source = await seed(tmp());
+    const loaded = await source.campaigns.load(campaignId);
+    const scene = loaded.scenes[0];
+    if (!scene) throw new Error('scene missing');
+    await source.campaigns.saveScene(campaignId, {
+      ...scene,
+      environment: { background: '#ffffff' },
+      entities: {},
+    });
+    const prefabId = '01J8Z0000000000000000PREF1';
+    const prefab = {
+      id: prefabId,
+      name: 'Asset only in prefab',
+      entity: {
+        name: 'Textured pillar',
+        layer: 'props' as const,
+        transform: {
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0, w: 1 },
+          scale: { x: 2, y: 3, z: 2 },
+        },
+        shape: {
+          kind: 'cylinder' as const,
+          color: '#ffffff',
+          walkable: true,
+          texture: { source: 'local' as const, hash, kind: 'image' as const },
+        },
+      },
+    };
+    await source.campaigns.saveCampaign(campaignId, {
+      ...loaded.campaign,
+      prefabs: { [prefabId]: prefab },
+    });
+    const archive = await exported(source);
+    expect(unzipSync(archive)['assets/' + hash + '.png']).toEqual(new Uint8Array(bytes));
+    const target = stores(tmp());
+    await target.campaigns.import(Readable.from([archive]));
+    expect((await target.campaigns.load(campaignId)).campaign.prefabs?.[prefabId]).toEqual(prefab);
+    expect(await toBuffer(await target.assets.get(hash))).toEqual(bytes);
+  });
+
   it('never leaks secrets, the index or identity links', async () => {
     const root = tmp();
     const source = await seed(root);

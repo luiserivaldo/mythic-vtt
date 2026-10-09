@@ -1,3 +1,6 @@
+import { prefabSave } from './prefab.save.js';
+import { prefabRemove } from './prefab.remove.js';
+import { prefabPlace } from './prefab.place.js';
 import type { AnyAction } from './define.js';
 import { aoePlace } from './aoe.place.js';
 import { aoeRemove } from './aoe.remove.js';
@@ -46,6 +49,9 @@ export const allActions: readonly AnyAction[] = [
   aoeUpdate,
   aoeRemove,
   tokenSetElevation,
+  prefabSave,
+  prefabRemove,
+  prefabPlace,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

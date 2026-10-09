@@ -38,5 +38,39 @@
       }
     }
   },
-  "activeSceneId": "01J8Z0000000000000000SCN01"
+  "activeSceneId": "01J8Z0000000000000000SCN01",
+  "prefabs": {
+    "01J8Z0000000000000000PREF1": {
+      "id": "01J8Z0000000000000000PREF1",
+      "name": "Reusable fixture",
+      "entity": {
+        "layer": "tokens",
+        "name": "Mira",
+        "transform": {
+          "position": {
+            "x": 4,
+            "y": 0,
+            "z": 6
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        },
+        "token": {
+          "sizeCells": 1,
+          "heightCells": 1,
+          "labelVisibility": "all",
+          "facing": 90
+        }
+      }
+    }
+  }
 }
