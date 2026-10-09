@@ -8,9 +8,11 @@ export const aoePlace = defineAction({
   schema: z.strictObject({ sceneId: Id, entity: AoEEntity }),
   permission: (state, actor, p) => {
     const scene = state.scenes[p.sceneId];
+    const existing = scene?.entities[p.entity.id];
     if (
       !scene ||
-      p.entity.id in scene.entities ||
+      actor.identityId !== p.entity.id ||
+      (existing !== undefined && !AoEEntity.safeParse(existing).success) ||
       isLayerLocked(scene, p.entity.layer) ||
       new Set(p.entity.owners).size !== p.entity.owners.length ||
       !p.entity.owners.every((ownerId) => ownerId in state.seats)
