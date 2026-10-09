@@ -8,6 +8,16 @@ import { useAoEHighlights } from './use-aoe-highlights.js';
 import { AOE_HIGHLIGHT_COLOR } from './canvas-style.js';
 
 const HIGHLIGHT = AOE_HIGHLIGHT_COLOR;
+export const AOE_CELL_INSET = 0.1;
+
+export function cellHighlightTransform(
+  cell: { x: number; y: number; z: number },
+  mode: RenderMode,
+): { position: readonly [number, number, number]; rotationX: number } {
+  return mode === '3d'
+    ? { position: [cell.x + 0.5, cell.y + 0.5, cell.z + 0.5], rotationX: 0 }
+    : { position: [cell.x + 0.5, cell.y + 0.012, cell.z + 0.5], rotationX: -Math.PI / 2 };
+}
 
 function CellHighlights({
   cells,
@@ -23,14 +33,16 @@ function CellHighlights({
     const current = mesh.current;
     if (!current) return;
     const matrix = new Matrix4();
-    const rotation = new Matrix4().makeRotationX(-Math.PI / 2);
+    const rotation = new Matrix4();
     cells.forEach((cell, index) => {
-      matrix.makeTranslation(cell.x + 0.5, cell.y + 0.012, cell.z + 0.5).multiply(rotation);
+      const visual = cellHighlightTransform(cell, mode);
+      rotation.makeRotationX(visual.rotationX);
+      matrix.makeTranslation(...visual.position).multiply(rotation);
       current.setMatrixAt(index, matrix);
     });
     current.instanceMatrix.needsUpdate = true;
     invalidate();
-  }, [cells, invalidate]);
+  }, [cells, invalidate, mode]);
 
   if (cells.length === 0) return null;
   return (
@@ -42,11 +54,15 @@ function CellHighlights({
       renderOrder={20}
       frustumCulled={false}
     >
-      <planeGeometry args={[0.9, 0.9]} />
+      {mode === '3d' ? (
+        <boxGeometry args={[1 - AOE_CELL_INSET, 1 - AOE_CELL_INSET, 1 - AOE_CELL_INSET]} />
+      ) : (
+        <planeGeometry args={[1 - AOE_CELL_INSET, 1 - AOE_CELL_INSET]} />
+      )}
       <meshBasicMaterial
         color={HIGHLIGHT}
         transparent
-        opacity={0.45}
+        opacity={mode === '3d' ? 0.2 : 0.45}
         side={DoubleSide}
         depthTest={mode === '3d'}
         depthWrite={false}
@@ -55,7 +71,7 @@ function CellHighlights({
   );
 }
 
-/** MEAS-04: non-pickable cell tints and token rings in the shared 2D/3D scene. */
+/** MEAS-04/06: non-pickable cell tints or volumes and token rings in the shared scene. */
 export function AoEHighlights({
   scene,
   rendered,
