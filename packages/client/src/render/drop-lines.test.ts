@@ -57,6 +57,7 @@ describe('dropLinesFor', () => {
       layer: 'props-under',
       position: [0, 0, 0],
       sizeCells: 1,
+      yaw: 0,
       secret: false,
       shape: {
         kind: 'box',
@@ -75,6 +76,7 @@ describe('dropLinesFor', () => {
       layer: 'tokens',
       position: [0, 5, 0],
       sizeCells: 1,
+      yaw: 0,
       secret: false,
       token: {
         image: undefined,

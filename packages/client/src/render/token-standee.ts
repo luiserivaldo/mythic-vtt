@@ -52,3 +52,11 @@ export function labelAnchor3d(sizeCells: number | undefined): readonly [number, 
   const { height, baseThickness } = standeeDimensions(sizeCells);
   return [0, baseThickness + height + LABEL_GAP, 0];
 }
+
+/**
+ * M1-34: the standee image quad billboards toward the camera (CAM-04) and then rotates by the
+ * token's own yaw on top, so the artwork follows the token without mirroring.
+ */
+export function standeeYaw(billboardYaw: number, entityYaw: number): number {
+  return billboardYaw + entityYaw;
+}

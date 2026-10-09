@@ -27,6 +27,8 @@ export interface RenderEntity {
   layer: RenderLayer;
   position: readonly [number, number, number];
   sizeCells: number;
+  /** M1-34: entity yaw about +Y (radians); 0 for missing or non-finite stored rotation. */
+  yaw: number;
   secret: boolean;
   aoe?: Volume | undefined;
   /** Present only for primitive entities (ENV-02). */
@@ -133,6 +135,17 @@ export function mapImageScale(scale: number): number {
   return Number.isFinite(scale) && scale > 0 ? scale : 1;
 }
 
+// The Quat schema accepts any number, so a stored NaN or Infinity must not reach the
+// renderer. The components are checked *before* yawFromQuaternion because atan2(±Inf, ±Inf)
+// can still yield a finite angle for garbage input, which three.js would then spin with.
+export function safeYaw(rotation: { x: number; y: number; z: number; w: number }): number {
+  const { x, y, z, w } = rotation;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z) || !Number.isFinite(w)) {
+    return 0;
+  }
+  return yawFromQuaternion(rotation);
+}
+
 export function mapScene(scene: Scene): RenderScene {
   return {
     id: scene.id,
@@ -148,6 +161,7 @@ export function mapScene(scene: Scene): RenderScene {
           entity.transform.position.y,
         ),
         sizeCells: footprintCells(entity.token?.sizeCells),
+        yaw: safeYaw(entity.transform.rotation),
         secret: entity.layer === 'dm',
         ...(renderAoE(entity) ? { aoe: renderAoE(entity) } : {}),
         ...(entity.shape ? { shape: renderShape(entity, entity.shape) } : {}),

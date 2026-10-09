@@ -5,7 +5,7 @@ import { DoubleSide, type Group } from 'three';
 import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
 import { TokenLabel, TokenMaterial } from './TokenSprite.js';
-import { billboardYaw, standeeDimensions, labelAnchor3d } from './token-standee.js';
+import { billboardYaw, standeeDimensions, standeeYaw, labelAnchor3d } from './token-standee.js';
 import { SELECTION_COLOR } from './canvas-style.js';
 
 const SELECTED = SELECTION_COLOR;
@@ -33,6 +33,8 @@ export function TokenStandee({
 }) {
   const pivot = useRef<Group>(null);
   const [x, y, z] = entity.position;
+  // M1-34: the image quad rotates by the token's own yaw on top of the camera billboard (TOK-01).
+  const yaw = entity.yaw;
   const dims = standeeDimensions(entity.sizeCells);
   const groundPosition = useMemo(() => ({ x, z }), [x, z]);
 
@@ -40,7 +42,7 @@ export function TokenStandee({
   useFrame(({ camera }) => {
     const g = pivot.current;
     if (!g) return;
-    g.rotation.y = billboardYaw(groundPosition, camera.position, g.rotation.y);
+    g.rotation.y = standeeYaw(billboardYaw(groundPosition, camera.position, g.rotation.y), yaw);
   });
 
   return (

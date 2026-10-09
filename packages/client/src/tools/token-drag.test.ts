@@ -162,7 +162,9 @@ describe('render helpers', () => {
   const rendered: RenderScene = {
     id: S,
     background: '#000',
-    entities: [{ id: E, layer: 'tokens', position: [2.5, 0, 3.5], sizeCells: 1, secret: false }],
+    entities: [
+      { id: E, layer: 'tokens', position: [2.5, 0, 3.5], sizeCells: 1, yaw: 0, secret: false },
+    ],
   };
   it('moves only the dragged entity in the rendered copy', () => {
     const local = {

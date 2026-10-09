@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Euler, Quaternion, Vector3 } from 'three';
 import { Entity, Scene } from '@mythic/shared';
 import { makeCampaign, tid } from '../testing.js';
 import {
@@ -8,8 +9,11 @@ import {
   orderedEntities,
   RENDER_LAYERS,
   renderLayer,
+  safeYaw,
   type RenderEntity,
 } from './scene-model.js';
+import { tokenQuadRotation } from './PickableEntities.js';
+import { standeeYaw } from './token-standee.js';
 
 const entity = (id: number, layer: Entity['layer'], x = 0, y = 0, z = 0) =>
   Entity.parse({
@@ -53,6 +57,7 @@ describe('render layer ordering', () => {
       layer,
       position: [0, 0, 0],
       sizeCells: 1,
+      yaw: 0,
       secret: false,
     }));
     expect(orderedEntities(entries).map((item) => item.layer)).toEqual(RENDER_LAYERS);
@@ -152,5 +157,89 @@ describe('primitive shapes (ENV-02)', () => {
   it('gives planes a fixed thickness and omits shape for non-shapes', () => {
     expect(map(shaped('plane', { x: 5, y: 9, z: 5 }))?.shape?.height).toBeLessThan(0.1);
     expect(map(entity(30, 'props'))?.shape).toBeUndefined();
+  });
+});
+
+describe('token rotation (M1-34)', () => {
+  const token = (rotation: { x: number; y: number; z: number; w: number }) =>
+    Entity.parse({
+      id: tid(40),
+      layer: 'tokens',
+      name: 'Trooper',
+      owners: [],
+      transform: {
+        position: { x: 0, y: 0, z: 0 },
+        rotation,
+        scale: { x: 1, y: 1, z: 1 },
+      },
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+    });
+  const yawOf = (rotation: { x: number; y: number; z: number; w: number }) =>
+    mapScene({ ...scene, entities: { [tid(40)]: token(rotation) } }).entities[0]?.yaw;
+
+  // Unit quaternions for a pure +Y rotation (same convention as the gizmo: quaternionFromYaw).
+  const yawQuat = (yaw: number) => ({
+    x: 0,
+    y: Math.sin(yaw / 2),
+    z: 0,
+    w: Math.cos(yaw / 2),
+  });
+
+  it('maps the entity yaw for zero, full turns and negative angles', () => {
+    expect(yawOf({ x: 0, y: 0, z: 0, w: 1 })).toBe(0);
+    expect(yawOf(yawQuat(0.75))).toBeCloseTo(0.75);
+    expect(yawOf(yawQuat(Math.PI))).toBeCloseTo(Math.PI);
+    // A full turn is stored as the identity quaternion, so the yaw reads back as 0.
+    expect(yawOf(yawQuat(2 * Math.PI))).toBeCloseTo(0);
+    expect(yawOf(yawQuat(-1.1))).toBeCloseTo(-1.1);
+  });
+
+  it('never lets a non-finite stored rotation reach the renderer', () => {
+    // Entity.parse (Zod number()) already rejects NaN/Infinity, so a non-finite rotation is
+    // never stored; safeYaw is the renderer-side guard that maps any such value to 0.
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      for (const key of ['x', 'y', 'z', 'w'] as const) {
+        const rotation: { x: number; y: number; z: number; w: number } = {
+          x: 0,
+          y: 0,
+          z: 0,
+          w: 1,
+          [key]: value,
+        };
+        expect(safeYaw(rotation), `${key}=${String(value)}`).toBe(0);
+      }
+    }
+    expect(safeYaw(yawQuat(0.5))).toBeCloseTo(0.5);
+  });
+
+  // The flat token quad uses three.js Euler order 'XYZ'. tokenQuadRotation must compose the
+  // -PI/2 tilt with the entity yaw into exactly "flat quad, then a pure turn about world +Y".
+  it('keeps the 2D quad in the floor plane and turned about world +Y by the entity yaw', () => {
+    const y = new Vector3(0, 1, 0);
+    for (const yaw of [0, 0.3, Math.PI / 2, Math.PI, -2.4, 5.9, -6.5]) {
+      const [xRot, yRot, zRot] = tokenQuadRotation(yaw);
+      const net = new Quaternion().setFromEuler(new Euler(xRot, yRot, zRot));
+      const expected = new Quaternion()
+        .setFromAxisAngle(y, yaw)
+        .multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2));
+      // Compositions are equal up to floating-point round-off (max ~5e-8 over a full sweep).
+      expect(net.angleTo(expected)).toBeLessThan(1e-6);
+      // The quad's normal (+Z before rotation) must point straight up at every angle, i.e.
+      // the quad stays flat on the floor plane instead of tilting into it.
+      const normal = new Vector3(0, 0, 1).applyQuaternion(net);
+      expect(normal.y).toBeCloseTo(1, 9);
+      // The artwork's right edge (+X before rotation) must point where the gizmo says the
+      // token's forward is: (cos yaw, 0, -sin yaw), the convention of primitives.ts `rotate`.
+      const right = new Vector3(1, 0, 0).applyQuaternion(net);
+      expect(right.x).toBeCloseTo(Math.cos(yaw), 6);
+      expect(right.y).toBeCloseTo(0, 6);
+      expect(right.z).toBeCloseTo(-Math.sin(yaw), 6);
+    }
+  });
+
+  it('adds the entity yaw on top of the standee billboard (CAM-04, no mirroring)', () => {
+    expect(standeeYaw(0, 0)).toBe(0);
+    expect(standeeYaw(Math.PI / 3, 0.5)).toBeCloseTo(Math.PI / 3 + 0.5);
+    expect(standeeYaw(-1.2, 2.0)).toBeCloseTo(0.8);
   });
 });

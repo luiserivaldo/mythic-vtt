@@ -44,6 +44,16 @@ type SceneSelectionSeats = Record<string, Seat>;
 // makes React re-render forever while no campaign has loaded yet.
 const NO_SEATS: SceneSelectionSeats = {};
 
+// M1-34 (TOK-01): a flat quad lies in the XZ plane (X rotation of -PI/2). In three.js's
+// 'XYZ' Euler order the rotation is Rx * Ry * Rz, and Ry(yaw) * Rx(-PI/2) = Rx(-PI/2) *
+// Rz(yaw) (the X and Y rotations do not commute), so the yaw belongs in the Z slot: the
+// net rotation is exactly "flat quad, then a pure turn about world +Y" — the same sense the
+// gizmo footprint draws the token (see primitives.ts `rotate`). Folding yaw into the X term
+// instead would tilt the quad out of the floor plane.
+export function tokenQuadRotation(yaw: number): readonly [number, number, number] {
+  return [-Math.PI / 2, 0, yaw];
+}
+
 export function PickableEntities({
   rendered,
   scene,
@@ -192,7 +202,7 @@ export function PickableEntities({
                   key={entity.id}
                   name={entity.id}
                   position={[...entity.position]}
-                  rotation={[-Math.PI / 2, 0, 0]}
+                  rotation={tokenQuadRotation(entity.yaw)}
                   renderOrder={order}
                   onClick={onClick}
                 >

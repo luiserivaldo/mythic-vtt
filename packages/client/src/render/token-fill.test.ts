@@ -7,6 +7,7 @@ const base: RenderEntity = {
   layer: 'tokens',
   position: [0, 0, 0],
   sizeCells: 1,
+  yaw: 0,
   secret: false,
   token: {
     image: undefined,
