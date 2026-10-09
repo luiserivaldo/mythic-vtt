@@ -17,6 +17,7 @@ import {
   visibleGhosts,
   GHOST_TTL_MS,
 } from '../tools/token-drag.js';
+import { selectionStore } from '../tools/selection-store.js';
 import { tokenDragStore } from '../tools/token-drag-store.js';
 import { EphemeralContext } from '../ui/ephemeral-context.js';
 import { SubmitContext } from '../ui/submit.js';
@@ -210,7 +211,10 @@ export function TokenDrag() {
         if (pressOnGizmoHandle(entity, ground, cam.zoom)) return;
       }
       pointerClaims.claim(e.pointerId, 'token drag');
-      e.stopPropagation();
+      // M1-28 moves any movable token without selecting it first, but a plain click must still
+      // select. The claim already keeps the camera from panning, so only swallow the press when
+      // the token is selected; an unselected token's press reaches picking and a click selects it.
+      if (selectionStore.getState().ids.includes(hitId)) e.stopPropagation();
       el.setPointerCapture(e.pointerId);
       press = {
         pointerId: e.pointerId,
