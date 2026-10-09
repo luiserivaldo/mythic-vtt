@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { openClient, RawClient, startTable, testUlid, type Table } from './harness.js';
 
 // M2-04: the 3D orbit camera (opened here via the ?camera=3d initial-mode override; M2-05 added the toggle). It must mount,
-// respond to right-drag orbit, wheel dolly and shift-drag pan, and reset, without runtime errors.
+// respond to right-drag orbit, wheel dolly and middle-drag pan, and reset, without runtime errors.
 
 let table: Table;
 let host: RawClient;
@@ -51,11 +51,9 @@ test('3D orbit camera orbits, dollies, pans and resets without errors', async ({
   await client.page.mouse.move(cx + 120, cy + 80, { steps: 6 });
   await client.page.mouse.up({ button: 'right' });
   await client.page.mouse.wheel(0, 300);
-  await client.page.keyboard.down('Shift');
   await client.page.mouse.down({ button: 'middle' });
   await client.page.mouse.move(cx - 60, cy + 30, { steps: 4 });
   await client.page.mouse.up({ button: 'middle' });
-  await client.page.keyboard.up('Shift');
   await client.page.getByRole('button', { name: 'Reset view' }).click();
   await expect(canvas).toBeVisible();
   expect(errors).toEqual([]);

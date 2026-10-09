@@ -37,6 +37,8 @@ export interface GroundBounds {
   maxZ: number;
 }
 
+export type CameraPointerMode = 'orbit' | 'pan';
+
 const DEG = Math.PI / 180;
 export const MIN_POLAR = 5 * DEG;
 export const MAX_POLAR = 85 * DEG;
@@ -54,6 +56,18 @@ export const DEFAULT_AZIMUTH = Math.PI / 4;
 export const DEFAULT_POLAR = 55 * DEG;
 /** Radians of rotation per pixel dragged. */
 export const ROTATE_SPEED = 0.006;
+
+/** M2-15: conventional 3D mouse mapping; tools may reserve left-drag for themselves. */
+export function cameraPointerMode(
+  pointerType: string,
+  button: number,
+  leftPanEnabled: boolean,
+): CameraPointerMode | null {
+  if (pointerType !== 'mouse') return 'orbit';
+  if (button === 2) return 'orbit';
+  if (button === 1 || (button === 0 && leftPanEnabled)) return 'pan';
+  return null;
+}
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const finiteOr = (v: number, fallback: number) => (Number.isFinite(v) ? v : fallback);
