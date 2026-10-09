@@ -37,3 +37,19 @@ export function useMapTexture(url: string | null) {
   }, [entry, invalidate]);
   return entry;
 }
+
+/** ENV-01: share the loaded texture dimensions between the image and its gizmo. */
+export function mapTextureAspect(entry: ReturnType<typeof useMapTexture>): number {
+  const image: unknown = entry.status === 'ready' ? entry.texture.image : null;
+  if (typeof image !== 'object' || image === null || !('width' in image) || !('height' in image))
+    return 1;
+  const { width, height } = image;
+  return typeof width === 'number' &&
+    typeof height === 'number' &&
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > 0 &&
+    height > 0
+    ? width / height
+    : 1;
+}
