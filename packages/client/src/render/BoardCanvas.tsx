@@ -124,8 +124,8 @@ function BoardScene({
       {grid && (
         <GridLines grid={grid} fill={scene?.background ?? DEFAULT_BACKGROUND} renderOrder={-1} />
       )}
-      {/* M1-18: TokenDrag claims a press on a selected, movable token (pointer-claims) so only
-          empty board pans. */}
+      {/* M1-28: TokenDrag claims a press on any movable token without selecting it first, while
+          empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
       <RulerTool mode={mode3d ? '3d' : '2d'} />
       {!aoeActive && <TokenDrag />}

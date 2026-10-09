@@ -5,7 +5,6 @@ import { Raycaster, Vector2, type Object3D } from 'three';
 import { useStore } from 'zustand';
 import type { Actor, Scene, Vec3 } from '@mythic/shared';
 import { useClientStore } from '../store/react.js';
-import { selectionStore } from '../tools/selection-store.js';
 import {
   dragStarted,
   groundPoint,
@@ -47,9 +46,10 @@ function entityIdAt(object: Object3D | null, scene: Scene): string | null {
 }
 
 /**
- * TOK-02: drag a selected, movable token. The press claims the pointer (so the camera does not
- * pan); the preview is render-local plus an ephemeral relay to others; release sends ONE
- * `token.move` and nothing is applied locally until the host's patch lands (D34).
+ * TOK-02 / M1-28: press-drag any movable token without selecting it first. The press claims the
+ * pointer (so the camera does not pan); the preview is render-local plus an ephemeral relay to
+ * others; release sends ONE `token.move` and nothing is applied locally until the host's patch
+ * lands (D34).
  */
 export function TokenDrag() {
   const gl = useThree((s) => s.gl);
@@ -185,8 +185,6 @@ export function TokenDrag() {
       if (press || pointerClaims.isClaimed(e.pointerId)) return;
       const { campaign: c, actor: a, scene: sc, mode: m } = latest.current;
       if (!sc || tokenDragStore.getState().local) return;
-      const selected = selectionStore.getState().ids;
-      if (selected.length === 0) return;
       const r = ray(e);
       const hits = raycaster.intersectObjects(getState().scene.children, true);
       let hitId: string | null = null;
@@ -197,7 +195,7 @@ export function TokenDrag() {
           break;
         }
       }
-      if (!hitId || !selected.includes(hitId)) return;
+      if (!hitId) return;
       const entity = movableToken(c, a, sc, hitId);
       if (!entity) return;
       const pos = entity.transform.position;
