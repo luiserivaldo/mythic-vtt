@@ -115,7 +115,9 @@ test('light defaults keep a populated host board readable in 2D and 3D', async (
   await page.getByRole('button', { name: '3D view' }).click();
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await page.waitForTimeout(500);
-  await expect(page.getByTestId('ruler-total')).toContainText('H 30 ft');
+  // Q29: changing the board camera preserves the independently selected 2D measurement mode.
+  await expect(page.getByLabel('Measurement mode')).toHaveValue('2d');
+  await expect(page.getByTestId('ruler-total')).toHaveText('30 ft');
   await page.screenshot({ path: testInfo.outputPath('palette-3d.png'), fullPage: true });
   expect(errors).toEqual([]);
   await context.close();
