@@ -69,6 +69,7 @@ function Fields({ entity, scene }: { entity: Entity; scene: Scene }) {
       entityId: entity.id,
       draft: next,
       base: entity.transform,
+      baseTokenSize: entity.token?.sizeCells,
     });
     void commitTransform({
       submit,
@@ -96,27 +97,29 @@ function Fields({ entity, scene }: { entity: Entity; scene: Scene }) {
   return (
     <section aria-labelledby={headingId} className="ui-panel ui-overlay ui-transform">
       <h2 id={headingId}>Transform: {entity.name}</h2>
-      {FIELDS.filter(({ field }) => !tokenOnly || field === 'y').map(({ field, label }) => (
-        <label key={field} className="ui-field">
-          {label(scene.grid.unitLabel)}
-          <input
-            type="text"
-            inputMode="decimal"
-            value={shown[field]}
-            aria-invalid={errors[field] !== undefined}
-            aria-describedby={errors[field] ? `${headingId}-${field}` : undefined}
-            onChange={(e) => {
-              setTyped({ ...shown, [field]: e.target.value });
-            }}
-            onKeyDown={onKeyDown}
-          />
-          {errors[field] && (
-            <span id={`${headingId}-${field}`} role="alert">
-              {errors[field]}
-            </span>
-          )}
-        </label>
-      ))}
+      {FIELDS.filter(({ field }) => !tokenOnly || field === 'y' || field === 'scale').map(
+        ({ field, label }) => (
+          <label key={field} className="ui-field">
+            {field === 'scale' && tokenOnly ? 'Size (cells)' : label(scene.grid.unitLabel)}
+            <input
+              type="text"
+              inputMode="decimal"
+              value={shown[field]}
+              aria-invalid={errors[field] !== undefined}
+              aria-describedby={errors[field] ? `${headingId}-${field}` : undefined}
+              onChange={(e) => {
+                setTyped({ ...shown, [field]: e.target.value });
+              }}
+              onKeyDown={onKeyDown}
+            />
+            {errors[field] && (
+              <span id={`${headingId}-${field}`} role="alert">
+                {errors[field]}
+              </span>
+            )}
+          </label>
+        ),
+      )}
       <button type="button" disabled={busy} onClick={apply}>
         Apply
       </button>
