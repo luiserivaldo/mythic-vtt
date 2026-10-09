@@ -1,3 +1,4 @@
+import { IdentityTransfer } from './IdentityTransfer.js';
 import { useEffect, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
 import { useClientStore } from '../store/react.js';
 import {
@@ -230,6 +231,7 @@ function NameStep({
           Continue
         </button>
       </form>
+      <IdentityTransfer />
     </Card>
   );
 }
