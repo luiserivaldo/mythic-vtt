@@ -7,6 +7,7 @@ import type { Actor, Scene, Vec3 } from '@mythic/shared';
 import { useClientStore } from '../store/react.js';
 import {
   dragStarted,
+  dragRulerPaths,
   groundPoint,
   movableToken,
   pressOnGizmoHandle,
@@ -21,8 +22,11 @@ import { EphemeralContext } from '../ui/ephemeral-context.js';
 import { SubmitContext } from '../ui/submit.js';
 import { useViewMode } from './view-mode-store.js';
 import { GHOST_COLOR } from './canvas-style.js';
+import { RULER_LOCAL_COLOR, RULER_REMOTE_COLOR } from './canvas-style.js';
 import { pointerClaims } from './pointer-claims.js';
 import type { OrthographicCamera } from 'three';
+import { RulerPath } from './RulerPath.js';
+import { rulerOwnerName } from '../tools/ruler.js';
 
 const SETTLE_TIMEOUT_MS = 2000;
 
@@ -287,20 +291,35 @@ export function TokenDrag() {
   }, [gl, invalidate, getState]);
 
   const ghosts = visibleGhosts(remote, scene, Date.now());
+  const rulers = dragRulerPaths(local, remote, scene, Date.now());
   return (
-    <group name="token-drag-ghosts">
-      {ghosts.map((g) => (
-        <mesh
-          key={g.key}
-          position={[g.to.x, g.to.y + 0.03, g.to.z]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          renderOrder={900}
-          raycast={() => null}
-        >
-          <planeGeometry args={[g.sizeCells, g.sizeCells]} />
-          <meshBasicMaterial color={GHOST_COLOR} transparent opacity={0.6} depthTest={false} />
-        </mesh>
-      ))}
+    <group name="token-drag-previews">
+      <group name="token-drag-ghosts">
+        {ghosts.map((g) => (
+          <mesh
+            key={g.key}
+            position={[g.to.x, g.to.y + 0.03, g.to.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            renderOrder={900}
+            raycast={() => null}
+          >
+            <planeGeometry args={[g.sizeCells, g.sizeCells]} />
+            <meshBasicMaterial color={GHOST_COLOR} transparent opacity={0.6} depthTest={false} />
+          </mesh>
+        ))}
+      </group>
+      {scene &&
+        rulers.map((ruler) => (
+          <RulerPath
+            key={ruler.key}
+            points={ruler.points}
+            scene={scene}
+            color={ruler.from === null ? RULER_LOCAL_COLOR : RULER_REMOTE_COLOR}
+            owner={ruler.from === null ? null : rulerOwnerName(campaign?.seats ?? {}, ruler.from)}
+            mode={mode}
+            testId={ruler.from === null ? 'drag-ruler' : 'remote-drag-ruler'}
+          />
+        ))}
     </group>
   );
 }

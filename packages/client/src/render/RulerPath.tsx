@@ -32,17 +32,19 @@ export function RulerPath({
   color,
   owner,
   mode,
+  testId: testIdOverride,
 }: {
   points: readonly Vec3[];
   scene: Scene;
   color: string;
   owner: string | null;
   mode: ViewMode;
+  testId?: string;
 }) {
   const measured = useMemo(() => measureRuler(points, scene.grid), [points, scene.grid]);
   const last = points[points.length - 1];
   if (!last || points.length === 0) return null;
-  const testId = owner === null ? 'ruler' : 'remote-ruler';
+  const testId = testIdOverride ?? (owner === null ? 'ruler' : 'remote-ruler');
   const total =
     mode === '3d'
       ? breakdown(measured.horizontalLabel, measured.verticalLabel, measured.totalLabel)
