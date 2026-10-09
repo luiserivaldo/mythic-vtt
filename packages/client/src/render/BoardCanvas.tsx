@@ -14,6 +14,7 @@ import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
 import { RulerTool } from './RulerTool.js';
 import { RulerToggle } from './RulerToggle.js';
+import { rulerStore } from '../tools/ruler-store.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
 import { TransformPanel } from '../ui/TransformPanel.js';
@@ -70,6 +71,7 @@ function BoardScene({
 }) {
   const invalidate = useThree((state) => state.invalidate);
   const aoeActive = useStore(aoeToolStore, (s) => s.active);
+  const rulerActive = useStore(rulerStore, (s) => s.tool);
   const localDrag = useStore(tokenDragStore, (state) => state.local);
   const shown = useMemo(() => withLocalDrag(scene, localDrag), [scene, localDrag]);
   useEffect(() => {
@@ -104,6 +106,7 @@ function BoardScene({
             orbitRef={director.orbitRef}
             applyRef={director.applyRef}
             keepInitialOrbit={director.keepInitialOrbit}
+            leftPanEnabled={!aoeActive && !rulerActive}
           />
         </Suspense>
       ) : (
@@ -212,7 +215,7 @@ export function BoardCanvas() {
               Reset view
             </button>
             <span className="ui-camera-hint">
-              3D mouse: right or middle drag orbit · Shift+drag pan · wheel zoom · left select/tools
+              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom
             </span>
           </>
         )}
