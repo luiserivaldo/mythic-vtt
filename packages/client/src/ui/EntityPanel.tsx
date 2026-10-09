@@ -9,6 +9,7 @@ import {
   capitalise,
   DEFAULT_TOKEN_COLOR,
   entityDeleteIntent,
+  entityCreateLayers,
   entityRenameIntent,
   entityShowGridOnTopIntent,
   entityRows,
@@ -32,11 +33,6 @@ import { entityMoveLayerIntent } from './intent-specs.js';
 import { moveTargets } from './layer-panel.js';
 import { NameForm } from './NameForm.js';
 import { useSubmit, type SendIntent } from './submit.js';
-
-/** Layers new entities can be created on: the host-only DM layer is offered to the host alone. */
-function createLayers(isHost: boolean): LayerId[] {
-  return isHost ? ['tokens', 'props', 'effects', 'dm'] : ['tokens', 'props', 'effects'];
-}
 
 function LayerSelect({
   value,
@@ -173,7 +169,7 @@ function TokenForm({
           ))}
         </select>
       </label>
-      <LayerSelect value={layer} layers={createLayers(isHost)} onChange={setLayer} />
+      <LayerSelect value={layer} layers={entityCreateLayers(isHost)} onChange={setLayer} />
       <label>
         Label shown to{' '}
         <select
@@ -373,7 +369,7 @@ function PropForm({
         />{' '}
         Walkable
       </label>
-      <LayerSelect value={layer} layers={createLayers(isHost)} onChange={setLayer} />
+      <LayerSelect value={layer} layers={entityCreateLayers(isHost)} onChange={setLayer} />
       <button className="ui-primary-action" type="submit" disabled={busy || !valid}>
         Create prop
       </button>

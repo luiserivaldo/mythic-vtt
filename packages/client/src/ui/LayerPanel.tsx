@@ -25,7 +25,10 @@ export function LayerPanel({ campaign }: { campaign: Campaign }) {
       <ul className="ui-list">
         {layerRows(scene, hidden).map((row) => (
           <li key={row.layer} className="ui-row">
-            <span>{row.label}</span>
+            <span>
+              <strong>{row.label}</strong>
+              {row.description && <> — {row.description}</>}
+            </span>
             <label>
               <input
                 type="checkbox"
