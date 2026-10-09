@@ -110,5 +110,10 @@
         "walkable": false
       }
     }
+  },
+  "overlay": {
+    "tint": "#8090ff",
+    "tintOpacity": 0.15,
+    "darkness": 0.2
   }
 }
