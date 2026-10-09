@@ -6,6 +6,8 @@ import {
   DEFAULT_GRID_COLOR,
   DEFAULT_GRID_OPACITY,
   Grid,
+  PIN_TEXT_MAX_LENGTH,
+  PinComponent,
   resolveGridStyle,
   resolveSceneBounds,
   Campaign,
@@ -96,6 +98,35 @@ describe('round-trip parse', () => {
     const parsed = schema.parse(value);
     expect(parsed).toEqual(value);
     expect(schema.parse(JSON.parse(JSON.stringify(parsed)))).toEqual(value);
+  });
+});
+
+describe('pin component (TRIG-01)', () => {
+  it('accepts bounded text and hover, click or proximity reveal rules', () => {
+    for (const reveal of ['hover', 'click', { proximity: 0 }, { proximity: 3.5 }]) {
+      expect(
+        PinComponent.safeParse({ text: 'x'.repeat(PIN_TEXT_MAX_LENGTH), reveal }).success,
+      ).toBe(true);
+    }
+  });
+
+  it('rejects empty or oversized text and malformed reveal rules', () => {
+    for (const value of [
+      { text: '', reveal: 'hover' },
+      { text: 'x'.repeat(PIN_TEXT_MAX_LENGTH + 1), reveal: 'click' },
+      { text: 'note', reveal: { proximity: -1 } },
+      { text: 'note', reveal: { proximity: 1, extra: true } },
+      { text: 'note', reveal: 'always' },
+      { text: 'note', reveal: 'hover', extra: true },
+    ]) {
+      expect(PinComponent.safeParse(value).success).toBe(false);
+    }
+  });
+
+  it('keeps entities without a pin valid and unchanged', () => {
+    const withoutPin = { ...entity, pin: undefined };
+    const parsed = Entity.parse(withoutPin);
+    expect(parsed.pin).toBeUndefined();
   });
 });
 

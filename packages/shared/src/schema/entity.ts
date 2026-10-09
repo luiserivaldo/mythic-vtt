@@ -65,10 +65,20 @@ const LegacyAoEComponent = z.strictObject({
 });
 const AoEComponent = z.union([AoEShape, LegacyAoEComponent]);
 
-const PinComponent = z.object({
-  text: z.string(),
-  reveal: z.union([z.enum(['hover', 'click']), z.object({ proximity: z.number().nonnegative() })]),
+export const PIN_TEXT_MAX_LENGTH = 4_096;
+
+export const PinReveal = z.union([
+  z.enum(['hover', 'click']),
+  z.strictObject({ proximity: z.number().nonnegative() }),
+]);
+export type PinReveal = z.infer<typeof PinReveal>;
+
+// TRIG-01: keep notes bounded at the state boundary because the full text is durable and shared.
+export const PinComponent = z.strictObject({
+  text: z.string().min(1).max(PIN_TEXT_MAX_LENGTH),
+  reveal: PinReveal,
 });
+export type PinComponent = z.infer<typeof PinComponent>;
 
 export const Entity = z.object({
   id: Id,
