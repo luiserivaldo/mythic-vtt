@@ -23,7 +23,7 @@ it('measures a real seated socket, sends RTT only to the DM, and clears it on di
       const ws = new WebSocket(`ws://127.0.0.1:${String(port)}/ws`);
       sockets.push(ws);
       const received: ServerMessage[] = [];
-      ws.on('message', (data) => {
+      ws.on('message', (data: Buffer) => {
         const decoded = decodeServerMessage(data.toString());
         if (decoded.ok) received.push(decoded.message);
       });
@@ -58,7 +58,9 @@ it('measures a real seated socket, sends RTT only to the DM, and clears it on di
     expect(JSON.stringify(presence)).not.toContain('test-secret');
     expect(JSON.stringify(presence)).not.toContain('127.0.0.1');
     await new Promise<void>((resolve) => {
-      player.ws.once('close', () => resolve());
+      player.ws.once('close', () => {
+        resolve();
+      });
       player.ws.close();
     });
     await expect.poll(() => seat()).toMatchObject({ connected: false, latencyMs: null });
