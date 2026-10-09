@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, startTable, testUlid, type Table } from './harness.js';
+import { RawClient, seedProfile, startTable, testUlid, type Table } from './harness.js';
 
 let table: Table | undefined;
 
@@ -39,12 +39,17 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
   if (!table) throw new Error('table not started');
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
+  const viewerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await seedProfile(viewerContext, 'viewer');
+  const viewer = await viewerContext.newPage();
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/?dev=1#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
   await expect(page.getByRole('complementary', { name: 'Developer diagnostics' })).toBeVisible();
   await page.getByRole('button', { name: 'Close developer diagnostics' }).click();
+  await viewer.goto(table.clientUrl);
+  await expect(viewer.getByRole('status')).toHaveText('Connected to New campaign');
   const identity = await page.evaluate(
     () =>
       JSON.parse(localStorage.getItem('mythic.identity.v1') ?? '{}') as {
@@ -122,7 +127,15 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
     await page.mouse.down();
     await page.mouse.move(start.x - zoom, start.y, { steps: 5 });
     await page.mouse.move(start.x - 2 * zoom, start.y, { steps: 5 });
+    if (index === 0) {
+      await expect(page.getByTestId('drag-ruler-total')).toHaveText('10 ft');
+      await expect(viewer.getByTestId('remote-drag-ruler-total')).toHaveText('DM: 10 ft');
+    }
     await page.mouse.up();
+    if (index === 0) {
+      await expect(page.getByTestId('drag-ruler-total')).toHaveCount(0);
+      await expect(viewer.getByTestId('remote-drag-ruler-total')).toHaveCount(0);
+    }
     const position = () =>
       (host.state as Snapshot).scenes[sceneId]?.entities[id]?.transform.position;
     await expect
@@ -138,5 +151,6 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
     await expect(page.getByTestId('token-label').filter({ hasText: name })).toHaveCount(0);
   }
   await host.close();
+  await viewerContext.close();
   await context.close();
 });

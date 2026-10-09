@@ -139,6 +139,12 @@ export interface Ghost {
   sizeCells: number;
 }
 
+export interface DragRulerPath {
+  key: string;
+  from: string | null;
+  points: readonly [Vec3, Vec3];
+}
+
 /** Remote previews worth drawing: this scene, entity still present, not already where it landed. */
 export function visibleGhosts(
   remote: Readonly<Record<string, RemotePreview>>,
@@ -160,6 +166,31 @@ export function visibleGhosts(
     });
   }
   return ghosts;
+}
+
+/** M1-40: derive rulers from the same local/remote preview data that positions drag ghosts. */
+export function dragRulerPaths(
+  local: LocalDrag | null,
+  remote: Readonly<Record<string, RemotePreview>>,
+  scene: Scene | null,
+  now: number,
+): DragRulerPath[] {
+  if (!scene) return [];
+  const paths: DragRulerPath[] = [];
+  if (
+    local &&
+    !local.settling &&
+    local.sceneId === scene.id &&
+    scene.entities[local.entityId]?.token &&
+    !samePosition(local.base, local.to)
+  ) {
+    paths.push({ key: 'local', from: null, points: [local.base, local.to] });
+  }
+  for (const ghost of visibleGhosts(remote, scene, now)) {
+    const base = scene.entities[ghost.entityId]?.transform.position;
+    if (base) paths.push({ key: ghost.key, from: ghost.key, points: [base, ghost.to] });
+  }
+  return paths;
 }
 
 /** Throttle: send when enough time passed, or immediately for the first/last position. */
