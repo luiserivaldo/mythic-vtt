@@ -82,14 +82,14 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
   /** @internal used by campaign-archive */
   readFile<T>(
     path: string,
-    kind: 'campaign' | 'scene' | 'snapshot',
+    kind: 'campaign' | 'scene' | 'snapshot' | 'session',
     schema: z.ZodType<T>,
   ): Promise<T> {
     return this.read(path, kind, schema);
   }
   private async read<T>(
     path: string,
-    kind: 'campaign' | 'scene' | 'snapshot',
+    kind: 'campaign' | 'scene' | 'snapshot' | 'session',
     schema: z.ZodType<T>,
   ): Promise<T> {
     let raw: unknown;
@@ -110,7 +110,7 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       );
     try {
       const payload =
-        kind === 'campaign'
+        kind === 'campaign' || kind === 'session'
           ? disk.data
           : Object.fromEntries(
               Object.entries(disk.data).filter(([key]) => key !== 'schemaVersion'),
@@ -249,7 +249,8 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
         throw error;
       }
-      const meta = SessionMeta.parse(JSON.parse(raw) as unknown);
+      const disk = SessionMeta.parse(JSON.parse(raw) as unknown);
+      const meta = SessionMeta.parse(this.migrate('session', disk.schemaVersion, disk));
       if (meta.sessionId !== name || meta.schemaVersion !== CURRENT_SCHEMA_VERSION)
         throw new StorageDataError(`Invalid session metadata: ${path}`, 'corrupt');
       sessions.push(meta);
