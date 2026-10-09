@@ -75,10 +75,7 @@ test('M0 exit: browser sync survives clean and SIGKILL host restarts', async ({ 
     await dm.getByRole('button', { name: 'Create token' }).click();
     await dm.getByLabel('Token name').fill('Persistent mage');
     await dm.getByRole('button', { name: 'Create token' }).click();
-    await dm
-      .locator('.ui-drawer')
-      .getByRole('button', { name: /^Close/ })
-      .click();
+    await dm.getByRole('button', { name: 'Close Entities panel' }).click();
 
     // Browser A performs a real token drag; browser B must render the resulting durable action.
     const beforeFirstMove = highestSeq(playerFrames);

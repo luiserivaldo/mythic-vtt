@@ -17,19 +17,17 @@ import { RulerToggle } from './RulerToggle.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
-import { TransformPanel } from '../ui/TransformPanel.js';
 import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
 import { outsideColor } from './canvas-style.js';
 import type { GroundBounds } from './camera-3d.js';
 import { useViewMode, type ViewMode } from './view-mode-store.js';
 import { useViewDirector } from './use-view-director.js';
 import { ViewToggle } from './ViewToggle.js';
-import { AoEToolPanel } from '../ui/AoEToolPanel.js';
 import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
-import { AoEAffectedPanel } from '../ui/AoEAffectedPanel.js';
 import { RenderDiagnostics } from './RenderDiagnostics.js';
+import { ToolPanelDock } from '../ui/ToolPanelDock.js';
 
 const OrbitControls3D = lazy(async () => {
   const module = await import('./OrbitControls3D.js');
@@ -42,10 +40,6 @@ const Skybox = lazy(async () => {
 const TransformGizmo3D = lazy(async () => {
   const module = await import('./TransformGizmo3D.js');
   return { default: module.TransformGizmo3D };
-});
-const TransformPanel3D = lazy(async () => {
-  const module = await import('../ui/TransformPanel3D.js');
-  return { default: module.TransformPanel3D };
 });
 
 function BoardScene({
@@ -157,7 +151,6 @@ function BoardScene({
 /** Single on-demand Three scene for the active host-filtered Scene. */
 export function BoardCanvas() {
   const viewMode = useViewMode();
-  const aoeActive = useStore(aoeToolStore, (s) => s.active);
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
   const [additiveMode, setAdditiveMode] = useState(false);
@@ -220,16 +213,7 @@ export function BoardCanvas() {
           </>
         )}
       </div>
-      <AoEToolPanel scene={source} />
-      <AoEAffectedPanel scene={source} />
-      {!aoeActive &&
-        (mode3d ? (
-          <Suspense fallback={<span role="status">Loading 3D tools…</span>}>
-            <TransformPanel3D />
-          </Suspense>
-        ) : (
-          <TransformPanel />
-        ))}
+      <ToolPanelDock campaign={campaign} scene={source} mode3d={mode3d} />
       <Canvas
         frameloop="demand"
         shadows={false}
