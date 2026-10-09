@@ -13,6 +13,7 @@ import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-mode
 import type { RenderGrid } from './grid-model.js';
 import { AoEVolume } from './AoEVolume.js';
 import { useUiStore } from '../ui/ui-store.js';
+import type { ElevatedGridSurface } from './elevated-grid.js';
 
 const Lighting3D = lazy(async () => {
   const module = await import('./Lighting3D.js');
@@ -71,6 +72,15 @@ export function PickableEntities({
         return surface ? [surface] : [];
       }),
     [scene, hiddenLayers],
+  );
+  const gridSurfaces = useMemo<readonly ElevatedGridSurface[]>(
+    () =>
+      (rendered?.entities ?? []).flatMap((entity) =>
+        entity.shape?.walkable && !hiddenLayers.has(scene?.entities[entity.id]?.layer ?? 'effects')
+          ? [{ id: entity.id, shape: entity.shape, position: entity.position }]
+          : [],
+      ),
+    [rendered, scene, hiddenLayers],
   );
 
   useEffect(() => {
@@ -161,6 +171,7 @@ export function PickableEntities({
                         shape={entity.shape}
                         grid={grid}
                         renderOrder={order + 1}
+                        surfaces={gridSurfaces}
                       />
                     </Suspense>
                   )}

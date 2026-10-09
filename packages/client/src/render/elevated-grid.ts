@@ -10,6 +10,12 @@ export type ElevatedGridShape = Pick<
   'kind' | 'width' | 'height' | 'depth' | 'yaw' | 'scale'
 >;
 
+export interface ElevatedGridSurface {
+  id: string;
+  shape: ElevatedGridShape;
+  position: readonly [number, number, number];
+}
+
 export function supportsElevatedGrid(kind: RenderShape['kind']): boolean {
   return kind === 'box' || kind === 'plane' || kind === 'cylinder' || kind === 'wedge';
 }
@@ -79,6 +85,22 @@ function ellipseSpan(
   return quadraticSpan(value - cz, shape.depth / 2, shape.width / 2, cosine, -sine, cx);
 }
 
+function footprintSpan(
+  surface: ElevatedGridSurface,
+  axis: 'x' | 'z',
+  value: number,
+): readonly [number, number] | null {
+  const { shape, position } = surface;
+  if (shape.kind === 'cylinder' || shape.kind === 'cone' || shape.kind === 'sphere')
+    return ellipseSpan(shape, position, axis, value);
+  const [cx, , cz] = position;
+  const footprint = primitiveFootprint(shape.kind, shape.scale, shape.yaw).map((point) => ({
+    x: point.x + cx,
+    z: point.z + cz,
+  }));
+  return polygonSpan(footprint, axis, value);
+}
+
 function surfaceY(
   shape: ElevatedGridShape,
   position: readonly [number, number, number],
@@ -96,6 +118,25 @@ function surfaceY(
     z,
   );
   return height === undefined ? null : position[1] + height + ELEVATED_GRID_LIFT;
+}
+
+function topSurfaceIdAt(
+  x: number,
+  z: number,
+  surfaces: readonly ElevatedGridSurface[],
+): string | null {
+  let bestId: string | null = null;
+  let bestY = -Infinity;
+  for (const surface of surfaces) {
+    const y = surfaceY(surface.shape, surface.position, x, z);
+    if (y === null) continue;
+    const rawY = y - ELEVATED_GRID_LIFT;
+    if (rawY > bestY + 1e-7 || (Math.abs(rawY - bestY) <= 1e-7 && surface.id < (bestId ?? ''))) {
+      bestY = rawY;
+      bestId = surface.id;
+    }
+  }
+  return bestId;
 }
 
 function appendSegment(
@@ -148,6 +189,65 @@ export function elevatedGridSegments(
         ? ellipseSpan(shape, position, 'z', z)
         : polygonSpan(footprint, 'z', z);
     if (span) appendSegment(out, shape, position, span[0], z, span[1], z);
+  }
+  return new Float32Array(out);
+}
+
+function addSplit(splits: number[], value: number, min: number, max: number): void {
+  if (value > min + 1e-8 && value < max - 1e-8) splits.push(value);
+}
+
+/**
+ * M3-09: clip one surface's lines wherever another walkable top owns the same plan position.
+ * Footprint crossings and cell boundaries split the lines; midpoint ownership then gives one
+ * deterministic winner, including coplanar surfaces where depth testing alone would z-fight.
+ */
+export function topmostElevatedGridSegments(
+  surface: ElevatedGridSurface,
+  surfaces: readonly ElevatedGridSurface[],
+): Float32Array {
+  const source = elevatedGridSegments(surface.shape, surface.position);
+  if (source.length === 0) return source;
+  const out: number[] = [];
+  for (let index = 0; index < source.length; index += 6) {
+    const x1 = source[index];
+    const z1 = source[index + 2];
+    const x2 = source[index + 3];
+    const z2 = source[index + 5];
+    if (x1 === undefined || z1 === undefined || x2 === undefined || z2 === undefined) continue;
+    const vertical = Math.abs(x2 - x1) < 1e-7;
+    const first = vertical ? z1 : x1;
+    const second = vertical ? z2 : x2;
+    const min = Math.min(first, second);
+    const max = Math.max(first, second);
+    const splits = [min, max];
+    for (let cell = Math.ceil(min); cell < max; cell += 1) addSplit(splits, cell, min, max);
+    for (const candidate of surfaces) {
+      if (candidate.id === surface.id) continue;
+      const span = footprintSpan(candidate, vertical ? 'x' : 'z', vertical ? x1 : z1);
+      if (!span) continue;
+      addSplit(splits, Math.max(min, span[0]), min, max);
+      addSplit(splits, Math.min(max, span[1]), min, max);
+    }
+    splits.sort((a, b) => a - b);
+    for (let part = 1; part < splits.length; part += 1) {
+      const from = splits[part - 1];
+      const to = splits[part];
+      if (from === undefined || to === undefined || to - from < 1e-8) continue;
+      const midpoint = (from + to) / 2;
+      const x = vertical ? x1 : midpoint;
+      const z = vertical ? midpoint : z1;
+      if (topSurfaceIdAt(x, z, surfaces) !== surface.id) continue;
+      appendSegment(
+        out,
+        surface.shape,
+        surface.position,
+        vertical ? x1 : from,
+        vertical ? from : z1,
+        vertical ? x2 : to,
+        vertical ? to : z2,
+      );
+    }
   }
   return new Float32Array(out);
 }

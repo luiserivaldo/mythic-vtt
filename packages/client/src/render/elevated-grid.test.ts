@@ -1,6 +1,12 @@
 import { primitiveProfileHeight } from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
-import { ELEVATED_GRID_LIFT, elevatedGridSegments, supportsElevatedGrid } from './elevated-grid.js';
+import {
+  ELEVATED_GRID_LIFT,
+  elevatedGridSegments,
+  supportsElevatedGrid,
+  topmostElevatedGridSegments,
+  type ElevatedGridSurface,
+} from './elevated-grid.js';
 
 const shape = (
   kind: 'box' | 'cylinder' | 'wedge' | 'sphere',
@@ -120,5 +126,43 @@ describe('elevatedGridSegments (GRID-05)', () => {
 
   it('draws nothing for an absurdly large top', () => {
     expect(elevatedGridSegments(shape('box', 5000, 1, 5000), [0, 0, 0]).length).toBe(0);
+  });
+
+  it('keeps only the topmost grid where walkable footprints overlap', () => {
+    const lower: ElevatedGridSurface = {
+      id: 'lower',
+      shape: shape('box', 4, 1, 4),
+      position: [4, 0, 4],
+    };
+    const upper: ElevatedGridSurface = {
+      id: 'upper',
+      shape: shape('box', 2, 1, 2),
+      position: [4, 2, 4],
+    };
+    const surfaces = [lower, upper];
+    const lowerSegments = segs(topmostElevatedGridSegments(lower, surfaces));
+    const upperSegments = segs(topmostElevatedGridSegments(upper, surfaces));
+    expect(lowerSegments.length).toBeGreaterThan(0);
+    expect(upperSegments.length).toBeGreaterThan(0);
+    for (const [x1, , z1, x2, , z2] of lowerSegments) {
+      const x = ((x1 ?? 0) + (x2 ?? 0)) / 2;
+      const z = ((z1 ?? 0) + (z2 ?? 0)) / 2;
+      expect(x > 3 && x < 5 && z > 3 && z < 5).toBe(false);
+    }
+    for (const segment of upperSegments) {
+      expect(segment[1]).toBeCloseTo(3 + ELEVATED_GRID_LIFT, 5);
+      expect(segment[4]).toBeCloseTo(3 + ELEVATED_GRID_LIFT, 5);
+    }
+  });
+
+  it('chooses one deterministic grid for coplanar surfaces', () => {
+    const first: ElevatedGridSurface = {
+      id: 'a',
+      shape: shape('box', 2, 1, 2),
+      position: [4, 0, 4],
+    };
+    const second = { ...first, id: 'b' };
+    expect(topmostElevatedGridSegments(first, [first, second]).length).toBeGreaterThan(0);
+    expect(topmostElevatedGridSegments(second, [first, second]).length).toBe(0);
   });
 });
