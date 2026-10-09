@@ -12,6 +12,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/ws': { target: `ws://127.0.0.1:${hostPort}`, ws: true },
+      '/api': `http://127.0.0.1:${hostPort}`,
       '/assets': `http://127.0.0.1:${hostPort}`,
     },
   },

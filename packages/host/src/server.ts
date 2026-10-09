@@ -7,6 +7,7 @@ import {
   createSeatUploadAuthorizer,
   registerAssetRoutes,
   registerCampaignRoutes,
+  registerHistoryRoutes,
   registerStaticClient,
   type UploadAuthorizer,
 } from './http/index.js';
@@ -149,6 +150,7 @@ export async function startHost(
     now: clock,
     ...(options.importLimits ? { importLimits: options.importLimits } : {}),
   });
+  registerHistoryRoutes(gateway.app, { store, engine, auth: httpAuth, now: clock });
   if (config.testEndpoints) {
     gateway.app.get('/__test/connections', () => ({
       open: gateway.connectionCount(),

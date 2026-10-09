@@ -1,3 +1,4 @@
+import { HistoryTools } from './ui/HistoryTools.js';
 import { useClientStore } from './store/react.js';
 import { DmPanels } from './ui/DmPanels.js';
 import { JoinScreen } from './ui/JoinScreen.js';
@@ -23,6 +24,7 @@ export function App() {
       <IdentityStatus />
       {pending > 0 && <p>{pending} action(s) waiting for the host</p>}
       <DmPanels />
+      <HistoryTools />
       <BoardCanvas />
       <JoinScreen />
     </main>
