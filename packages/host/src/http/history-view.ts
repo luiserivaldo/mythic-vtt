@@ -2,6 +2,8 @@ import { applyPatches } from 'immer';
 import {
   diffPatches,
   viewEntity,
+  visibleTo,
+  type Entity,
   type Audience,
   type Campaign,
   type HistoryPage,
@@ -10,14 +12,20 @@ import {
 import type { LogEntry } from '../storage/types.js';
 
 /** PERM-03: use today's seat privileges, and intersect historical and current entity visibility. */
-function projection(state: Campaign, current: Campaign, audience: Audience): unknown {
+function projection(
+  state: Campaign,
+  current: Campaign,
+  audience: Audience,
+  latestEntities: ReadonlyMap<string, Entity>,
+): unknown {
   const seat = audience.kind === 'seat' ? current.seats[audience.seatId] : undefined;
-  const scenes: Record<string, unknown> = {};
-  for (const scene of Object.values(state.scenes)) {
-    const entities: Record<string, unknown> = {};
+  const filtered = visibleTo(audience, { ...state, seats: current.seats });
+  const scenes: Campaign['scenes'] = {};
+  for (const scene of Object.values(filtered.scenes)) {
+    const entities: Record<string, Entity> = {};
     for (const entity of Object.values(scene.entities)) {
       let view = viewEntity(audience, entity, seat);
-      const now = current.scenes[scene.id]?.entities[entity.id];
+      const now = latestEntities.get(`${scene.id}/${entity.id}`);
       if (!view || (now && !viewEntity(audience, now, seat))) continue;
       // A now-private label must not be revealed by an older public log entry.
       if (now?.token && audience.kind !== 'host') {
@@ -49,7 +57,8 @@ function projection(state: Campaign, current: Campaign, audience: Audience): unk
       return [id, view];
     }),
   );
-  return { ...state, seats, scenes };
+  // Re-filter references (for example initiative order) after intersecting entity visibility.
+  return { ...visibleTo(audience, { ...filtered, scenes }), seats };
 }
 
 /** Reverse the stored inverse patches locally; never send raw payloads or inverse patches. */
@@ -62,18 +71,29 @@ export function historyPage(
 ): HistoryPage {
   let after = current;
   const entries: HistoryPage['entries'] = [];
+  const latestEntities = new Map<string, Entity>();
+  const remember = (state: Campaign) => {
+    for (const scene of Object.values(state.scenes))
+      for (const entity of Object.values(scene.entities)) {
+        const key = `${scene.id}/${entity.id}`;
+        if (!latestEntities.has(key)) latestEntities.set(key, entity);
+      }
+  };
+  remember(current);
   for (const entry of [...log]
     .filter((item) => item.envelope.seq <= seq)
     .sort((a, b) => b.envelope.seq - a.envelope.seq)) {
     const { envelope } = entry;
     const before = applyPatches(after, entry.inversePatches);
+    // Deleted entities keep their last known visibility; deletion must not revive old secrets.
+    remember(before);
     if (
       (query.before === undefined || envelope.seq < query.before) &&
       (query.seatId === undefined || envelope.actor.seatId === query.seatId)
     ) {
       let changes = diffPatches(
-        projection(before, current, audience),
-        projection(after, current, audience),
+        projection(before, current, audience, latestEntities),
+        projection(after, current, audience, latestEntities),
       );
       if (query.entityId !== undefined)
         changes = changes.filter(

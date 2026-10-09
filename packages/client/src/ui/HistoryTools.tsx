@@ -1,3 +1,4 @@
+import { historyGroups } from './history-groups.js';
 import { HistoryPage, type HistoryEntry } from '@mythic/shared';
 import { useEffect, useState } from 'react';
 import { loadOrCreateIdentity } from '../net/identity.js';
@@ -57,6 +58,7 @@ function HistoryPanel() {
           disabled={busy}
           onChange={(event) => {
             setSeatId(event.target.value);
+            setBefore(undefined);
           }}
         >
           <option value="">All seats</option>
@@ -74,6 +76,7 @@ function HistoryPanel() {
           disabled={busy}
           onChange={(event) => {
             setEntityId(event.target.value);
+            setBefore(undefined);
           }}
         >
           <option value="">All entities</option>
@@ -98,26 +101,37 @@ function HistoryPanel() {
       {error && <p role="alert">{error}</p>}
       {!busy && entries.length === 0 && <p>No visible actions.</p>}
       <ol>
-        {entries.map((entry) => (
-          <li key={`${entry.sessionId}:${String(entry.seq)}`}>
-            <details>
-              <summary>
-                #{entry.seq} {entry.type} —{' '}
-                {entry.seatId ? (campaign?.seats[entry.seatId]?.label ?? 'Seat') : 'DM'}
-                {entry.round !== undefined &&
-                  ` · Round ${String(entry.round)}, turn ${String(entry.turn ?? 0)}`}
-              </summary>
-              <ul>
-                {entry.changes.map((change, index) => (
-                  <li key={index}>
-                    <code>
-                      {change.op} /{change.path.join('/')}
-                      {change.op !== 'remove' && `: ${JSON.stringify(change.value)}`}
-                    </code>
-                  </li>
-                ))}
-              </ul>
-            </details>
+        {historyGroups(entries).map((group, groupIndex) => (
+          <li key={groupIndex}>
+            <h3>
+              {group.round === undefined && group.turn === undefined
+                ? 'Before rounds'
+                : `Round ${String(group.round ?? '—')}, turn ${String(group.turn ?? '—')}`}
+            </h3>
+            <ol>
+              {group.entries.map((entry) => (
+                <li key={`${entry.sessionId}:${String(entry.seq)}`}>
+                  <details>
+                    <summary>
+                      #{entry.seq} {entry.type} —{' '}
+                      {entry.seatId ? (campaign?.seats[entry.seatId]?.label ?? 'Seat') : 'DM'}
+                      {entry.round !== undefined &&
+                        ` · Round ${String(entry.round)}, turn ${String(entry.turn ?? 0)}`}
+                    </summary>
+                    <ul>
+                      {entry.changes.map((change, index) => (
+                        <li key={index}>
+                          <code>
+                            {change.op} /{change.path.join('/')}
+                            {change.op !== 'remove' && `: ${JSON.stringify(change.value)}`}
+                          </code>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                </li>
+              ))}
+            </ol>
           </li>
         ))}
       </ol>

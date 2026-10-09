@@ -126,6 +126,11 @@ test('history filters, survives restart and excludes private REST content', asyn
   expect(JSON.stringify(await nowPrivate.json())).not.toMatch(
     new RegExp(`History hero|${entityId}|Secret warden|${hiddenId}`),
   );
+  expect(await host.intent('entity.delete', { sceneId, entityId })).toMatchObject({ t: 'ack' });
+  const deletedPrivate = await spectator.page.request.get(endpoint, { headers });
+  expect(JSON.stringify(await deletedPrivate.json())).not.toMatch(
+    new RegExp(`History hero|${entityId}`),
+  );
   await player.close();
   await host.close();
   await table.restart();

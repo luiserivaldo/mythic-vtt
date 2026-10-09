@@ -81,6 +81,13 @@ describe('history projection', () => {
     expect(historyPage(f.state, 3, f.log, spectator, { limit: 50 }).entries).toEqual([]);
     expect(historyPage(f.state, 3, f.log, { kind: 'host' }, { limit: 50 }).entries).toHaveLength(3);
   });
+  it('keeps the last private visibility after deletion instead of reviving old public names', () => {
+    const f = fixture();
+    f.apply('entity.setLayer', { sceneId: IDS.scene, entityId: IDS.entity, layer: 'dm' });
+    f.apply('entity.delete', { sceneId: IDS.scene, entityId: IDS.entity });
+    expect(historyPage(f.state, 4, f.log, spectator, { limit: 50 }).entries).toEqual([]);
+    expect(historyPage(f.state, 4, f.log, { kind: 'host' }, { limit: 50 }).entries).toHaveLength(4);
+  });
   it('filters historical and current label visibility, including ownership changes', () => {
     const f = fixture();
     const token = f.state.scenes[IDS.scene]?.entities[IDS.entity]?.token;
