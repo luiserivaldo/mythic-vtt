@@ -10,6 +10,7 @@ export interface PresenceConn {
   readonly displayName: string;
   readonly avatar: string | undefined;
   readonly isHost: boolean;
+  readonly latencyMs?: number | null;
 }
 
 /**
@@ -26,6 +27,7 @@ export function buildHostPresence(state: Campaign, conns: Iterable<PresenceConn>
       seatId: seat.id,
       ...(live ? { displayName: live.displayName } : {}),
       connected: live !== undefined,
+      latencyMs: live?.latencyMs ?? null,
     };
   });
 
