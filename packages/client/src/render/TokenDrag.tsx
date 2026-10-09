@@ -5,9 +5,9 @@ import { Raycaster, Vector2, type Object3D } from 'three';
 import { useStore } from 'zustand';
 import type { Actor, Scene, Vec3 } from '@mythic/shared';
 import { useClientStore } from '../store/react.js';
-import { selectionStore } from '../tools/selection-store.js';
 import {
   dragStarted,
+  dragRulerPaths,
   groundPoint,
   movableToken,
   pressOnGizmoHandle,
@@ -17,13 +17,17 @@ import {
   visibleGhosts,
   GHOST_TTL_MS,
 } from '../tools/token-drag.js';
+import { selectionStore } from '../tools/selection-store.js';
 import { tokenDragStore } from '../tools/token-drag-store.js';
 import { EphemeralContext } from '../ui/ephemeral-context.js';
 import { SubmitContext } from '../ui/submit.js';
 import { useViewMode } from './view-mode-store.js';
 import { GHOST_COLOR } from './canvas-style.js';
+import { RULER_LOCAL_COLOR, RULER_REMOTE_COLOR } from './canvas-style.js';
 import { pointerClaims } from './pointer-claims.js';
 import type { OrthographicCamera } from 'three';
+import { RulerPath } from './RulerPath.js';
+import { rulerOwnerName } from '../tools/ruler.js';
 
 const SETTLE_TIMEOUT_MS = 2000;
 
@@ -47,9 +51,10 @@ function entityIdAt(object: Object3D | null, scene: Scene): string | null {
 }
 
 /**
- * TOK-02: drag a selected, movable token. The press claims the pointer (so the camera does not
- * pan); the preview is render-local plus an ephemeral relay to others; release sends ONE
- * `token.move` and nothing is applied locally until the host's patch lands (D34).
+ * TOK-02 / M1-28: press-drag any movable token without selecting it first. The press claims the
+ * pointer (so the camera does not pan); the preview is render-local plus an ephemeral relay to
+ * others; release sends ONE `token.move` and nothing is applied locally until the host's patch
+ * lands (D34).
  */
 export function TokenDrag() {
   const gl = useThree((s) => s.gl);
@@ -185,8 +190,6 @@ export function TokenDrag() {
       if (press || pointerClaims.isClaimed(e.pointerId)) return;
       const { campaign: c, actor: a, scene: sc, mode: m } = latest.current;
       if (!sc || tokenDragStore.getState().local) return;
-      const selected = selectionStore.getState().ids;
-      if (selected.length === 0) return;
       const r = ray(e);
       const hits = raycaster.intersectObjects(getState().scene.children, true);
       let hitId: string | null = null;
@@ -197,7 +200,7 @@ export function TokenDrag() {
           break;
         }
       }
-      if (!hitId || !selected.includes(hitId)) return;
+      if (!hitId) return;
       const entity = movableToken(c, a, sc, hitId);
       if (!entity) return;
       const pos = entity.transform.position;
@@ -208,7 +211,10 @@ export function TokenDrag() {
         if (pressOnGizmoHandle(entity, ground, cam.zoom)) return;
       }
       pointerClaims.claim(e.pointerId, 'token drag');
-      e.stopPropagation();
+      // M1-28 moves any movable token without selecting it first, but a plain click must still
+      // select. The claim already keeps the camera from panning, so only swallow the press when
+      // the token is selected; an unselected token's press reaches picking and a click selects it.
+      if (selectionStore.getState().ids.includes(hitId)) e.stopPropagation();
       el.setPointerCapture(e.pointerId);
       press = {
         pointerId: e.pointerId,
@@ -289,20 +295,35 @@ export function TokenDrag() {
   }, [gl, invalidate, getState]);
 
   const ghosts = visibleGhosts(remote, scene, Date.now());
+  const rulers = dragRulerPaths(local, remote, scene, Date.now());
   return (
-    <group name="token-drag-ghosts">
-      {ghosts.map((g) => (
-        <mesh
-          key={g.key}
-          position={[g.to.x, g.to.y + 0.03, g.to.z]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          renderOrder={900}
-          raycast={() => null}
-        >
-          <planeGeometry args={[g.sizeCells, g.sizeCells]} />
-          <meshBasicMaterial color={GHOST_COLOR} transparent opacity={0.6} depthTest={false} />
-        </mesh>
-      ))}
+    <group name="token-drag-previews">
+      <group name="token-drag-ghosts">
+        {ghosts.map((g) => (
+          <mesh
+            key={g.key}
+            position={[g.to.x, g.to.y + 0.03, g.to.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            renderOrder={900}
+            raycast={() => null}
+          >
+            <planeGeometry args={[g.sizeCells, g.sizeCells]} />
+            <meshBasicMaterial color={GHOST_COLOR} transparent opacity={0.6} depthTest={false} />
+          </mesh>
+        ))}
+      </group>
+      {scene &&
+        rulers.map((ruler) => (
+          <RulerPath
+            key={ruler.key}
+            points={ruler.points}
+            scene={scene}
+            color={ruler.from === null ? RULER_LOCAL_COLOR : RULER_REMOTE_COLOR}
+            owner={ruler.from === null ? null : rulerOwnerName(campaign?.seats ?? {}, ruler.from)}
+            mode={mode}
+            testId={ruler.from === null ? 'drag-ruler' : 'remote-drag-ruler'}
+          />
+        ))}
     </group>
   );
 }

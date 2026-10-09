@@ -105,10 +105,15 @@ export function TransformGizmo3D() {
 
   const settling = preview?.settling === true;
   const storedTransform = entity?.transform;
+  const storedTokenSize = entity?.token?.sizeCells;
   useEffect(() => {
     if (!settling) return;
     const p = gizmoStore.getState().preview;
-    if (p && storedTransform && storedTransform !== p.base) {
+    if (
+      p &&
+      storedTransform &&
+      (storedTransform !== p.base || storedTokenSize !== p.baseTokenSize)
+    ) {
       gizmoStore.getState().clear();
       invalidate();
       return;
@@ -120,7 +125,7 @@ export function TransformGizmo3D() {
     return () => {
       clearTimeout(timer);
     };
-  }, [settling, storedTransform, invalidate]);
+  }, [settling, storedTransform, storedTokenSize, invalidate]);
 
   useEffect(() => {
     if (!entityId) return;
@@ -205,6 +210,7 @@ export function TransformGizmo3D() {
         entityId: t.entity.id,
         draft: d,
         base: t.entity.transform,
+        baseTokenSize: t.entity.token?.sizeCells,
       });
       invalidate();
     };

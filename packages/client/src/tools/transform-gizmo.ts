@@ -89,9 +89,19 @@ export function snapFootprint(extents: { width: number; depth: number }): number
   return Math.max(1, Math.round(Math.max(extents.width, extents.depth)));
 }
 
+/** M1-35: tokens author their uniform size in `token.sizeCells`; other entities use transform scale. */
+export function entityScale(entity: Entity): number {
+  return entity.token ? footprintCells(entity.token.sizeCells) : entity.transform.scale.x;
+}
+
 export function draftFromEntity(entity: Entity): GizmoDraft {
-  const { position, rotation, scale } = entity.transform;
-  return { x: position.x, z: position.z, yaw: yawFromQuaternion(rotation), scale: scale.x };
+  const { position, rotation } = entity.transform;
+  return {
+    x: position.x,
+    z: position.z,
+    yaw: yawFromQuaternion(rotation),
+    scale: entityScale(entity),
+  };
 }
 
 /** Apply a draft to the stored transform: untouched parts keep their exact stored values. */

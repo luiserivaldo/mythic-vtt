@@ -4,6 +4,7 @@ import type { RenderScene } from '../render/scene-model.js';
 import { makeCampaign, tid } from '../testing.js';
 import {
   dragStarted,
+  dragRulerPaths,
   groundPoint,
   intersectPlaneY,
   movableToken,
@@ -186,6 +187,28 @@ describe('render helpers', () => {
     );
     expect(visibleGhosts({ a: { ...fresh, sceneId: tid(9) } }, sc, 1100)).toHaveLength(0);
     expect(visibleGhosts({ a: fresh }, null, 1100)).toHaveLength(0);
+  });
+  it('derives temporary rulers from drag previews and hides the local ruler on release', () => {
+    const sc = scene();
+    const local = {
+      sceneId: S,
+      entityId: E,
+      base: { x: 2.5, y: 0, z: 3.5 },
+      to: { x: 4.5, y: 0, z: 5.5 },
+      settling: false,
+    };
+    const fresh = { sceneId: S, entityId: E, to: { x: 5.5, y: 0, z: 3.5 }, at: 1000 };
+    expect(dragRulerPaths(local, { sender: fresh }, sc, 1100)).toEqual([
+      { key: 'local', from: null, points: [local.base, local.to] },
+      {
+        key: 'sender',
+        from: 'sender',
+        points: [sc.entities[E]?.transform.position, fresh.to],
+      },
+    ]);
+    expect(dragRulerPaths({ ...local, settling: true }, {}, sc, 1100)).toEqual([]);
+    expect(dragRulerPaths(local, { sender: fresh }, sc, 5000)).toHaveLength(1);
+    expect(dragRulerPaths(local, {}, null, 1100)).toEqual([]);
   });
   it('prunes stale remote previews from the store', () => {
     tokenDragStore

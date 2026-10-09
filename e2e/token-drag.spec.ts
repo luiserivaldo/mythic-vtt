@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid, type Table } from './harness.js';
 
-// M1-18 (TOK-02): dragging a selected token previews live to other clients (ephemeral relay) and
-// commits ONE snapped token.move on drop; a token drag does not pan the camera.
+// M1-18 / M1-28 (TOK-02): press-dragging an unselected token previews live to other clients and
+// commits ONE snapped token.move on drop without moving the camera or selecting first.
 
 let table: Table;
 
@@ -81,12 +81,9 @@ test('host drags a token: others see the preview, the drop commits one snapped t
     y: box.y + box.height / 2 + (z - 15) * zoom,
   });
 
-  const panel = page.getByRole('region', { name: /Transform/ });
   const start = at(2.5, 3.5);
-  await expect(async () => {
-    await page.mouse.click(start.x, start.y);
-    await expect(panel).toBeVisible({ timeout: 1000 });
-  }).toPass();
+  const panel = page.getByRole('region', { name: /Transform/ });
+  await expect(panel).toHaveCount(0);
 
   // Grab off-centre (a quarter cell from the middle) and drag 3 cells right, 2 down.
   const grab = { x: start.x + zoom * 0.3, y: start.y + zoom * 0.3 };
@@ -95,6 +92,7 @@ test('host drags a token: others see the preview, the drop commits one snapped t
   await page.mouse.move(grab.x + zoom, grab.y + zoom * 0.5, { steps: 6 });
   await page.mouse.move(grab.x + 3 * zoom, grab.y + 2 * zoom, { steps: 6 });
   await page.mouse.up();
+  await expect(panel).toHaveCount(0);
 
   const position = () => {
     const s = observer.state as Snapshot;

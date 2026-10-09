@@ -10,6 +10,7 @@ import {
 } from './intent-specs.js';
 import { NameForm } from './NameForm.js';
 import {
+  connectedIdentityRows,
   isValidIdentityId,
   isValidLabel,
   PERMISSION_KEYS,
@@ -28,12 +29,28 @@ interface Props {
 
 export function SeatPanel({ campaign, presence, unseated }: Props) {
   const roster = rosterOptions(unseated);
+  const connected = connectedIdentityRows(campaign, presence, unseated);
   const { send, error } = useSubmit();
   const [identity, setIdentity] = useState<Record<string, string>>({});
   return (
     <section aria-labelledby="ui-seats-h" className="ui-panel">
       <h2 id="ui-seats-h">Participants and permissions</h2>
-      <ul className="ui-list">
+      <h3>Connected identities</h3>
+      {connected.length === 0 ? (
+        <p>No players or spectators are connected.</p>
+      ) : (
+        <ul className="ui-list" aria-label="Connected identities">
+          {connected.map((identity) => (
+            <li className="ui-row" key={identity.key}>
+              <strong>{identity.displayName}</strong>
+              <span>{identity.seatLabel}</span>
+              <span className="ui-badge">{identity.roleLabel}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <h3>Participants</h3>
+      <ul className="ui-list" aria-label="Seats">
         {seatRows(campaign, presence).map((row) => {
           const typed = identity[row.id] ?? '';
           return (

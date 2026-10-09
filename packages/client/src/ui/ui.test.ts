@@ -18,9 +18,15 @@ import {
 } from './intent-specs.js';
 import { layerRows, moveTargets, toggleHidden } from './layer-panel.js';
 import { sceneRows, isValidSceneName } from './scene-list.js';
-import { isValidIdentityId, isValidLabel, seatRows } from './seat-panel.js';
+import { connectedIdentityRows, isValidIdentityId, isValidLabel, seatRows } from './seat-panel.js';
 import { toolbarItems } from './toolbar-items.js';
-import { canManageSeats, isAdminRole, isReadOnlyViewer, viewerRole } from './viewer.js';
+import {
+  canManageSeats,
+  identitySummary,
+  isAdminRole,
+  isReadOnlyViewer,
+  viewerRole,
+} from './viewer.js';
 
 const S = tid(2);
 const E = tid(3);
@@ -112,7 +118,32 @@ describe('viewerRole', () => {
       'map',
       'entities',
       'seats',
+      'share',
     ]);
+  });
+  it('describes the current identity, role and seat', () => {
+    expect(identitySummary({ displayName: 'DM', isHost: true, seatId: null, campaign })).toEqual({
+      displayName: 'DM',
+      roleLabel: 'DM',
+      seatLabel: 'Host',
+    });
+    expect(identitySummary({ displayName: 'Cleo', isHost: false, seatId: C, campaign })).toEqual({
+      displayName: 'Cleo',
+      roleLabel: 'Co-DM',
+      seatLabel: 'Cleo',
+    });
+    expect(identitySummary({ displayName: 'Pia', isHost: false, seatId: P, campaign })).toEqual({
+      displayName: 'Pia',
+      roleLabel: 'Player',
+      seatLabel: 'Pia',
+    });
+    expect(
+      identitySummary({ displayName: 'Quinn', isHost: false, seatId: null, campaign }),
+    ).toEqual({
+      displayName: 'Quinn',
+      roleLabel: 'Spectator',
+      seatLabel: 'Spectator',
+    });
   });
   it('treats seat-less observers and no-action player slots as camera-only viewers', () => {
     const campaign = world();
@@ -185,6 +216,31 @@ describe('view models', () => {
     if (!player) throw new Error('missing player fixture');
     player.permissions = { view: true, move: false, edit: false, delete: false };
     expect(seatRows(readOnly, null).find((row) => row.id === P)?.roleLabel).toBe('Spectator');
+  });
+  it('joins the host-only roster to seat labels and includes unseated spectators', () => {
+    expect(
+      connectedIdentityRows(
+        world(),
+        [
+          { seatId: C, connected: true, displayName: 'Cleo Client' },
+          { seatId: P, connected: false, displayName: 'Pia Client' },
+        ],
+        [{ identityId: tid(10), displayName: 'Quinn' }],
+      ),
+    ).toEqual([
+      {
+        key: `seat-${C}`,
+        displayName: 'Cleo Client',
+        seatLabel: 'Cleo',
+        roleLabel: 'Co-DM',
+      },
+      {
+        key: `identity-${tid(10)}`,
+        displayName: 'Quinn',
+        seatLabel: 'Unseated',
+        roleLabel: 'Spectator',
+      },
+    ]);
   });
   it('validates typed input', () => {
     expect(isValidLabel('')).toBe(false);

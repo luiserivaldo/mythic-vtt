@@ -1,0 +1,32 @@
+name: DCO
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    name: dco
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check Signed-off-by on every commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+        run: |
+          # Bots such as Dependabot cannot certify the DCO; a maintainer reviews those PRs.
+          if [ "$AUTHOR_TYPE" = "Bot" ]; then echo "Bot author: skipped."; exit 0; fi
+          # Commits promoted from develop to main were already checked when they entered develop.
+          exclude=""
+          if [ "$BASE_REF" = "main" ]; then exclude="origin/develop"; fi
+          scripts/check-dco.sh "$BASE_SHA" "$HEAD_SHA" "$exclude"

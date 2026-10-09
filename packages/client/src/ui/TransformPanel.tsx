@@ -60,6 +60,7 @@ function TransformFields({ entity, scene }: { entity: Entity; scene: Scene }) {
       entityId: entity.id,
       draft: parsed.draft,
       base: entity.transform,
+      baseTokenSize: entity.token?.sizeCells,
     });
     void commitTransform({
       submit,
@@ -88,7 +89,7 @@ function TransformFields({ entity, scene }: { entity: Entity; scene: Scene }) {
       <h2 id={headingId}>Transform: {entity.name}</h2>
       {FIELDS.map(({ field, label }) => (
         <label key={field} className="ui-field">
-          {label(unitLabel)}
+          {field === 'scale' && entity.token ? 'Size (cells)' : label(unitLabel)}
           <input
             type="text"
             inputMode="decimal"

@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { RawClient, seedProfile, startTable, testUlid, type Table } from './harness.js';
 
-// M1-21 (MEAS-01): the 2D ruler measures with the scene's units, finishes on double-click, and is
-// shared live through the ephemeral relay with the sender's seat name. Nothing is logged.
+// M1-41 (MEAS-01/02): quick rulers clear on release, Persistent rulers remain one-per-sender, and
+// the idle tool yields token clicks back to selection. Everything is ephemeral and nothing is logged.
 
 let table: Table;
 
@@ -32,6 +32,7 @@ test('the ruler measures in scene units and a second client sees it with the sen
 }) => {
   const scene = testUlid('SCENE', 1);
   const seat = testUlid('SEAT', 1);
+  const token = testUlid('TOKEN', 1);
   const setup = await RawClient.connect(table, {
     name: 'host',
     ...HOST,
@@ -42,6 +43,21 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await setup.intent('scene.activate', { sceneId: scene });
   await setup.intent('seat.create', { seatId: seat, label: 'Aria' });
   await setup.intent('seat.assign', { seatId: seat, identityId: PLAYER.identityId });
+  await setup.intent('entity.create', {
+    sceneId: scene,
+    entity: {
+      id: token,
+      layer: 'tokens',
+      name: 'Ruler target',
+      owners: [],
+      transform: {
+        position: { x: 15.5, y: 0, z: 12.5 },
+        rotation: { x: 0, y: 0, z: 0, w: 1 },
+        scale: { x: 1, y: 1, z: 1 },
+      },
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+    },
+  });
 
   const dmContext = await browser.newContext();
   await dmContext.addInitScript((identity) => {
@@ -67,18 +83,18 @@ test('the ruler measures in scene units and a second client sees it with the sen
   const a = at(5.5, 5.5);
   const b = at(11.5, 5.5);
   const c = at(11.5, 8.5);
+  const tokenAt = at(15.5, 12.5);
 
   await dm.getByRole('button', { name: 'Ruler' }).click();
   await expect(dm.getByRole('button', { name: 'Ruler' })).toHaveAttribute('aria-pressed', 'true');
   await dm.mouse.move(a.x, a.y);
   await dm.mouse.down();
   await dm.mouse.move(b.x, b.y, { steps: 5 });
-  await dm.mouse.up();
   await expect(dm.getByTestId('ruler-total')).toHaveText('30 ft');
-  // Release finishes a quick measurement, which remains readable until the next press.
-  await expect(dm.getByTestId('ruler-total')).toHaveText('30 ft');
-  // The second client sees the live ruler, named after the sender (a seatless DM).
   await expect(player.getByTestId('remote-ruler-total')).toHaveText('DM: 30 ft');
+  await dm.mouse.up();
+  await expect(dm.getByTestId('ruler-total')).toHaveCount(0);
+  await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
 
   // A short press starts a fresh click-path, then click and double-click build 6 + 3 cells.
   await dm.mouse.click(a.x, a.y);
@@ -94,13 +110,47 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await expect(dm.getByTestId('ruler-total')).toHaveCount(0);
   await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
 
-  // The seated player's ruler carries the seat name; Enter finishes it.
+  // Persistent rulers remain after release, and each sender has one independent slot.
+  await dm.getByLabel('Persistent').check();
+  await dm.mouse.move(a.x, a.y);
+  await dm.mouse.down();
+  await dm.mouse.move(b.x, b.y, { steps: 5 });
+  await dm.mouse.up();
+  await expect(dm.getByTestId('ruler-total')).toHaveText('30 ft');
+  await expect(player.getByTestId('remote-ruler-total')).toHaveText('DM: 30 ft');
+
   await player.keyboard.press('r');
-  await player.mouse.click(a.x, a.y);
-  await player.mouse.move(b.x, b.y, { steps: 5 });
-  await player.keyboard.press('Enter');
+  await player.getByLabel('Persistent').check();
+  const playerAt = await cellToPixel(player);
+  const playerA = playerAt(5.5, 5.5);
+  const playerB = playerAt(11.5, 5.5);
+  await player.mouse.move(playerA.x, playerA.y);
+  await player.mouse.down();
+  await player.mouse.move(playerB.x, playerB.y, { steps: 5 });
+  await player.mouse.up();
   await expect(player.getByTestId('ruler-total')).toHaveText('30 ft');
   await expect(dm.getByTestId('remote-ruler-total')).toHaveText('Aria: 30 ft');
+  await expect(player.getByTestId('remote-ruler-total')).toHaveText('DM: 30 ft');
+
+  // A replacement changes only the DM's slot; Aria's ruler remains visible.
+  await dm.mouse.move(a.x, a.y);
+  await dm.mouse.down();
+  await dm.mouse.move(c.x, c.y, { steps: 5 });
+  await dm.mouse.up();
+  await expect(dm.getByTestId('ruler-total')).toHaveText('35 ft');
+  await expect(dm.getByTestId('remote-ruler-total')).toHaveText('Aria: 30 ft');
+
+  // Right click clears only this user's ruler and leaves the tool armed.
+  await dm.mouse.click(c.x, c.y, { button: 'right' });
+  await expect(dm.getByTestId('ruler-total')).toHaveCount(0);
+  await expect(dm.getByTestId('remote-ruler-total')).toHaveText('Aria: 30 ft');
+  await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
+  await expect(dm.getByRole('button', { name: 'Ruler' })).toHaveAttribute('aria-pressed', 'true');
+
+  // A short token click while idle exits the tool, then the normal selection click opens Transform.
+  await dm.mouse.click(tokenAt.x, tokenAt.y);
+  await expect(dm.getByRole('button', { name: 'Ruler' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(dm.getByRole('region', { name: 'Transform: Ruler target' })).toBeVisible();
 
   expect(errors).toEqual([]);
   await setup.close();

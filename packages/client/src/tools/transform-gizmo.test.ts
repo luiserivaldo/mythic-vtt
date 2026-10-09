@@ -10,6 +10,8 @@ import {
   applyScale,
   buildTransform,
   draftFromEntity,
+  entityExtents,
+  entityScale,
   formatTyped,
   handleLayout,
   hitHandle,
@@ -191,6 +193,18 @@ describe('buildTransform', () => {
   });
 });
 
+describe('token scale source (TOK-09)', () => {
+  it('uses token.sizeCells for drafts and footprints, never transform scale', () => {
+    const token = entity({
+      token: { sizeCells: 3, heightCells: 3, labelVisibility: 'all' },
+      transform: { ...entity().transform, scale: { x: 9, y: 8, z: 7 } },
+    });
+    expect(entityScale(token)).toBe(3);
+    expect(draftFromEntity(token).scale).toBe(3);
+    expect(entityExtents(token)).toEqual({ width: 3, depth: 3 });
+  });
+});
+
 describe('resolveGizmoTarget (PERM-01/02, D23)', () => {
   const campaign = (): Campaign => {
     const c = makeCampaign();
@@ -246,7 +260,13 @@ describe('commitTransform (D34)', () => {
   const draft = { x: 4.5, z: 3.5, yaw: 0, scale: 1 };
   const begin = (e: Entity) => {
     gizmoStore.getState().clear();
-    gizmoStore.getState().begin({ sceneId: S, entityId: E, draft, base: e.transform });
+    gizmoStore.getState().begin({
+      sceneId: S,
+      entityId: E,
+      draft,
+      base: e.transform,
+      baseTokenSize: e.token?.sizeCells,
+    });
   };
   const run = (e: Entity, submit: Submit) =>
     commitTransform({ submit, store: gizmoStore, sceneId: S, entity: e, draft });
@@ -268,6 +288,42 @@ describe('commitTransform (D34)', () => {
     ]);
     expect(gizmoStore.getState().preview?.settling).toBe(true);
     expect(gizmoStore.getState().busy).toBe(false);
+  });
+  it('updates a token size without changing its transform scale', async () => {
+    const e = entity({ token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' } });
+    const resized = { ...draftFromEntity(e), scale: 2 };
+    gizmoStore.getState().clear();
+    gizmoStore.getState().begin({
+      sceneId: S,
+      entityId: E,
+      draft: resized,
+      base: e.transform,
+      baseTokenSize: e.token?.sizeCells,
+    });
+    const calls: unknown[][] = [];
+    const ok = await commitTransform({
+      submit: (...args) => {
+        calls.push(args);
+        return Promise.resolve<IntentResult>({ ok: true, seq: 1 });
+      },
+      store: gizmoStore,
+      sceneId: S,
+      entity: e,
+      draft: resized,
+    });
+    expect(ok).toBe(true);
+    expect(calls).toEqual([
+      [
+        'entity.update',
+        {
+          sceneId: S,
+          entityId: E,
+          changes: { token: { ...e.token, sizeCells: 2 } },
+        },
+        S,
+      ],
+    ]);
+    expect(e.transform.scale).toEqual({ x: 1, y: 1, z: 1 });
   });
   it('reverts the preview and reports the reason on reject', async () => {
     const e = entity();

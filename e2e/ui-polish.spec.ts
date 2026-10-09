@@ -13,7 +13,7 @@ test.afterAll(async () => {
   await table?.stop();
 });
 
-test('spawns at the scene centre, offsets the next spawn, and the panels are a drawer over a full-window board', async ({
+test('spawns at the scene centre, offsets the next spawn, and panels overlay a full-window board', async ({
   browser,
 }, testInfo) => {
   if (!table) throw new Error('table not started');
@@ -37,13 +37,13 @@ test('spawns at the scene centre, offsets the next spawn, and the panels are a d
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
-  // Opening a panel overlays the board: the board keeps its size and the drawer sits beside it.
+  // Opening a tool panel overlays the board: the board keeps its size and the dock sits beside it.
   const openBox = await board.boundingBox();
   expect(openBox).toEqual(closedBox);
-  const drawer = page.locator('.ui-drawer');
-  const drawerBox = await drawer.boundingBox();
-  expect(drawerBox?.x).toBeGreaterThan(600);
-  expect(Math.round((drawerBox?.y ?? 0) + (drawerBox?.height ?? 0))).toBe(720);
+  const dock = page.getByRole('complementary', { name: 'Tool panels' });
+  const dockBox = await dock.boundingBox();
+  expect(dockBox?.x).toBeGreaterThan(600);
+  expect((dockBox?.height ?? 0) + (dockBox?.y ?? 0)).toBeLessThanOrEqual(720);
 
   await page.getByLabel('Token name').fill('Goblin');
   await page.getByLabel('Colour (no image)').fill('#cc3322');
@@ -71,8 +71,8 @@ test('spawns at the scene centre, offsets the next spawn, and the panels are a d
   await page.waitForTimeout(500);
   await page.screenshot({ path: testInfo.outputPath('drawer-1280.png') });
 
-  await drawer.getByRole('button', { name: /^Close/ }).click();
-  await expect(drawer).toHaveCount(0);
+  await dock.getByRole('button', { name: 'Close Entities panel' }).click();
+  await expect(dock.getByRole('button', { name: 'Restore Entities panel' })).toBeVisible();
   expect(errors).toEqual([]);
   await context.close();
 });

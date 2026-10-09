@@ -11,13 +11,13 @@ import {
 } from '../tools/aoe-placement.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { selectionStore } from '../tools/selection-store.js';
+import { useJoinEnv } from './join-context.js';
 import { useSubmit } from './submit.js';
 
 const KINDS: AoEKind[] = ['sphere', 'cylinder', 'cone', 'cube', 'line'];
-const CHECK_ID = '01H00000000000000000000000';
-
 /** All controls are DOM labels. The tool draft and preview are local to this browser. */
 export function AoEToolPanel({ scene }: { scene: Scene | null }) {
+  const join = useJoinEnv();
   const campaign = useClientStore((s) => s.campaign);
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
@@ -27,7 +27,11 @@ export function AoEToolPanel({ scene }: { scene: Scene | null }) {
   const busy = useStore(aoeToolStore, (s) => s.busy);
   const error = useStore(aoeToolStore, (s) => s.error);
   const { send, error: submitError } = useSubmit();
-  const actor: Actor | null = isHost ? { kind: 'host' } : seatId ? { kind: 'seat', seatId } : null;
+  const actor: Actor | null = isHost
+    ? { kind: 'host', identityId: join?.identityId }
+    : seatId
+      ? { kind: 'seat', seatId, identityId: join?.identityId }
+      : null;
   const entity = useMemo(() => {
     if (!scene || selected.length !== 1) return null;
     const candidate = scene.entities[selected[0] ?? ''];
@@ -38,7 +42,13 @@ export function AoEToolPanel({ scene }: { scene: Scene | null }) {
     !!campaign &&
     !!scene &&
     !!actor &&
-    canPerform(campaign, actor, 'aoe.place', aoePlacePayload(scene.id, CHECK_ID, draft, scene));
+    !!join &&
+    canPerform(
+      campaign,
+      actor,
+      'aoe.place',
+      aoePlacePayload(scene.id, join.identityId, draft, scene),
+    );
   const canUpdate =
     !!campaign &&
     !!scene &&
@@ -145,7 +155,10 @@ export function AoEToolPanel({ scene }: { scene: Scene | null }) {
               }}
             />
           </label>
-          <p>Click to place; drag to aim. Elevation defaults to the surface below.</p>
+          <p>
+            Click to place; drag to aim. Right-click your AoE to remove it. Elevation defaults to
+            the surface below.
+          </p>
         </>
       )}
       {entity && (

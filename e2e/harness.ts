@@ -136,7 +136,7 @@ async function linuxProcessMetrics(
  * Starts a fresh host on a free port with a temporary data dir, then the Vite client pointed at
  * it. Needs `pnpm build` first: the host runs from `packages/host/dist`.
  */
-export async function startTable(): Promise<Table> {
+export async function startTable(options: { publicUrl?: string } = {}): Promise<Table> {
   const dataDir = await mkdtemp(join(tmpdir(), 'mythic-e2e-'));
   const children: ChildProcess[] = [];
   let host: ChildProcess | undefined;
@@ -154,6 +154,7 @@ export async function startTable(): Promise<Table> {
         MYTHIC_PORT: String(port),
         MYTHIC_DATA_DIR: dataDir,
         MYTHIC_TEST_ENDPOINTS: '1',
+        ...(options.publicUrl !== undefined ? { MYTHIC_PUBLIC_URL: options.publicUrl } : {}),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

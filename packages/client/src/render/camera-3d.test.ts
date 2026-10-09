@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   clampOrbit,
   clampTargetToGround,
+  cameraPointerMode,
   dampVelocity,
   DEFAULT_FOV_DEGREES,
   defaultOrbit,
@@ -47,6 +48,17 @@ function invariants(o: Orbit3D) {
 }
 
 describe('camera-3d', () => {
+  it('maps right to orbit and middle or available left to pan', () => {
+    expect(cameraPointerMode('mouse', 2, true)).toBe('orbit');
+    expect(cameraPointerMode('mouse', 2, false)).toBe('orbit');
+    expect(cameraPointerMode('mouse', 1, true)).toBe('pan');
+    expect(cameraPointerMode('mouse', 1, false)).toBe('pan');
+    expect(cameraPointerMode('mouse', 0, true)).toBe('pan');
+    expect(cameraPointerMode('mouse', 0, false)).toBeNull();
+    expect(cameraPointerMode('mouse', 3, true)).toBeNull();
+    expect(cameraPointerMode('touch', 0, false)).toBe('orbit');
+  });
+
   it('clampOrbit always satisfies every invariant', () => {
     fc.assert(
       fc.property(orbitArb, (o) => {

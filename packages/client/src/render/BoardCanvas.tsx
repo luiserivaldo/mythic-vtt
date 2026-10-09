@@ -14,21 +14,20 @@ import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
 import { RulerTool } from './RulerTool.js';
 import { RulerToggle } from './RulerToggle.js';
+import { rulerStore } from '../tools/ruler-store.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
-import { TransformPanel } from '../ui/TransformPanel.js';
 import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
 import { outsideColor } from './canvas-style.js';
 import type { GroundBounds } from './camera-3d.js';
 import { useViewMode, type ViewMode } from './view-mode-store.js';
 import { useViewDirector } from './use-view-director.js';
 import { ViewToggle } from './ViewToggle.js';
-import { AoEToolPanel } from '../ui/AoEToolPanel.js';
 import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
-import { AoEAffectedPanel } from '../ui/AoEAffectedPanel.js';
 import { RenderDiagnostics } from './RenderDiagnostics.js';
+import { ToolPanelDock } from '../ui/ToolPanelDock.js';
 import { isReadOnlyViewer } from '../ui/viewer.js';
 
 const OrbitControls3D = lazy(async () => {
@@ -42,10 +41,6 @@ const Skybox = lazy(async () => {
 const TransformGizmo3D = lazy(async () => {
   const module = await import('./TransformGizmo3D.js');
   return { default: module.TransformGizmo3D };
-});
-const TransformPanel3D = lazy(async () => {
-  const module = await import('../ui/TransformPanel3D.js');
-  return { default: module.TransformPanel3D };
 });
 
 function BoardScene({
@@ -73,6 +68,7 @@ function BoardScene({
 }) {
   const invalidate = useThree((state) => state.invalidate);
   const aoeActive = useStore(aoeToolStore, (s) => s.active);
+  const rulerActive = useStore(rulerStore, (s) => s.tool);
   const localDrag = useStore(tokenDragStore, (state) => state.local);
   const shown = useMemo(() => withLocalDrag(scene, localDrag), [scene, localDrag]);
   useEffect(() => {
@@ -107,6 +103,7 @@ function BoardScene({
             orbitRef={director.orbitRef}
             applyRef={director.applyRef}
             keepInitialOrbit={director.keepInitialOrbit}
+            leftPanEnabled={!aoeActive && !rulerActive}
           />
         </Suspense>
       ) : (
@@ -127,8 +124,8 @@ function BoardScene({
       {grid && (
         <GridLines grid={grid} fill={scene?.background ?? DEFAULT_BACKGROUND} renderOrder={-1} />
       )}
-      {/* M1-18: TokenDrag claims a press on a selected, movable token (pointer-claims) so only
-          empty board pans. */}
+      {/* M1-28: TokenDrag claims a press on any movable token without selecting it first, while
+          empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
       {!readOnly && <RulerTool mode={mode3d ? '3d' : '2d'} />}
       {!readOnly && !aoeActive && <TokenDrag />}
@@ -158,7 +155,6 @@ function BoardScene({
 /** Single on-demand Three scene for the active host-filtered Scene. */
 export function BoardCanvas() {
   const viewMode = useViewMode();
-  const aoeActive = useStore(aoeToolStore, (s) => s.active);
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
   const [additiveMode, setAdditiveMode] = useState(false);
@@ -223,22 +219,12 @@ export function BoardCanvas() {
               Reset view
             </button>
             <span className="ui-camera-hint">
-              3D mouse: right or middle drag orbit · Shift+drag pan · wheel zoom · left select/tools
+              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom
             </span>
           </>
         )}
       </div>
-      {!readOnly && <AoEToolPanel scene={source} />}
-      {!readOnly && <AoEAffectedPanel scene={source} />}
-      {!readOnly &&
-        !aoeActive &&
-        (mode3d ? (
-          <Suspense fallback={<span role="status">Loading 3D tools…</span>}>
-            <TransformPanel3D />
-          </Suspense>
-        ) : (
-          <TransformPanel />
-        ))}
+      <ToolPanelDock campaign={campaign} scene={source} mode3d={mode3d} />
       <Canvas
         frameloop="demand"
         shadows={false}

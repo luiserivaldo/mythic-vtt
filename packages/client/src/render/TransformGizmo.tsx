@@ -10,6 +10,7 @@ import {
   applyRotate,
   applyScale,
   draftFromEntity,
+  entityScale,
   entityExtents,
   handleLayout,
   hitHandle,
@@ -76,10 +77,15 @@ export function TransformGizmo() {
   // The host's patch landed (or timed out): hand the entity back to stored state.
   const settling = preview?.settling === true;
   const storedTransform = entity?.transform;
+  const storedTokenSize = entity?.token?.sizeCells;
   useEffect(() => {
     if (!settling) return;
     const p = gizmoStore.getState().preview;
-    if (p && storedTransform && storedTransform !== p.base) {
+    if (
+      p &&
+      storedTransform &&
+      (storedTransform !== p.base || storedTokenSize !== p.baseTokenSize)
+    ) {
       gizmoStore.getState().clear();
       invalidate();
       return;
@@ -91,7 +97,7 @@ export function TransformGizmo() {
     return () => {
       clearTimeout(timer);
     };
-  }, [settling, storedTransform, invalidate]);
+  }, [settling, storedTransform, storedTokenSize, invalidate]);
 
   useEffect(() => {
     if (!entityId) return;
@@ -123,8 +129,8 @@ export function TransformGizmo() {
       if (!t || !d) return;
       const zoom = view().zoom;
       const extents = entityExtents(t.entity);
-      const half =
-        (Math.max(extents.width, extents.depth) * d.scale) / (t.entity.transform.scale.x || 1) / 2;
+      const baseScale = entityScale(t.entity) || 1;
+      const half = (Math.max(extents.width, extents.depth) * d.scale) / baseScale / 2;
       const layout = handleLayout({ x: d.x, z: d.z }, d.yaw, half, 1 / zoom);
       const point = toWorld(e);
       const kind = hitHandle(point, layout, HANDLE_HIT_PX / zoom);
@@ -140,6 +146,7 @@ export function TransformGizmo() {
         entityId: t.entity.id,
         draft: d,
         base: t.entity.transform,
+        baseTokenSize: t.entity.token?.sizeCells,
       });
       invalidate();
     };
@@ -257,7 +264,7 @@ export function TransformGizmo() {
 
   const wpp = 1 / pxPerUnit;
   const extents = entityExtents(entity);
-  const baseScale = entity.transform.scale.x || 1;
+  const baseScale = entityScale(entity) || 1;
   const ratio = draft.scale / baseScale;
   const width = extents.width * ratio;
   const depth = extents.depth * ratio;

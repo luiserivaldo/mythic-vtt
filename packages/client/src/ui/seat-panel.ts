@@ -63,6 +63,45 @@ export interface RosterOption {
   label: string;
 }
 
+export interface ConnectedIdentityRow {
+  key: string;
+  displayName: string;
+  seatLabel: string;
+  roleLabel: 'Co-DM' | 'Player' | 'Spectator';
+}
+
+/** M1-39: the host-only presence feed, joined to seat labels without exposing it to other clients. */
+export function connectedIdentityRows(
+  campaign: Campaign,
+  presence:
+    readonly { seatId: string; connected: boolean; displayName?: string | undefined }[] | null,
+  unseated: readonly { identityId: string; displayName: string }[] | undefined,
+): ConnectedIdentityRow[] {
+  const rows: ConnectedIdentityRow[] = [];
+  for (const entry of presence ?? []) {
+    if (!entry.connected) continue;
+    const seat = campaign.seats[entry.seatId];
+    if (!seat) continue;
+    rows.push({
+      key: `seat-${seat.id}`,
+      displayName: entry.displayName ?? 'Unnamed player',
+      seatLabel: seat.label,
+      roleLabel: seat.role === 'codm' ? 'Co-DM' : 'Player',
+    });
+  }
+  for (const entry of unseated ?? []) {
+    rows.push({
+      key: `identity-${entry.identityId}`,
+      displayName: entry.displayName,
+      seatLabel: 'Unseated',
+      roleLabel: 'Spectator',
+    });
+  }
+  return rows.sort(
+    (a, b) => a.displayName.localeCompare(b.displayName) || a.seatLabel.localeCompare(b.seatLabel),
+  );
+}
+
 /** M1-11: connected identities without a seat, as dropdown options for `seat.assign`. */
 export function rosterOptions(
   unseated: readonly { identityId: string; displayName: string }[] | undefined,

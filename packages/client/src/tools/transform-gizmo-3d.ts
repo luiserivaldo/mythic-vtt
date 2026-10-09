@@ -5,7 +5,7 @@ import {
   type Campaign,
   type Entity,
 } from '@mythic/shared';
-import type { GizmoDraft, GizmoTarget } from './transform-gizmo.js';
+import { entityScale, type GizmoDraft, type GizmoTarget } from './transform-gizmo.js';
 
 export interface Vec3Like {
   x: number;
@@ -122,14 +122,14 @@ export function rotateDraft(
 }
 
 export function draft3dFromEntity(entity: Entity): GizmoDraft {
-  const { position, rotation, scale } = entity.transform;
+  const { position, rotation } = entity.transform;
   return {
     x: position.x,
     y: position.y,
     z: position.z,
     yaw: yawFromQuaternion(rotation),
     rotation,
-    scale: scale.x,
+    scale: entityScale(entity),
   };
 }
 
