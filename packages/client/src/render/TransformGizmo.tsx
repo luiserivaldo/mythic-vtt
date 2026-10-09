@@ -24,6 +24,8 @@ import { useGizmoTarget } from '../tools/use-gizmo-target.js';
 import { screenToWorld, type View2D } from './camera-2d.js';
 import { GIZMO_MOVE_COLOR, GIZMO_ROTATE_COLOR, GIZMO_SCALE_COLOR } from './canvas-style.js';
 import { pointerClaims } from './pointer-claims.js';
+import { assetUrl } from '../assets/asset-url.js';
+import { mapTextureAspect, useMapTexture } from './use-texture.js';
 
 const SQUARE = new Float32Array([-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5]);
 const COLOR = GIZMO_MOVE_COLOR;
@@ -52,12 +54,16 @@ export function TransformGizmo() {
   const [pxPerUnit, setPxPerUnit] = useState(48);
 
   const entity = target?.entity ?? null;
+  const texture = useMapTexture(
+    entity?.layer === 'map' && entity.image ? assetUrl('', entity.image.asset) : null,
+  );
+  const imageAspect = mapTextureAspect(texture);
   const live = preview && entity && preview.entityId === entity.id ? preview.draft : null;
   const draft = useMemo(() => live ?? (entity ? draftFromEntity(entity) : null), [live, entity]);
 
   // Latest values for the long-lived native listeners.
-  const latest = useRef({ target, draft, submit });
-  latest.current = { target, draft, submit };
+  const latest = useRef({ target, draft, submit, imageAspect });
+  latest.current = { target, draft, submit, imageAspect };
 
   useFrame(({ camera }) => {
     const zoom = (camera as OrthographicCamera).zoom;
@@ -128,7 +134,7 @@ export function TransformGizmo() {
       const { target: t, draft: d } = latest.current;
       if (!t || !d) return;
       const zoom = view().zoom;
-      const extents = entityExtents(t.entity);
+      const extents = entityExtents(t.entity, latest.current.imageAspect);
       const baseScale = entityScale(t.entity) || 1;
       const half = (Math.max(extents.width, extents.depth) * d.scale) / baseScale / 2;
       const layout = handleLayout({ x: d.x, z: d.z }, d.yaw, half, 1 / zoom);
@@ -160,7 +166,7 @@ export function TransformGizmo() {
       const center = { x: start.x, z: start.z };
       let next: GizmoDraft;
       if (drag.kind === 'move') {
-        const extents = entityExtents(t.entity);
+        const extents = entityExtents(t.entity, latest.current.imageAspect);
         const moved = applyMove({
           start: center,
           pointerStart: drag.pointerStart,
@@ -263,7 +269,7 @@ export function TransformGizmo() {
   if (!target || !entity || !draft) return null;
 
   const wpp = 1 / pxPerUnit;
-  const extents = entityExtents(entity);
+  const extents = entityExtents(entity, imageAspect);
   const baseScale = entityScale(entity) || 1;
   const ratio = draft.scale / baseScale;
   const width = extents.width * ratio;

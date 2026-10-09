@@ -5,7 +5,8 @@ import { DoubleSide } from 'three';
 import { assetUrl } from '../assets/asset-url.js';
 import { worldToLocal } from '../tools/battlemap-calibration.js';
 import { calibrationStore } from '../tools/battlemap-store.js';
-import { useMapTexture } from './use-texture.js';
+import { mapTextureAspect, useMapTexture } from './use-texture.js';
+import { gizmoStore } from '../tools/gizmo-store.js';
 import type { RenderEntity } from './scene-model.js';
 import { SELECTION_COLOR } from './canvas-style.js';
 
@@ -39,11 +40,16 @@ export function MapImageMesh({
     invalidate();
   }, [points, calibrating, invalidate]);
 
-  const image =
-    entry.status === 'ready' ? (entry.texture.image as { width: number; height: number }) : null;
-  const aspect = image && image.width > 0 && image.height > 0 ? image.width / image.height : 1;
-  const scale = mapImage.scale;
-  const [px, py, pz] = entity.position;
+  const aspect = mapTextureAspect(entry);
+  const preview = useStore(gizmoStore, (state) => state.preview);
+  const draft = preview?.entityId === entity.id ? preview.draft : null;
+  const scale = draft?.scale ?? mapImage.scale;
+  const [storedX, py, storedZ] = entity.position;
+  const px = draft?.x ?? storedX;
+  const pz = draft?.z ?? storedZ;
+  useEffect(() => {
+    invalidate();
+  }, [draft, invalidate]);
 
   function onClick(event: ThreeEvent<MouseEvent>) {
     if (!calibrating) {
