@@ -45,10 +45,9 @@ test('the DM replaces and quick-deletes their persistent AoE without page errors
     const sceneId = testUlid('SCENE', 404);
     expect((await host.intent('scene.create', { sceneId, name: 'AoE tool board' })).t).toBe('ack');
     const tool = page.getByRole('region', { name: 'AoE tool' });
-    const toggle = tool.getByRole('button', { name: 'AoE placement' });
-    await expect(toggle).toBeVisible();
-    await toggle.click();
-    await tool.getByLabel('AoE shape').selectOption('cone');
+    await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+    await page.getByText('Measurement shapes', { exact: true }).click();
+    await page.getByLabel('Measurement shape').selectOption('cone');
     await tool.getByLabel('AoE rotation').fill('90');
     const canvas = page.locator('canvas');
     const box = await canvas.boundingBox();

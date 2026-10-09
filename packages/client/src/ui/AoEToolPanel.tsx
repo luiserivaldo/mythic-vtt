@@ -16,7 +16,13 @@ import { useSubmit } from './submit.js';
 
 const KINDS: AoEKind[] = ['sphere', 'cylinder', 'cone', 'cube', 'line'];
 /** All controls are DOM labels. The tool draft and preview are local to this browser. */
-export function AoEToolPanel({ scene }: { scene: Scene | null }) {
+export function AoEToolPanel({
+  scene,
+  unified = false,
+}: {
+  scene: Scene | null;
+  unified?: boolean;
+}) {
   const join = useJoinEnv();
   const campaign = useClientStore((s) => s.campaign);
   const isHost = useClientStore((s) => s.isHost);
@@ -89,34 +95,38 @@ export function AoEToolPanel({ scene }: { scene: Scene | null }) {
   };
   return (
     <section className="ui-panel ui-overlay ui-aoe-tool" aria-label="AoE tool">
-      <button
-        type="button"
-        aria-pressed={active}
-        disabled={!canPlace}
-        onClick={() => {
-          aoeToolStore.getState().setActive(!active);
-        }}
-      >
-        AoE placement
-      </button>
+      {!unified && (
+        <button
+          type="button"
+          aria-pressed={active}
+          disabled={!canPlace}
+          onClick={() => {
+            aoeToolStore.getState().setActive(!active);
+          }}
+        >
+          AoE placement
+        </button>
+      )}
       {active && (
         <>
-          <label>
-            Shape{' '}
-            <select
-              aria-label="AoE shape"
-              value={draft.kind}
-              onChange={(e) => {
-                aoeToolStore.getState().setDraft({ kind: e.target.value as AoEKind });
-              }}
-            >
-              {KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {kind}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!unified && (
+            <label>
+              Shape{' '}
+              <select
+                aria-label="AoE shape"
+                value={draft.kind}
+                onChange={(e) => {
+                  aoeToolStore.getState().setDraft({ kind: e.target.value as AoEKind });
+                }}
+              >
+                {KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {kind}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             Size ({unit}){' '}
             <input

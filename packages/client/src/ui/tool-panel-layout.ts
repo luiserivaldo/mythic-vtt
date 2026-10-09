@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 
-export const TOOL_PANEL_ORDER = ['entities', 'transform', 'aoe'] as const;
+export const TOOL_PANEL_ORDER = ['entities', 'transform', 'aoe', 'ruler'] as const;
 export type ToolPanelId = (typeof TOOL_PANEL_ORDER)[number];
 
 interface ToolPanelLayoutState {
@@ -14,7 +14,7 @@ interface ToolPanelLayoutState {
 
 export const toolPanelLayoutStore = createStore<ToolPanelLayoutState>()((set) => ({
   entities: 'hidden',
-  collapsed: { transform: false, aoe: false },
+  collapsed: { transform: false, aoe: false, ruler: false },
   toggleEntities: () => {
     set((state) => ({ entities: state.entities === 'open' ? 'collapsed' : 'open' }));
   },

@@ -103,8 +103,8 @@ test('light defaults keep a populated host board readable in 2D and 3D', async (
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   const from = await cellToPixel(page, 13.5, 11.5);
   const to = await cellToPixel(page, 19.5, 11.5);
-  await page.getByRole('button', { name: 'Ruler' }).click();
-  await page.getByLabel('Persistent').check();
+  await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+  await page.getByLabel('Ruler fade').selectOption('linger');
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 6 });

@@ -28,26 +28,23 @@ test('tool panels share an ordered dock and active tools collapse to restore but
 
   const dock = page.getByRole('complementary', { name: 'Tool panels' });
   const panels = dock.locator('[data-tool-panel]');
-  await expect(panels).toHaveCount(3);
+  await expect(panels).toHaveCount(2);
   await expect(panels.nth(0)).toHaveAttribute('data-tool-panel', 'entities');
   await expect(panels.nth(1)).toHaveAttribute('data-tool-panel', 'transform');
-  await expect(panels.nth(2)).toHaveAttribute('data-tool-panel', 'aoe');
-  const boxes = await Promise.all([0, 1, 2].map((index) => panels.nth(index).boundingBox()));
+  const boxes = await Promise.all([0, 1].map((index) => panels.nth(index).boundingBox()));
   expect((boxes[0]?.y ?? 0) + (boxes[0]?.height ?? 0)).toBeLessThanOrEqual(boxes[1]?.y ?? 0);
-  expect((boxes[1]?.y ?? 0) + (boxes[1]?.height ?? 0)).toBeLessThanOrEqual(boxes[2]?.y ?? 0);
 
   await dock.getByRole('button', { name: 'Close Transform panel' }).click();
   await expect(page.getByRole('button', { name: 'Restore Transform panel' })).toBeVisible();
   await page.getByRole('button', { name: 'Restore Transform panel' }).click();
 
-  const aoe = page.getByRole('region', { name: 'AoE tool' });
-  const placement = aoe.getByRole('button', { name: 'AoE placement' });
-  await placement.click();
-  await expect(placement).toHaveAttribute('aria-pressed', 'true');
-  await dock.getByRole('button', { name: 'Close AoE panel' }).click();
-  await expect(page.getByRole('button', { name: 'Restore AoE panel' })).toBeVisible();
-  await page.getByRole('button', { name: 'Restore AoE panel' }).click();
-  await expect(placement).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+  await page.getByText('Measurement shapes', { exact: true }).click();
+  await page.getByLabel('Measurement shape').selectOption('cone');
+  await dock.getByRole('button', { name: 'Close Ruler panel' }).click();
+  await expect(page.getByRole('button', { name: 'Restore Ruler panel' })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore Ruler panel' }).click();
+  await expect(page.getByLabel('Measurement shape')).toHaveValue('cone');
 
   await dock.getByRole('button', { name: 'Close Entities panel' }).click();
   await expect(page.getByRole('button', { name: 'Restore Entities panel' })).toBeVisible();

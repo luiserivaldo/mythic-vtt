@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useStore } from 'zustand';
 import { rulerStore } from '../tools/ruler-store.js';
+import { aoeToolStore } from '../tools/aoe-tool-store.js';
+import { activateMeasurement } from '../tools/measurement-tool.js';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -10,12 +12,14 @@ function isTypingTarget(target: EventTarget | null): boolean {
 /** Board toolbar button plus the `R` shortcut for the Ruler tool (MEAS-01). Available to everyone. */
 export function RulerToggle() {
   const armed = useStore(rulerStore, (s) => s.tool);
-  const persistent = useStore(rulerStore, (s) => s.persistent);
+  const aoeActive = useStore(aoeToolStore, (s) => s.active);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'r' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
       if (isTypingTarget(e.target)) return;
-      rulerStore.getState().setTool(!rulerStore.getState().tool);
+      activateMeasurement(
+        rulerStore.getState().tool || aoeToolStore.getState().active ? null : 'distance',
+      );
     };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -26,24 +30,14 @@ export function RulerToggle() {
     <>
       <button
         type="button"
-        aria-pressed={armed}
+        aria-pressed={armed || aoeActive}
         title="Measure distance (R). Drag for a quick measure; click for waypoints; Esc clears"
         onClick={() => {
-          rulerStore.getState().setTool(!armed);
+          activateMeasurement(armed || aoeActive ? null : 'distance');
         }}
       >
         Ruler
       </button>
-      <label title="Keep a completed ruler until the next measure or right click">
-        <input
-          type="checkbox"
-          checked={persistent}
-          onChange={(event) => {
-            rulerStore.getState().setPersistent(event.currentTarget.checked);
-          }}
-        />
-        Persistent
-      </label>
     </>
   );
 }
