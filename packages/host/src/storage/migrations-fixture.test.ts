@@ -1,3 +1,4 @@
+import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { mkdtempSync } from 'node:fs';
@@ -28,7 +29,7 @@ describe('golden save v1 through the shared migrate hook', () => {
       expect(campaign).toMatchObject({
         id: campaignId,
         name: 'The Sunken Chapel',
-        schemaVersion: 1,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
       });
       expect(Object.keys(campaign.seats)).toHaveLength(2);
       expect(scenes.map((s) => s.name)).toEqual(['Flooded Nave']);
