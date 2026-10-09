@@ -38,7 +38,9 @@ describe('AoE placement', () => {
   it('maps every kind to its geometry dimensions and host-valid place/update payload', () => {
     for (const kind of ['sphere', 'cylinder', 'cone', 'cube', 'line'] as const) {
       const payload = aoePlacePayload(S, E, { ...draft, kind }, scene);
-      expect(canPerform(campaign, { kind: 'host' }, 'aoe.place', payload)).toBe(true);
+      expect(canPerform(campaign, { kind: 'host', identityId: E }, 'aoe.place', payload)).toBe(
+        true,
+      );
       const withEntity = { ...scene, entities: { [E]: payload.entity } };
       expect(
         canPerform(

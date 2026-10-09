@@ -5,7 +5,7 @@ import { AoEShape } from '../schema/index.js';
 import { tokensInAoE } from '../geometry/index.js';
 import { aoePlace } from './aoe.place.js';
 import { reduceAction } from './run.js';
-import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix, testId } from './testing.js';
+import { ACTORS, IDS, makeCampaign, makeEntity, testId } from './testing.js';
 
 const T = 'aoe.place';
 const aoeId = testId(12);
@@ -14,11 +14,13 @@ const entity = {
   aoe: { kind: 'sphere' as const, radius: 4, color: '#ff4400' },
 };
 const payload = { sceneId: IDS.scene, entity };
+const host = { ...ACTORS.host, identityId: aoeId } as const;
+const coDm = { ...ACTORS.coDm, identityId: aoeId } as const;
 const envelope = (p: unknown = payload): ActionEnvelope => ({
   id: IDS.action,
   type: T,
   payload: p,
-  actor: ACTORS.host,
+  actor: host,
   campaignId: IDS.campaign,
   sceneId: IDS.scene,
   sessionId: IDS.session,
@@ -52,15 +54,18 @@ describe(`${T} schema`, () => {
 });
 
 describe(`${T} permissions`, () => {
-  it('allows host and co-DM but denies players, spectators and mods by default', () => {
-    expect(permissionMatrix(makeCampaign(), T, payload)).toEqual({
-      host: true,
-      owner: false,
-      otherSeat: false,
-      coDm: true,
-      spectator: false,
-      mod: false,
-    });
+  it('allows host and co-DM identities but denies non-admin and mismatched identities', () => {
+    const state = makeCampaign();
+    expect(aoePlace.permission(state, host, payload)).toBe(true);
+    expect(aoePlace.permission(state, coDm, payload)).toBe(true);
+    expect(aoePlace.permission(state, { ...ACTORS.owner, identityId: aoeId }, payload)).toBe(false);
+    expect(aoePlace.permission(state, { ...ACTORS.spectator, identityId: aoeId }, payload)).toBe(
+      false,
+    );
+    expect(aoePlace.permission(state, ACTORS.host, payload)).toBe(false);
+    expect(
+      aoePlace.permission(state, { ...ACTORS.host, identityId: IDS.otherIdentity }, payload),
+    ).toBe(false);
   });
 
   it('does not let a seat-level edit grant bypass admin-only placement', () => {
@@ -68,22 +73,26 @@ describe(`${T} permissions`, () => {
     const seat = state.seats[IDS.owner];
     if (seat) seat.permissions.edit = true;
     const owned = { ...payload, entity: { ...entity, owners: [IDS.owner] } };
-    expect(aoePlace.permission(state, ACTORS.owner, owned)).toBe(false);
+    expect(aoePlace.permission(state, { ...ACTORS.owner, identityId: aoeId }, owned)).toBe(false);
   });
 
   it('keeps DM-layer placement host-only', () => {
     const hidden = { ...payload, entity: { ...entity, layer: 'dm' as const } };
-    expect(aoePlace.permission(makeCampaign(), ACTORS.host, hidden)).toBe(true);
-    expect(aoePlace.permission(makeCampaign(), ACTORS.coDm, hidden)).toBe(false);
+    expect(aoePlace.permission(makeCampaign(), host, hidden)).toBe(true);
+    expect(aoePlace.permission(makeCampaign(), coDm, hidden)).toBe(false);
   });
 
-  it('rejects duplicate ids, unknown owners and locked layers', () => {
-    const duplicate = makeCampaign();
-    const scene = duplicate.scenes[IDS.scene];
-    if (scene) scene.entities[aoeId] = entity;
-    expect(aoePlace.permission(duplicate, ACTORS.host, payload)).toBe(false);
+  it('allows replacing the same identity AoE but rejects a collision, unknown owners and locks', () => {
+    const replacement = makeCampaign();
+    const scene = replacement.scenes[IDS.scene];
+    if (scene) scene.entities[aoeId] = { ...entity, name: 'Previous AoE' };
+    expect(aoePlace.permission(replacement, host, payload)).toBe(true);
+    const collision = makeCampaign();
+    const collisionScene = collision.scenes[IDS.scene];
+    if (collisionScene) collisionScene.entities[aoeId] = makeEntity(aoeId);
+    expect(aoePlace.permission(collision, host, payload)).toBe(false);
     expect(
-      aoePlace.permission(makeCampaign(), ACTORS.host, {
+      aoePlace.permission(makeCampaign(), host, {
         ...payload,
         entity: { ...entity, owners: [testId(24)] },
       }),
@@ -91,17 +100,36 @@ describe(`${T} permissions`, () => {
     const locked = makeCampaign();
     const lockedScene = locked.scenes[IDS.scene];
     if (lockedScene) lockedScene.layers.effects = { locked: true };
-    expect(aoePlace.permission(locked, ACTORS.host, payload)).toBe(false);
+    expect(aoePlace.permission(locked, host, payload)).toBe(false);
   });
 });
 
 describe(`${T} reducer and visibility`, () => {
-  it('places the AoE deterministically without mutating the input', () => {
+  it('replaces only the placing identity AoE without mutating the input', () => {
     const before = makeCampaign();
+    const otherId = IDS.otherIdentity;
+    const otherAoE = {
+      ...makeEntity(otherId, { layer: 'effects', name: 'Other user AoE' }),
+      aoe: { kind: 'sphere' as const, radius: 2, color: '#0088ff' },
+    };
+    const scene = before.scenes[IDS.scene];
+    if (scene) {
+      scene.entities[aoeId] = { ...entity, name: 'Previous AoE' };
+      scene.entities[otherId] = otherAoE;
+    }
     const result = reduceAction(before, envelope());
     expect(result.state.scenes[IDS.scene]?.entities[aoeId]).toEqual(entity);
-    expect(before.scenes[IDS.scene]?.entities[aoeId]).toBeUndefined();
-    expect(result).toEqual(reduceAction(makeCampaign(), envelope()));
+    expect(result.state.scenes[IDS.scene]?.entities[otherId]).toEqual(otherAoE);
+    expect(before.scenes[IDS.scene]?.entities[aoeId]?.name).toBe('Previous AoE');
+  });
+
+  it('sends an effects-layer AoE to players and spectators', () => {
+    const before = makeCampaign();
+    const result = reduceAction(before, envelope());
+    for (const audience of [{ kind: 'seat', seatId: IDS.owner }, { kind: 'spectators' }] as const)
+      expect(JSON.stringify(patchesFor(audience, before, result.state, result.patches))).toContain(
+        'Fireball',
+      );
   });
 
   it('does not send an AoE placed on the DM layer to players or spectators', () => {
