@@ -100,6 +100,71 @@ test('the marker picker syncs, persists and never sends private markers', async 
   await newcomer.waitFor('private snapshot', () => newcomer.state !== undefined);
   expect(newcomer.frames.join('\n')).not.toMatch(/Secret curse|Moon marked|blinded/);
   expect(token(newcomer)?.statusMarkers).toBeUndefined();
+  // The owner can resize this token, but its DM-only marker list is not theirs to replace.
+  const playerIdentity = { identityId: testUlid('PLAYER', 1), identitySecret: 'marker-owner' };
+  const seatId = testUlid('SEAT', 1);
+  expect(await host.intent('seat.create', { seatId, label: 'Owner' })).toMatchObject({ t: 'ack' });
+  expect(
+    await host.intent('seat.assign', { seatId, identityId: playerIdentity.identityId }),
+  ).toMatchObject({ t: 'ack' });
+  expect(
+    await host.intent('permission.update', {
+      target: 'seat',
+      seatId,
+      permissions: { edit: true, move: true },
+    }),
+  ).toMatchObject({ t: 'ack' });
+  expect(
+    await host.intent('entity.setOwners', { sceneId, entityId, owners: [seatId] }),
+  ).toMatchObject({ t: 'ack' });
+  const player = await RawClient.connect(table, { name: 'Owner', ...playerIdentity });
+  await player.waitFor('owner snapshot', () => token(player) !== undefined);
+  expect(token(player)?.statusMarkers).toBeUndefined();
+  expect(
+    await player.intent('token.setStatusMarkers', {
+      sceneId,
+      entityId,
+      markers: [{ kind: 'text', text: 'Replacement' }],
+    }),
+  ).toMatchObject({ t: 'reject' });
+  const playerContext = await browser.newContext();
+  await playerContext.addInitScript(
+    ({ identity, seatId }) => {
+      localStorage.setItem('mythic.identity.v1', JSON.stringify(identity));
+      localStorage.setItem(
+        'mythic.profile.v1',
+        JSON.stringify({ displayName: 'Owner', lastSeatId: seatId }),
+      );
+    },
+    { identity: playerIdentity, seatId },
+  );
+  const playerPage = await playerContext.newPage();
+  const playerErrors: string[] = [];
+  playerPage.on('pageerror', (error) => playerErrors.push(error.message));
+  await playerPage.goto(table.clientUrl);
+  const canvasBox = await playerPage.locator('canvas').boundingBox();
+  if (!canvasBox) throw new Error('canvas missing');
+  await expect(async () => {
+    await playerPage.mouse.click(
+      canvasBox.x + canvasBox.width / 2,
+      canvasBox.y + canvasBox.height / 2,
+    );
+    await expect(playerPage.getByLabel('Size (cells)')).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await playerPage.getByRole('button', { name: 'Restore Token panel' }).click();
+  await expect(playerPage.getByRole('region', { name: 'Token status markers' })).toHaveCount(0);
+  await expect(playerPage.getByRole('button', { name: 'Add custom marker' })).toHaveCount(0);
+  await playerPage.getByLabel('Size (cells)').fill('2');
+  await playerPage.getByLabel('Size (cells)').press('Enter');
+  await host.waitFor('owner resize', () => token(host)?.sizeCells === 2);
+  expect(token(host)?.statusMarkers).toEqual([
+    { kind: 'icon', icon: 'blinded' },
+    { kind: 'text', text: 'Moon marked' },
+    { kind: 'text', text: 'Secret curse' },
+  ]);
+  await player.waitForSeq(host.lastSeq);
+  expect(token(player)?.statusMarkers).toBeUndefined();
+  expect(player.frames.join('\n')).not.toMatch(/Secret curse|Moon marked|blinded/);
   const privateToken = token(host);
   expect(
     await host.intent('entity.update', {
@@ -109,6 +174,7 @@ test('the marker picker syncs, persists and never sends private markers', async 
     }),
   ).toMatchObject({ t: 'ack' });
   await observer.waitFor('revealed markers', () => token(observer)?.statusMarkers?.length === 3);
+  await expect(playerPage.getByRole('region', { name: 'Token status markers' })).toBeVisible();
   await expect(panel.getByRole('list')).toContainText('Secret curse');
   await panel.getByRole('button', { name: 'Remove marker 3' }).click();
   await observer.waitFor('marker removed', () => token(observer)?.statusMarkers?.length === 2);
@@ -122,6 +188,9 @@ test('the marker picker syncs, persists and never sends private markers', async 
   await expect(panel.getByRole('listitem')).toHaveCount(2);
   await expect(panel.getByRole('list')).toContainText('Moon marked');
   expect(errors).toEqual([]);
+  expect(playerErrors).toEqual([]);
+  await playerContext.close();
+  await player.close();
   await newcomer.close();
   await observer.close();
   await host.close();

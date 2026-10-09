@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Id, TokenStatusMarkers } from '../schema/index.js';
 import { defineAction } from './define.js';
-import { canUseEntity, isLayerLocked } from './entity-access.js';
+import { canUseEntity, canReadEntityLabel, isLayerLocked } from './entity-access.js';
 
 export const tokenSetStatusMarkers = defineAction({
   type: 'token.setStatusMarkers',
@@ -13,7 +13,8 @@ export const tokenSetStatusMarkers = defineAction({
       scene &&
       entity?.token &&
       !isLayerLocked(scene, entity.layer) &&
-      canUseEntity(state, actor, entity, 'edit')
+      canUseEntity(state, actor, entity, 'edit') &&
+      canReadEntityLabel(state, actor, entity)
     );
   },
   reduce: (draft, action) => {

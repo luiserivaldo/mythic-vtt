@@ -1,5 +1,6 @@
 import {
   canPerform,
+  canReadEntityLabel,
   StatusIcon,
   TokenStatusMarker,
   TokenStatusMarkers,
@@ -64,6 +65,7 @@ export function TokenStatusPanel({
       payload: { sceneId: scene.id, entityId: entity.id, markers: next },
     });
   };
+  if (!canReadEntityLabel(campaign, actor, entity)) return null;
   return (
     <section aria-label="Token status markers">
       <ul>
