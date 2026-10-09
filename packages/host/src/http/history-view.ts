@@ -43,7 +43,11 @@ function projection(state: Campaign, current: Campaign, audience: Audience): unk
   }
   // Identity bindings are authentication metadata, never history content.
   const seats = Object.fromEntries(
-    Object.entries(state.seats).map(([id, value]) => [id, { ...value, identityId: null }]),
+    Object.entries(state.seats).map(([id, value]) => {
+      const view: Record<string, unknown> = { ...value };
+      delete view['identityId'];
+      return [id, view];
+    }),
   );
   return { ...state, seats, scenes };
 }
