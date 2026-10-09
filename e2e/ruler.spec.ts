@@ -133,7 +133,10 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await player.keyboard.press('r');
   await player.getByLabel('Ruler fade').selectOption('linger');
   await player.getByText('Measurement shapes', { exact: true }).click();
-  await expect(player.getByRole('option', { name: 'Cone', exact: true })).toBeDisabled();
+  await expect(player.getByRole('option', { name: 'Cone', exact: true })).toHaveAttribute(
+    'disabled',
+    '',
+  );
   await expect(player.getByLabel('Measurement shape')).toHaveValue('distance');
   // Preference updates must preserve the user's expanded shape picker.
   await player.getByLabel('Grid snapping').uncheck();
