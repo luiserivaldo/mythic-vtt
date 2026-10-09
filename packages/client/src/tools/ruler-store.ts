@@ -6,6 +6,8 @@ import type { RemoteRuler } from './ruler.js';
 interface RulerState {
   /** The Ruler tool is armed (board toolbar button or `R`). */
   tool: boolean;
+  /** Keep a completed press-drag ruler until it is replaced or explicitly cleared. */
+  persistent: boolean;
   /** `idle` has nothing drawn; `active` is placing waypoints; `finished` keeps the readout up. */
   phase: 'idle' | 'active' | 'finished';
   sceneId: string | null;
@@ -13,6 +15,7 @@ interface RulerState {
   cursor: Vec3 | null;
   remote: Readonly<Record<string, RemoteRuler>>;
   setTool(tool: boolean): void;
+  setPersistent(persistent: boolean): void;
   begin(sceneId: string, first: Vec3): void;
   setPoints(points: readonly Vec3[]): void;
   setCursor(cursor: Vec3 | null): void;
@@ -24,6 +27,7 @@ interface RulerState {
 
 export const rulerStore = createStore<RulerState>()((set) => ({
   tool: false,
+  persistent: false,
   phase: 'idle',
   sceneId: null,
   points: [],
@@ -31,6 +35,9 @@ export const rulerStore = createStore<RulerState>()((set) => ({
   remote: {},
   setTool: (tool) => {
     set(tool ? { tool } : { tool, phase: 'idle', sceneId: null, points: [], cursor: null });
+  },
+  setPersistent: (persistent) => {
+    set({ persistent });
   },
   begin: (sceneId, first) => {
     set({ phase: 'active', sceneId, points: [first], cursor: null });
