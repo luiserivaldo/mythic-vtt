@@ -65,3 +65,5 @@ Found a bug or have an idea? Please open an issue. If you want to help build Myt
 ## Licence
 
 Mythic VTT is licensed under the [GNU Affero General Public License v3.0](LICENSE). "Mythic VTT" and "MythicTomes" are trademarks of MythicTomes.
+
+Selected tokens have a Token panel for persistent reach/aura rings. Set each radius in scene units and choose its colour; rings follow the token in 2D and 3D. Editing requires token edit permission. Saves use schema version 2; version 1 campaigns and sessions migrate without losing data.

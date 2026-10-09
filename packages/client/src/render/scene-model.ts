@@ -28,6 +28,7 @@ export interface RenderEntity {
   position: readonly [number, number, number];
   sizeCells: number;
   secret: boolean;
+  rings?: { radius: number; color: string }[];
   aoe?: Volume | undefined;
   /** Present only for primitive entities (ENV-02). */
   shape?: RenderShape;
@@ -157,6 +158,14 @@ export function mapScene(scene: Scene): RenderScene {
                 asset: entity.image.asset,
                 scale: mapImageScale(entity.transform.scale.x),
               },
+            }
+          : {}),
+        ...(entity.token?.rings
+          ? {
+              rings: entity.token.rings.map((ring) => ({
+                ...ring,
+                radius: ring.radius / scene.grid.unitsPerCell,
+              })),
             }
           : {}),
         ...(entity.token
