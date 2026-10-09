@@ -14,7 +14,8 @@ interface ToolPanelLayoutState {
 
 export const toolPanelLayoutStore = createStore<ToolPanelLayoutState>()((set) => ({
   entities: 'hidden',
-  collapsed: { transform: false, aoe: false, token: false },
+  // Keep optional token details tucked away so selection does not obscure the table.
+  collapsed: { transform: false, aoe: false, token: true },
   toggleEntities: () => {
     set((state) => ({ entities: state.entities === 'open' ? 'collapsed' : 'open' }));
   },

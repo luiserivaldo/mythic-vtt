@@ -62,6 +62,7 @@ test('ring controls synchronize in scene units and survive 2D/3D and reload', as
   await page.goto(table.clientUrl);
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Hero', exact: true }).click();
+  await page.getByRole('button', { name: 'Restore Token panel' }).click();
   const panel = page.getByRole('region', { name: 'Token rings' });
   await panel.getByLabel('Ring radius (ft)').fill('10');
   await panel.getByRole('button', { name: 'Add ring' }).click();
@@ -86,6 +87,7 @@ test('ring controls synchronize in scene units and survive 2D/3D and reload', as
   await page.reload();
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Hero', exact: true }).click();
+  await page.getByRole('button', { name: 'Restore Token panel' }).click();
   await expect(panel.getByRole('list')).toContainText('10 ft');
   await panel.getByRole('button', { name: 'Remove ring 1' }).click();
   await expect(panel.getByRole('listitem')).toHaveCount(0);

@@ -5,7 +5,7 @@ describe('tool panel layout', () => {
   beforeEach(() => {
     toolPanelLayoutStore.setState({
       entities: 'hidden',
-      collapsed: { transform: false, aoe: false, token: false },
+      collapsed: { transform: false, aoe: false, token: true },
     });
   });
 
@@ -27,7 +27,7 @@ describe('tool panel layout', () => {
     toolPanelLayoutStore.getState().restore('aoe');
     expect(toolPanelLayoutStore.getState()).toMatchObject({
       entities: 'open',
-      collapsed: { transform: false, aoe: false, token: false },
+      collapsed: { transform: false, aoe: false, token: true },
     });
   });
 });
