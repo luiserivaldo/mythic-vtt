@@ -19,7 +19,7 @@ import {
 } from '../tools/token-drag.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { tokenDragStore } from '../tools/token-drag-store.js';
-import { EphemeralContext } from '../ui/ephemeral-context.js';
+import { EphemeralContext, isRemoteEphemeralSender } from '../ui/ephemeral-context.js';
 import { SubmitContext } from '../ui/submit.js';
 import { useViewMode } from './view-mode-store.js';
 import { GHOST_COLOR } from './canvas-style.js';
@@ -83,7 +83,12 @@ export function TokenDrag() {
   useEffect(() => {
     const store = tokenDragStore.getState();
     const off = ephemeral?.on((m) => {
-      if (m.channel !== 'token.drag-preview' || !m.from) return;
+      if (
+        m.channel !== 'token.drag-preview' ||
+        !isRemoteEphemeralSender(m.from, ephemeral.identityId)
+      ) {
+        return;
+      }
       const parsed = TokenDragPreview.shape.data.safeParse(m.data);
       if (!parsed.success) return;
       store.setRemote(m.from, { ...parsed.data, at: Date.now() });
@@ -304,6 +309,7 @@ export function TokenDrag() {
         {ghosts.map((g) => (
           <mesh
             key={g.key}
+            name="token-drag-ghost"
             position={[g.to.x, g.to.y + 0.03, g.to.z]}
             rotation={[-Math.PI / 2, 0, 0]}
             renderOrder={900}

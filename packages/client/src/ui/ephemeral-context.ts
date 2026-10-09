@@ -9,3 +9,11 @@ export interface EphemeralApi {
 }
 
 export const EphemeralContext = createContext<EphemeralApi | null>(null);
+
+/** M1-33: the host echoes ephemerals back to their sender; only other senders are remote. */
+export function isRemoteEphemeralSender(
+  from: string | undefined,
+  identityId: string,
+): from is string {
+  return from !== undefined && from !== identityId;
+}

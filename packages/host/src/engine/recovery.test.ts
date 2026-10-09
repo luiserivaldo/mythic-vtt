@@ -1,3 +1,4 @@
+import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,7 +34,7 @@ it('recovers an unclean session from the checkpoint and complete log tail', asyn
   for (const scene of Object.values(campaign.scenes)) await store.saveScene(campaign.id, scene);
   await store.startSession(
     campaign.id,
-    { schemaVersion: 1, sessionId, startedAt: 1 },
+    { schemaVersion: CURRENT_SCHEMA_VERSION, sessionId, startedAt: 1 },
     {
       seq: 0,
       state: campaign,
