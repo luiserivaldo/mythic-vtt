@@ -1,3 +1,4 @@
+import { InitiativeTools } from './ui/InitiativeTools.js';
 import { useClientStore } from './store/react.js';
 import { DmPanels } from './ui/DmPanels.js';
 import { JoinScreen } from './ui/JoinScreen.js';
@@ -25,6 +26,7 @@ export function App() {
       {ready && <IdentityTransfer />}
       {pending > 0 && <p>{pending} action(s) waiting for the host</p>}
       <DmPanels />
+      <InitiativeTools />
       <BoardCanvas />
       <JoinScreen />
     </main>

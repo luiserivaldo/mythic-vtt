@@ -16,6 +16,7 @@ Built by **MythicTomes**. Self-hosting is free and fully featured; optional host
 - **Seats and permissions.** One DM and up to 10 players, with per-token control over who can move what.
 - **Grid and measuring.** Square grid, custom units, diagonal rules, and a ruler that reports horizontal, vertical and total distance.
 - **Battlemaps.** Upload an image, calibrate it to the grid and place tokens.
+- **Rounds.** The DM configures initiative, advances turns and tracks rounds. Private combatants stay out of other clients’ rosters.
 - **Layers and secrets.** Map, token and DM-only layers. Hidden information is never sent to players.
 - **Safe by default.** Every change is recorded: autosave, crash recovery and JSON export.
 - **2D ↔ 3D in one click.** Elevation, platforms, primitive shapes, drop lines and a clamped camera. Everything works in 2D too; 3D only adds information.

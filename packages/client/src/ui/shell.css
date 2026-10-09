@@ -541,3 +541,10 @@ main [tabindex]:focus-visible {
   margin-bottom: 0.25rem;
   overflow-wrap: anywhere;
 }
+
+.ui-initiative-tools {
+  position: absolute;
+  top: 0.5rem;
+  right: 6rem;
+  z-index: 3;
+}

@@ -68,7 +68,23 @@ function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
         if (view !== entity) changed = true;
       }
     }
-    return changed ? { ...scene, entities } : scene;
+    let initiative = scene.initiative;
+    if (initiative) {
+      // HIST-05 / PERM-03: a private combatant must never appear in a public roster or turn.
+      const order = initiative.order.filter((id) => entities[id] !== undefined);
+      const activeEntityId =
+        initiative.activeEntityId !== null && order.includes(initiative.activeEntityId)
+          ? initiative.activeEntityId
+          : null;
+      if (
+        order.length !== initiative.order.length ||
+        activeEntityId !== initiative.activeEntityId
+      ) {
+        initiative = { ...initiative, order, activeEntityId };
+        changed = true;
+      }
+    }
+    return changed ? { ...scene, entities, ...(initiative ? { initiative } : {}) } : scene;
   });
 }
 

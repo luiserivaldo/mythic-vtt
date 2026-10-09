@@ -1,3 +1,4 @@
+import { Initiative } from './initiative.js';
 import { z } from 'zod';
 import { AssetRef } from './asset.js';
 import { Entity } from './entity.js';
@@ -48,6 +49,7 @@ export const Scene = z.object({
   }),
   layers: z.partialRecord(LayerId, z.object({ locked: z.boolean() })),
   entities: z.record(Id, Entity),
+  initiative: Initiative.optional(),
 });
 export type Scene = z.infer<typeof Scene>;
 
