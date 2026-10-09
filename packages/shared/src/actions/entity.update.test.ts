@@ -45,6 +45,12 @@ describe(`${T} schema`, () => {
     expect(entityUpdate.schema.safeParse({ ...payload, changes: { transform: 3 } }).success).toBe(
       false,
     );
+    expect(
+      entityUpdate.schema.safeParse({
+        ...payload,
+        changes: { pin: { text: 'x', reveal: 'click' } },
+      }).success,
+    ).toBe(false);
     expect(entityUpdate.schema.safeParse({ ...payload, extra: true }).success).toBe(false);
   });
 });

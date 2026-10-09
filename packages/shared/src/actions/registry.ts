@@ -21,6 +21,9 @@ import { seatUpdate } from './seat.update.js';
 import { sessionJoin } from './session.join.js';
 import { tokenMove } from './token.move.js';
 import { tokenSetElevation } from './token.setElevation.js';
+import { pinCreate } from './pin.create.js';
+import { pinUpdate } from './pin.update.js';
+import { pinRemove } from './pin.remove.js';
 
 /** Append-only: add new actions at the end to keep merges painless. */
 export const allActions: readonly AnyAction[] = [
@@ -46,6 +49,9 @@ export const allActions: readonly AnyAction[] = [
   aoeUpdate,
   aoeRemove,
   tokenSetElevation,
+  pinCreate,
+  pinUpdate,
+  pinRemove,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

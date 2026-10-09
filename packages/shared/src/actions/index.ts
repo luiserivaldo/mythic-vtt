@@ -24,3 +24,6 @@ export { tokenSetElevation } from './token.setElevation.js';
 export { aoePlace } from './aoe.place.js';
 export { aoeUpdate } from './aoe.update.js';
 export { aoeRemove } from './aoe.remove.js';
+export { pinCreate } from './pin.create.js';
+export { pinUpdate } from './pin.update.js';
+export { pinRemove } from './pin.remove.js';
