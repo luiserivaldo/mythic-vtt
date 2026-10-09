@@ -18,6 +18,6 @@ export function toolbarItems(role: ViewerRole): ToolbarItem[] {
       { id: 'entities', label: 'Entities' },
     );
   }
-  if (role === 'host') items.push({ id: 'seats', label: 'Seats' });
+  if (role === 'host') items.push({ id: 'seats', label: 'Participants' });
   return items;
 }

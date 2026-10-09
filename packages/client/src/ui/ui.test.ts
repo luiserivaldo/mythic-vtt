@@ -1,4 +1,4 @@
-import { canPerform, type Campaign, type Entity, type Scene } from '@mythic/shared';
+import { canPerform, SEAT_TEMPLATES, type Campaign, type Entity, type Scene } from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
 import { createClientStore } from '../store/store.js';
 import { makeCampaign, tid } from '../testing.js';
@@ -20,7 +20,7 @@ import { layerRows, moveTargets, toggleHidden } from './layer-panel.js';
 import { sceneRows, isValidSceneName } from './scene-list.js';
 import { isValidIdentityId, isValidLabel, seatRows } from './seat-panel.js';
 import { toolbarItems } from './toolbar-items.js';
-import { canManageSeats, isAdminRole, viewerRole } from './viewer.js';
+import { canManageSeats, isAdminRole, isReadOnlyViewer, viewerRole } from './viewer.js';
 
 const S = tid(2);
 const E = tid(3);
@@ -114,6 +114,25 @@ describe('viewerRole', () => {
       'seats',
     ]);
   });
+  it('treats seat-less observers and no-action player slots as camera-only viewers', () => {
+    const campaign = world();
+    expect(isReadOnlyViewer({ isHost: false, seatId: null, campaign })).toBe(true);
+    expect(isReadOnlyViewer({ isHost: true, seatId: null, campaign })).toBe(false);
+    expect(isReadOnlyViewer({ isHost: false, seatId: C, campaign })).toBe(false);
+    const player = campaign.seats[P];
+    if (!player) throw new Error('missing player fixture');
+    const readOnlyCampaign = {
+      ...campaign,
+      seats: {
+        ...campaign.seats,
+        [P]: {
+          ...player,
+          permissions: { view: true, move: false, edit: false, delete: false },
+        },
+      },
+    };
+    expect(isReadOnlyViewer({ isHost: false, seatId: P, campaign: readOnlyCampaign })).toBe(true);
+  });
 });
 
 describe('store host hint', () => {
@@ -161,6 +180,11 @@ describe('view models', () => {
       ['Pia', 'Player', false, false],
     ]);
     expect(seatRows(world(), null).every((r) => !r.connected)).toBe(true);
+    const readOnly = world();
+    const player = readOnly.seats[P];
+    if (!player) throw new Error('missing player fixture');
+    player.permissions = { view: true, move: false, edit: false, delete: false };
+    expect(seatRows(readOnly, null).find((row) => row.id === P)?.roleLabel).toBe('Spectator');
   });
   it('validates typed input', () => {
     expect(isValidLabel('')).toBe(false);
@@ -194,6 +218,22 @@ describe('intent specs are accepted by the shared actions', () => {
       name: 'Inn',
     });
     expect(seatAssignIntent(P, ` ${tid(13)} `).payload).toEqual({ seatId: P, identityId: tid(13) });
+  });
+  it('builds an accepted atomic create intent for every role template', () => {
+    for (const [index, template] of SEAT_TEMPLATES.entries()) {
+      const spec = seatCreateIntent(
+        tid(20 + index),
+        template.label,
+        template.role,
+        template.permissions,
+      );
+      expect(canPerform(state, host, spec.type, spec.payload)).toBe(true);
+      expect(spec.payload).toMatchObject({
+        label: template.label,
+        role: template.role,
+        permissions: template.permissions,
+      });
+    }
   });
   it('a co-DM may manage scenes and layers but not seats', () => {
     const coDm = { kind: 'seat', seatId: C } as const;
