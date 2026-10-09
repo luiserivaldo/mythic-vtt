@@ -141,3 +141,66 @@ test('DM saves a private library and places independent configured copies across
   await host.close();
   await observer.close();
 });
+
+test('co-DM never receives or instantiates a prefab whose source view is denied', async () => {
+  const host = await RawClient.connect(table, {
+    name: 'DM',
+    identityId: testUlid('HOST', 1),
+    identitySecret: 'prefab-host',
+  });
+  const sceneId = testUlid('SCENE', 3),
+    entityId = testUlid('PROP', 3),
+    prefabId = testUlid('PREFAB', 3),
+    seatId = testUlid('SEAT', 3);
+  const identity = { identityId: testUlid('CODM', 3), identitySecret: 'prefab-codm' };
+  expect(
+    await host.intent('scene.create', { sceneId, name: 'Private configuration' }),
+  ).toMatchObject({ t: 'ack' });
+  expect(await host.intent('seat.create', { seatId, label: 'Co-DM', role: 'codm' })).toMatchObject({
+    t: 'ack',
+  });
+  expect(
+    await host.intent('seat.assign', { seatId, identityId: identity.identityId }),
+  ).toMatchObject({ t: 'ack' });
+  expect(
+    await host.intent('entity.create', {
+      sceneId,
+      entity: {
+        id: entityId,
+        name: 'Restricted pillar',
+        layer: 'props',
+        owners: [],
+        perms: { view: false },
+        transform: {
+          position: { x: 5, y: 0, z: 5 },
+          rotation: { x: 0, y: 0, z: 0, w: 1 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+        shape: { kind: 'cylinder', color: '#8090ff', walkable: true },
+      },
+    }),
+  ).toMatchObject({ t: 'ack' });
+  const coDm = await RawClient.connect(table, { name: 'Co-DM', ...identity });
+  await coDm.waitFor('co-DM snapshot', () => coDm.state !== undefined);
+  const save = { sceneId, entityId, prefabId, name: 'Restricted blueprint' };
+  expect(await host.intent('prefab.save', save)).toMatchObject({ t: 'ack' });
+  await coDm.waitForSeq(host.lastSeq);
+  expect(JSON.stringify(coDm.frames)).not.toMatch(/Restricted pillar|Restricted blueprint/);
+  expect(JSON.stringify(coDm.frames)).not.toContain(prefabId);
+  expect(Campaign.parse(coDm.state).prefabs?.[prefabId]).toBeUndefined();
+  expect(
+    await coDm.intent('prefab.save', { ...save, prefabId: testUlid('PREFAB', 4) }),
+  ).toMatchObject({ t: 'reject' });
+  expect(
+    await coDm.intent('prefab.place', {
+      sceneId,
+      prefabId,
+      entityId: testUlid('COPY', 4),
+      to: { x: 10, y: 0, z: 10 },
+    }),
+  ).toMatchObject({ t: 'reject' });
+  expect(await coDm.intent('prefab.remove', { prefabId })).toMatchObject({ t: 'reject' });
+  expect(Campaign.parse(host.state).prefabs?.[prefabId]).toBeDefined();
+  await host.close();
+  await coDm.close();
+});

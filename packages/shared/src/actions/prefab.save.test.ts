@@ -34,7 +34,7 @@ function fixture() {
     name: 'Configured pillar',
     layer: 'props',
     owners: [IDS.owner],
-    perms: { view: false },
+    perms: { edit: true },
     shape: { kind: 'cylinder', color: '#8090ff', walkable: true },
     transform: {
       position: { x: 2, y: 3, z: 4 },
@@ -151,6 +151,47 @@ describe('campaign prefabs', () => {
     expect(visibleTo({ kind: 'seat', seatId: IDS.coDm }, after.state).prefabs).toEqual(
       after.state.prefabs,
     );
+  });
+  it('respects co-DM ownership/view overrides and rejects guessed unreadable prefab IDs', () => {
+    const before = fixture(),
+      source = before.scenes[IDS.scene]?.entities[IDS.entity];
+    if (!source) throw new Error('entity');
+    source.owners = [];
+    source.perms = { view: false };
+    expect(checkIntent(before, ACTORS.coDm, 'prefab.save', save).ok).toBe(false);
+    const after = reduceAction(before, action);
+    expect(
+      visibleTo({ kind: 'seat', seatId: IDS.coDm }, after.state).prefabs?.[prefabId],
+    ).toBeUndefined();
+    expect(
+      JSON.stringify(
+        patchesFor({ kind: 'seat', seatId: IDS.coDm }, before, after.state, after.patches),
+      ),
+    ).not.toContain('Configured pillar');
+    expect(
+      checkIntent(after.state, ACTORS.coDm, 'prefab.place', {
+        sceneId: targetId,
+        prefabId,
+        entityId: copyId,
+        to: { x: 5, y: 0, z: 5 },
+      }).ok,
+    ).toBe(false);
+    expect(checkIntent(after.state, ACTORS.coDm, 'prefab.remove', { prefabId }).ok).toBe(false);
+    const owned = fixture(),
+      entity = owned.scenes[IDS.scene]?.entities[IDS.entity];
+    if (!entity) throw new Error('entity');
+    entity.owners = [IDS.coDm];
+    entity.perms = { view: false };
+    const saved = reduceAction(owned, action).state;
+    expect(visibleTo({ kind: 'seat', seatId: IDS.coDm }, saved).prefabs?.[prefabId]).toBeDefined();
+    const legacy = Campaign.parse(saved),
+      blueprint = legacy.prefabs?.[prefabId];
+    if (!blueprint) throw new Error('prefab');
+    delete blueprint.entity.owners;
+    expect(visibleTo({ kind: 'host' }, legacy).prefabs?.[prefabId]).toBeDefined();
+    expect(
+      visibleTo({ kind: 'seat', seatId: IDS.coDm }, legacy).prefabs?.[prefabId],
+    ).toBeUndefined();
   });
   it('places numeric positions exactly while leaving the blueprint unchanged', () => {
     const saved = reduceAction(fixture(), action).state;

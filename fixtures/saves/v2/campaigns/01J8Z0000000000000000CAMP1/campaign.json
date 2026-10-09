@@ -69,7 +69,8 @@
           "heightCells": 1,
           "labelVisibility": "all",
           "facing": 90
-        }
+        },
+        "owners": ["01J8Z0000000000000000SEAT2"]
       }
     }
   }

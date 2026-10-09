@@ -1,3 +1,4 @@
+import { canReadPrefab } from './prefab-access.js';
 import { z } from 'zod';
 import { Entity, Id, Vec3, type Prefab } from '../schema/index.js';
 import { defineAction } from './define.js';
@@ -5,7 +6,9 @@ import { entityCreate } from './entity.create.js';
 
 function copy(prefab: Prefab, id: string, to: z.infer<typeof Vec3>) {
   return Entity.parse({
-    ...prefab.entity,
+    ...Object.fromEntries(
+      Object.entries(prefab.entity).filter(([key]) => !['owners', 'perms'].includes(key)),
+    ),
     id,
     owners: [],
     transform: { ...prefab.entity.transform, position: to },
@@ -18,6 +21,7 @@ export const prefabPlace = defineAction({
     const prefab = state.prefabs?.[p.prefabId];
     return (
       !!prefab &&
+      canReadPrefab(state, actor, prefab) &&
       entityCreate.permission(state, actor, {
         sceneId: p.sceneId,
         entity: copy(prefab, p.entityId, p.to),

@@ -2,8 +2,10 @@ import { z } from 'zod';
 import { Entity } from './entity.js';
 import { Id } from './ids.js';
 
-// ENV-09: a reusable configuration carries neither instance identity nor seat grants.
-export const PrefabEntity = Entity.omit({ id: true, owners: true, perms: true }).strict();
+// ENV-09: keep source visibility metadata; placed copies clear ownership and grants.
+export const PrefabEntity = Entity.omit({ id: true })
+  .extend({ owners: z.array(Id).optional() })
+  .strict();
 export const Prefab = z.strictObject({
   id: Id,
   name: z.string().trim().min(1).max(120),
