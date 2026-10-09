@@ -3,6 +3,7 @@ import { useClientStore } from '../store/react.js';
 import { Toolbar } from './Toolbar.js';
 import { toolbarItems, type PanelId } from './toolbar-items.js';
 import { viewerRole } from './viewer.js';
+import { joinUrlsFromNotices } from './share-panel.js';
 
 const ScenePanel = lazy(async () => {
   const module = await import('./ScenePanel.js');
@@ -24,6 +25,10 @@ const SeatPanel = lazy(async () => {
   const module = await import('./SeatPanel.js');
   return { default: module.SeatPanel };
 });
+const SharePanel = lazy(async () => {
+  const module = await import('./SharePanel.js');
+  return { default: module.SharePanel };
+});
 
 /** Toolbar plus the DM panels. Renders nothing for players and observers (D24, PERM-02). */
 export function DmPanels() {
@@ -32,6 +37,7 @@ export function DmPanels() {
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const presence = useClientStore((s) => s.presence);
+  const notices = useClientStore((s) => s.notices);
   const [open, setOpen] = useState<PanelId | null>(null);
   const shellRef = useRef<HTMLElement>(null);
   const [drawerTop, setDrawerTop] = useState(0);
@@ -95,6 +101,7 @@ export function DmPanels() {
                 unseated={presence?.unseated}
               />
             )}
+            {shown === 'share' && <SharePanel joinUrls={joinUrlsFromNotices(notices)} />}
           </Suspense>
         </div>
       )}

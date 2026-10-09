@@ -2,6 +2,11 @@ import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 
 export type Interfaces = Record<string, NetworkInterfaceInfo[] | undefined>;
 
+export interface PlayerJoinUrl {
+  kind: 'lan' | 'public';
+  url: string;
+}
+
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1']);
 
 export function isLoopbackHost(host: string): boolean {
@@ -26,4 +31,22 @@ export function lanUrls(host: string, port: number, interfaces?: Interfaces): st
   if (isLoopbackHost(host)) return [];
   const addrs = host === '0.0.0.0' || host === '::' ? lanAddresses(interfaces) : [host];
   return addrs.map((a) => `http://${a}:${String(port)}`);
+}
+
+/** M1-38: player-visible URLs never retain a fragment, where the one-time host token lives. */
+export function playerJoinUrls(
+  host: string,
+  port: number,
+  publicUrl?: string,
+  interfaces?: Interfaces,
+): PlayerJoinUrl[] {
+  const urls: PlayerJoinUrl[] = lanUrls(host, port, interfaces).map((url) => ({
+    kind: 'lan',
+    url,
+  }));
+  if (publicUrl !== undefined) {
+    const withoutFragment = publicUrl.split('#', 1)[0]?.replace(/\/+$/, '');
+    if (withoutFragment) urls.push({ kind: 'public', url: withoutFragment });
+  }
+  return urls;
 }

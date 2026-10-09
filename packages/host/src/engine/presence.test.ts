@@ -18,8 +18,10 @@ const named = (id: string, name: string, opts: { isHost?: boolean } = {}): FakeC
 
 const presenceOf = (c: FakeConnection) =>
   c.received.filter((m): m is Extract<ServerMessage, { t: 'presence' }> => m.t === 'presence');
+const noticesOf = (c: FakeConnection) =>
+  c.received.filter((m): m is Extract<ServerMessage, { t: 'notice' }> => m.t === 'notice');
 
-function setup() {
+function setup(joinUrls?: readonly { kind: 'lan' | 'public'; url: string }[]) {
   return createEngine({
     campaign: fixtureCampaign(),
     sessionId: tid(20),
@@ -27,6 +29,7 @@ function setup() {
     clock: fakeClock(),
     random: fakeRandom(),
     onError: () => undefined,
+    ...(joinUrls !== undefined ? { hostJoinUrls: () => joinUrls } : {}),
   });
 }
 
@@ -68,6 +71,31 @@ describe('engine roster (M1-11, PERM-03)', () => {
     expect(presenceOf(bob)).toEqual([]);
     expect(bob.wire()).not.toContain('Alice');
     expect(alice.wire()).not.toContain('Bobby');
+  });
+
+  it('sends reported join URLs to host connections only', async () => {
+    const joinUrls = [{ kind: 'public' as const, url: 'https://table.example/play' }];
+    const engine = setup(joinUrls);
+    const host = named(T.host, 'DM', { isHost: true });
+    const player = named(T.alice, 'Alice');
+    const spectator = named(T.bob, 'Bob');
+    await engine.onConnect(host);
+    await engine.onConnect(player);
+    await engine.onConnect(spectator);
+    await engine.idle();
+
+    expect(noticesOf(host)).toEqual([
+      {
+        t: 'notice',
+        level: 'info',
+        code: 'join-url-public',
+        message: 'https://table.example/play',
+      },
+    ]);
+    for (const connection of [player, spectator]) {
+      expect(noticesOf(connection)).toEqual([]);
+      expect(connection.wire()).not.toContain('table.example');
+    }
   });
 
   it('updates when an identity is seated or disconnects', async () => {

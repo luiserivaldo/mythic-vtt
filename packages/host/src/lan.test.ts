@@ -1,6 +1,6 @@
 import type { NetworkInterfaceInfo } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { lanAddresses, lanUrls, type Interfaces } from './lan.js';
+import { lanAddresses, lanUrls, playerJoinUrls, type Interfaces } from './lan.js';
 
 const iface = (address: string, internal = false, family: 'IPv4' | 'IPv6' = 'IPv4') =>
   ({
@@ -25,5 +25,13 @@ describe('LAN address selection', () => {
     expect(lanUrls('0.0.0.0', 9, nics)).toEqual(['http://192.168.1.20:9', 'http://10.0.0.7:9']);
     expect(lanUrls('127.0.0.1', 9, nics)).toEqual([]);
     expect(lanUrls('10.0.0.7', 9, nics)).toEqual(['http://10.0.0.7:9']);
+  });
+  it('reports LAN and public player links without fragments', () => {
+    expect(playerJoinUrls('0.0.0.0', 9, 'https://table.example/play/#section', nics)).toEqual([
+      { kind: 'lan', url: 'http://192.168.1.20:9' },
+      { kind: 'lan', url: 'http://10.0.0.7:9' },
+      { kind: 'public', url: 'https://table.example/play' },
+    ]);
+    expect(playerJoinUrls('127.0.0.1', 9, undefined, nics)).toEqual([]);
   });
 });
