@@ -79,10 +79,18 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
     const scenes: Campaign['scenes'] = {};
     let changed = false;
     for (const [id, scene] of Object.entries(state.scenes)) {
+      if (scene.dmOnly && seat?.role !== 'codm') {
+        changed = true;
+        continue;
+      }
       const view = viewScene(audience, scene, seat);
       scenes[id] = view;
       if (view !== scene) changed = true;
     }
-    return changed ? { ...state, scenes } : state;
+    const activeSceneId =
+      state.activeSceneId && scenes[state.activeSceneId] ? state.activeSceneId : null;
+    return changed || activeSceneId !== state.activeSceneId
+      ? { ...state, scenes, activeSceneId }
+      : state;
   });
 }

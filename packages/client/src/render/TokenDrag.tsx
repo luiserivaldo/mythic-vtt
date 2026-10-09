@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { TokenDragPreview } from '@mythic/protocol';
 import { useThree } from '@react-three/fiber';
 import { useContext, useEffect, useMemo, useRef } from 'react';
@@ -62,7 +63,7 @@ export function TokenDrag() {
   const getState = useThree((s) => s.get);
   const submit = useContext(SubmitContext);
   const ephemeral = useContext(EphemeralContext);
-  const campaign = useClientStore((s) => s.campaign);
+  const campaign = useViewedCampaign();
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const mode = useViewMode();

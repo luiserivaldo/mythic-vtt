@@ -1,3 +1,4 @@
+import { PROTOCOL_VERSION } from '../packages/protocol/src/version.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
@@ -369,7 +370,7 @@ export class RawClient {
     ws.send(
       JSON.stringify({
         t: 'hello',
-        v: 1,
+        v: PROTOCOL_VERSION,
         identityId: opts.identityId,
         identitySecret: opts.identitySecret,
         displayName: opts.name,

@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import type { Actor } from '@mythic/shared';
 import { useMemo } from 'react';
 import { useStore } from 'zustand';
@@ -7,7 +8,7 @@ import { resolveGizmo3DTarget, type Gizmo3DTarget } from './transform-gizmo-3d.j
 
 /** M2-08: the one selected prop/primitive/token this viewer may transform in 3D, or null. */
 export function useGizmoTarget3D(): Gizmo3DTarget | null {
-  const campaign = useClientStore((s) => s.campaign);
+  const campaign = useViewedCampaign();
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const ids = useStore(selectionStore, (s) => s.ids);

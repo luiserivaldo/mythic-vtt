@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { SceneOverlay } from './SceneOverlay.js';
 import { Canvas, useThree } from '@react-three/fiber';
 import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
@@ -6,7 +7,6 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useStore } from 'zustand';
 import { tokenDragStore } from '../tools/token-drag-store.js';
 import { withLocalDrag } from '../tools/token-drag.js';
-import { useClientStore } from '../store/react.js';
 import { activeRenderScene, type RenderScene } from './scene-model.js';
 import { PickableEntities } from './PickableEntities.js';
 import { selectionStore } from '../tools/selection-store.js';
@@ -156,7 +156,7 @@ export function BoardCanvas() {
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
   const [additiveMode, setAdditiveMode] = useState(false);
-  const campaign = useClientStore((state) => state.campaign);
+  const campaign = useViewedCampaign();
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
   const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
   const source = campaign?.activeSceneId ? (campaign.scenes[campaign.activeSceneId] ?? null) : null;
@@ -179,6 +179,9 @@ export function BoardCanvas() {
       }}
       className="ui-board"
     >
+      <span className="ui-visually-hidden" aria-label="Current scene">
+        {source?.name ?? ''}
+      </span>
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
         <button
           type="button"

@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { IntentResult } from '../net/intents.js';
 import { usePointerOwner } from '../render/pointer-claims.js';
@@ -79,7 +80,7 @@ function DevOverlay({
   const [open, toggle] = useDevOverlayToggle();
   const connection = useClientStore((state) => state.connection);
   const seq = useClientStore((state) => state.seq);
-  const campaign = useClientStore((state) => state.campaign);
+  const campaign = useViewedCampaign();
   const selectedId = useUiStore((state) => state.selectedEntityId);
   const pointerOwner = usePointerOwner();
   const scene = campaign?.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;

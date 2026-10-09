@@ -58,4 +58,5 @@ export async function saveCampaignCheckpoint(
   await store.writeSnapshot(campaign.id, sessionId, label, { seq, state: campaign });
   await store.saveCampaign(campaign.id, CampaignFile.parse(campaign));
   for (const scene of Object.values(campaign.scenes)) await store.saveScene(campaign.id, scene);
+  await store.pruneScenes(campaign.id, new Set(Object.keys(campaign.scenes)));
 }

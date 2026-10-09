@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { AoEEntity, canPerform, type Actor, type Scene } from '@mythic/shared';
 import { useMemo } from 'react';
 import { useStore } from 'zustand';
@@ -18,7 +19,7 @@ const KINDS: AoEKind[] = ['sphere', 'cylinder', 'cone', 'cube', 'line'];
 /** All controls are DOM labels. The tool draft and preview are local to this browser. */
 export function AoEToolPanel({ scene }: { scene: Scene | null }) {
   const join = useJoinEnv();
-  const campaign = useClientStore((s) => s.campaign);
+  const campaign = useViewedCampaign();
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const selected = useStore(selectionStore, (s) => s.ids);

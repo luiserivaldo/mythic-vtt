@@ -69,3 +69,5 @@ Mythic VTT is licensed under the [GNU Affero General Public License v3.0](LICENS
 Identity backup and transfer is available on the join screen and while connected. Download the JSON backup and import it in another browser to keep the same identity and campaign seat. The file contains your identity secret: keep it private. Import replaces this browser’s identity and reloads; the file is handled locally and never uploaded.
 
 Scene filters: DM/co-DM tint and darkness washes work in 2D and 3D while keeping labels clear.
+
+New campaigns start with one blank active scene. The DM can browse scenes locally without moving players, and create DM-only scenes that players and spectators never receive. Only the DM activates a public scene for players. The last scene cannot be deleted; deleting the players' active scene leaves their board empty and blocks new joins until another public scene is activated.
