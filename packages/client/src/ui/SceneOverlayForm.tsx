@@ -21,7 +21,9 @@ function OverlayForm({ scene }: { scene: Scene }) {
         <input
           type="color"
           value={draft.tint}
-          onChange={(e) => setDraft({ ...draft, tint: e.target.value })}
+          onChange={(e) => {
+            setDraft({ ...draft, tint: e.target.value });
+          }}
         />
       </label>
       <label>
@@ -32,7 +34,9 @@ function OverlayForm({ scene }: { scene: Scene }) {
           max="0.35"
           step="0.05"
           value={draft.tintOpacity}
-          onChange={(e) => setDraft({ ...draft, tintOpacity: Number(e.target.value) })}
+          onChange={(e) => {
+            setDraft({ ...draft, tintOpacity: Number(e.target.value) });
+          }}
         />
       </label>
       <label>
@@ -43,7 +47,9 @@ function OverlayForm({ scene }: { scene: Scene }) {
           max="0.5"
           step="0.05"
           value={draft.darkness}
-          onChange={(e) => setDraft({ ...draft, darkness: Number(e.target.value) })}
+          onChange={(e) => {
+            setDraft({ ...draft, darkness: Number(e.target.value) });
+          }}
         />
       </label>
       <button
