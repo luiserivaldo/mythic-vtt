@@ -1,3 +1,4 @@
+import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import type { AnyAction } from './define.js';
 import { aoePlace } from './aoe.place.js';
 import { aoeRemove } from './aoe.remove.js';
@@ -46,6 +47,7 @@ export const allActions: readonly AnyAction[] = [
   aoeUpdate,
   aoeRemove,
   tokenSetElevation,
+  tokenSetStatusMarkers,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

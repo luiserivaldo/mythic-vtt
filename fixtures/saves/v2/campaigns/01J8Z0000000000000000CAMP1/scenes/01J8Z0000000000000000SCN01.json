@@ -49,7 +49,17 @@
         "sizeCells": 1,
         "heightCells": 1,
         "labelVisibility": "all",
-        "facing": 90
+        "facing": 90,
+        "statusMarkers": [
+          {
+            "kind": "icon",
+            "icon": "blinded"
+          },
+          {
+            "kind": "text",
+            "text": "Marked by the moon"
+          }
+        ]
       }
     },
     "01J8Z0000000000000000ENT02": {

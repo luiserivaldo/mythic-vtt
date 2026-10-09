@@ -51,7 +51,14 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
     const label = entity.token?.labelVisibility;
     const coDm = audience.kind === 'seat' && seat?.role === 'codm';
     const hideName = label === 'dm' ? !coDm : label === 'owner' ? !(owner || coDm) : false;
-    return hideName && entity.name !== '' ? { ...entity, name: '' } : entity;
+    if (!hideName) return entity;
+    // TOK-06 / PERM-03: status markers share the label's audience, even for unnamed tokens.
+    if (entity.token?.statusMarkers !== undefined) {
+      const token = { ...entity.token };
+      delete token.statusMarkers;
+      return { ...entity, name: '', token };
+    }
+    return entity.name !== '' ? { ...entity, name: '' } : entity;
   });
 }
 

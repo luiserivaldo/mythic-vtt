@@ -1,3 +1,4 @@
+import { TokenStatusPanel } from './TokenStatusPanel.js';
 import type { Campaign, Scene } from '@mythic/shared';
 import { lazy, Suspense, type ReactNode } from 'react';
 import { useStore } from 'zustand';
@@ -95,7 +96,8 @@ export function ToolPanelDock({
   // Preserve the prior panel behavior for a non-admin who may update an owned, selected AoE.
   const showAoE = scene !== null && (canAdmin || selectedEntity?.aoe !== undefined);
 
-  if (!showEntities && !showTransform && !showAoE) return null;
+  const showToken = campaign !== null && scene !== null && selectedEntity?.token !== undefined;
+  if (!showEntities && !showTransform && !showAoE && !showToken) return null;
   return (
     <aside className="ui-tool-dock" aria-label="Tool panels">
       {showEntities && (
@@ -116,6 +118,16 @@ export function ToolPanelDock({
         <PanelFrame id="aoe" label="AoE" collapsed={collapsed.aoe}>
           <AoEToolPanel scene={scene} />
           <AoEAffectedPanel scene={scene} />
+        </PanelFrame>
+      )}
+      {showToken && (
+        <PanelFrame id="token" label="Token" collapsed={collapsed.token}>
+          <TokenStatusPanel
+            key={selectedEntity.id}
+            campaign={campaign}
+            scene={scene}
+            entity={selectedEntity}
+          />
         </PanelFrame>
       )}
     </aside>
