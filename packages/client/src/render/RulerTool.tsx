@@ -35,9 +35,10 @@ function isTypingTarget(target: EventTarget | null): boolean {
 /**
  * MEAS-01/02: the multi-waypoint ruler uses the ground plane in 2D and ray-hit surfaces in 3D.
  * While the tool is armed a press claims its pointer (pointer-claims) so the camera does not
- * pan and TokenDrag does not start. A drag measures from press to release; a short press retains
- * click-to-add waypoints. Double-click or Enter finishes and Esc cancels. The path is render-local
- * plus an ephemeral relay; nothing is an action.
+ * pan and TokenDrag does not start. A drag measures until release, optionally retaining the result;
+ * a short press retains click-to-add waypoints. A short token click while idle exits the tool so the
+ * normal selection handler can run. Right-click or Esc clears. The path is render-local plus an
+ * ephemeral relay; nothing is an action.
  */
 function entityIdForObject(object: Object3D, scene: Scene): string | undefined {
   let current: Object3D | null = object;
@@ -81,6 +82,8 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
   useEffect(() => {
     const off = ephemeral?.on((m) => {
       if (m.channel !== 'ruler.preview' || !m.from) return;
+      // The host echoes ephemerals to their sender; the local path already represents this user.
+      if (m.from === ephemeral.identityId) return;
       const parsed = RulerPreview.shape.data.safeParse(m.data);
       if (!parsed.success) return;
       const { sceneId: sid, points: pts, phase: ph } = parsed.data;
@@ -108,6 +111,7 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
       x: number;
       y: number;
       point: Vec3;
+      tokenId: string | null;
       beganMeasurement: boolean;
       dragging: boolean;
     } | null = null;
@@ -161,6 +165,22 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
         : null;
     };
 
+    const tokenAt = (e: { clientX: number; clientY: number }): string | null => {
+      const sc = latest.current.scene;
+      if (!sc) return null;
+      const r = el.getBoundingClientRect();
+      const ndc = new Vector2(
+        ((e.clientX - r.left) / r.width) * 2 - 1,
+        -(((e.clientY - r.top) / r.height) * 2 - 1),
+      );
+      raycaster.setFromCamera(ndc, getState().camera);
+      for (const intersection of raycaster.intersectObjects(getState().scene.children, true)) {
+        const entityId = entityIdForObject(intersection.object, sc);
+        if (entityId && sc.entities[entityId]?.token) return entityId;
+      }
+      return null;
+    };
+
     const finish = () => {
       const s = rulerStore.getState();
       if (s.phase !== 'active') return;
@@ -196,6 +216,7 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
         x: e.clientX,
         y: e.clientY,
         point,
+        tokenId: tokenAt(e),
         beganMeasurement,
         dragging: false,
       };
@@ -216,7 +237,14 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
       if (!sc || !point) return;
       if (start.dragging) {
         rulerStore.getState().setCursor(point);
-        finish();
+        if (rulerStore.getState().persistent) finish();
+        else cancel();
+        return;
+      }
+      // M1-41: a token remains a quick route back to selection, but dragging from the same press
+      // still measures from the token/surface as required by MEAS-02.
+      if (start.beganMeasurement && start.tokenId) {
+        rulerStore.getState().setTool(false);
         return;
       }
       const s = rulerStore.getState();
@@ -268,6 +296,12 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
       e.stopPropagation();
       finish();
     };
+    const onContextMenu = (e: MouseEvent) => {
+      if (!rulerStore.getState().tool || e.target !== el) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cancel();
+    };
 
     const onKey = (e: KeyboardEvent) => {
       const s = rulerStore.getState();
@@ -304,6 +338,7 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
     el.addEventListener('pointermove', onMove);
     window.addEventListener('click', onClick, true);
     window.addEventListener('dblclick', onDoubleClick, true);
+    window.addEventListener('contextmenu', onContextMenu, true);
     window.addEventListener('keydown', onKey);
     return () => {
       if (down) {
@@ -318,6 +353,7 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
       el.removeEventListener('pointermove', onMove);
       window.removeEventListener('click', onClick, true);
       window.removeEventListener('dblclick', onDoubleClick, true);
+      window.removeEventListener('contextmenu', onContextMenu, true);
       window.removeEventListener('keydown', onKey);
     };
   }, [gl, getState]);

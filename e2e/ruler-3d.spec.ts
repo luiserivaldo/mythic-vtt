@@ -96,6 +96,7 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   const ground = projectToCanvas(pose, box, { x: 20, y: 0, z: 25 });
   const platformTop = projectToCanvas(pose, box, { x: 20, y: 10, z: 15 });
   await page.getByRole('button', { name: 'Ruler' }).click();
+  await page.getByLabel('Persistent').check();
   // The platform spawns at scene centre. Project known world points through the live pose so this
   // regression remains about surface measurement rather than one particular camera framing.
   await page.mouse.move(ground.x, ground.y);

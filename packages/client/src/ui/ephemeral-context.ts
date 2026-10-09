@@ -3,6 +3,7 @@ import type { Session } from './session.js';
 
 /** Ephemeral channel access for board tools (M1-07); null until a session exists (tests). */
 export interface EphemeralApi {
+  identityId: string;
   send: Session['sendEphemeral'];
   on: Session['onEphemeral'];
 }
