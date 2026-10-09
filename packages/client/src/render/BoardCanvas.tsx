@@ -127,8 +127,8 @@ function BoardScene({
       {/* M1-28: TokenDrag claims a press on any movable token without selecting it first, while
           empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
-      {!readOnly && <RulerTool mode={mode3d ? '3d' : '2d'} />}
-      {!readOnly && !aoeActive && <TokenDrag />}
+      <RulerTool mode={mode3d ? '3d' : '2d'} readOnly={readOnly} />
+      {!aoeActive && <TokenDrag readOnly={readOnly} />}
       <PickableEntities
         rendered={shown}
         scene={source}
