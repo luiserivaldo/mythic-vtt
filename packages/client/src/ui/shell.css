@@ -53,6 +53,17 @@ main > p {
   font-size: 0.85rem;
   color: var(--ui-muted);
 }
+.ui-identity-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.ui-identity-status span {
+  padding: 0 0.35rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+}
 
 .ui-shell {
   padding: var(--ui-bar-pad) 0.6rem;

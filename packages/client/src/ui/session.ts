@@ -23,6 +23,7 @@ export interface Session {
   start: (profile: Pick<Profile, 'displayName' | 'avatar'>) => void;
   stop: () => void;
   started: () => boolean;
+  currentProfile: () => Pick<Profile, 'displayName' | 'avatar'> | null;
   subscribe: (listener: () => void) => () => void;
   joinSeat: (seatId: string) => void;
   /** Stable for the whole page, so contexts never change; fails fast until a client exists. */
@@ -33,6 +34,7 @@ export interface Session {
 
 export function createSession(deps: SessionDeps): Session {
   let client: GameClient | undefined;
+  let currentProfile: Pick<Profile, 'displayName' | 'avatar'> | null = null;
   const listeners = new Set<() => void>();
   const notify = () => {
     for (const l of listeners) l();
@@ -40,6 +42,7 @@ export function createSession(deps: SessionDeps): Session {
   return {
     start(profile) {
       client?.stop();
+      currentProfile = profile;
       client = createGameClient({
         url: deps.url,
         identity: deps.identity,
@@ -55,9 +58,11 @@ export function createSession(deps: SessionDeps): Session {
     stop() {
       client?.stop();
       client = undefined;
+      currentProfile = null;
       notify();
     },
     started: () => client !== undefined,
+    currentProfile: () => currentProfile,
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

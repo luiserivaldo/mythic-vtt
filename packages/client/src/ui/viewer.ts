@@ -8,6 +8,32 @@ export interface ViewerInput {
   campaign: Campaign | null;
 }
 
+export interface IdentitySummary {
+  displayName: string;
+  roleLabel: 'DM' | 'Co-DM' | 'Player' | 'Spectator';
+  seatLabel: string;
+}
+
+/** M1-39: a client-facing identity label derived only from that client's filtered snapshot. */
+export function identitySummary(input: ViewerInput & { displayName: string }): IdentitySummary {
+  if (input.isHost) {
+    return { displayName: input.displayName, roleLabel: 'DM', seatLabel: 'Host' };
+  }
+  const seat = input.seatId === null ? undefined : input.campaign?.seats[input.seatId];
+  if (!seat) {
+    return {
+      displayName: input.displayName,
+      roleLabel: 'Spectator',
+      seatLabel: 'Spectator',
+    };
+  }
+  return {
+    displayName: input.displayName,
+    roleLabel: seat.role === 'codm' ? 'Co-DM' : 'Player',
+    seatLabel: seat.label,
+  };
+}
+
 /**
  * D24: the host is admin; a seat with role `codm` is admin too. A client with no seat that did
  * not claim host is an observer. This only decides what to *show*; the host re-checks every intent.
