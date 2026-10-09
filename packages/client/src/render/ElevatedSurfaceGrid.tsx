@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { BufferAttribute, BufferGeometry, LineBasicMaterial } from 'three';
 import type { RenderEntity, RenderShape } from './scene-model.js';
 import type { RenderGrid } from './grid-model.js';
-import { elevatedGridSegments } from './elevated-grid.js';
+import { topmostElevatedGridSegments, type ElevatedGridSurface } from './elevated-grid.js';
 
 /** GRID-05 overlay. It is visual-only: it never participates in entity picking. */
 export function ElevatedSurfaceGrid({
@@ -10,21 +10,26 @@ export function ElevatedSurfaceGrid({
   shape,
   grid,
   renderOrder,
+  surfaces,
 }: {
   entity: RenderEntity;
   shape: RenderShape;
   grid: RenderGrid;
   renderOrder: number;
+  surfaces: readonly ElevatedGridSurface[];
 }) {
   const geometry = useMemo(() => {
     const next = new BufferGeometry();
     next.setAttribute(
       'position',
-      new BufferAttribute(elevatedGridSegments(shape, entity.position), 3),
+      new BufferAttribute(
+        topmostElevatedGridSegments({ id: entity.id, shape, position: entity.position }, surfaces),
+        3,
+      ),
     );
     next.computeBoundingSphere();
     return next;
-  }, [entity.position, shape]);
+  }, [entity.id, entity.position, shape, surfaces]);
   const material = useMemo(
     () =>
       new LineBasicMaterial({
