@@ -10,12 +10,12 @@ import { useClientStore } from '../store/react.js';
 import { activeRenderScene, type RenderScene } from './scene-model.js';
 import { PickableEntities } from './PickableEntities.js';
 import { selectionStore } from '../tools/selection-store.js';
+import { rulerStore } from '../tools/ruler-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
 import { RulerTool } from './RulerTool.js';
 import { RulerToggle } from './RulerToggle.js';
-import { rulerStore } from '../tools/ruler-store.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
 import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
@@ -155,7 +155,6 @@ export function BoardCanvas() {
   const viewMode = useViewMode();
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
-  const [additiveMode, setAdditiveMode] = useState(false);
   const campaign = useClientStore((state) => state.campaign);
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
   const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
@@ -174,29 +173,22 @@ export function BoardCanvas() {
       aria-label="Scene board"
       tabIndex={0}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') selectionStore.getState().clear();
+        if (event.key === 'Escape') {
+          // Cancel active drag or measure first, then clear selection
+          const dragState = tokenDragStore.getState();
+          if (dragState.local) {
+            dragState.setLocal(null);
+          } else if (rulerStore.getState().phase === 'active') {
+            rulerStore.getState().clear();
+          } else {
+            selectionStore.getState().clear();
+          }
+        }
         if (mode3d && event.key === 'Home') setResetToken((n) => n + 1);
       }}
       className="ui-board"
     >
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
-        <button
-          type="button"
-          aria-pressed={additiveMode}
-          onClick={() => {
-            setAdditiveMode((value) => !value);
-          }}
-        >
-          Multi-select
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            selectionStore.getState().clear();
-          }}
-        >
-          Clear selection
-        </button>
         <ViewToggle />
         <RulerToggle />
         {mode3d && (
@@ -221,7 +213,7 @@ export function BoardCanvas() {
         shadows={false}
         gl={{ antialias: true }}
         onPointerMissed={(event) => {
-          if (!additiveMode && !event.shiftKey && !event.ctrlKey && !event.metaKey)
+          if (!event.shiftKey && !event.ctrlKey && !event.metaKey)
             selectionStore.getState().clear();
         }}
       >
@@ -230,7 +222,7 @@ export function BoardCanvas() {
           scene={scene}
           source={source}
           grid={grid}
-          additiveMode={additiveMode}
+          additiveMode={false}
           viewMode={viewMode}
           bounds={bounds}
           canvasSize={canvasSize}
