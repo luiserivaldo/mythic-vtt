@@ -1,11 +1,12 @@
+import { v1ToV2 } from './v1-to-v2.js';
 import { CURRENT_SCHEMA_VERSION } from '../schema/index.js';
 import { runMigrations, type MigrationStep, type SaveKind } from './runner.js';
 
 /**
  * Append-only list of real migrations (one file per step: `v<N>-to-v<N+1>.ts`).
- * Empty while the current version is 1: there is no v0 save format.
+ * There is no v0 save format.
  */
-export const MIGRATION_STEPS: readonly MigrationStep[] = [];
+export const MIGRATION_STEPS: readonly MigrationStep[] = [v1ToV2];
 
 /**
  * Ready-made hook for the host store's injectable `migrate` option

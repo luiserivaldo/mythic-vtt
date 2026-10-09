@@ -1,3 +1,4 @@
+import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { mkdtempSync } from 'node:fs';
@@ -114,7 +115,10 @@ describe('local storage durability', () => {
       await expect(store.load(sampleCampaign.id)).rejects.toMatchObject({
         code: 'corrupt',
       } satisfies Partial<StorageDataError>);
-      await writeFile(path, JSON.stringify({ ...sampleCampaign, schemaVersion: 2 }));
+      await writeFile(
+        path,
+        JSON.stringify({ ...sampleCampaign, schemaVersion: CURRENT_SCHEMA_VERSION + 1 }),
+      );
       await expect(store.load(sampleCampaign.id)).rejects.toMatchObject({
         code: 'unsupported-version',
       } satisfies Partial<StorageDataError>);
