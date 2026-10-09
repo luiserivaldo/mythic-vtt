@@ -19,7 +19,7 @@ function HistoryPanel() {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [seatId, entityId]);
   async function load(older = false, signal?: AbortSignal) {
     setBusy(true);
     setError('');
@@ -37,6 +37,11 @@ function HistoryPanel() {
         headers: { Authorization: `Mythic ${identity.identityId}.${identity.identitySecret}` },
         ...(signal ? { signal } : {}),
       });
+      if (response.status === 409 || response.status === 410) {
+        setBefore(undefined);
+        setError('History changed or the page expired. Refresh history to continue.');
+        return;
+      }
       if (!response.ok) throw new Error('Could not load history');
       const page = HistoryPage.parse(await response.json());
       if (signal?.aborted) return;
@@ -170,7 +175,13 @@ export function HistoryTools() {
         History
       </button>
       {open && (
-        <div className="ui-drawer" style={{ top: '8rem' }}>
+        <div
+          className="ui-drawer"
+          style={{ top: '8rem' }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setOpen(false);
+          }}
+        >
           <button
             type="button"
             aria-label="Close History panel"

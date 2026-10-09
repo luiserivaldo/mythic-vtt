@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { reduceAction, type ActionEnvelope, type Audience } from '@mythic/shared';
 import { ACTORS, IDS, makeCampaign, makeEntity } from '../../../shared/src/actions/testing.js';
 import type { LogEntry } from '../storage/types.js';
-import { historyPage } from './history-view.js';
+import { historyPage, scanHistory } from './history-view.js';
+import { HISTORY_SCAN_LIMIT } from '../storage/history-log-reader.js';
 
 function fixture() {
   let state = makeCampaign();
@@ -86,7 +87,11 @@ describe('history projection', () => {
     f.apply('entity.setLayer', { sceneId: IDS.scene, entityId: IDS.entity, layer: 'dm' });
     f.apply('entity.delete', { sceneId: IDS.scene, entityId: IDS.entity });
     expect(historyPage(f.state, 4, f.log, spectator, { limit: 50 }).entries).toEqual([]);
-    expect(historyPage(f.state, 4, f.log, { kind: 'host' }, { limit: 50 }).entries).toHaveLength(4);
+    expect(
+      historyPage(f.state, 4, f.log, { kind: 'host' }, { limit: 50 }).entries.map(
+        (entry) => entry.seq,
+      ),
+    ).toEqual([4, 3, 2, 1]);
   });
   it('filters historical and current label visibility, including ownership changes', () => {
     const f = fixture();
@@ -129,5 +134,81 @@ describe('history projection', () => {
     expect(view.entries.some((entry) => entry.type === 'entity.delete')).toBe(true);
     expect(JSON.stringify(view)).not.toContain(IDS.identity);
     expect(f.state.seats[IDS.owner]?.identityId).toBe(IDS.identity);
+  });
+});
+
+describe('history work budgets and checkpoints', () => {
+  it('pre-filters absent entity IDs and projects only the touched entity among thousands', () => {
+    const state = makeCampaign(),
+      scene = state.scenes[IDS.scene];
+    if (!scene) throw new Error('scene');
+    for (let index = 0; index < 2000; index++) {
+      const id = String(index).padStart(26, '0');
+      scene.entities[id] = makeEntity(id);
+    }
+    const entity = makeEntity(IDS.entity, { name: 'Current' });
+    scene.entities[IDS.entity] = entity;
+    const log: LogEntry[] = Array.from({ length: 1000 }, (_, index) => ({
+      envelope: {
+        id: IDS.action,
+        type: 'entity.update',
+        actor: ACTORS.host,
+        payload: {},
+        campaignId: IDS.campaign,
+        sessionId: IDS.session,
+        seq: 1000 - index,
+        ts: 1000,
+      },
+      inversePatches: [
+        {
+          op: 'replace',
+          path: ['scenes', IDS.scene, 'entities', IDS.entity, 'name'],
+          value: `Old ${String(index)}`,
+        },
+      ],
+    }));
+    const missing = scanHistory(state, state, log, spectator, { limit: 50, entityId: IDS.other });
+    expect(missing.work).toEqual({ scanned: HISTORY_SCAN_LIMIT, projectedEntities: 0 });
+    expect(missing.page.entries).toEqual([]);
+    expect(missing.page.before).toBe(1000 - HISTORY_SCAN_LIMIT + 1);
+    const first = scanHistory(state, state, log, spectator, { limit: 1, entityId: IDS.entity });
+    expect(first.work.projectedEntities).toBe(2);
+    expect(first.page.entries[0]?.seq).toBe(1000);
+    const second = scanHistory(
+      state,
+      first.checkpoint,
+      log.slice(first.consumed),
+      spectator,
+      { limit: 1, before: first.page.before },
+      first.latestEntities,
+    );
+    expect(second.page.entries[0]?.seq).toBe(999);
+    expect(scene.entities[IDS.entity]?.name).toBe('Current');
+  });
+  it('retains deleted private visibility across continuation checkpoints', () => {
+    const f = fixture();
+    f.apply('entity.setLayer', { sceneId: IDS.scene, entityId: IDS.entity, layer: 'dm' });
+    f.apply('entity.delete', { sceneId: IDS.scene, entityId: IDS.entity });
+    const descending = [...f.log].reverse();
+    const first = scanHistory(
+      f.state,
+      f.state,
+      descending.slice(0, 2),
+      spectator,
+      { limit: 50 },
+      new Map(),
+      true,
+    );
+    expect(first.page.entries).toEqual([]);
+    expect(first.page.before).toBe(3);
+    const second = scanHistory(
+      f.state,
+      first.checkpoint,
+      descending.slice(2),
+      spectator,
+      { limit: 50, before: 3 },
+      first.latestEntities,
+    );
+    expect(second.page.entries).toEqual([]);
   });
 });
