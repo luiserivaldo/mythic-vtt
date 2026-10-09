@@ -10,6 +10,7 @@ import {
   type AoEKind,
 } from '../tools/aoe-placement.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
+import { rulerStore } from '../tools/ruler-store.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { useJoinEnv } from './join-context.js';
 import { useSubmit } from './submit.js';
@@ -24,6 +25,10 @@ export function AoEToolPanel({
   unified?: boolean;
 }) {
   const join = useJoinEnv();
+  const snap = useStore(rulerStore, (s) => s.snap);
+  const measuredScene = scene
+    ? { ...scene, grid: { ...scene.grid, snap: snap && scene.grid.snap } }
+    : null;
   const campaign = useClientStore((s) => s.campaign);
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
@@ -53,14 +58,19 @@ export function AoEToolPanel({
       campaign,
       actor,
       'aoe.place',
-      aoePlacePayload(scene.id, join.identityId, draft, scene),
+      aoePlacePayload(scene.id, join.identityId, draft, measuredScene ?? scene),
     );
   const canUpdate =
     !!campaign &&
     !!scene &&
     !!actor &&
     !!entity &&
-    canPerform(campaign, actor, 'aoe.update', aoeUpdatePayload(scene.id, entity, draft, scene));
+    canPerform(
+      campaign,
+      actor,
+      'aoe.update',
+      aoeUpdatePayload(scene.id, entity, draft, measuredScene ?? scene),
+    );
   const canRemove =
     !!campaign &&
     !!scene &&
@@ -85,7 +95,7 @@ export function AoEToolPanel({
     try {
       const ok = await send({
         type: 'aoe.update',
-        payload: aoeUpdatePayload(scene.id, entity, draft, scene),
+        payload: aoeUpdatePayload(scene.id, entity, draft, measuredScene ?? scene),
         sceneId: scene.id,
       });
       if (ok) aoeToolStore.getState().setError(null);
