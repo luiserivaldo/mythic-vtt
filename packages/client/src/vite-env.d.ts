@@ -11,6 +11,7 @@ declare global {
     /** Development/test-only render counters for performance assertions. */
     __mythicRender?: {
       getFrameCount(): number;
+      getObjectNames(): string[];
       getRenderInfo(): { calls: number; triangles: number; lines: number; points: number };
     };
   }

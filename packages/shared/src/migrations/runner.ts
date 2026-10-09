@@ -1,7 +1,7 @@
 import { CURRENT_SCHEMA_VERSION } from '../schema/index.js';
 
 /** Root file kinds that carry a `schemaVersion` on disk. */
-export type SaveKind = 'campaign' | 'scene' | 'snapshot';
+export type SaveKind = 'campaign' | 'scene' | 'snapshot' | 'session';
 
 /**
  * A pure one-version step: takes a payload at version `from` and returns a new payload at `from + 1`.

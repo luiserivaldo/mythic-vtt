@@ -5,12 +5,12 @@ describe('tool panel layout', () => {
   beforeEach(() => {
     toolPanelLayoutStore.setState({
       entities: 'hidden',
-      collapsed: { transform: false, aoe: false },
+      collapsed: { transform: false, aoe: false, token: true },
     });
   });
 
   it('keeps a stable stacking order', () => {
-    expect(TOOL_PANEL_ORDER).toEqual(['entities', 'transform', 'aoe']);
+    expect(TOOL_PANEL_ORDER).toEqual(['entities', 'transform', 'aoe', 'token']);
   });
 
   it('collapses active panels without hiding their restore control', () => {
@@ -27,7 +27,7 @@ describe('tool panel layout', () => {
     toolPanelLayoutStore.getState().restore('aoe');
     expect(toolPanelLayoutStore.getState()).toMatchObject({
       entities: 'open',
-      collapsed: { transform: false, aoe: false },
+      collapsed: { transform: false, aoe: false, token: true },
     });
   });
 });

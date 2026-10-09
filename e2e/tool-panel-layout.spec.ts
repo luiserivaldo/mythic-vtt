@@ -32,9 +32,16 @@ test('tool panels share an ordered dock and active tools collapse to restore but
   await expect(panels.nth(0)).toHaveAttribute('data-tool-panel', 'entities');
   await expect(panels.nth(1)).toHaveAttribute('data-tool-panel', 'transform');
   await expect(panels.nth(2)).toHaveAttribute('data-tool-panel', 'aoe');
-  const boxes = await Promise.all([0, 1, 2].map((index) => panels.nth(index).boundingBox()));
+  await dock.getByRole('button', { name: 'Restore Token panel' }).click();
+  await expect(panels).toHaveCount(4);
+  await expect(panels.nth(3)).toHaveAttribute('data-tool-panel', 'token');
+  const boxes = await Promise.all([0, 1, 2, 3].map((index) => panels.nth(index).boundingBox()));
   expect((boxes[0]?.y ?? 0) + (boxes[0]?.height ?? 0)).toBeLessThanOrEqual(boxes[1]?.y ?? 0);
   expect((boxes[1]?.y ?? 0) + (boxes[1]?.height ?? 0)).toBeLessThanOrEqual(boxes[2]?.y ?? 0);
+
+  expect((boxes[2]?.y ?? 0) + (boxes[2]?.height ?? 0)).toBeLessThanOrEqual(boxes[3]?.y ?? 0);
+  await dock.getByRole('button', { name: 'Close Token panel' }).click();
+  await expect(dock.getByRole('button', { name: 'Restore Token panel' })).toBeVisible();
 
   await dock.getByRole('button', { name: 'Close Transform panel' }).click();
   await expect(page.getByRole('button', { name: 'Restore Transform panel' })).toBeVisible();

@@ -1,3 +1,4 @@
+import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { mkdtempSync } from 'node:fs';
@@ -28,11 +29,27 @@ describe('golden save v1 through the shared migrate hook', () => {
       expect(campaign).toMatchObject({
         id: campaignId,
         name: 'The Sunken Chapel',
-        schemaVersion: 1,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
       });
       expect(Object.keys(campaign.seats)).toHaveLength(2);
       expect(scenes.map((s) => s.name)).toEqual(['Flooded Nave']);
       expect(Object.keys(scenes[0]?.entities ?? {})).toHaveLength(3);
+    } finally {
+      await store.close();
+    }
+  });
+  it('migrates version 1 session metadata without discarding the session', async () => {
+    const root = await copyFixture();
+    const sessionId = '01J8Z0000000000000000SESS1';
+    await writeFile(
+      join(root, 'campaigns', campaignId, 'sessions', sessionId, 'meta.json'),
+      JSON.stringify({ schemaVersion: 1, sessionId, startedAt: 123 }),
+    );
+    const store = new LocalCampaignStore(root, storeMigrate);
+    try {
+      expect(await store.readSessions(campaignId)).toEqual([
+        { schemaVersion: CURRENT_SCHEMA_VERSION, sessionId, startedAt: 123 },
+      ]);
     } finally {
       await store.close();
     }

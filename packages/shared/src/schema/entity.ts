@@ -9,6 +9,12 @@ import { Transform } from './math.js';
 // D38: optional additive placeholder colour for tokens without an image (no schemaVersion bump).
 export const TokenColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
+export const TokenRing = z.strictObject({
+  radius: z.number().positive().max(10000),
+  color: TokenColor,
+});
+export type TokenRing = z.infer<typeof TokenRing>;
+
 const TokenComponent = z.object({
   sizeCells: z.number().positive(),
   heightCells: z.number().positive(),
@@ -17,6 +23,7 @@ const TokenComponent = z.object({
   labelVisibility: z.enum(['all', 'owner', 'dm']),
   facing: z.number().optional(),
   characterInstanceId: Id.optional(),
+  rings: z.array(TokenRing).max(8).optional(),
 });
 
 const ShapeComponent = z.object({

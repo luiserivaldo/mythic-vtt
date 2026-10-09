@@ -1,3 +1,4 @@
+import { TokenRings } from './TokenRings.js';
 import { walkableFromEntity, type Scene, type Seat } from '@mythic/shared';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
@@ -106,6 +107,11 @@ export function PickableEntities({
           <DropLines rendered={rendered} />
         </Suspense>
       )}
+      {rendered?.entities
+        .filter((entity) => entity.token && entity.rings?.length)
+        .map((entity) => (
+          <TokenRings key={entity.id} entity={entity} />
+        ))}
       {RENDER_LAYERS.map((layer, order) => (
         <group key={layer} name={layer}>
           {rendered?.entities
