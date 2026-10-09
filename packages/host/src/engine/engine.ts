@@ -239,6 +239,18 @@ export function createEngine(options: EngineOptions): Engine {
 
     const ts = clock();
     const rng = randomFloats(rngCount(type, check.payload), random);
+    const payloadSceneId =
+      typeof check.payload === 'object' &&
+      check.payload !== null &&
+      'sceneId' in check.payload &&
+      typeof check.payload.sceneId === 'string'
+        ? check.payload.sceneId
+        : undefined;
+    const sceneId = payloadSceneId ?? state.activeSceneId;
+    const initiative = sceneId ? state.scenes[sceneId]?.initiative : undefined;
+    const turn = initiative?.activeEntityId
+      ? initiative.order.indexOf(initiative.activeEntityId) + 1
+      : 0;
     const envelope: ActionEnvelope = {
       id: ulid(ts, random),
       type,
@@ -249,6 +261,8 @@ export function createEngine(options: EngineOptions): Engine {
       sessionId,
       seq: seq + 1,
       ts,
+      // HIST-05: transition actions belong to the turn they end; subsequent actions use the new turn.
+      ...(initiative && turn > 0 ? { round: initiative.round, turn } : {}),
       ...(rng.length > 0 ? { rng } : {}),
       ...(extra.clientRef !== undefined ? { clientRef: extra.clientRef } : {}),
     };

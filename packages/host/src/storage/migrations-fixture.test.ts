@@ -38,6 +38,22 @@ describe('golden save v1 through the shared migrate hook', () => {
       await store.close();
     }
   });
+  it('migrates version 1 session metadata without discarding the session', async () => {
+    const root = await copyFixture();
+    const sessionId = '01J8Z0000000000000000SESS1';
+    await writeFile(
+      join(root, 'campaigns', campaignId, 'sessions', sessionId, 'meta.json'),
+      JSON.stringify({ schemaVersion: 1, sessionId, startedAt: 123 }),
+    );
+    const store = new LocalCampaignStore(root, storeMigrate);
+    try {
+      expect(await store.readSessions(campaignId)).toEqual([
+        { schemaVersion: CURRENT_SCHEMA_VERSION, sessionId, startedAt: 123 },
+      ]);
+    } finally {
+      await store.close();
+    }
+  });
   it('still rejects a newer schemaVersion as unsupported', async () => {
     const root = await copyFixture();
     const path = join(root, 'campaigns', campaignId);

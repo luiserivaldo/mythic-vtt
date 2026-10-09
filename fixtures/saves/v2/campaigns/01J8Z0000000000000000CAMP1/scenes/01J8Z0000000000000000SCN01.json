@@ -110,5 +110,10 @@
         "walkable": false
       }
     }
+  },
+  "initiative": {
+    "round": 2,
+    "order": ["01J8Z0000000000000000ENT01", "01J8Z0000000000000000ENT02"],
+    "activeEntityId": "01J8Z0000000000000000ENT01"
   }
 }

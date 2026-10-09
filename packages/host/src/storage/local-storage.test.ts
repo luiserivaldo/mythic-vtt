@@ -151,7 +151,10 @@ describe('local storage durability', () => {
       await store.saveCampaign(sampleCampaign.id, sampleCampaign);
       await store.saveScene(sampleCampaign.id, sampleScene);
       const path = join(base, 'campaigns', sampleCampaign.id, 'scenes', `${sampleScene.id}.json`);
-      await writeFile(path, JSON.stringify({ schemaVersion: 1, id: sampleScene.id }));
+      await writeFile(
+        path,
+        JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION, id: sampleScene.id }),
+      );
       await expect(store.load(sampleCampaign.id)).rejects.toMatchObject({ code: 'corrupt' });
     } finally {
       await store.close();
