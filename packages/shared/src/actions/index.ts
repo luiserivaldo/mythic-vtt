@@ -24,3 +24,6 @@ export { tokenSetElevation } from './token.setElevation.js';
 export { aoePlace } from './aoe.place.js';
 export { aoeUpdate } from './aoe.update.js';
 export { aoeRemove } from './aoe.remove.js';
+export { prefabSave } from './prefab.save.js';
+export { prefabRemove } from './prefab.remove.js';
+export { prefabPlace } from './prefab.place.js';

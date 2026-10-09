@@ -1,6 +1,6 @@
 import type { ViewerRole } from './viewer.js';
 
-export type PanelId = 'scenes' | 'layers' | 'map' | 'entities' | 'seats' | 'share';
+export type PanelId = 'scenes' | 'layers' | 'map' | 'entities' | 'seats' | 'share' | 'prefabs';
 
 export interface ToolbarItem {
   id: PanelId;
@@ -16,6 +16,7 @@ export function toolbarItems(role: ViewerRole): ToolbarItem[] {
       { id: 'layers', label: 'Layers' },
       { id: 'map', label: 'Map' },
       { id: 'entities', label: 'Entities' },
+      { id: 'prefabs', label: 'Prefabs' },
     );
   }
   if (role === 'host') {

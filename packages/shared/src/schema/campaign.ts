@@ -1,10 +1,11 @@
+import { Prefabs } from './prefab.js';
 import { z } from 'zod';
 import { Id } from './ids.js';
 import { Scene } from './scene.js';
 import { Seat } from './seat.js';
 
 /** Bumped by the `schema-change` skill; migrations live in `../migrations`. */
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export const Campaign = z.object({
   id: Id,
@@ -18,5 +19,6 @@ export const Campaign = z.object({
   seats: z.record(Id, Seat),
   scenes: z.record(Id, Scene),
   activeSceneId: Id.nullable(),
+  prefabs: Prefabs.optional(),
 });
 export type Campaign = z.infer<typeof Campaign>;

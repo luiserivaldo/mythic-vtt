@@ -1,4 +1,4 @@
-import type { Campaign, Entity, Scene, Seat } from '../schema/index.js';
+import type { Campaign, Entity, Prefab, Scene, Seat } from '../schema/index.js';
 import { audienceKey, type Audience } from './audience.js';
 
 // PERM-03: filtering happens on the host before serialization. Anything an audience may not see
@@ -55,6 +55,21 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
   });
 }
 
+/** PERM-03: a library entry retains the source entity's visibility/ownership policy. */
+export function viewPrefab(audience: Audience, prefab: Prefab, seat?: Seat): Prefab | null {
+  if (audience.kind === 'host') return prefab;
+  if (audience.kind !== 'seat' || seat?.role !== 'codm' || !seat.permissions.view) return null;
+  // Older experimental blueprints did not capture visibility; keep them host-only.
+  if (prefab.entity.owners === undefined) return null;
+  return viewEntity(
+    audience,
+    { ...prefab.entity, id: prefab.id, owners: prefab.entity.owners },
+    seat,
+  ) === null
+    ? null
+    : prefab;
+}
+
 function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
   const key = viewKey(audience, seat);
   return memo(sceneCache, scene, key, () => {
@@ -83,6 +98,25 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
       scenes[id] = view;
       if (view !== scene) changed = true;
     }
-    return changed ? { ...state, scenes } : state;
+    // PERM-03: prefab blueprints may contain DM-layer content and private labels.
+    const mayReadPrefabs =
+      audience.kind === 'seat' && seat?.role === 'codm' && seat.permissions.view;
+    const view = changed ? { ...state, scenes } : state;
+    if (state.prefabs && !mayReadPrefabs) {
+      const withoutPrefabs = { ...view };
+      delete withoutPrefabs.prefabs;
+      return withoutPrefabs;
+    }
+    if (state.prefabs) {
+      const prefabs: NonNullable<Campaign['prefabs']> = {};
+      let hidden = false;
+      for (const [id, prefab] of Object.entries(state.prefabs)) {
+        const allowed = viewPrefab(audience, prefab, seat);
+        if (allowed) prefabs[id] = allowed;
+        else hidden = true;
+      }
+      if (hidden) return { ...view, prefabs };
+    }
+    return view;
   });
 }

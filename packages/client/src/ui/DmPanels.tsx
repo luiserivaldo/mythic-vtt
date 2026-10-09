@@ -28,6 +28,11 @@ const SharePanel = lazy(async () => {
   return { default: module.SharePanel };
 });
 
+const PrefabPanel = lazy(async () => {
+  const module = await import('./PrefabPanel.js');
+  return { default: module.PrefabPanel };
+});
+
 /** Toolbar plus the DM panels. Renders nothing for players and observers (D24, PERM-02). */
 export function DmPanels() {
   const campaign = useClientStore((s) => s.campaign);
@@ -96,6 +101,9 @@ export function DmPanels() {
           </div>
           <Suspense fallback={<p role="status">Loading panel…</p>}>
             {shown === 'scenes' && <ScenePanel campaign={campaign} />}
+            {shown === 'prefabs' && (
+              <PrefabPanel key={campaign.activeSceneId} campaign={campaign} />
+            )}
             {shown === 'layers' && <LayerPanel campaign={campaign} />}
             {shown === 'map' && <MapPanel campaign={campaign} />}
             {shown === 'seats' && (
