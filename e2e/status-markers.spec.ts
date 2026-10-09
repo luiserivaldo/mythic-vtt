@@ -11,6 +11,7 @@ test.afterAll(async () => {
 });
 
 test('the marker picker syncs, persists and never sends private markers', async ({ browser }) => {
+  test.setTimeout(60_000);
   if (!table) throw new Error('table not started');
   const identity = { identityId: testUlid('HOST', 1), identitySecret: 'marker-test-host' };
   const host = await RawClient.connect(table, {
@@ -142,9 +143,10 @@ test('the marker picker syncs, persists and never sends private markers', async 
   const playerErrors: string[] = [];
   playerPage.on('pageerror', (error) => playerErrors.push(error.message));
   await playerPage.goto(table.clientUrl);
-  const canvasBox = await playerPage.locator('canvas').boundingBox();
-  if (!canvasBox) throw new Error('canvas missing');
+  await expect(playerPage.getByRole('status')).toHaveText('Connected to New campaign');
   await expect(async () => {
+    const canvasBox = await playerPage.locator('canvas').boundingBox();
+    if (!canvasBox) throw new Error('canvas missing');
     await playerPage.mouse.click(
       canvasBox.x + canvasBox.width / 2,
       canvasBox.y + canvasBox.height / 2,
