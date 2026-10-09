@@ -47,7 +47,6 @@ function BoardScene({
   scene,
   source,
   grid,
-  additiveMode,
   viewMode,
   bounds,
   canvasSize,
@@ -57,7 +56,6 @@ function BoardScene({
   scene: RenderScene | null;
   source: Scene | null;
   grid: RenderGrid | null;
-  additiveMode: boolean;
   viewMode: ViewMode;
   bounds: GroundBounds | null;
   canvasSize: SceneBounds;
@@ -127,13 +125,7 @@ function BoardScene({
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
       <RulerTool mode={mode3d ? '3d' : '2d'} />
       {!aoeActive && <TokenDrag />}
-      <PickableEntities
-        rendered={shown}
-        scene={source}
-        additiveMode={additiveMode}
-        mode={mode3d ? '3d' : '2d'}
-        grid={grid}
-      />
+      <PickableEntities rendered={shown} scene={source} mode={mode3d ? '3d' : '2d'} grid={grid} />
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       <SceneOverlay overlay={source?.overlay} />
       {/* M1-20 / M2-08: 2D handles, or the 3D gizmo; both are off while the AoE tool is active. */}
@@ -155,7 +147,6 @@ export function BoardCanvas() {
   const viewMode = useViewMode();
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
-  const [additiveMode, setAdditiveMode] = useState(false);
   const campaign = useClientStore((state) => state.campaign);
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
   const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
@@ -180,23 +171,6 @@ export function BoardCanvas() {
       className="ui-board"
     >
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
-        <button
-          type="button"
-          aria-pressed={additiveMode}
-          onClick={() => {
-            setAdditiveMode((value) => !value);
-          }}
-        >
-          Multi-select
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            selectionStore.getState().clear();
-          }}
-        >
-          Clear selection
-        </button>
         <ViewToggle />
         <RulerToggle />
         {mode3d && (
@@ -221,7 +195,7 @@ export function BoardCanvas() {
         shadows={false}
         gl={{ antialias: true }}
         onPointerMissed={(event) => {
-          if (!additiveMode && !event.shiftKey && !event.ctrlKey && !event.metaKey)
+          if (!event.shiftKey && !event.ctrlKey && !event.metaKey)
             selectionStore.getState().clear();
         }}
       >
@@ -230,7 +204,6 @@ export function BoardCanvas() {
           scene={scene}
           source={source}
           grid={grid}
-          additiveMode={additiveMode}
           viewMode={viewMode}
           bounds={bounds}
           canvasSize={canvasSize}
