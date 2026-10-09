@@ -1,0 +1,7 @@
+#!/bin/sh
+# Opt in with: git config core.hooksPath .githooks
+# Appends a Signed-off-by line (the Developer Certificate of Origin) if the message lacks one.
+# Skips merges and squashes.
+case "$2" in merge|squash) exit 0 ;; esac
+git interpret-trailers --in-place --if-exists doNothing \
+  --trailer "Signed-off-by: $(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/\1/p')" "$1"
