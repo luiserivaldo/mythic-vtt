@@ -27,6 +27,7 @@ import { ViewToggle } from './ViewToggle.js';
 import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
+import { OcclusionFade } from './OcclusionFade.js';
 import { RenderDiagnostics } from './RenderDiagnostics.js';
 import { ToolPanelDock } from '../ui/ToolPanelDock.js';
 import { handleBoardEscape } from './board-keyboard.js';
@@ -127,6 +128,7 @@ function BoardScene({
       <RulerTool mode={mode3d ? '3d' : '2d'} />
       {!aoeActive && <TokenDrag />}
       <PickableEntities rendered={shown} scene={source} mode={mode3d ? '3d' : '2d'} grid={grid} />
+      {mode3d && <OcclusionFade rendered={shown} />}
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       <SceneOverlay overlay={source?.overlay} />
       {/* M1-20 / M2-08: 2D handles, or the 3D gizmo; both are off while the AoE tool is active. */}
