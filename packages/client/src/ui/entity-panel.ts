@@ -42,6 +42,12 @@ export const LAYER_LABELS: Record<LayerId, string> = {
   effects: 'Effects',
 };
 
+/** LAY-01: Map is offered in every layer picker; entity defaults remain unchanged. */
+export function entityCreateLayers(isHost: boolean): LayerId[] {
+  const publicLayers: LayerId[] = ['tokens', 'props', 'map', 'effects'];
+  return isHost ? [...publicLayers, 'dm'] : publicLayers;
+}
+
 export const DEFAULT_TOKEN_COLOR = DEFAULT_BOARD_TOKEN_COLOR;
 export const MAX_PROP_CELLS = 50;
 const UNIT_ROTATION = { x: 0, y: 0, z: 0, w: 1 } as const;

@@ -21,6 +21,12 @@ interface Snapshot {
   >;
 }
 
+interface BrowserDiagnostics {
+  __mythicRender?: {
+    getObjectCount(name: string): number;
+  };
+}
+
 const HOST = { identityId: testUlid('HOST', 1), identitySecret: 'host-secret' };
 
 test('host drags a token: others see the preview, the drop commits one snapped token.move', async ({
@@ -91,6 +97,27 @@ test('host drags a token: others see the preview, the drop commits one snapped t
   await page.mouse.down();
   await page.mouse.move(grab.x + zoom, grab.y + zoom * 0.5, { steps: 6 });
   await page.mouse.move(grab.x + 3 * zoom, grab.y + 2 * zoom, { steps: 6 });
+
+  // M1-33: the host echoes ephemerals to every recipient, including their sender. Once another
+  // client has received this drag, the sender must still render only its local token preview.
+  await expect
+    .poll(
+      () =>
+        observer.frames
+          .map((frame) => JSON.parse(frame) as { t: string; channel?: string })
+          .filter(
+            (message) => message.t === 'ephemeral' && message.channel === 'token.drag-preview',
+          ).length,
+    )
+    .toBeGreaterThan(0);
+  await page.waitForTimeout(100);
+  expect(
+    await page.evaluate(() =>
+      (globalThis as unknown as BrowserDiagnostics).__mythicRender?.getObjectCount(
+        'token-drag-ghost',
+      ),
+    ),
+  ).toBe(0);
   await page.mouse.up();
   await expect(panel).toHaveCount(0);
 

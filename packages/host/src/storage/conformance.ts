@@ -1,3 +1,4 @@
+import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
 import { Readable } from 'node:stream';
 import { createHash } from 'node:crypto';
@@ -11,7 +12,7 @@ const sessionId = '01J00000000000000000000003';
 export const sampleCampaign: CampaignFile = {
   id: campaignId,
   name: 'Test',
-  schemaVersion: 1,
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   settings: {
     defaultBinding: 'persistent',
     instanceMode: 'linked',

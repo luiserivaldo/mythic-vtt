@@ -1,3 +1,4 @@
+import { SceneOverlayForm } from './SceneOverlayForm.js';
 import type { Campaign } from '@mythic/shared';
 import { newId } from './ids.js';
 import {
@@ -53,6 +54,12 @@ export function ScenePanel({ campaign }: { campaign: Campaign }) {
                 name={row.name}
                 initial={boundsDraft(campaign, row.id)}
                 onSubmit={(b) => send(sceneBoundsIntent(row.id, b))}
+              />
+            )}
+            {row.active && campaign.scenes[row.id] && (
+              <SceneOverlayForm
+                key={`${row.id}:${JSON.stringify(campaign.scenes[row.id]?.overlay)}`}
+                scene={campaign.scenes[row.id] ?? null}
               />
             )}
             {row.active && (

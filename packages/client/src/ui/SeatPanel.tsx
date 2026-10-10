@@ -50,7 +50,7 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
         </ul>
       )}
       <h3>Participants</h3>
-      <ul className="ui-list" aria-label="Seats">
+      <ul className="ui-list" aria-label="Participants">
         {seatRows(campaign, presence).map((row) => {
           const typed = identity[row.id] ?? '';
           return (

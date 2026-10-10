@@ -1,6 +1,8 @@
 import type { ViewerRole } from './viewer.js';
+import type { SeatPermissions } from '@mythic/shared';
+import { dockTabs } from './registries.js';
 
-export type PanelId = 'scenes' | 'layers' | 'map' | 'entities' | 'seats' | 'share';
+export type PanelId = string;
 
 export interface ToolbarItem {
   id: PanelId;
@@ -8,18 +10,9 @@ export interface ToolbarItem {
 }
 
 /** Which panel toggles this viewer gets (pure, so it is unit-tested). */
-export function toolbarItems(role: ViewerRole): ToolbarItem[] {
-  const items: ToolbarItem[] = [];
-  if (role === 'host' || role === 'codm') {
-    items.push(
-      { id: 'scenes', label: 'Scenes' },
-      { id: 'layers', label: 'Layers' },
-      { id: 'map', label: 'Map' },
-      { id: 'entities', label: 'Entities' },
-    );
-  }
-  if (role === 'host') {
-    items.push({ id: 'seats', label: 'Participants' }, { id: 'share', label: 'Invite' });
-  }
-  return items;
+export function toolbarItems(
+  role: ViewerRole,
+  permissions: SeatPermissions | null = null,
+): ToolbarItem[] {
+  return dockTabs.allowed(role, permissions).map(({ id, label }) => ({ id, label }));
 }

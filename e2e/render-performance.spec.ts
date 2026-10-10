@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { connectAoEPlacer } from './aoe-fixture.js';
 import {
   PERFORMANCE_SCENE,
   RENDER_BUDGET,
@@ -63,6 +64,7 @@ async function renderInfo(page: Page): Promise<RenderInfo> {
 
 let table: Table;
 let host: RawClient;
+const placers: RawClient[] = [];
 
 test.beforeAll(async () => {
   table = await startTable();
@@ -125,8 +127,10 @@ test.beforeAll(async () => {
     );
   }
   for (let index = 0; index < PERFORMANCE_SCENE.aoes; index++) {
+    const placer = await connectAoEPlacer(table, host, testUlid('AOEPERF', index), index);
+    placers.push(placer);
     intents.push(
-      host.intent('aoe.place', {
+      placer.intent('aoe.place', {
         sceneId,
         entity: {
           id: testUlid('AOEPERF', index),
@@ -144,6 +148,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  await Promise.all(placers.map((placer) => placer.close()));
   await host.close();
   await table.stop();
 });

@@ -103,7 +103,7 @@ test('a new visitor joins by name and seat; the DM sees them and seats a spectat
 
   // The DM seats the spectator from the dropdown, not by typing an identity id.
   const rogue = dm
-    .getByRole('list', { name: 'Seats' })
+    .getByRole('list', { name: 'Participants' })
     .getByRole('listitem')
     .filter({ hasText: 'Rogue' });
   const picker = rogue.getByLabel('Connected participant for Rogue');

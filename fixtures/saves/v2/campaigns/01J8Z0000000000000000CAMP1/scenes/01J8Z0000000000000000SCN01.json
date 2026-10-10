@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 2,
+  "id": "01J8Z0000000000000000SCN01",
+  "name": "Flooded Nave",
+  "grid": {
+    "type": "square",
+    "sizePx": 70,
+    "unitsPerCell": 5,
+    "unitLabel": "ft",
+    "diagonal": "alternating",
+    "snap": true
+  },
+  "environment": {
+    "background": "#10161c"
+  },
+  "layers": {
+    "map": {
+      "locked": true
+    },
+    "dm": {
+      "locked": false
+    }
+  },
+  "entities": {
+    "01J8Z0000000000000000ENT01": {
+      "id": "01J8Z0000000000000000ENT01",
+      "layer": "tokens",
+      "name": "Mira",
+      "owners": ["01J8Z0000000000000000SEAT2"],
+      "transform": {
+        "position": {
+          "x": 4,
+          "y": 0,
+          "z": 6
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "token": {
+        "sizeCells": 1,
+        "heightCells": 1,
+        "labelVisibility": "all",
+        "facing": 90
+      }
+    },
+    "01J8Z0000000000000000ENT02": {
+      "id": "01J8Z0000000000000000ENT02",
+      "layer": "dm",
+      "name": "Drowned Warden",
+      "owners": [],
+      "transform": {
+        "position": {
+          "x": 9,
+          "y": 0,
+          "z": 3
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "token": {
+        "sizeCells": 2,
+        "heightCells": 2,
+        "labelVisibility": "dm"
+      }
+    },
+    "01J8Z0000000000000000ENT03": {
+      "id": "01J8Z0000000000000000ENT03",
+      "layer": "props",
+      "name": "Altar",
+      "owners": [],
+      "transform": {
+        "position": {
+          "x": 6,
+          "y": 0,
+          "z": 1
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": {
+          "x": 2,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "shape": {
+        "kind": "box",
+        "color": "#8a8f98",
+        "walkable": false
+      }
+    }
+  },
+  "overlay": {
+    "tint": "#8090ff",
+    "tintOpacity": 0.15,
+    "darkness": 0.2
+  }
+}

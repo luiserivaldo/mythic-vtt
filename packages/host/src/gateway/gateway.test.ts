@@ -32,9 +32,14 @@ const open: WebSocket[] = [];
 
 async function start(
   handler?: GatewayHandler,
-  opts: { helloTimeoutMs?: number; hostToken?: string; identities?: IdentityStore } = {},
+  opts: {
+    helloTimeoutMs?: number;
+    hostToken?: string;
+    identities?: IdentityStore;
+    heartbeatMs?: number;
+  } = {},
 ) {
-  gw = createGateway({ ...(handler ? { handler } : {}), ...opts, heartbeatMs: 0 });
+  gw = createGateway({ ...(handler ? { handler } : {}), heartbeatMs: 0, ...opts });
   port = await gw.listen();
 }
 
@@ -414,5 +419,39 @@ describe('host token (D24)', () => {
     expect([ma, mb].filter((m) => m.t === 'error')).toHaveLength(1);
     expect([ma, mb].filter((m) => m.t === 'pong')).toHaveLength(1);
     expect(r.conns.filter((c) => c.isHost)).toHaveLength(1);
+  });
+});
+
+describe('transport RTT (UX-06)', () => {
+  it('measures authenticated automatic pong replies without exposing connection details', async () => {
+    const r = recorder();
+    const samples: number[] = [];
+    await start(
+      {
+        ...r.handler,
+        onLatency: (conn) => {
+          if (conn.latencyMs !== null && conn.latencyMs !== undefined) samples.push(conn.latencyMs);
+        },
+      },
+      { heartbeatMs: 1000 },
+    );
+    const c = await connect();
+    c.send(hello());
+    await expect.poll(() => samples.length).toBeGreaterThan(0);
+    expect(samples[0]).toBeGreaterThanOrEqual(0);
+    expect(samples[0]).toBeLessThanOrEqual(30_000);
+    expect(c.received).toEqual([]);
+  });
+  it('rejects version 1 after the presence contract upgrade', async () => {
+    await start();
+    const c = await connect();
+    c.send(hello({ v: 1 }));
+    expect(await c.next()).toMatchObject({
+      t: 'error',
+      code: 'protocol-mismatch',
+      supportedVersion: 2,
+      fatal: true,
+    });
+    await c.closed;
   });
 });

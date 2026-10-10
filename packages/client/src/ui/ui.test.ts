@@ -181,7 +181,11 @@ describe('view models', () => {
     expect(rows.map((r) => r.layer)).toEqual(['map', 'props', 'tokens', 'dm', 'effects']);
     expect(rows.find((r) => r.layer === 'props')?.locked).toBe(true);
     expect(rows.find((r) => r.layer === 'dm')?.hidden).toBe(true);
-    expect(rows.find((r) => r.layer === 'map')).toMatchObject({ locked: false, hidden: false });
+    expect(rows.find((r) => r.layer === 'map')).toMatchObject({
+      description: 'Battlemap images, ground, terrain and fixed objects',
+      locked: false,
+      hidden: false,
+    });
   });
   it('toggles hidden without mutating the input', () => {
     const a = new Set(['dm'] as const);

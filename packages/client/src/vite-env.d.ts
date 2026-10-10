@@ -8,10 +8,15 @@ declare global {
     __mythicCamera?: {
       getPose(): Readonly<Orbit3D>;
     };
+    /** Development-only read access to actual primitive material state. */
+    __mythicOcclusion?: {
+      getMaterials(): { id: string; opacity: number; depthWrite: boolean }[];
+    };
     /** Development/test-only render counters for performance assertions. */
     __mythicRender?: {
       getFrameCount(): number;
       getRenderInfo(): { calls: number; triangles: number; lines: number; points: number };
+      getObjectCount(name: string): number;
     };
   }
 }

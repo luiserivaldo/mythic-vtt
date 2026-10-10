@@ -12,6 +12,8 @@ export interface GatewayConnection {
   readonly isHost: boolean;
   /** Last `seq` the client reported in `hello`, for replay or snapshot. */
   readonly lastSeq: number | undefined;
+  /** UX-06: most recent host-measured transport RTT; absent until measured. */
+  readonly latencyMs?: number | null;
   /** Validated and encoded by the gateway; a no-op once the socket is closed. */
   send(message: ServerMessage): void;
   /** Pre-serialized frame, for spectator fan-out (§7.4). */
@@ -31,6 +33,8 @@ export interface GatewayHandler {
   onIntent(conn: GatewayConnection, msg: Of<'intent'>): void | Promise<void>;
   onEphemeral(conn: GatewayConnection, msg: Of<'ephemeral'>): void | Promise<void>;
   onDisconnect(conn: GatewayConnection): void;
+  /** Ephemeral telemetry only; never an action or persisted campaign state. */
+  onLatency?(conn: GatewayConnection): void;
 }
 
 /** Placeholder until the engine exists: every intent is refused rather than silently dropped. */
