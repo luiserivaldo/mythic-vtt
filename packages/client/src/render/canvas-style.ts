@@ -1,8 +1,8 @@
 import { DEFAULT_SCENE_BACKGROUND } from '@mythic/shared';
 
-/** PT1-08 defaults for the board, its surround, and overlays. Pure, no Three.js. */
+/** UI-SHELL-02 defaults keep the grey board distinct from dark blue space. Pure, no Three.js. */
 export const DEFAULT_BOARD_COLOR = DEFAULT_SCENE_BACKGROUND;
-export const OUTSIDE_FALLBACK = '#b9d4ec';
+export const OUTSIDE_FALLBACK = '#152942';
 export const BORDER_COLOR = '#334155';
 export const LABEL_BACKGROUND_COLOR = '#111827';
 export const LABEL_TEXT_COLOR = '#f8fafc';
@@ -56,7 +56,7 @@ export function compositeHex(
 }
 
 /**
- * The default board gets the light-blue surround. Explicit backgrounds retain the established
+ * The default board gets the dark-blue surround. Explicit backgrounds retain the established
  * derived surround, including the charcoal used for dark scenes.
  */
 export function outsideColor(background: string | undefined): string {

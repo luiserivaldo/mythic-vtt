@@ -30,7 +30,7 @@ async function cellToPixel(page: Page, x: number, z: number) {
   };
 }
 
-test('light defaults keep a populated host board readable in 2D and 3D', async ({
+test('grey tiles and dark blue surround keep a populated board readable in 2D and 3D', async ({
   browser,
 }, testInfo) => {
   const sceneId = testUlid('PALETTE-SCENE', 1);
