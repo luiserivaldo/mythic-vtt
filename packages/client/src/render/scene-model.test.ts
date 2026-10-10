@@ -154,3 +154,56 @@ describe('primitive shapes (ENV-02)', () => {
     expect(map(entity(30, 'props'))?.shape).toBeUndefined();
   });
 });
+
+describe('token yaw (M1-34)', () => {
+  const tokenEntity = (id: number, rotation: { x: number; y: number; z: number; w: number }) =>
+    Entity.parse({
+      id: tid(id),
+      layer: 'tokens',
+      name: 'Token',
+      owners: [],
+      transform: {
+        position: { x: 0, y: 0, z: 0 },
+        rotation,
+        scale: { x: 1, y: 1, z: 1 },
+      },
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+    });
+  const yawOf = (entity: Entity) =>
+    mapScene({ ...scene, entities: { [entity.id]: entity } }).entities.find(
+      (e) => e.id === entity.id,
+    )?.token?.yaw;
+
+  it('maps an unrotated token to zero yaw', () => {
+    expect(yawOf(tokenEntity(40, { x: 0, y: 0, z: 0, w: 1 }))).toBe(0);
+  });
+
+  it('maps a Y-rotated token to the same yaw across signed angles', () => {
+    for (const theta of [
+      (-3 * Math.PI) / 4,
+      -Math.PI / 2,
+      -Math.PI / 4,
+      0,
+      Math.PI / 4,
+      Math.PI / 2,
+      (3 * Math.PI) / 4,
+    ]) {
+      const yaw = yawOf(
+        tokenEntity(41, { x: 0, y: Math.sin(theta / 2), z: 0, w: Math.cos(theta / 2) }),
+      );
+      expect(yaw).toBeCloseTo(theta, 5);
+    }
+  });
+
+  it('wraps a 180-degree rotation to the principal yaw', () => {
+    for (const s of [1, -1]) {
+      const yaw = yawOf(tokenEntity(42, { x: 0, y: s, z: 0, w: 0 }));
+      // NaN fails toBeCloseTo, so an undefined yaw would surface here.
+      expect(Math.abs(yaw ?? NaN)).toBeCloseTo(Math.PI, 5);
+    }
+  });
+
+  it('leaves non-token entities without a token entry', () => {
+    expect(yawOf(entity(43, 'props'))).toBeUndefined();
+  });
+});
