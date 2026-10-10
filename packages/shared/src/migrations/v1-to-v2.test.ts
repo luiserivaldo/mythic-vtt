@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
-import { storeMigrate } from './registry.js';
+import { createStoreMigrate } from './registry.js';
+import { v1ToV2 } from './v1-to-v2.js';
+const storeMigrate = createStoreMigrate([v1ToV2], 2);
 
 it('preserves old campaign, scene, session and snapshot data without mutating inputs', () => {
   const original = { schemaVersion: 1, arbitrary: { preserved: true } };

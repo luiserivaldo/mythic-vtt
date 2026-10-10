@@ -1,3 +1,4 @@
+import { sceneDelete } from './scene.delete.js';
 import { sceneSetOverlay } from './scene.setOverlay.js';
 import type { AnyAction } from './define.js';
 import { aoePlace } from './aoe.place.js';
@@ -48,6 +49,7 @@ export const allActions: readonly AnyAction[] = [
   aoeRemove,
   tokenSetElevation,
   sceneSetOverlay,
+  sceneDelete,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

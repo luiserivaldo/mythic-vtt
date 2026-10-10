@@ -1,10 +1,10 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { RulerPreview } from '@mythic/protocol';
 import { useThree } from '@react-three/fiber';
 import { useContext, useEffect, useMemo, useRef } from 'react';
 import { Raycaster, Vector2, type Object3D } from 'three';
 import { useStore } from 'zustand';
 import type { Scene, Vec3 } from '@mythic/shared';
-import { useClientStore } from '../store/react.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { intersectPlaneY } from '../tools/token-drag.js';
 import {
@@ -54,7 +54,7 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
   const ephemeral = useContext(EphemeralContext);
-  const campaign = useClientStore((s) => s.campaign);
+  const campaign = useViewedCampaign();
   const scene: Scene | null = campaign?.activeSceneId
     ? (campaign.scenes[campaign.activeSceneId] ?? null)
     : null;

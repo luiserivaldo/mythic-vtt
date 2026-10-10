@@ -1,6 +1,6 @@
 import { enablePatches, produceWithPatches, type Patch } from 'immer';
 import type { Campaign } from '../schema/index.js';
-import type { AnyAction } from './define.js';
+import { isHost, isCoDm, type AnyAction } from './define.js';
 import type { Actor, ActionEnvelope } from './envelope.js';
 import { getAction } from './registry.js';
 
@@ -26,6 +26,17 @@ export function checkIntent(
     return { ok: false, reason: 'invalid-payload', detail: parsed.error.message };
   }
   if (actor.kind === 'mod' && !action.modExposed) return { ok: false, reason: 'forbidden' };
+  const data: unknown = parsed.data;
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    'sceneId' in data &&
+    typeof data.sceneId === 'string' &&
+    state.scenes[data.sceneId]?.dmOnly &&
+    !isHost(actor) &&
+    !isCoDm(state, actor)
+  )
+    return { ok: false, reason: 'forbidden' };
   if (!action.permission(state, actor, parsed.data)) return { ok: false, reason: 'forbidden' };
   return { ok: true, action, payload: parsed.data };
 }

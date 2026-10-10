@@ -1,5 +1,6 @@
+import { loadCampaign } from './campaign.js';
 import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
-import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
@@ -85,4 +86,45 @@ it('recovers an unclean session from the checkpoint and complete log tail', asyn
     clientRef: 'next',
   });
   expect(restarted.engine.seq()).toBe(4);
+});
+
+it('checkpoint removes deleted scene files and preserves the remaining private scene', async () => {
+  dir = await mkdtemp(join(tmpdir(), 'mythic-scene-delete-'));
+  const campaign = fixtureCampaign();
+  const scene = campaign.scenes[T.scene];
+  if (!scene) throw new Error('fixture lacks scene');
+  const privateId = tid(28);
+  campaign.scenes[privateId] = { ...structuredClone(scene), id: privateId, dmOnly: true };
+  const store = new LocalCampaignStore(dir, storeMigrate);
+  abandoned = store;
+  await store.saveCampaign(campaign.id, CampaignFile.parse(campaign));
+  for (const entry of Object.values(campaign.scenes)) await store.saveScene(campaign.id, entry);
+  Reflect.deleteProperty(campaign.scenes, T.scene);
+  campaign.activeSceneId = null;
+  await saveCampaignCheckpoint(store, campaign, tid(25), 1, 'autosave');
+  const loaded = await store.load(campaign.id);
+  expect(loaded.scenes.map((entry) => entry.id)).toEqual([privateId]);
+  expect(loaded.campaign.activeSceneId).toBeNull();
+});
+
+it('migrates and persists a zero-scene split save as one blank active scene', async () => {
+  dir = await mkdtemp(join(tmpdir(), 'mythic-empty-save-'));
+  const campaign = { ...fixtureCampaign(), scenes: {}, activeSceneId: null };
+  const store = new LocalCampaignStore(dir, storeMigrate);
+  abandoned = store;
+  await store.saveCampaign(campaign.id, CampaignFile.parse(campaign));
+  await writeFile(
+    join(dir, 'campaigns', campaign.id, 'campaign.json'),
+    JSON.stringify({ ...CampaignFile.parse(campaign), schemaVersion: 2 }),
+  );
+  const loaded = await loadCampaign(store, campaign.id);
+  expect(Object.keys(loaded.scenes)).toHaveLength(1);
+  expect(loaded.scenes[loaded.activeSceneId ?? '']).toMatchObject({
+    name: 'Blank scene',
+    dmOnly: false,
+  });
+  const reloaded = await store.load(campaign.id);
+  expect(reloaded.scenes).toHaveLength(1);
+  expect(reloaded.campaign.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+  expect(reloaded.campaign.activeSceneId).toBe(loaded.activeSceneId);
 });

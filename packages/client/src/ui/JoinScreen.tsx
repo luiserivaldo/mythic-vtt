@@ -31,6 +31,8 @@ function JoinFlow({ env }: { env: JoinEnv }) {
   const started = useSyncExternalStore(session.subscribe, session.started);
   const ready = useClientStore((s) => s.ready);
   const seatId = useClientStore((s) => s.seatId);
+  const campaign = useClientStore((s) => s.campaign);
+  const notices = useClientStore((s) => s.notices);
   const [profile, setProfile] = useState<Profile | null>(env.initialProfile);
   const [editingName, setEditingName] = useState(false);
 
@@ -75,6 +77,19 @@ function JoinFlow({ env }: { env: JoinEnv }) {
     return (
       <Card title="Joining the table">
         <p>Connecting to the host...</p>
+      </Card>
+    );
+  }
+  if (
+    !env.hostVisitor &&
+    ready &&
+    campaign?.activeSceneId === null &&
+    (!seatId || campaign.seats[seatId]?.role !== 'codm') &&
+    (step === 'seat' || notices.some((n) => n.message.startsWith('No active scene.')))
+  ) {
+    return (
+      <Card title="Waiting for a scene">
+        <p role="alert">No active scene. Ask the DM to activate a scene before joining.</p>
       </Card>
     );
   }
