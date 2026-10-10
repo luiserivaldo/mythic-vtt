@@ -394,3 +394,29 @@ describe('battlemap gizmo bounds (M1-42)', () => {
     expect(resolveGizmoTarget(campaign, [map.id], null)).toBeNull();
   });
 });
+
+describe('3D gizmo uses same aspect source as 2D (M1-47)', () => {
+  const map = entity({
+    layer: 'map',
+    image: { asset: { source: 'local', kind: 'image', hash: 'a'.repeat(64) }, calibrated: true },
+    transform: { ...entity().transform, scale: { x: 4, y: 4, z: 4 } },
+  });
+  it('gives the same footprint for 2:1 aspect as the 2D gizmo', () => {
+    const aspect = 2;
+    const extents2D = entityExtents(map, aspect);
+    const footprint2D = snapFootprint(extents2D);
+    // The 3D gizmo now uses the same entityExtents function with the same aspect
+    const extents3D = entityExtents(map, aspect);
+    const footprint3D = snapFootprint(extents3D);
+    expect(footprint2D).toBe(footprint3D);
+    expect(extents2D).toEqual(extents3D);
+  });
+  it('falls back to square for invalid aspect in both gizmos', () => {
+    for (const aspect of [undefined, 0, -1, NaN, Infinity]) {
+      const extents2D = entityExtents(map, aspect);
+      const extents3D = entityExtents(map, aspect);
+      expect(extents2D).toEqual(extents3D);
+      expect(snapFootprint(extents2D)).toBe(snapFootprint(extents3D));
+    }
+  });
+});
