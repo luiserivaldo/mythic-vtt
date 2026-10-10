@@ -32,7 +32,7 @@ test('the DM link shows live AoE affected tokens in 2D and 3D', async ({ browser
     const sceneId = testUlid('SCENE', 505);
     const insideId = testUlid('TOKEN', 501);
     const outsideId = testUlid('TOKEN', 502);
-    const aoeId = testUlid('AOE', 503);
+    const aoeId = identity.identityId;
     const transform = (x: number, y: number, z: number) => ({
       position: { x, y, z },
       rotation: { x: 0, y: 0, z: 0, w: 1 },
