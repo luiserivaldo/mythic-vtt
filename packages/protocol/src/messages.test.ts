@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   decodeClientMessage,
@@ -70,7 +71,7 @@ const server: ServerMessage[] = [
   { t: 'ack', clientRef: 'c1', seq: 4 },
   { t: 'reject', clientRef: 'c1', reason: 'forbidden', detail: 'nope' },
   { t: 'ephemeral', channel: 'cursor', data: [1, 2], from: id },
-  { t: 'presence', seats: [{ seatId: id, connected: true }], spectators: 2 },
+  { t: 'presence', seats: [{ seatId: id, connected: true, latencyMs: null }], spectators: 2 },
   { t: 'pong', n: 1 },
   { t: 'notice', level: 'warning', code: 'quota', message: 'almost full' },
   {
@@ -169,5 +170,29 @@ describe('ruler preview', () => {
         JSON.stringify({ ...message, data: { ...message.data, points: [{ x: 1, z: 2 }] } }),
       ).ok,
     ).toBe(false);
+  });
+});
+
+describe('v2 presence latency', () => {
+  it('decodes the golden online/offline fixture and round-trips it', () => {
+    const raw = readFileSync(
+      new URL('../../../fixtures/protocol/v2/presence.json', import.meta.url),
+      'utf8',
+    );
+    const decoded = decodeServerMessage(raw);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) throw new Error('invalid golden fixture');
+    expect(decodeServerMessage(encodeServerMessage(decoded.message))).toEqual(decoded);
+  });
+  it('rejects missing, unbounded and private connection details', () => {
+    const seat = { seatId: id, connected: true, latencyMs: 42 };
+    const valid = (value: unknown) =>
+      decodeServerMessage(JSON.stringify({ t: 'presence', seats: [value], spectators: 0 })).ok;
+    expect(valid(seat)).toBe(true);
+    for (const latencyMs of [-1, 0.5, 30_001, '42'])
+      expect(valid({ ...seat, latencyMs })).toBe(false);
+    expect(valid({ seatId: id, connected: true })).toBe(false);
+    expect(valid({ ...seat, ip: '192.0.2.1' })).toBe(false);
+    expect(valid({ ...seat, identitySecret: 'not-a-real-secret' })).toBe(false);
   });
 });

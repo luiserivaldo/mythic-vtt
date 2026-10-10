@@ -13,6 +13,7 @@ import { noopHandler, type GatewayConnection, type GatewayHandler } from './engi
 import { createMemoryIdentityStore, type IdentityStore } from './identity-store.js';
 import { hashSecret, verifySecret } from './secrets.js';
 import { createHostTokenGate, type HostTokenGate } from './host-token.js';
+import { createLatencyProbe } from './latency-probe.js';
 
 export const WS_PATH = '/ws';
 
@@ -92,6 +93,8 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
     let conn: GatewayConnection | undefined;
     let helloInFlight = false;
     let alive = true;
+    let latencyMs: number | null = null;
+    const probe = createLatencyProbe();
 
     const helloTimer = setTimeout(() => {
       if (!conn) fail(ws, 'unauthorized', 'hello timeout', true);
@@ -104,11 +107,18 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
               return;
             }
             alive = false;
-            ws.ping();
+            ws.ping(probe.start());
           }, heartbeatMs)
         : undefined;
-    ws.on('pong', () => {
+    ws.on('pong', (payload: Buffer) => {
+      const sample = probe.complete(payload.toString());
+      if (sample === null) return;
       alive = true;
+      latencyMs = sample;
+      if (conn) {
+        const current = conn;
+        void run(ws, () => handler.onLatency?.(current));
+      }
     });
 
     ws.on('close', () => {
@@ -165,7 +175,14 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         } finally {
           helloInFlight = false;
         }
-        if (conn) await run(ws, () => handler.onConnect(conn as GatewayConnection));
+        if (conn) {
+          await run(ws, () => handler.onConnect(conn as GatewayConnection));
+          // Browsers answer control-frame pings automatically, so no client clock or claimed RTT.
+          if (heartbeatMs > 0 && ws.readyState === WebSocket.OPEN) {
+            alive = false;
+            ws.ping(probe.start());
+          }
+        }
         return;
       }
       if (!conn) {
@@ -237,6 +254,9 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         avatar: hello.avatar,
         isHost,
         lastSeq: hello.lastSeq,
+        get latencyMs() {
+          return latencyMs;
+        },
         send: (m) => {
           sendTo(socket, m);
         },

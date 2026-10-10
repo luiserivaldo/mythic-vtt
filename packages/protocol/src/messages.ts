@@ -140,6 +140,8 @@ export const Presence = z.strictObject({
       seatId: Ulid,
       displayName: z.string().optional(),
       connected: z.boolean(),
+      /** UX-06: host-measured RTT; null before the first sample or while offline. */
+      latencyMs: z.number().int().min(0).max(30_000).nullable(),
     }),
   ),
   spectators: z.number().int().nonnegative(),
