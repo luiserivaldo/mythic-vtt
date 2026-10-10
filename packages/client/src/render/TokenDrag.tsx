@@ -28,6 +28,7 @@ import { pointerClaims } from './pointer-claims.js';
 import type { OrthographicCamera } from 'three';
 import { RulerPath } from './RulerPath.js';
 import { rulerOwnerName } from '../tools/ruler.js';
+import { rulerStore } from '../tools/ruler-store.js';
 
 const SETTLE_TIMEOUT_MS = 2000;
 
@@ -66,6 +67,7 @@ export function TokenDrag() {
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const mode = useViewMode();
+  const measureMovement = useStore(rulerStore, (s) => s.measureMovement);
   const local = useStore(tokenDragStore, (s) => s.local);
   const remote = useStore(tokenDragStore, (s) => s.remote);
 
@@ -319,6 +321,7 @@ export function TokenDrag() {
         ))}
       </group>
       {scene &&
+        measureMovement &&
         rulers.map((ruler) => (
           <RulerPath
             key={ruler.key}

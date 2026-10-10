@@ -111,7 +111,7 @@ test('held right orbits while middle and available left pan monotonically', asyn
   await page.getByRole('button', { name: 'Reset view' }).click();
   await waitForCameraToRest(page);
   const beforeToolDrag = await cameraPose(page);
-  const ruler = page.getByRole('button', { name: 'Ruler' });
+  const ruler = page.getByRole('button', { name: 'Ruler', exact: true });
   await ruler.click();
   await expect(ruler).toHaveAttribute('aria-pressed', 'true');
   await page.mouse.move(x, y);

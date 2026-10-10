@@ -8,6 +8,13 @@ interface RulerState {
   tool: boolean;
   /** Keep a completed press-drag ruler until it is replaced or explicitly cleared. */
   persistent: boolean;
+  mode: '2d' | '3d';
+  snap: boolean;
+  broadcast: boolean;
+  measureMovement: boolean;
+  setPreferences(
+    patch: Partial<Pick<RulerState, 'mode' | 'snap' | 'broadcast' | 'measureMovement'>>,
+  ): void;
   /** `idle` has nothing drawn; `active` is placing waypoints; `finished` keeps the readout up. */
   phase: 'idle' | 'active' | 'finished';
   sceneId: string | null;
@@ -28,6 +35,17 @@ interface RulerState {
 export const rulerStore = createStore<RulerState>()((set) => ({
   tool: false,
   persistent: false,
+  mode: '2d',
+  snap: true,
+  broadcast: true,
+  measureMovement: true,
+  setPreferences: (patch) => {
+    set(
+      patch.mode === undefined
+        ? patch
+        : { ...patch, phase: 'idle', points: [], cursor: null, sceneId: null },
+    );
+  },
   phase: 'idle',
   sceneId: null,
   points: [],
