@@ -11,7 +11,7 @@ import {
 } from './canvas-style.js';
 
 describe('outsideColor (D37)', () => {
-  it('uses light blue around the default board and a charcoal surround for explicit dark scenes', () => {
+  it('uses dark blue around the default board and a charcoal surround for explicit dark scenes', () => {
     expect(outsideColor(DEFAULT_BOARD_COLOR)).toBe(OUTSIDE_FALLBACK);
     expect(outsideColor('#000000')).toBe('#1b1c21');
     expect(outsideColor('rebeccapurple')).toBe(OUTSIDE_FALLBACK);

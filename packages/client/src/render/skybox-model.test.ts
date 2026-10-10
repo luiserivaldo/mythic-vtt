@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_BACKGROUND,
+  DEFAULT_SKYBOX_HORIZON,
   DEFAULT_ZENITH,
   domeColors,
   gradientAt,
@@ -31,9 +32,9 @@ describe('skybox-model', () => {
     expect(resolveBackground('#000000', 'bad').zenith).toBeNull();
     expect(resolveBackground('#000000', '#fff').zenith).toBe('#ffffff');
   });
-  it('uses the light board and blue zenith defaults without overriding explicit colours', () => {
+  it('uses a blue default skybox around grey tiles without overriding explicit colours', () => {
     expect(resolveBackground(undefined, undefined)).toEqual({
-      horizon: DEFAULT_BACKGROUND,
+      horizon: DEFAULT_SKYBOX_HORIZON,
       zenith: DEFAULT_ZENITH,
     });
     expect(resolveBackground(DEFAULT_BACKGROUND, undefined).zenith).toBe(DEFAULT_ZENITH);
