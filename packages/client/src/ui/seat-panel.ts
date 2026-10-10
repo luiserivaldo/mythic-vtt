@@ -30,7 +30,12 @@ export function seatRows(
       label: seat.label,
       role: seat.role,
       // D24: the UI says "Co-DM" for the stored `codm` role.
-      roleLabel: seat.role === 'codm' ? 'Co-DM' : 'Player',
+      roleLabel:
+        seat.role === 'codm'
+          ? 'Co-DM'
+          : !seat.permissions.move && !seat.permissions.edit && !seat.permissions.delete
+            ? 'Spectator'
+            : 'Player',
       occupied: seat.identityId !== null,
       connected: online.has(seat.id),
       occupantName: names.get(seat.id),

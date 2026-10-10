@@ -9,7 +9,7 @@ import { useGizmoTarget3D } from '../tools/use-gizmo-target-3d.js';
 import { AoEAffectedPanel } from './AoEAffectedPanel.js';
 import { AoEToolPanel } from './AoEToolPanel.js';
 import { toolPanelLayoutStore, type ToolPanelId } from './tool-panel-layout.js';
-import { viewerRole } from './viewer.js';
+import { isReadOnlyViewer, viewerRole } from './viewer.js';
 
 const EntityPanel = lazy(async () => {
   const module = await import('./EntityPanel.js');
@@ -86,6 +86,7 @@ export function ToolPanelDock({
   const selected = useStore(selectionStore, (state) => state.ids);
   const target2d = useGizmoTarget();
   const target3d = useGizmoTarget3D();
+  const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
   const role = campaign ? viewerRole({ isHost, seatId, campaign }) : 'observer';
   const canAdmin = role === 'host' || role === 'codm';
   const showEntities = canAdmin && campaign !== null && entities !== 'hidden';
@@ -95,7 +96,7 @@ export function ToolPanelDock({
   // Preserve the prior panel behavior for a non-admin who may update an owned, selected AoE.
   const showAoE = scene !== null && (canAdmin || selectedEntity?.aoe !== undefined);
 
-  if (!showEntities && !showTransform && !showAoE) return null;
+  if (readOnly || (!showEntities && !showTransform && !showAoE)) return null;
   return (
     <aside className="ui-tool-dock" aria-label="Tool panels">
       {showEntities && (

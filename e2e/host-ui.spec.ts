@@ -25,7 +25,7 @@ test('the DM link makes the browser host: panels appear, the token leaves the UR
 
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-  for (const panel of ['Scenes', 'Layers', 'Map', 'Seats']) {
+  for (const panel of ['Scenes', 'Layers', 'Map', 'Participants']) {
     await expect(page.getByText(panel, { exact: true }).first()).toBeVisible();
   }
   expect(page.url()).not.toContain('host=');
@@ -85,7 +85,7 @@ test('the DM link makes the browser host: panels appear, the token leaves the UR
   // A plain visitor on the same table is not the host and gets no DM panels.
   const viewer = await openClient(browser, table, 'viewer');
   await expect(viewer.page.getByRole('status')).toHaveText('Connected to New campaign');
-  await expect(viewer.page.getByText('Seats', { exact: true })).toHaveCount(0);
+  await expect(viewer.page.getByText('Participants', { exact: true })).toHaveCount(0);
   await expect(viewer.page.getByText('Invite', { exact: true })).toHaveCount(0);
 
   expect(errors).toEqual([]);

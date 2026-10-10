@@ -45,7 +45,13 @@ function entityIdForObject(object: Object3D, scene: Scene): string | undefined {
   return undefined;
 }
 
-export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
+export function RulerTool({
+  mode = '2d',
+  readOnly = false,
+}: {
+  mode?: ViewMode;
+  readOnly?: boolean;
+}) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
@@ -100,6 +106,8 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
   }, [ephemeral]);
 
   useEffect(() => {
+    // Read-only viewers still receive rulers; only pointer and publishing handlers are disabled.
+    if (readOnly) return;
     const el = gl.domElement;
     const raycaster = new Raycaster();
     let down: {
@@ -352,7 +360,7 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
       window.removeEventListener('contextmenu', onContextMenu, true);
       window.removeEventListener('keydown', onKey);
     };
-  }, [gl, getState]);
+  }, [gl, getState, readOnly]);
 
   const localPoints = useMemo(
     () => (phase === 'idle' ? NO_REMOTE : phase === 'active' ? withCursor(points, cursor) : points),

@@ -8,6 +8,7 @@ import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix, testId } from 
 const T = 'seat.create';
 const seatId = testId(20);
 const payload = { seatId, label: 'Player 4', binding: 'session' as const, role: 'player' as const };
+const readOnly = { view: true, move: false, edit: false, delete: false };
 const envelope = (p: unknown = payload): ActionEnvelope => ({
   id: IDS.action,
   type: T,
@@ -22,12 +23,15 @@ const envelope = (p: unknown = payload): ActionEnvelope => ({
 describe(`${T} schema`, () => {
   it('accepts a valid payload', () => {
     expect(seatCreate.schema.safeParse(payload).success).toBe(true);
+    expect(seatCreate.schema.safeParse({ ...payload, permissions: readOnly }).success).toBe(true);
   });
   it.each([
     ['missing label', { seatId }],
     ['empty label', { seatId, label: '  ' }],
     ['wrong binding', { seatId, label: 'P4', binding: 'forever' }],
     ['bad id', { seatId: 'bad', label: 'P4' }],
+    ['partial permissions', { ...payload, permissions: { view: true } }],
+    ['unknown permission', { ...payload, permissions: { ...readOnly, create: true } }],
     ['extra junk', { ...payload, extra: true }],
   ])('rejects %s', (_name, candidate) => {
     expect(seatCreate.schema.safeParse(candidate).success).toBe(false);
@@ -69,6 +73,11 @@ describe(`${T} reducer`, () => {
   it('uses the campaign binding and player role defaults', () => {
     const { state } = reduceAction(makeCampaign(), envelope({ seatId, label: 'Player 4' }));
     expect(state.seats[seatId]).toMatchObject({ binding: 'persistent', role: 'player' });
+  });
+
+  it('atomically applies an explicit permission preset', () => {
+    const { state } = reduceAction(makeCampaign(), envelope({ ...payload, permissions: readOnly }));
+    expect(state.seats[seatId]?.permissions).toEqual(readOnly);
   });
 
   it('is deterministic', () => {

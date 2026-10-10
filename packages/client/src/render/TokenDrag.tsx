@@ -56,7 +56,7 @@ function entityIdAt(object: Object3D | null, scene: Scene): string | null {
  * others; release sends ONE `token.move` and nothing is applied locally until the host's patch
  * lands (D34).
  */
-export function TokenDrag() {
+export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
@@ -126,6 +126,8 @@ export function TokenDrag() {
   }, [settling, storedPosition]);
 
   useEffect(() => {
+    // Keep remote drag previews visible to spectators without enabling local movement.
+    if (readOnly) return;
     const el = gl.domElement;
     let press: Press | null = null;
     let swallowClick = false;
@@ -297,7 +299,7 @@ export function TokenDrag() {
       el.removeEventListener('click', onClickCapture, true);
       window.removeEventListener('keydown', onKey);
     };
-  }, [gl, invalidate, getState]);
+  }, [gl, invalidate, getState, readOnly]);
 
   const ghosts = visibleGhosts(remote, scene, Date.now());
   const rulers = dragRulerPaths(local, remote, scene, Date.now());
