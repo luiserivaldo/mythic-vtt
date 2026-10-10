@@ -33,6 +33,8 @@ import {
 import { useGizmoTarget3D } from '../tools/use-gizmo-target-3d.js';
 import { GIZMO_MOVE_COLOR, GIZMO_ROTATE_COLOR, GIZMO_SCALE_COLOR } from './canvas-style.js';
 import { pointerClaims } from './pointer-claims.js';
+import { assetUrl } from '../assets/asset-url.js';
+import { mapTextureAspect, useMapTexture } from './use-texture.js';
 
 const COLORS: Record<Gizmo3DHandle, string> = {
   'move-xz': GIZMO_MOVE_COLOR,
@@ -77,12 +79,16 @@ export function TransformGizmo3D() {
   const draftPosition = useMemo(() => new Vector3(), []);
 
   const entity = target?.entity ?? null;
+  const texture = useMapTexture(
+    entity?.layer === 'map' && entity.image ? assetUrl('', entity.image.asset) : null,
+  );
+  const imageAspect = mapTextureAspect(texture);
   const live = preview && entity && preview.entityId === entity.id ? preview.draft : null;
   const draft = useMemo(() => live ?? (entity ? draft3dFromEntity(entity) : null), [live, entity]);
   const kinds = useMemo(() => (target ? handlesFor(target.kind) : []), [target]);
 
-  const latest = useRef({ target, draft, submit, kinds });
-  latest.current = { target, draft, submit, kinds };
+  const latest = useRef({ target, draft, submit, kinds, imageAspect });
+  latest.current = { target, draft, submit, kinds, imageAspect };
 
   // Constant screen size: rescale from the camera distance every frame.
   useFrame(({ camera, size }) => {
@@ -232,7 +238,7 @@ export function TransformGizmo3D() {
           pointerStart: { x: drag.startPoint.x, z: drag.startPoint.z },
           pointer: { x: now.point.x, z: now.point.z },
           grid: snap ? t.scene.grid : { ...t.scene.grid, snap: false },
-          footprint: snapFootprint(entityExtents(t.entity)),
+          footprint: snapFootprint(entityExtents(t.entity, latest.current.imageAspect)),
           y: start.y ?? 0,
         });
         next = { ...start, x: moved.x, z: moved.z };
