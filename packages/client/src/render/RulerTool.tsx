@@ -24,13 +24,9 @@ import { pointerClaims } from './pointer-claims.js';
 import { RulerPath } from './RulerPath.js';
 import { RULER_LOCAL_COLOR, RULER_REMOTE_COLOR } from './canvas-style.js';
 import type { ViewMode } from './view-mode-store.js';
+import { isTypingTarget } from './typing-target.js';
 
 const NO_REMOTE: readonly never[] = [];
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
-}
 
 /**
  * MEAS-01/02: the multi-waypoint ruler uses the ground plane in 2D and ray-hit surfaces in 3D.
