@@ -1,4 +1,3 @@
-import { PROTOCOL_VERSION } from '../packages/protocol/src/version.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';

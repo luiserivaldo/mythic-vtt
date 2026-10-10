@@ -64,6 +64,41 @@ describe('UX-04 scene lifecycle', () => {
       false,
     );
   });
+  it('filters private entity and scene edits from optimized raw patches', () => {
+    const before = campaign();
+    for (const action of [
+      {
+        type: 'entity.create',
+        payload: {
+          sceneId: privateId,
+          entity: {
+            layer: 'props',
+            owners: [],
+            transform: {
+              position: { x: 0, y: 0, z: 0 },
+              rotation: { x: 0, y: 0, z: 0, w: 1 },
+              scale: { x: 1, y: 1, z: 1 },
+            },
+            shape: { kind: 'box', color: '#667788', walkable: false },
+            id: testId(23),
+            name: 'SECRET-PRIVATE-ENTITY',
+          },
+        },
+      },
+      { type: 'scene.rename', payload: { sceneId: privateId, name: 'SECRET-RENAMED' } },
+    ]) {
+      const result = reduceAction(before, { ...envelope, ...action });
+      for (const audience of [
+        { kind: 'seat', seatId: IDS.owner },
+        { kind: 'spectators' },
+      ] as const) {
+        expect(patchesFor(audience, before, result.state, result.patches)).toEqual([]);
+      }
+      expect(
+        patchesFor({ kind: 'seat', seatId: IDS.coDm }, before, result.state, result.patches).length,
+      ).toBeGreaterThan(0);
+    }
+  });
   it('never activates a private scene; only the DM activates public scenes', () => {
     expect(canPerform(campaign(), ACTORS.host, 'scene.activate', { sceneId: privateId })).toBe(
       false,
