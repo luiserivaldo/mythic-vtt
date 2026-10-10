@@ -1,11 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from 'zustand';
 import { rulerStore } from '../tools/ruler-store.js';
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
-}
+import { isTypingTarget } from './typing-target.js';
 
 /** Board toolbar button plus the `R` shortcut for the Ruler tool (MEAS-01). Available to everyone. */
 export function RulerToggle() {
