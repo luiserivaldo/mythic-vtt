@@ -541,3 +541,13 @@ main [tabindex]:focus-visible {
   margin-bottom: 0.25rem;
   overflow-wrap: anywhere;
 }
+
+.ui-history-tools {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 3;
+}
+.ui-history-tools code {
+  overflow-wrap: anywhere;
+}

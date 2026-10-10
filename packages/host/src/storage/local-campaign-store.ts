@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { desc } from 'drizzle-orm';
-import { mkdir, open, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdir, open, opendir, readFile, readdir, stat } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -229,11 +229,18 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
     );
     await atomicWrite(join(dir, 'meta.json'), JSON.stringify(SessionMeta.parse(meta)));
   }
-  async readSessions(campaignId: Id): Promise<SessionMeta[]> {
+  async readSessions(campaignId: Id, max?: number): Promise<SessionMeta[]> {
     const dir = join(this.folder(campaignId), 'sessions');
     let names: string[];
     try {
-      names = await readdir(dir);
+      if (max !== undefined) {
+        names = [];
+        const directory = await opendir(dir);
+        for await (const entry of directory) {
+          names.push(entry.name);
+          if (names.length > max) throw new Error('history session budget exceeded');
+        }
+      } else names = await readdir(dir);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
       throw error;
@@ -244,6 +251,8 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       const path = join(dir, name, 'meta.json');
       let raw: string;
       try {
+        if (max !== undefined && (await stat(path)).size > 1024)
+          throw new Error('history metadata budget exceeded');
         raw = await readFile(path, 'utf8');
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
