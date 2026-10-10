@@ -15,6 +15,7 @@ const base: RenderEntity = {
     entityLayer: 'tokens',
     perms: undefined,
     labelVisibility: 'all',
+    yaw: 0,
   },
 };
 const withToken = (patch: Partial<NonNullable<RenderEntity['token']>>): RenderEntity => ({

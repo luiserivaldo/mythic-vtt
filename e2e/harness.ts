@@ -4,6 +4,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PROTOCOL_VERSION } from '../packages/protocol/src/version.js';
 import type { Browser, BrowserContext, Page } from '@playwright/test';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -369,7 +370,7 @@ export class RawClient {
     ws.send(
       JSON.stringify({
         t: 'hello',
-        v: 1,
+        v: PROTOCOL_VERSION,
         identityId: opts.identityId,
         identitySecret: opts.identitySecret,
         displayName: opts.name,

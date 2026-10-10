@@ -13,6 +13,7 @@ const LAYER_LABELS: Record<LayerId, string> = {
 export interface LayerRow {
   layer: LayerId;
   label: string;
+  description?: string;
   locked: boolean;
   hidden: boolean;
 }
@@ -22,6 +23,9 @@ export function layerRows(scene: Scene, hidden: ReadonlySet<LayerId>): LayerRow[
   return LAYER_ORDER.map((layer) => ({
     layer,
     label: LAYER_LABELS[layer],
+    ...(layer === 'map'
+      ? { description: 'Battlemap images, ground, terrain and fixed objects' }
+      : {}),
     locked: scene.layers[layer]?.locked ?? false,
     hidden: hidden.has(layer),
   }));

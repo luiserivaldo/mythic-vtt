@@ -8,6 +8,7 @@ import { selectionStore } from '../tools/selection-store.js';
 import { MapImageMesh } from './MapImage.js';
 import { ElevationBadge, SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { entityFill } from './token-fill.js';
+import { TOKEN_GROUND_FRAME } from './token-frame.js';
 import { PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
 import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-model.js';
 import type { RenderGrid } from './grid-model.js';
@@ -47,13 +48,11 @@ const NO_SEATS: SceneSelectionSeats = {};
 export function PickableEntities({
   rendered,
   scene,
-  additiveMode,
   mode = '2d',
   grid = null,
 }: {
   rendered: RenderScene | null;
   scene: Scene | null;
-  additiveMode: boolean;
   /** 3D is only reachable explicitly until the 2D/3D toggle exists (M2-05). */
   mode?: RenderMode;
   /** GRID-05: scene grid style for walkable tops (3D only). */
@@ -93,9 +92,7 @@ export function PickableEntities({
     event.stopPropagation();
     const hits = event.intersections.map(({ object, distance }) => ({ id: object.name, distance }));
     const id = pickEntity(hits, scene, actor);
-    selectionStore
-      .getState()
-      .pick(scene.id, id, additiveMode || event.shiftKey || event.ctrlKey || event.metaKey);
+    selectionStore.getState().pick(scene.id, id, event.shiftKey || event.ctrlKey || event.metaKey);
   }
 
   return (
@@ -188,25 +185,34 @@ export function PickableEntities({
                   />
                 </Suspense>
               ) : (
-                <mesh
-                  key={entity.id}
-                  name={entity.id}
-                  position={[...entity.position]}
-                  rotation={[-Math.PI / 2, 0, 0]}
-                  renderOrder={order}
-                  onClick={onClick}
-                >
-                  <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
-                  <TokenMaterial
-                    entity={entity}
-                    color={entityFill(entity, selected.includes(entity.id)).color}
-                  />
-                  {entityFill(entity, selected.includes(entity.id)).ring && (
-                    <SelectionRing size={entity.sizeCells} />
-                  )}
-                  <TokenLabel entity={entity} actor={actor} />
-                  <ElevationBadge entity={entity} actor={actor} />
-                </mesh>
+                <Fragment key={entity.id}>
+                  {/* M1-34: the image spins about the token centre (world Y); the label and badge
+                      are screen-projected (CAM-04) and stay fixed. */}
+                  <group position={[...entity.position]}>
+                    <group rotation={[0, entity.token?.yaw ?? 0, 0]}>
+                      <mesh
+                        name={entity.id}
+                        rotation={[-Math.PI / 2, 0, 0]}
+                        renderOrder={order}
+                        onClick={onClick}
+                      >
+                        <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
+                        <TokenMaterial
+                          entity={entity}
+                          color={entityFill(entity, selected.includes(entity.id)).color}
+                        />
+                        {entityFill(entity, selected.includes(entity.id)).ring && (
+                          <SelectionRing size={entity.sizeCells} />
+                        )}
+                      </mesh>
+                    </group>
+                    {/* Anchors are authored in the token's ground plane; the frame keeps them there. */}
+                    <group rotation={TOKEN_GROUND_FRAME}>
+                      <TokenLabel entity={entity} actor={actor} />
+                      <ElevationBadge entity={entity} actor={actor} />
+                    </group>
+                  </group>
+                </Fragment>
               ),
             )}
         </group>

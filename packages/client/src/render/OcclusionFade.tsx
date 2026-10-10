@@ -41,7 +41,7 @@ export function OcclusionFade({ rendered }: { rendered: RenderScene | null }) {
   }, [rendered, selected, scene, invalidate]);
 
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    if (!(import.meta.env.DEV || import.meta.env.MODE === 'test')) return;
     const diagnostics = {
       getMaterials: () =>
         meshes.current.map((mesh) => {
@@ -69,6 +69,12 @@ export function OcclusionFade({ rendered }: { rendered: RenderScene | null }) {
     if (!dirty.current && previousCamera.current.equals(camera.position)) return;
     dirty.current = false;
     previousCamera.current.copy(camera.position);
+    // CAM-05: without a selected token there is no sightline to raycast. Restore a previous
+    // fade, but avoid traversing the scene graph on every frame of an unselected camera orbit.
+    if (targets.length === 0) {
+      controller.reset();
+      return;
+    }
     scene.updateMatrixWorld();
     controller.update(camera.position, targets, meshes.current);
     // Camera/input/store changes already schedule this frame; fading needs no animation loop.
