@@ -29,7 +29,7 @@ export const prefabSave = defineAction({
     const p = action.payload;
     const entity = draft.scenes[p.sceneId]?.entities[p.entityId];
     if (!entity) return;
-    // Source grants govern blueprint visibility, but do not carry over to placed copies.
+    // Source grants govern blueprint visibility; placed copies inherit only a hidden view.
     const blueprint = PrefabEntity.parse(
       Object.fromEntries(Object.entries(entity).filter(([key]) => key !== 'id')),
     );

@@ -40,8 +40,8 @@ export function PrefabPanel({ campaign }: { campaign: Campaign }) {
     <section aria-labelledby="ui-prefabs-h" className="ui-panel">
       <h2 id="ui-prefabs-h">Prefab library</h2>
       <p>
-        Save a configuration, then place independent copies in any scene. Copies start unowned with
-        no instance permission overrides.
+        Save a configuration, then place independent copies in any scene. Copies start unowned;
+        copies of a hidden entity stay hidden, and linked characters stay linked.
       </p>
       <label>
         Source entity{' '}
