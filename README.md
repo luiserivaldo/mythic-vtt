@@ -73,6 +73,8 @@ Found a bug or have an idea? Please open an issue. If you want to help build Myt
 
 Mythic VTT is licensed under the [GNU Affero General Public License v3.0](LICENSE). "Mythic VTT" and "MythicTomes" are trademarks of MythicTomes.
 
+Prefab library: DM/co-DM tools save entity configurations per campaign and place independent copies across scenes, including their referenced assets in campaign exports.
+
 Selected tokens have a Token panel for persistent reach/aura rings. Set each radius in scene units and choose its colour; rings follow the token in 2D and 3D. Editing requires token edit permission. Saves use schema version 3; version 1 and 2 campaigns and sessions migrate without losing data.
 
 New campaigns start with one blank active scene. The DM can browse scenes locally without moving players, and create DM-only scenes that players and spectators never receive. Only the DM activates a public scene for players. The last scene cannot be deleted; deleting the players' active scene leaves their board empty and blocks new joins until another public scene is activated.
