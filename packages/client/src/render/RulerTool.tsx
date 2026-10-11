@@ -6,6 +6,7 @@ import { useStore } from 'zustand';
 import type { Scene, Vec3 } from '@mythic/shared';
 import { useClientStore } from '../store/react.js';
 import { rulerStore } from '../tools/ruler-store.js';
+import { measurementScene } from '../tools/measurement-tool.js';
 import { intersectPlaneY } from '../tools/token-drag.js';
 import {
   appendWaypoint,
@@ -64,6 +65,7 @@ export function RulerTool({
   latest.current = { scene, ephemeral, mode };
   const sceneId = scene?.id ?? null;
 
+  const measurementMode = useStore(rulerStore, (s) => s.mode);
   const phase = useStore(rulerStore, (s) => s.phase);
   const points = useStore(rulerStore, (s) => s.points);
   const cursor = useStore(rulerStore, (s) => s.cursor);
@@ -124,6 +126,7 @@ export function RulerTool({
     const publish = (kind: RulerPhase, force: boolean) => {
       const { scene: sc, ephemeral: eph } = latest.current;
       if (!eph || !sc) return;
+      if (kind !== 'cancelled' && !rulerStore.getState().broadcast) return;
       const s = rulerStore.getState();
       const path =
         kind === 'cancelled' ? [] : kind === 'active' ? withCursor(s.points, s.cursor) : s.points;
@@ -135,7 +138,8 @@ export function RulerTool({
     };
 
     const pointAt = (e: { clientX: number; clientY: number }): Vec3 | null => {
-      const sc = latest.current.scene;
+      const source = latest.current.scene;
+      const sc = source ? measurementScene(source) : null;
       if (!sc) return null;
       const r = el.getBoundingClientRect();
       const ndc = new Vector2(
@@ -143,7 +147,7 @@ export function RulerTool({
         -(((e.clientY - r.top) / r.height) * 2 - 1),
       );
       raycaster.setFromCamera(ndc, getState().camera);
-      if (latest.current.mode === '3d') {
+      if (rulerStore.getState().mode === '3d') {
         for (const intersection of raycaster.intersectObjects(getState().scene.children, true)) {
           const entityId = entityIdForObject(intersection.object, sc);
           if (!entityId) continue;
@@ -163,14 +167,15 @@ export function RulerTool({
         0,
       );
       return hit
-        ? latest.current.mode === '3d'
+        ? rulerStore.getState().mode === '3d'
           ? prepareRulerPoint3d(hit, sc)
           : prepareRulerPoint(hit, sc)
         : null;
     };
 
     const tokenAt = (e: { clientX: number; clientY: number }): string | null => {
-      const sc = latest.current.scene;
+      const source = latest.current.scene;
+      const sc = source ? measurementScene(source) : null;
       if (!sc) return null;
       const r = el.getBoundingClientRect();
       const ndc = new Vector2(
@@ -209,7 +214,8 @@ export function RulerTool({
       if (!rulerStore.getState().tool || e.target !== el) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (pointerClaims.isClaimed(e.pointerId)) return;
-      const sc = latest.current.scene;
+      const source = latest.current.scene;
+      const sc = source ? measurementScene(source) : null;
       const point = pointAt(e);
       if (!sc || !point) return;
       const beganMeasurement = rulerStore.getState().phase !== 'active';
@@ -236,7 +242,8 @@ export function RulerTool({
       down = null;
       pointerClaims.release(start.pointerId);
       if (el.hasPointerCapture(start.pointerId)) el.releasePointerCapture(start.pointerId);
-      const sc = latest.current.scene;
+      const source = latest.current.scene;
+      const sc = source ? measurementScene(source) : null;
       const point = pointAt(e);
       if (!sc || !point) return;
       if (start.dragging) {
@@ -277,7 +284,8 @@ export function RulerTool({
         if (!down.dragging) {
           down.dragging = true;
           if (!down.beganMeasurement) {
-            const sc = latest.current.scene;
+            const source = latest.current.scene;
+            const sc = source ? measurementScene(source) : null;
             if (!sc) return;
             s.begin(sc.id, down.point);
           }
@@ -332,7 +340,11 @@ export function RulerTool({
 
     // Disarming the tool mid-measure must tell others to drop it.
     const unsubscribe = rulerStore.subscribe((state, previous) => {
-      if (previous.phase !== 'idle' && state.phase === 'idle') publish('cancelled', true);
+      if (
+        (previous.phase !== 'idle' && state.phase === 'idle') ||
+        (previous.broadcast && !state.broadcast)
+      )
+        publish('cancelled', true);
     });
 
     // Window capture runs before the camera and token handlers, whatever their mount order.
@@ -375,7 +387,7 @@ export function RulerTool({
         scene={scene}
         color={RULER_LOCAL_COLOR}
         owner={null}
-        mode={mode}
+        mode={measurementMode}
       />
       {remotes.map(([from, r]) => (
         <RulerPath
