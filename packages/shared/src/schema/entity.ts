@@ -60,6 +60,8 @@ const TokenComponent = z.object({
   characterInstanceId: Id.optional(),
   statusMarkers: TokenStatusMarkers.optional(),
   rings: z.array(TokenRing).max(8).optional(),
+  /** TOK-03: vertical position is locked; moves keep the height and ignore gravity. */
+  flying: z.boolean().optional(),
 });
 
 const ShapeComponent = z.object({

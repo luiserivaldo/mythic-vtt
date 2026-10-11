@@ -9,5 +9,6 @@ export const Seat = z.object({
   identityId: Id.nullable(),
   role: z.enum(['player', 'codm']),
   permissions: SeatPermissions,
+  interactionEnabled: z.boolean().optional(),
 });
 export type Seat = z.infer<typeof Seat>;

@@ -1,3 +1,5 @@
+import { createSpectatorLinks } from './gateway/spectator-links.js';
+import { registerSpectatorRoutes } from './http/spectator-routes.js';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { storeMigrate } from '@mythic/shared';
@@ -117,7 +119,12 @@ export async function startHost(
   // Counts connections that completed `hello`, so tests can tell "socket open" from "authenticated".
   let authenticated = 0;
   const hostToken = options.hostToken ?? generateHostToken();
+  const spectatorLinks = createSpectatorLinks(
+    join(config.dataDir, 'index.sqlite'),
+    engine.state().id,
+  );
   const gateway = createGateway({
+    spectatorTokenValid: (token) => spectatorLinks.valid(token),
     hostToken,
     identities,
     handler: {
@@ -137,6 +144,13 @@ export async function startHost(
     identities,
     state: () => engine.state(),
     now: clock,
+  });
+  registerSpectatorRoutes(gateway.app, {
+    auth: httpAuth,
+    links: spectatorLinks,
+    disconnect: () => {
+      gateway.disconnectSpectators();
+    },
   });
   registerAssetRoutes(gateway.app, {
     assetStore,
@@ -164,6 +178,7 @@ export async function startHost(
     port = await gateway.listen({ port: config.port, host: config.host });
   } catch (error) {
     await gateway.close();
+    spectatorLinks.close();
     await closeStores();
     throw error;
   }
@@ -195,6 +210,7 @@ export async function startHost(
             'end',
           );
         } finally {
+          spectatorLinks.close();
           await closeStores();
         }
       }

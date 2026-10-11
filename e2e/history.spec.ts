@@ -72,6 +72,17 @@ test('history filters, survives restart and excludes private REST content', asyn
   await page.getByRole('button', { name: 'History', exact: true }).click();
   const history = page.getByRole('region', { name: 'Action history' });
   await expect(history.getByText('entity.create', { exact: false }).first()).toBeVisible();
+  // UX-10: history renders inside the right dock, and Escape closes it and returns focus.
+  await expect(
+    page.getByRole('complementary', { name: 'Right dock' }).getByRole('region', {
+      name: 'Action history',
+    }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(history).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'History', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'History', exact: true }).click();
+  await expect(history.getByText('entity.create', { exact: false }).first()).toBeVisible();
   await history.getByLabel('History seat').selectOption(seatId);
   await history.getByRole('button', { name: 'Refresh history' }).click();
   await expect(history.locator('summary')).toHaveCount(1);

@@ -32,7 +32,8 @@ test('overlapping walkable tops render one stable top grid in 3D', async ({ brow
   const list = page.getByRole('list', { name: 'Entities in this scene' });
   await list.getByRole('button', { name: 'Dais', exact: true }).click();
   const toggle = page.getByLabel('Show grid on top of Dais');
-  await toggle.check();
+  await expect(toggle).not.toBeChecked();
+  await toggle.click();
   await expect(toggle).toBeChecked();
 
   const identity = await page.evaluate(

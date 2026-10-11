@@ -1,6 +1,6 @@
 import { historyGroups } from './history-groups.js';
 import { HistoryPage, type HistoryEntry } from '@mythic/shared';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadOrCreateIdentity } from '../net/identity.js';
 import { useClientStore } from '../store/react.js';
 import { viewerRole } from './viewer.js';
@@ -161,11 +161,25 @@ export function HistoryTools() {
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const [open, setOpen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
   if (!campaign || !ready) return null;
   const role = viewerRole({ campaign, isHost, seatId });
+  const close = () => {
+    setOpen(false);
+    toggle.current?.focus();
+  };
+  // UX-10: history sits in the right dock with the other panels, so it never covers the board or
+  // another drawer. Escape closes it from anywhere inside and hands focus back to the button.
   return (
-    <aside aria-label="History tools" className="ui-history-tools">
+    <aside
+      aria-label="History tools"
+      className="ui-history-tools"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && open) close();
+      }}
+    >
       <button
+        ref={toggle}
         type="button"
         aria-expanded={open}
         onClick={() => {
@@ -175,20 +189,8 @@ export function HistoryTools() {
         History
       </button>
       {open && (
-        <div
-          className="ui-drawer"
-          style={{ top: '8rem' }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') setOpen(false);
-          }}
-        >
-          <button
-            type="button"
-            aria-label="Close History panel"
-            onClick={() => {
-              setOpen(false);
-            }}
-          >
+        <div className="ui-history-body">
+          <button type="button" aria-label="Close History panel" onClick={close}>
             Close
           </button>
           <HistoryPanel key={`${campaign.id}:${seatId ?? ''}:${role}`} />

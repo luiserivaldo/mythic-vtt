@@ -116,14 +116,78 @@ export function surfaceHeightAt(
     currentElevation === undefined
       ? Infinity
       : currentElevation + Math.max(options.maxStepUp ?? DEFAULT_MAX_STEP_UP, 0) + EPS;
-  let best = GROUND_ELEVATION;
+  return Math.max(highestSurfaceAt(x, z, walkables, limit) ?? GROUND_ELEVATION, GROUND_ELEVATION);
+}
+
+/**
+ * Elevation of the highest walkable surface at (x, z) that is at or below `limit`, or undefined
+ * when no walkable shape covers the point (the bare ground is not a walkable surface here).
+ */
+function highestSurfaceAt(
+  x: number,
+  z: number,
+  walkables: readonly WalkableSurface[],
+  limit: number,
+): number | undefined {
+  let best: number | undefined;
   for (const w of walkables) {
     const h = primitiveProfileHeight(w, x, z);
     if (h === undefined) continue;
     const elevation = w.position.y + h;
-    if (elevation <= limit && elevation > best) best = elevation;
+    if (
+      elevation <= limit &&
+      elevation > GROUND_ELEVATION &&
+      (best === undefined || elevation > best)
+    )
+      best = elevation;
   }
   return best;
+}
+
+/**
+ * The highest walkable surface at (x, z), or undefined when none covers it. This is what a
+ * top-down view shows under the cursor, so the 2D board uses it as its "surface under the cursor".
+ */
+export function topSurfaceAt(
+  x: number,
+  z: number,
+  walkables: readonly WalkableSurface[],
+): number | undefined {
+  return highestSurfaceAt(x, z, walkables, Infinity);
+}
+
+export interface MoveElevationInput {
+  /** The token's footprint centre after snapping. */
+  position: { x: number; z: number };
+  /** The token's elevation before the move. */
+  elevation: number;
+  /** TOK-03: a flying token's height is locked; surfaces and gravity are ignored. */
+  flying?: boolean;
+  /**
+   * Elevation of the walkable surface the cursor is over (a 3D ray hit on a walkable shape, or
+   * `topSurfaceAt` in 2D). Omit when the cursor is not over one.
+   */
+  surfaceUnderCursor?: number;
+}
+
+/**
+ * Elevation a token has after being moved (TOK-03, ENV-04, Q26). Moving never applies gravity:
+ * the token keeps its elevation, unless it is dropped onto a walkable surface under the cursor,
+ * in which case it takes that surface's exact height (D25). A flying token always keeps its own.
+ *
+ * The cursor's hit is resolved against the surfaces at the snapped footprint centre, so stacked
+ * platforms and ramps give the height under the token and not the height under the pointer. A
+ * higher platform than the one picked is never chosen.
+ */
+export function moveElevation(
+  input: MoveElevationInput,
+  walkables: readonly WalkableSurface[],
+  pickTolerance: number = DEFAULT_MAX_STEP_UP,
+): number {
+  const { position, elevation, flying, surfaceUnderCursor: picked } = input;
+  if (flying || picked === undefined) return elevation;
+  const limit = picked + Math.max(pickTolerance, 0) + EPS;
+  return highestSurfaceAt(position.x, position.z, walkables, limit) ?? picked;
 }
 
 /**

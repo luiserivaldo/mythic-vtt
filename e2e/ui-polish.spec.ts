@@ -13,7 +13,7 @@ test.afterAll(async () => {
   await table?.stop();
 });
 
-test('spawns at the scene centre, offsets the next spawn, and panels overlay a full-window board', async ({
+test('spawns at the scene centre, offsets the next spawn, and keeps panels beside the board', async ({
   browser,
 }, testInfo) => {
   if (!table) throw new Error('table not started');
@@ -37,7 +37,7 @@ test('spawns at the scene centre, offsets the next spawn, and panels overlay a f
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Entities', exact: true }).click();
-  // Opening a tool panel overlays the board: the board keeps its size and the dock sits beside it.
+  // Opening a tool panel keeps the board width and positions the panel in the dock.
   const openBox = await board.boundingBox();
   expect(openBox).toEqual(closedBox);
   const dock = page.getByRole('complementary', { name: 'Tool panels' });
@@ -59,14 +59,18 @@ test('spawns at the scene centre, offsets the next spawn, and panels overlay a f
   await list.getByRole('button', { name: 'Goblin', exact: true }).click();
   await expect(x).toHaveValue('102.5');
   await expect(z).toHaveValue('77.5');
+  const selectedBoard = await board.boundingBox();
+  const selectedPanels = await dock.boundingBox();
+  if (!selectedBoard || !selectedPanels) throw new Error('Selected token panels must be visible');
+  expect(selectedPanels.x).toBeGreaterThanOrEqual(selectedBoard.x + selectedBoard.width);
   await list.getByRole('button', { name: 'Crate', exact: true }).click();
   await expect(x).toHaveValue('107.5');
   await expect(z).toHaveValue('82.5');
 
   // The transform panel is readable: light labels (--ui-muted) on the dark panel surface.
   const panel = page.locator('.ui-transform');
-  await expect(panel).toHaveCSS('background-color', 'rgb(23, 33, 43)');
-  await expect(panel.locator('label').first()).toHaveCSS('color', 'rgb(169, 182, 195)');
+  await expect(panel).toHaveCSS('background-color', 'rgb(23, 43, 69)');
+  await expect(panel.locator('label').first()).toHaveCSS('color', 'rgb(186, 201, 216)');
 
   await page.waitForTimeout(500);
   await page.screenshot({ path: testInfo.outputPath('drawer-1280.png') });

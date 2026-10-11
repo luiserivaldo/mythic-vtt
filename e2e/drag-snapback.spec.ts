@@ -92,7 +92,8 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
               transform: {
                 position: { x: from.x, y: 0, z: from.z },
                 rotation: { x: 0, y: 0, z: 0, w: 1 },
-                scale: { x: 4, y: 2, z: 4 },
+                // Wide enough that the 2-cell drag ends well inside it, not on its edge.
+                scale: { x: 5, y: 2, z: 5 },
               },
               shape: { kind: 'box', color: '#888888', walkable: true },
             },
@@ -142,7 +143,9 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
       .poll(() => position()?.x, { message: name, timeout: 5_000 })
       .toBeCloseTo(from.x - 2);
     expect(position()?.z, name).toBeCloseTo(from.z);
-    expect(position()?.y, name).toBe(entry.layer === 'props' ? 2 : 0);
+    // Q26: a move keeps the elevation, unless it is dropped onto a platform under the cursor.
+    const platformUnderDrop = entry.layer === 'map' || entry.layer === 'props';
+    expect(position()?.y, name).toBe(platformUnderDrop ? 2 : entry.elevation);
     expect(errors, name).toEqual([]);
     expect((await host.intent('entity.delete', { sceneId, entityId: id })).t).toBe('ack');
     if (entry.layer === 'map' || entry.layer === 'props') {

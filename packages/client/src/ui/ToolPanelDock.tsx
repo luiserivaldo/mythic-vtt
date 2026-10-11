@@ -2,6 +2,7 @@ import { TokenStatusPanel } from './TokenStatusPanel.js';
 import { TokenRingsPanel } from './TokenRingsPanel.js';
 import type { Campaign, Scene } from '@mythic/shared';
 import { lazy, Suspense, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
 import { useClientStore } from '../store/react.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
@@ -77,10 +78,12 @@ export function ToolPanelDock({
   campaign,
   scene,
   mode3d,
+  container,
 }: {
   campaign: Campaign | null;
   scene: Scene | null;
   mode3d: boolean;
+  container: HTMLElement | null;
 }) {
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
@@ -103,9 +106,13 @@ export function ToolPanelDock({
   const showRuler = scene !== null && (rulerActive || aoeActive);
 
   const showToken = campaign !== null && scene !== null && selectedEntity?.token !== undefined;
-  if (readOnly || (!showEntities && !showTransform && !showAoE && !showToken && !showRuler))
+  if (
+    !container ||
+    readOnly ||
+    (!showEntities && !showTransform && !showAoE && !showToken && !showRuler)
+  )
     return null;
-  return (
+  return createPortal(
     <aside className="ui-tool-dock" aria-label="Tool panels">
       {showEntities && (
         <PanelFrame id="entities" label="Entities" collapsed={entities === 'collapsed'}>
@@ -149,6 +156,7 @@ export function ToolPanelDock({
           {aoeActive && <AoEAffectedPanel scene={scene} />}
         </PanelFrame>
       )}
-    </aside>
+    </aside>,
+    container,
   );
 }
