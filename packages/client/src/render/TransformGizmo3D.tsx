@@ -6,15 +6,11 @@ import { useStore } from 'zustand';
 import { SubmitContext } from '../ui/submit.js';
 import { commitTransform } from '../tools/gizmo-commit.js';
 import { gizmoStore } from '../tools/gizmo-store.js';
-import {
-  applyMove,
-  entityExtents,
-  snapFootprint,
-  type GizmoDraft,
-} from '../tools/transform-gizmo.js';
+import { applyMove, type GizmoDraft } from '../tools/transform-gizmo.js';
 import {
   axisVector,
   draft3dFromEntity,
+  gizmo3dMoveFootprint,
   handleAnchors,
   handlesFor,
   hitScreenHandle,
@@ -238,7 +234,7 @@ export function TransformGizmo3D() {
           pointerStart: { x: drag.startPoint.x, z: drag.startPoint.z },
           pointer: { x: now.point.x, z: now.point.z },
           grid: snap ? t.scene.grid : { ...t.scene.grid, snap: false },
-          footprint: snapFootprint(entityExtents(t.entity, latest.current.imageAspect)),
+          footprint: gizmo3dMoveFootprint(t.entity, latest.current.imageAspect),
           y: start.y ?? 0,
         });
         next = { ...start, x: moved.x, z: moved.z };
