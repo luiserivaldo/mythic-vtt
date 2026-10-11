@@ -142,11 +142,12 @@ describe('initiative actions and visibility', () => {
                   },
                 }
               : {
-                  type: 'entity.update',
+                  type: 'permission.update',
                   payload: {
                     sceneId: IDS.scene,
                     entityId: IDS.entity,
-                    changes: { perms: { view: hidden } },
+                    target: 'entity',
+                    permissions: { view: hidden },
                   },
                 };
           const result = reduceAction(before, { ...envelope, ...action });

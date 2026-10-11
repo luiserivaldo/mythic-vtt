@@ -118,10 +118,11 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   ).toMatchObject({ t: 'ack' });
   for (const hidden of [true, false]) {
     expect(
-      await host.intent('entity.update', {
+      await host.intent('permission.update', {
         sceneId,
         entityId: beast,
-        changes: { perms: { view: !hidden } },
+        target: 'entity',
+        permissions: { view: !hidden },
       }),
     ).toMatchObject({ t: 'ack' });
     await player.waitForSeq(host.lastSeq);
