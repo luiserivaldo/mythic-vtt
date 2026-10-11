@@ -205,8 +205,9 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await expect(dm.getByRole('region', { name: 'Transform: Ruler target' })).toBeVisible();
 
   // A finished ruler consumes the first Escape and broadcasts its cancel. The selected token
-  // remains until a second Escape reaches BoardCanvas.
-  await dm.getByRole('button', { name: 'Ruler' }).click();
+  // remains until a second Escape reaches BoardCanvas. Broadcast was turned off above.
+  await dm.getByRole('button', { name: 'Ruler', exact: true }).click();
+  await dm.getByLabel('Broadcast to others').check();
   await dm.mouse.move(a.x, a.y);
   await dm.mouse.down();
   await dm.mouse.move(b.x, b.y, { steps: 5 });
