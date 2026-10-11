@@ -183,7 +183,14 @@ test('DM-layer data never reaches players or spectators, across layer moves, edi
     host.intent('entity.update', {
       sceneId: SCENE,
       entityId: h1.id,
-      changes: { name: 'SECRET-RENAMED-H1', pin: { text: 'SECRET-NEW-PIN', reveal: 'hover' } },
+      changes: { name: 'SECRET-RENAMED-H1' },
+    }),
+  );
+  await ok(
+    host.intent('pin.update', {
+      sceneId: SCENE,
+      entityId: h1.id,
+      changes: { text: 'SECRET-NEW-PIN', reveal: 'hover' },
     }),
   );
   await ok(host.intent('entity.delete', { sceneId: SCENE, entityId: h2.id }));
@@ -213,8 +220,14 @@ test('DM-layer data never reaches players or spectators, across layer moves, edi
       entityId: h1.id,
       changes: {
         name: 'SECRET-AFTER-HIDE',
-        pin: { text: 'SECRET-PIN-AFTER-HIDE', reveal: 'click' },
       },
+    }),
+  );
+  await ok(
+    host.intent('pin.update', {
+      sceneId: SCENE,
+      entityId: h1.id,
+      changes: { text: 'SECRET-PIN-AFTER-HIDE', reveal: 'click' },
     }),
   );
   await ok(host.intent('entity.delete', { sceneId: SCENE, entityId: h1.id }));
