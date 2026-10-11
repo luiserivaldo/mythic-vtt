@@ -151,7 +151,7 @@ function BoardScene({
 }
 
 /** Single on-demand Three scene for the active host-filtered Scene. */
-export function BoardCanvas() {
+export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | null }) {
   const viewMode = useViewMode();
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
@@ -198,12 +198,18 @@ export function BoardCanvas() {
               Reset view
             </button>
             <span className="ui-camera-hint">
-              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom
+              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom ·
+              middle-click a selected token to lock its height
             </span>
           </>
         )}
       </div>
-      <ToolPanelDock campaign={campaign} scene={source} mode3d={mode3d} />
+      <ToolPanelDock
+        campaign={campaign}
+        scene={source}
+        mode3d={mode3d}
+        container={panelContainer}
+      />
       <Canvas
         frameloop="demand"
         shadows={false}

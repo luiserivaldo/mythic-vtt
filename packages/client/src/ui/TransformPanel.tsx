@@ -144,6 +144,22 @@ function ElevationControls({ entity, scene }: { entity: Entity; scene: Scene }) 
     }
   };
 
+  /** TOK-03 / Q26: lock or release the token's height (also reachable by middle-clicking it). */
+  const setFlying = async (flying: boolean) => {
+    if (!submit || busy) return;
+    setBusy(true);
+    try {
+      const result = await submit(
+        'token.setFlying',
+        { sceneId: scene.id, entityId: entity.id, flying },
+        scene.id,
+      );
+      setError(result.ok ? null : describeFailure(result));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const apply = () => {
     const value = typed === null ? null : parseNumber(typed);
     const elevation = value === null ? null : elevationFromUnits(value, grid);
@@ -190,6 +206,16 @@ function ElevationControls({ entity, scene }: { entity: Entity; scene: Scene }) 
       >
         +
       </button>
+      <label className="ui-field">
+        <input
+          type="checkbox"
+          aria-label="Flying"
+          checked={entity.token.flying === true}
+          disabled={busy}
+          onChange={(e) => void setFlying(e.target.checked)}
+        />
+        Flying (locks height)
+      </label>
       {error && <p role="alert">{error}</p>}
     </div>
   );

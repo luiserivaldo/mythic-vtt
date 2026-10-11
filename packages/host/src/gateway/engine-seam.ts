@@ -10,6 +10,8 @@ export interface GatewayConnection {
   readonly avatar: string | undefined;
   /** D24: true when this identity is the host's bound identity (bound via the one-time host token). */
   readonly isHost: boolean;
+  /** M4-01: credential-bound read-only connection, independent of identity/seat bindings. */
+  readonly isSpectator?: boolean;
   /** Last `seq` the client reported in `hello`, for replay or snapshot. */
   readonly lastSeq: number | undefined;
   /** UX-06: most recent host-measured transport RTT; absent until measured. */

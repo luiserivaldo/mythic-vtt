@@ -74,6 +74,23 @@ function expectNoSecrets(...conns: FakeConnection[]) {
 }
 
 describe('connect', () => {
+  it('pins a watch connection to the spectator audience even when its identity owns a seat', async () => {
+    const { engine, log } = setup();
+    const watcher = { ...fakeConnection(T.alice), isSpectator: true };
+    await engine.onConnect(watcher);
+    expect(ofType(watcher, 'snapshot')[0]?.seatId).toBeNull();
+    expectNoSecrets(watcher);
+    await engine.onIntent(watcher, rename('Attack', 'watch-intent'));
+    expect(ofType(watcher, 'reject')).toEqual([
+      { t: 'reject', clientRef: 'watch-intent', reason: 'forbidden' },
+    ]);
+    await engine.onJoin(watcher, { t: 'join', seatId: T.coDm });
+    await engine.onEphemeral(watcher, { t: 'ephemeral', channel: 'ping', data: {} });
+    expect(engine.seq()).toBe(0);
+    expect(log.entries).toHaveLength(0);
+    expect(ofType(watcher, 'ephemeral')).toHaveLength(0);
+  });
+
   it('sends each audience its own filtered snapshot (PERM-03)', async () => {
     const { engine } = setup();
     const host = fakeConnection(T.host, { isHost: true });

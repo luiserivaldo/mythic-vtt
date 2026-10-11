@@ -14,6 +14,7 @@ import {
 import { SELECTION_COLOR } from './canvas-style.js';
 
 const SELECTED = SELECTION_COLOR;
+const FLYING_COLOR = '#7dd3fc';
 
 /**
  * M2-06 / TOK-03: a 3D token. Base disc at `position` (feet, y = elevation) plus an
@@ -72,6 +73,13 @@ export function TokenStandee({
         <mesh raycast={() => null} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
           <ringGeometry args={[dims.baseRadius, dims.baseRadius * 1.12, 48]} />
           <meshBasicMaterial color={SELECTED} side={DoubleSide} />
+        </mesh>
+      )}
+      {entity.token?.flying && (
+        // TOK-03: flying indicator. Not pickable, like the selection ring.
+        <mesh raycast={() => null} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+          <ringGeometry args={[dims.baseRadius * 1.2, dims.baseRadius * 1.32, 48]} />
+          <meshBasicMaterial color={FLYING_COLOR} side={DoubleSide} />
         </mesh>
       )}
       <group ref={pivot} position={[0, dims.baseThickness, 0]}>

@@ -22,7 +22,8 @@
         "move": true,
         "edit": true,
         "delete": true
-      }
+      },
+      "interactionEnabled": true
     },
     "01J8Z0000000000000000SEAT2": {
       "id": "01J8Z0000000000000000SEAT2",
@@ -35,7 +36,8 @@
         "move": true,
         "edit": false,
         "delete": false
-      }
+      },
+      "interactionEnabled": true
     }
   },
   "activeSceneId": "01J8Z0000000000000000SCN01"

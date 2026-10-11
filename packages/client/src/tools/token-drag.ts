@@ -3,10 +3,11 @@ import {
   yawFromQuaternion,
   canPerform,
   clampToBounds,
-  dropElevation,
+  moveElevation,
   resolveSceneBounds,
   snapToGrid,
   tokenFootprintCells,
+  topSurfaceAt,
   walkableFromEntity,
   type Actor,
   type Campaign,
@@ -42,8 +43,55 @@ export function movableToken(
     : null;
 }
 
-/** TOK-02: snap the footprint centre, clamp its whole footprint, then take exact surface height (D25). */
-export function tokenDrop(scene: Scene, entity: Entity, raw: Vec3): Vec3 {
+function sceneWalkables(scene: Scene) {
+  return Object.values(scene.entities).flatMap((candidate) => {
+    const surface = walkableFromEntity(candidate);
+    return surface ? [surface] : [];
+  });
+}
+
+/** One ray hit, reduced to what picking a surface needs (kept free of three.js so it stays testable). */
+export interface SurfaceHit {
+  entityId: string;
+  /** World height of the hit point. */
+  y: number;
+  /** World-space `y` component of the hit face's normal; 1 faces straight up. */
+  normalY: number;
+}
+
+/** A hit face counts as a standable top when it is no steeper than about 60 degrees. */
+const TOP_FACE_MIN_NORMAL_Y = 0.5;
+
+/**
+ * Elevation of the walkable surface under the cursor, or undefined when there is none (TOK-03, Q26).
+ * 2D looks straight down, so it is the highest walkable at the cursor. 3D takes the first walkable
+ * the ray meets, and only when it meets a top face: a platform's side or a steep slope picks nothing.
+ */
+export function cursorSurface(
+  scene: Scene,
+  mode: '2d' | '3d',
+  ray: Ray,
+  hits: readonly SurfaceHit[],
+): number | undefined {
+  if (mode === '2d') return topSurfaceAt(ray.origin.x, ray.origin.z, sceneWalkables(scene));
+  for (const hit of hits) {
+    if (!scene.entities[hit.entityId]?.shape?.walkable) continue;
+    return hit.normalY >= TOP_FACE_MIN_NORMAL_Y ? hit.y : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * TOK-02: snap the footprint centre, clamp its whole footprint, then settle the elevation. Moving
+ * keeps `raw.y` (no gravity) unless the cursor is over a walkable surface; a flying token never
+ * changes (TOK-03, Q26).
+ */
+export function tokenDrop(
+  scene: Scene,
+  entity: Entity,
+  raw: Vec3,
+  surfaceUnderCursor?: number,
+): Vec3 {
   const footprint = tokenFootprintCells(entity.token?.sizeCells);
   const snapped =
     scene.grid.snap && scene.grid.type === 'square'
@@ -60,11 +108,16 @@ export function tokenDrop(scene: Scene, entity: Entity, raw: Vec3): Vec3 {
   );
   const x = centre.x + half;
   const z = centre.z + half;
-  const walkables = Object.values(scene.entities).flatMap((candidate) => {
-    const surface = walkableFromEntity(candidate);
-    return surface ? [surface] : [];
-  });
-  return { x, y: dropElevation({ x, y: raw.y, z }, walkables), z };
+  const y = moveElevation(
+    {
+      position: { x, z },
+      elevation: raw.y,
+      flying: entity.token?.flying === true,
+      ...(surfaceUnderCursor === undefined ? {} : { surfaceUnderCursor }),
+    },
+    sceneWalkables(scene),
+  );
+  return { x, y, z };
 }
 
 /** Minimum gap between ephemeral previews (M1-07 budget keeps this well under the rate limit). */
@@ -89,10 +142,16 @@ export function intersectPlaneY(ray: Ray, y: number): Vec3 | null {
  * Pointer to ground point, following walkable surfaces. After the first hit the token's drop
  * height is known, so intersect again at that height to cancel perspective parallax (3D).
  */
-export function groundPoint(ray: Ray, startY: number, scene: Scene, entity: Entity): Vec3 | null {
+export function groundPoint(
+  ray: Ray,
+  startY: number,
+  scene: Scene,
+  entity: Entity,
+  surfaceUnderCursor?: number,
+): Vec3 | null {
   const first = intersectPlaneY(ray, startY);
   if (!first) return null;
-  const dropped = tokenDrop(scene, entity, first);
+  const dropped = tokenDrop(scene, entity, first, surfaceUnderCursor);
   const second = intersectPlaneY(ray, dropped.y);
   return second ?? first;
 }
@@ -103,12 +162,14 @@ export function previewPosition(
   entity: Entity,
   ground: Vec3,
   grab: { x: number; z: number },
+  surfaceUnderCursor?: number,
 ): Vec3 {
-  return tokenDrop(scene, entity, {
-    x: ground.x - grab.x,
-    y: entity.transform.position.y,
-    z: ground.z - grab.z,
-  });
+  return tokenDrop(
+    scene,
+    entity,
+    { x: ground.x - grab.x, y: entity.transform.position.y, z: ground.z - grab.z },
+    surfaceUnderCursor,
+  );
 }
 
 export function samePosition(a: Vec3, b: Vec3): boolean {

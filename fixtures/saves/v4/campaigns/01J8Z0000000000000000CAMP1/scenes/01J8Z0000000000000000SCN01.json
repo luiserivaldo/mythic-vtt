@@ -49,18 +49,7 @@
         "sizeCells": 1,
         "heightCells": 1,
         "labelVisibility": "all",
-        "facing": 90,
-        "quickFields": {
-          "hp": {
-            "value": 12,
-            "visibility": "owner",
-            "color": "#22aa44"
-          },
-          "speed": {
-            "value": 6,
-            "visibility": "all"
-          }
-        }
+        "facing": 90
       }
     },
     "01J8Z0000000000000000ENT02": {
@@ -89,18 +78,7 @@
       "token": {
         "sizeCells": 2,
         "heightCells": 2,
-        "labelVisibility": "dm",
-        "quickFields": {
-          "hp": {
-            "value": 12,
-            "visibility": "owner",
-            "color": "#22aa44"
-          },
-          "speed": {
-            "value": 6,
-            "visibility": "all"
-          }
-        }
+        "labelVisibility": "dm"
       }
     },
     "01J8Z0000000000000000ENT03": {

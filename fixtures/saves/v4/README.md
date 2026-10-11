@@ -1,3 +1,9 @@
-# Save schema v4 — token quick fields
+# UX-02 seat interaction (MV-190)
 
-Preserves the v3 scene lifecycle fixture and adds optional token-backed quick fields. HP is owner-visible; Speed is public and stored in grid cells. Older saves migrate without invented statistics.
+State/save schema v4 adds optional Seat.interactionEnabled (absent means enabled).
+The v3-to-v4 migration defaults existing seats on in campaign files and nested
+snapshots, preserving explicit false and all other data. This fixture retains
+scene lifecycle v3 data and demonstrates explicit enabled seats.
+
+Protocol v4 requires matching host and client. Action envelopes and coordinates
+are unchanged. Older fixture versions remain supported through the migration chain.
