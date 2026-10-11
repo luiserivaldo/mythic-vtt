@@ -11,6 +11,28 @@ function recipients(
 }
 
 describe('ephemeral relay', () => {
+  it('blocks all tool ephemerals from a disabled seat and resumes after re-enabling', () => {
+    const state = fixtureCampaign();
+    const seat = state.seats[T.seatA];
+    if (!seat) throw new Error('missing seat');
+    const alice = fakeConnection(T.alice);
+    const host = fakeConnection(T.host, { isHost: true });
+    const relay = createEphemeralRelay(() => 1000);
+    seat.interactionEnabled = false;
+    for (const channel of ['cursor', 'ping', 'ruler', 'token.drag-preview'])
+      relay.relay(alice, { t: 'ephemeral', channel, data: {} }, state, recipients(state, [host]));
+    expect(host.received).toEqual([]);
+    expect(relay.stats().dropped.forbidden).toBe(4);
+    seat.interactionEnabled = true;
+    relay.relay(
+      alice,
+      { t: 'ephemeral', channel: 'cursor', data: {} },
+      state,
+      recipients(state, [host]),
+    );
+    expect(host.received).toHaveLength(1);
+  });
+
   it('filters entity previews by current audience, including D32 co-DM visibility', () => {
     const state = fixtureCampaign();
     const coDmSeat = state.seats[T.coDm];

@@ -173,7 +173,9 @@ export function OrbitControls3D({
       pointers.set(e.pointerId, point);
       starts.set(e.pointerId, point);
       modes.set(e.pointerId, mode);
-      if (e.pointerType !== 'mouse' || e.button !== 0) dragging.add(e.pointerId);
+      // A pan waits for the drag threshold (left or middle), so a middle click on a selected token
+      // can toggle flying (TOK-03) without nudging the camera. Orbit starts at once.
+      if (mode !== 'pan') dragging.add(e.pointerId);
       gestureActive.current = true;
       el.setPointerCapture(e.pointerId);
       lastMoveTime = e.timeStamp;

@@ -1,3 +1,4 @@
+import { cryptoRandom, systemClock, ulid } from '../engine/sources.js';
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -28,6 +29,7 @@ export interface GatewayOptions {
   maxPayloadBytes?: number;
   /** D24: one-time host token the first host hello must present. Omit to disable host binding. */
   hostToken?: string;
+  spectatorTokenValid?: (token: string) => boolean;
 }
 
 export interface Gateway {
@@ -36,11 +38,14 @@ export interface Gateway {
   listen(opts?: { port?: number; host?: string }): Promise<number>;
   close(): Promise<void>;
   connectionCount(): number;
+  disconnectSpectators(): void;
 }
 
 // WebSocket close codes: 1008 policy violation, 1002 protocol error.
 const CLOSE_POLICY = 1008;
 const CLOSE_PROTOCOL = 1002;
+/** How long `close()` lets in-flight HTTP requests finish before cutting their connections. */
+const HTTP_CLOSE_GRACE_MS = 500;
 
 export function createGateway(options: GatewayOptions = {}): Gateway {
   const handler = options.handler ?? noopHandler;
@@ -68,7 +73,8 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
-      handleConnection(ws);
+      const token = new URL(req.url ?? '/', 'http://localhost').searchParams.get('watch');
+      handleConnection(ws, token ?? undefined);
     });
   });
 
@@ -88,7 +94,7 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
     if (fatal) ws.close(closeCode, code);
   }
 
-  function handleConnection(ws: WebSocket): void {
+  function handleConnection(ws: WebSocket, watchToken?: string): void {
     sockets.add(ws);
     let conn: GatewayConnection | undefined;
     let helloInFlight = false;
@@ -153,6 +159,10 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         return;
       }
       const msg = decoded.message;
+      if (watchToken !== undefined && !options.spectatorTokenValid?.(watchToken)) {
+        fail(ws, 'unauthorized', 'spectator link unavailable', true);
+        return;
+      }
 
       if (msg.t === 'ping') {
         sendTo(ws, { t: 'pong', n: msg.n });
@@ -190,6 +200,13 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         return;
       }
       const c = conn;
+      if (c.isSpectator) {
+        if (msg.t === 'intent')
+          c.send({ t: 'reject', clientRef: msg.clientRef, reason: 'forbidden' });
+        else if (msg.t === 'join')
+          fail(ws, 'unauthorized', 'spectator connections are read-only', false);
+        return;
+      }
       switch (msg.t) {
         case 'join':
           await run(ws, () => handler.onJoin(c, msg));
@@ -213,6 +230,28 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
           supportedVersion: PROTOCOL_VERSION,
         });
         return undefined;
+      }
+      if (watchToken !== undefined) {
+        // SES-11 / PERM-03: never bind the visitor's existing host or seat identity.
+        return {
+          connectionId: randomUUID(),
+          identityId: ulid(systemClock(), cryptoRandom),
+          displayName: 'Spectator',
+          avatar: undefined,
+          isHost: false,
+          isSpectator: true,
+          lastSeq: undefined,
+          latencyMs: null,
+          send: (message) => {
+            sendTo(socket, message);
+          },
+          sendRaw: (frame) => {
+            if (socket.readyState === WebSocket.OPEN) socket.send(frame);
+          },
+          close: (code, reason) => {
+            socket.close(code, reason);
+          },
+        };
       }
       const candidate = await hashSecret(hello.identitySecret);
       const stored = await identities.registerIfAbsent({
@@ -289,7 +328,22 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
     async close() {
       for (const ws of sockets) ws.terminate();
       wss.close();
-      await app.close();
+      // `app.close()` waits for every in-flight HTTP request. A client that never reads its
+      // response (a streamed export, a stalled import) would hold shutdown forever, so after a
+      // short grace period the remaining connections are cut.
+      const forceTimer = setTimeout(() => {
+        app.server.closeAllConnections();
+      }, HTTP_CLOSE_GRACE_MS);
+      try {
+        await app.close();
+      } finally {
+        clearTimeout(forceTimer);
+      }
+    },
+    disconnectSpectators() {
+      for (const connections of liveByIdentity.values())
+        for (const connection of connections)
+          if (connection.isSpectator) connection.close(CLOSE_POLICY, 'spectator-link-revoked');
     },
     connectionCount: () => sockets.size,
   };

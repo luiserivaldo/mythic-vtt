@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid } from './harness.js';
+import { PROTOCOL_VERSION } from '../packages/protocol/src/version.js';
 
 test('join colour persists and colours the avatar and shared ruler in 2D and 3D', async ({
   browser,
@@ -8,9 +9,28 @@ test('join colour persists and colours the avatar and shared ruler in 2D and 3D'
   const dmContext = await browser.newContext();
   const playerContext = await browser.newContext();
   try {
+    await dmContext.addInitScript(() => {
+      localStorage.setItem(
+        'mythic.profile.v1',
+        JSON.stringify({ displayName: 'Colour DM', color: '#2a9a66' }),
+      );
+    });
     const dm = await dmContext.newPage();
+    const sent: unknown[] = [];
+    dm.on('websocket', (socket) => {
+      socket.on('framesent', (frame) => sent.push(JSON.parse(frame.payload.toString())));
+    });
     await dm.goto(`${table.clientUrl}/#host=${table.hostToken}`);
     await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
+    expect(sent).toContainEqual(
+      expect.objectContaining({
+        t: 'hello',
+        v: PROTOCOL_VERSION,
+        displayName: 'Colour DM',
+        color: '#2a9a66',
+      }),
+    );
+    await expect(dm.getByRole('complementary', { name: 'Right dock' })).toBeVisible();
     const identity = await dm.evaluate(
       () =>
         JSON.parse(localStorage.getItem('mythic.identity.v1') ?? '{}') as {

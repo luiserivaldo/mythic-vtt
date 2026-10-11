@@ -32,7 +32,8 @@ export function makeCampaign(): Campaign {
     binding: 'persistent' as const,
     identityId: null,
     role,
-    permissions: perms,
+    // A copy per seat: tests mutate a seat's permissions and must not leak into other seats/tests.
+    permissions: { ...perms },
   });
   return {
     id: IDS.campaign,

@@ -115,6 +115,7 @@ export function createEngine(options: EngineOptions): Engine {
   const placeOf = (conn: GatewayConnection) => ({
     identityId: conn.identityId,
     isHost: conn.isHost,
+    ...(conn.isSpectator ? { isSpectator: true } : {}),
   });
 
   function snapshotFor(audience: Audience): ServerMessage {
@@ -339,6 +340,10 @@ export function createEngine(options: EngineOptions): Engine {
     onIntent(conn, msg: Of<'intent'>) {
       return serialize(async () => {
         if (!members.has(conn.connectionId)) return; // disconnected while queued
+        if (conn.isSpectator) {
+          conn.send({ t: 'reject', clientRef: msg.clientRef, reason: 'forbidden' });
+          return;
+        }
         const outcome = await apply(conn, msg.type, msg.payload, {
           clientRef: msg.clientRef,
           ...(msg.sceneId !== undefined ? { sceneId: msg.sceneId } : {}),
@@ -374,7 +379,7 @@ export function createEngine(options: EngineOptions): Engine {
           });
           return;
         }
-        if (msg.seatId === undefined) return;
+        if (conn.isSpectator || msg.seatId === undefined) return;
         const outcome = await apply(
           conn,
           'session.join',
@@ -398,7 +403,7 @@ export function createEngine(options: EngineOptions): Engine {
     onEphemeral(conn, msg) {
       return serialize(() => {
         if (!members.has(conn.connectionId)) return;
-        ephemeralRelay.relay(conn, msg, state, members.values());
+        if (!conn.isSpectator) ephemeralRelay.relay(conn, msg, state, members.values());
       });
     },
 

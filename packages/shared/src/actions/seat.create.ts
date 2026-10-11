@@ -21,6 +21,7 @@ export const seatCreate = defineAction({
       binding: a.payload.binding ?? draft.settings.defaultBinding,
       identityId: null,
       role: a.payload.role ?? 'player',
+      interactionEnabled: true,
       permissions: { ...(a.payload.permissions ?? DEFAULT_PERMISSIONS) },
     };
   },
