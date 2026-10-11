@@ -321,6 +321,17 @@ export function createEngine(options: EngineOptions): Engine {
         const member: Member = { conn, audience, key: audienceViewKey(state, placeOf(conn)) };
         members.set(conn.connectionId, member);
         greet(member);
+        if (
+          !conn.isHost &&
+          state.activeSceneId === null &&
+          (audience.kind !== 'seat' || state.seats[audience.seatId]?.role !== 'codm')
+        )
+          conn.send({
+            t: 'notice',
+            level: 'warning',
+            code: 'no-active-scene',
+            message: 'No active scene. Ask the DM to activate a scene before joining.',
+          });
         publishPresence();
       });
     },
@@ -349,7 +360,21 @@ export function createEngine(options: EngineOptions): Engine {
      */
     onJoin(conn, msg: Of<'join'>) {
       return serialize(async () => {
-        if (!members.has(conn.connectionId) || msg.seatId === undefined) return;
+        if (!members.has(conn.connectionId)) return;
+        if (
+          state.activeSceneId === null &&
+          !conn.isHost &&
+          (!msg.seatId || state.seats[msg.seatId]?.role !== 'codm')
+        ) {
+          conn.send({
+            t: 'error',
+            code: 'seat-unavailable',
+            message: 'No active scene. Ask the DM to activate a scene before joining.',
+            fatal: false,
+          });
+          return;
+        }
+        if (msg.seatId === undefined) return;
         const outcome = await apply(
           conn,
           'session.join',

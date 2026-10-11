@@ -119,7 +119,22 @@ export const dockTabs = createRegistry<DockTab>([
     allowed: admin,
     panel: 'entities',
   },
-  { id: 'seats', label: 'Seats', icon: 'seats', group: 'table', allowed: host, panel: 'seats' },
+  {
+    id: 'prefabs',
+    label: 'Prefabs',
+    icon: 'prefabs',
+    group: 'world',
+    allowed: admin,
+    panel: 'prefabs',
+  },
+  {
+    id: 'seats',
+    label: 'Participants',
+    icon: 'seats',
+    group: 'table',
+    allowed: host,
+    panel: 'seats',
+  },
   { id: 'share', label: 'Invite', icon: 'share', group: 'table', allowed: host, panel: 'share' },
 ]);
 

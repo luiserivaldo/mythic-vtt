@@ -39,9 +39,7 @@ test('the DM creates a bounded scene from the panel and resizes it, with no page
   await height.fill('12');
   await page.getByRole('button', { name: 'Create scene' }).click();
 
-  await expect(
-    page.getByRole('complementary', { name: 'DM tools' }).getByText('Bounded', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('listitem').getByText('Bounded', { exact: true })).toBeVisible();
   const canvasWidth = page.getByLabel('Canvas of Bounded width');
   await expect(canvasWidth).toHaveValue('20');
   await expect(page.getByLabel('Canvas of Bounded height')).toHaveValue('12');

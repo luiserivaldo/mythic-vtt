@@ -1,3 +1,5 @@
+import { TokenStatusPanel } from './TokenStatusPanel.js';
+import { TokenRingsPanel } from './TokenRingsPanel.js';
 import type { Campaign, Scene } from '@mythic/shared';
 import { lazy, Suspense, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -10,7 +12,9 @@ import { useGizmoTarget3D } from '../tools/use-gizmo-target-3d.js';
 import { AoEAffectedPanel } from './AoEAffectedPanel.js';
 import { AoEToolPanel } from './AoEToolPanel.js';
 import { toolPanelLayoutStore, type ToolPanelId } from './tool-panel-layout.js';
-import { viewerRole } from './viewer.js';
+import { isReadOnlyViewer, viewerRole } from './viewer.js';
+import { rulerStore } from '../tools/ruler-store.js';
+import { RulerPanel } from './RulerPanel.js';
 
 const EntityPanel = lazy(async () => {
   const module = await import('./EntityPanel.js');
@@ -86,9 +90,11 @@ export function ToolPanelDock({
   const entities = useStore(toolPanelLayoutStore, (state) => state.entities);
   const collapsed = useStore(toolPanelLayoutStore, (state) => state.collapsed);
   const aoeActive = useStore(aoeToolStore, (state) => state.active);
+  const rulerActive = useStore(rulerStore, (state) => state.tool);
   const selected = useStore(selectionStore, (state) => state.ids);
   const target2d = useGizmoTarget();
   const target3d = useGizmoTarget3D();
+  const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
   const role = campaign ? viewerRole({ isHost, seatId, campaign }) : 'observer';
   const canAdmin = role === 'host' || role === 'codm';
   const showEntities = canAdmin && campaign !== null && entities !== 'hidden';
@@ -96,9 +102,16 @@ export function ToolPanelDock({
   const selectedEntity =
     scene && selected.length === 1 ? scene.entities[selected[0] ?? ''] : undefined;
   // Preserve the prior panel behavior for a non-admin who may update an owned, selected AoE.
-  const showAoE = scene !== null && (canAdmin || selectedEntity?.aoe !== undefined);
+  const showAoE = scene !== null && !aoeActive && selectedEntity?.aoe !== undefined;
+  const showRuler = scene !== null && (rulerActive || aoeActive);
 
-  if (!container || (!showEntities && !showTransform && !showAoE)) return null;
+  const showToken = campaign !== null && scene !== null && selectedEntity?.token !== undefined;
+  if (
+    !container ||
+    readOnly ||
+    (!showEntities && !showTransform && !showAoE && !showToken && !showRuler)
+  )
+    return null;
   return createPortal(
     <aside className="ui-tool-dock" aria-label="Tool panels">
       {showEntities && (
@@ -117,8 +130,30 @@ export function ToolPanelDock({
       )}
       {showAoE && (
         <PanelFrame id="aoe" label="AoE" collapsed={collapsed.aoe}>
-          <AoEToolPanel scene={scene} />
+          <AoEToolPanel scene={scene} unified />
           <AoEAffectedPanel scene={scene} />
+        </PanelFrame>
+      )}
+      {showToken && (
+        <PanelFrame id="token" label="Token" collapsed={collapsed.token}>
+          <TokenStatusPanel
+            key={`status-${selectedEntity.id}`}
+            campaign={campaign}
+            scene={scene}
+            entity={selectedEntity}
+          />
+          <TokenRingsPanel
+            key={`rings-${selectedEntity.id}`}
+            campaign={campaign}
+            scene={scene}
+            entity={selectedEntity}
+          />
+        </PanelFrame>
+      )}
+      {showRuler && (
+        <PanelFrame id="ruler" label="Ruler" collapsed={collapsed.ruler}>
+          <RulerPanel scene={scene} />
+          {aoeActive && <AoEAffectedPanel scene={scene} />}
         </PanelFrame>
       )}
     </aside>,

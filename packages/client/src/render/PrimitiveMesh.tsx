@@ -51,6 +51,8 @@ export function PrimitiveMesh({
         renderOrder={renderOrder}
         onClick={onClick}
       >
+        {/* CAM-05 owns opacity, transparency and depthWrite temporarily; keep those out of
+            JSX so a colour/selection rerender does not overwrite an active fade. */}
         <meshStandardMaterial
           color={color}
           side={DoubleSide}

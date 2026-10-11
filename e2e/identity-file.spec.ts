@@ -17,14 +17,14 @@ test('identity backup transfers an occupied seat to another browser without uplo
   const dm = await dmContext.newPage();
   await dm.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
-  await dm.getByRole('button', { name: 'Seats', exact: true }).click();
-  await dm.getByPlaceholder('New seat name').fill('Wizard');
-  await dm.getByRole('button', { name: 'Add seat' }).click();
+  await dm.getByRole('button', { name: 'Participants', exact: true }).click();
+  await dm.getByPlaceholder('Custom participant name').fill('Wizard');
+  await dm.getByRole('button', { name: 'Add custom participant' }).click();
   const first = await openClient(browser, table, 'original', { joinScreen: true });
   await first.page.getByLabel('Display name').fill('Alice');
   await first.page.getByRole('button', { name: 'Continue' }).click();
   await first.page.getByRole('radio', { name: /Wizard/ }).check();
-  await first.page.getByRole('button', { name: 'Join seat', exact: true }).click();
+  await first.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
   await expect(first.page.getByRole('dialog')).toHaveCount(0);
   await first.page.getByText('Identity backup and transfer', { exact: true }).click();
   await expect(first.page.getByText(/This file contains your identity secret/)).toBeVisible();

@@ -1,3 +1,4 @@
+import { TokenRings } from './TokenRings.js';
 import { walkableFromEntity, type Scene, type Seat } from '@mythic/shared';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
@@ -48,13 +49,11 @@ const NO_SEATS: SceneSelectionSeats = {};
 export function PickableEntities({
   rendered,
   scene,
-  additiveMode,
   mode = '2d',
   grid = null,
 }: {
   rendered: RenderScene | null;
   scene: Scene | null;
-  additiveMode: boolean;
   /** 3D is only reachable explicitly until the 2D/3D toggle exists (M2-05). */
   mode?: RenderMode;
   /** GRID-05: scene grid style for walkable tops (3D only). */
@@ -94,9 +93,7 @@ export function PickableEntities({
     event.stopPropagation();
     const hits = event.intersections.map(({ object, distance }) => ({ id: object.name, distance }));
     const id = pickEntity(hits, scene, actor);
-    selectionStore
-      .getState()
-      .pick(scene.id, id, additiveMode || event.shiftKey || event.ctrlKey || event.metaKey);
+    selectionStore.getState().pick(scene.id, id, event.shiftKey || event.ctrlKey || event.metaKey);
   }
 
   return (
@@ -107,6 +104,11 @@ export function PickableEntities({
           <DropLines rendered={rendered} />
         </Suspense>
       )}
+      {rendered?.entities
+        .filter((entity) => entity.token && entity.rings?.length)
+        .map((entity) => (
+          <TokenRings key={entity.id} entity={entity} />
+        ))}
       {RENDER_LAYERS.map((layer, order) => (
         <group key={layer} name={layer}>
           {rendered?.entities
