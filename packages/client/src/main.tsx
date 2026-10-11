@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import { createHostTokenHolder, extractHostToken } from './net/host-token.js';
 import { loadOrCreateIdentity } from './net/identity.js';
+import { extractSeatInvite, redeemSeatInvite, seatInviteMessage } from './net/seat-invite.js';
 import { ClientStoreContext } from './store/react.js';
 import { createClientStore } from './store/store.js';
 import { JoinContext } from './ui/join-context.js';
@@ -25,6 +26,9 @@ const identity = loadOrCreateIdentity(
 // D24: the DM link carries `#host=<token>`; read it once and scrub it from the address bar.
 const hostToken = watchVisitor ? undefined : extractHostToken(location, history);
 const hostTokenHolder = createHostTokenHolder(hostToken);
+// SES-04: `#invite=<seatId>.<token>`, read once and scrubbed like the host token.
+const seatInvite =
+  watchVisitor || hostToken !== undefined ? undefined : extractSeatInvite(location, history);
 
 const store = createClientStore();
 const uiStore = createUiStore();
@@ -67,7 +71,19 @@ const hostVisitor = !watchVisitor && (hostToken !== undefined || remembered);
 const initialProfile = loadProfile(localStorage);
 if (watchVisitor) session.start({ displayName: 'Spectator' });
 else if (hostVisitor) session.start({ displayName: initialProfile?.displayName ?? 'DM' });
-else if (initialProfile) session.start(initialProfile);
+else if (seatInvite) {
+  // The host learns this identity from `hello`, so connect first, then redeem the invite. The
+  // seat arrives through the normal patch stream; a failure leaves the usual join screen.
+  session.start(initialProfile ?? { displayName: 'Player' });
+  const unsubscribe = store.subscribe((s) => {
+    if (!s.ready) return;
+    unsubscribe();
+    void redeemSeatInvite(identity, seatInvite).then((result) => {
+      const message = seatInviteMessage(result);
+      if (message) window.alert(message);
+    });
+  });
+} else if (initialProfile) session.start(initialProfile);
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('missing #root');
