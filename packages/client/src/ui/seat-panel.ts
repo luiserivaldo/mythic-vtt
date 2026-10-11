@@ -24,6 +24,7 @@ export function seatRows(
   const online = new Set((presence ?? []).filter((p) => p.connected).map((p) => p.seatId));
   const names = new Map((presence ?? []).map((p) => [p.seatId, p.displayName]));
   return Object.values(campaign.seats)
+    .filter((seat) => !seat.archived)
     .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id))
     .map((seat) => ({
       id: seat.id,

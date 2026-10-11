@@ -37,7 +37,8 @@ export function isHost(actor: Actor): boolean {
  */
 export function seatOf(state: Campaign, actor: Actor): Seat | undefined {
   if (actor.kind !== 'seat' || actor.seatId === undefined) return undefined;
-  return state.seats[actor.seatId];
+  const seat = state.seats[actor.seatId];
+  return seat?.archived ? undefined : seat;
 }
 
 export function isCoDm(state: Campaign, actor: Actor): boolean {

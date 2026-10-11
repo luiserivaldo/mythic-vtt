@@ -31,6 +31,7 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
   const roster = rosterOptions(unseated);
   const connected = connectedIdentityRows(campaign, presence, unseated);
   const { send, error } = useSubmit();
+  const [archiveId, setArchiveId] = useState<string | null>(null);
   const [identity, setIdentity] = useState<Record<string, string>>({});
   return (
     <section aria-labelledby="ui-seats-h" className="ui-panel">
@@ -48,6 +49,63 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
             </li>
           ))}
         </ul>
+      )}
+      {archiveId !== null && campaign.seats[archiveId] && (
+        <section role="dialog" aria-modal="true" aria-labelledby="archive-title">
+          <h3 id="archive-title">Archive {campaign.seats[archiveId].label}?</h3>
+          <p>
+            This seat can no longer be joined. Its tokens become unassigned; nothing is deleted.
+          </p>
+          <ul>
+            <li>
+              {campaign.seats[archiveId].identityId
+                ? 'The bound login loses access to this seat.'
+                : 'No login is bound to this seat.'}
+            </li>
+            {Object.values(campaign.scenes).flatMap((scene) =>
+              Object.values(scene.entities)
+                .filter((entity) => entity.owners.includes(archiveId))
+                .map((entity) => (
+                  <li key={`${scene.id}/${entity.id}`}>
+                    {entity.name || 'Unnamed entity'} in {scene.name}
+                    {entity.token?.characterInstanceId
+                      ? ' (character link retained, ownership becomes unassigned)'
+                      : ''}
+                  </li>
+                )),
+            )}
+          </ul>
+          <button
+            type="button"
+            onClick={() => {
+              void send({ type: 'seat.archive', payload: { seatId: archiveId } }).then((ok) => {
+                if (ok) setArchiveId(null);
+              });
+            }}
+          >
+            Confirm archive
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setArchiveId(null);
+            }}
+          >
+            Cancel
+          </button>
+        </section>
+      )}
+      {Object.values(campaign.seats).some((seat) => seat.archived) && (
+        <details>
+          <summary>Archived seats</summary>
+          <ul>
+            {Object.values(campaign.seats)
+              .filter((seat) => seat.archived)
+              .map((seat) => (
+                <li key={seat.id}>{seat.label} (archived)</li>
+              ))}
+          </ul>
+        </details>
       )}
       <h3>Participants</h3>
       <ul className="ui-list" aria-label="Participants">
@@ -75,6 +133,14 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
                     <option value="codm">Co-DM</option>
                   </select>
                 </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setArchiveId(row.id);
+                  }}
+                >
+                  Archive participant
+                </button>
                 {row.occupied && (
                   <button
                     type="button"

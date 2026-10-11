@@ -21,15 +21,17 @@ export function buildHostPresence(state: Campaign, conns: Iterable<PresenceConn>
   const byIdentity = new Map<string, PresenceConn>();
   for (const c of conns) if (!byIdentity.has(c.identityId)) byIdentity.set(c.identityId, c);
 
-  const seats: PresenceMessage['seats'] = Object.values(state.seats).map((seat) => {
-    const live = seat.identityId === null ? undefined : byIdentity.get(seat.identityId);
-    return {
-      seatId: seat.id,
-      ...(live ? { displayName: live.displayName } : {}),
-      connected: live !== undefined,
-      latencyMs: live?.latencyMs ?? null,
-    };
-  });
+  const seats: PresenceMessage['seats'] = Object.values(state.seats)
+    .filter((seat) => !seat.archived)
+    .map((seat) => {
+      const live = seat.identityId === null ? undefined : byIdentity.get(seat.identityId);
+      return {
+        seatId: seat.id,
+        ...(live ? { displayName: live.displayName } : {}),
+        connected: live !== undefined,
+        latencyMs: live?.latencyMs ?? null,
+      };
+    });
 
   const unseated: NonNullable<PresenceMessage['unseated']> = [];
   for (const c of byIdentity.values()) {

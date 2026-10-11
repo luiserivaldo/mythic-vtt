@@ -9,7 +9,8 @@ export interface Participant {
 
 /** The seat this identity currently occupies (SES-03: at most one), if any. */
 export function seatIdOf(state: Campaign, identityId: string): string | undefined {
-  for (const seat of Object.values(state.seats)) if (seat.identityId === identityId) return seat.id;
+  for (const seat of Object.values(state.seats))
+    if (!seat.archived && seat.identityId === identityId) return seat.id;
   return undefined;
 }
 

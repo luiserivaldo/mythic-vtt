@@ -17,7 +17,7 @@ export const entityCreate = defineAction({
       isWithinBounds(resolveSceneBounds(scene), p.entity.transform.position) &&
       !isLayerLocked(scene, p.entity.layer) &&
       new Set(p.entity.owners).size === p.entity.owners.length &&
-      p.entity.owners.every((ownerId) => ownerId in state.seats)
+      p.entity.owners.every((ownerId) => ownerId in state.seats && !state.seats[ownerId]?.archived)
     );
   },
   reduce: (draft, a) => {
