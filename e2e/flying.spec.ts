@@ -186,7 +186,11 @@ test('elevated tokens keep their height; flying locks it; a spectator cannot tog
   expect(entity()?.token?.flying).toBe(true);
 
   // 6. The panel checkbox releases the lock again.
-  await panel.getByRole('checkbox', { name: 'Flying' }).uncheck();
+  // The box is driven by host state, so it flips only after the round trip. `uncheck()` insists on
+  // an immediate change and fails when the host is slow; click, then wait for the state.
+  const flyingBox = panel.getByRole('checkbox', { name: 'Flying' });
+  await flyingBox.click();
+  await expect(flyingBox).not.toBeChecked({ timeout: 10_000 });
   await expect.poll(() => entity()?.token?.flying, { timeout: 10_000 }).toBeUndefined();
   await expect(page.getByTestId('elevation-badge')).not.toContainText('Flying');
 
