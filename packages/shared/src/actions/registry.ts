@@ -1,3 +1,5 @@
+import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
+import { tokenSetRings } from './token.setRings.js';
 import { sceneDelete } from './scene.delete.js';
 import { sceneSetOverlay } from './scene.setOverlay.js';
 import type { AnyAction } from './define.js';
@@ -49,6 +51,8 @@ export const allActions: readonly AnyAction[] = [
   aoeRemove,
   tokenSetElevation,
   sceneSetOverlay,
+  tokenSetRings,
+  tokenSetStatusMarkers,
   sceneDelete,
 ];
 

@@ -24,3 +24,5 @@ export { tokenSetElevation } from './token.setElevation.js';
 export { aoePlace } from './aoe.place.js';
 export { aoeUpdate } from './aoe.update.js';
 export { aoeRemove } from './aoe.remove.js';
+export { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
+export { canReadEntityLabel } from './entity-access.js';

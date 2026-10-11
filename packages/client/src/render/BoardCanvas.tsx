@@ -7,6 +7,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useStore } from 'zustand';
 import { tokenDragStore } from '../tools/token-drag-store.js';
 import { withLocalDrag } from '../tools/token-drag.js';
+import { useClientStore } from '../store/react.js';
 import { activeRenderScene, type RenderScene } from './scene-model.js';
 import { PickableEntities } from './PickableEntities.js';
 import { selectionStore } from '../tools/selection-store.js';
@@ -27,8 +28,11 @@ import { ViewToggle } from './ViewToggle.js';
 import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
+import { OcclusionFade } from './OcclusionFade.js';
 import { RenderDiagnostics } from './RenderDiagnostics.js';
 import { ToolPanelDock } from '../ui/ToolPanelDock.js';
+import { isReadOnlyViewer } from '../ui/viewer.js';
+import { handleBoardEscape } from './board-keyboard.js';
 
 const OrbitControls3D = lazy(async () => {
   const module = await import('./OrbitControls3D.js');
@@ -47,22 +51,22 @@ function BoardScene({
   scene,
   source,
   grid,
-  additiveMode,
   viewMode,
   bounds,
   canvasSize,
   frameKey,
   resetToken,
+  readOnly,
 }: {
   scene: RenderScene | null;
   source: Scene | null;
   grid: RenderGrid | null;
-  additiveMode: boolean;
   viewMode: ViewMode;
   bounds: GroundBounds | null;
   canvasSize: SceneBounds;
   frameKey: string;
   resetToken: number;
+  readOnly: boolean;
 }) {
   const invalidate = useThree((state) => state.invalidate);
   const aoeActive = useStore(aoeToolStore, (s) => s.active);
@@ -125,19 +129,15 @@ function BoardScene({
       {/* M1-28: TokenDrag claims a press on any movable token without selecting it first, while
           empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
-      <RulerTool mode={mode3d ? '3d' : '2d'} />
-      {!aoeActive && <TokenDrag />}
-      <PickableEntities
-        rendered={shown}
-        scene={source}
-        additiveMode={additiveMode}
-        mode={mode3d ? '3d' : '2d'}
-        grid={grid}
-      />
+      <RulerTool mode={mode3d ? '3d' : '2d'} readOnly={readOnly} />
+      {!aoeActive && <TokenDrag readOnly={readOnly} />}
+      <PickableEntities rendered={shown} scene={source} mode={mode3d ? '3d' : '2d'} grid={grid} />
+      {mode3d && <OcclusionFade rendered={shown} />}
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       <SceneOverlay overlay={source?.overlay} />
       {/* M1-20 / M2-08: 2D handles, or the 3D gizmo; both are off while the AoE tool is active. */}
-      {!aoeActive &&
+      {!readOnly &&
+        !aoeActive &&
         (mode3d ? (
           <Suspense fallback={null}>
             <TransformGizmo3D />
@@ -145,7 +145,7 @@ function BoardScene({
         ) : (
           <TransformGizmo />
         ))}
-      <AoEPlacementCanvas scene={source} mode={mode3d ? '3d' : '2d'} />
+      {!readOnly && <AoEPlacementCanvas scene={source} mode={mode3d ? '3d' : '2d'} />}
     </>
   );
 }
@@ -155,8 +155,10 @@ export function BoardCanvas() {
   const viewMode = useViewMode();
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
-  const [additiveMode, setAdditiveMode] = useState(false);
   const campaign = useViewedCampaign();
+  const isHost = useClientStore((state) => state.isHost);
+  const seatId = useClientStore((state) => state.seatId);
+  const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
   const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
   const source = campaign?.activeSceneId ? (campaign.scenes[campaign.activeSceneId] ?? null) : null;
@@ -174,7 +176,7 @@ export function BoardCanvas() {
       aria-label="Scene board"
       tabIndex={0}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') selectionStore.getState().clear();
+        handleBoardEscape(event);
         if (mode3d && event.key === 'Home') setResetToken((n) => n + 1);
       }}
       className="ui-board"
@@ -183,25 +185,8 @@ export function BoardCanvas() {
         {source?.name ?? ''}
       </span>
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
-        <button
-          type="button"
-          aria-pressed={additiveMode}
-          onClick={() => {
-            setAdditiveMode((value) => !value);
-          }}
-        >
-          Multi-select
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            selectionStore.getState().clear();
-          }}
-        >
-          Clear selection
-        </button>
         <ViewToggle />
-        <RulerToggle />
+        {!readOnly && <RulerToggle />}
         {mode3d && (
           <>
             <button
@@ -224,7 +209,7 @@ export function BoardCanvas() {
         shadows={false}
         gl={{ antialias: true }}
         onPointerMissed={(event) => {
-          if (!additiveMode && !event.shiftKey && !event.ctrlKey && !event.metaKey)
+          if (!event.shiftKey && !event.ctrlKey && !event.metaKey)
             selectionStore.getState().clear();
         }}
       >
@@ -233,12 +218,12 @@ export function BoardCanvas() {
           scene={scene}
           source={source}
           grid={grid}
-          additiveMode={additiveMode}
           viewMode={viewMode}
           bounds={bounds}
           canvasSize={canvasSize}
           frameKey={frameKey}
           resetToken={resetToken}
+          readOnly={readOnly}
         />
       </Canvas>
     </div>

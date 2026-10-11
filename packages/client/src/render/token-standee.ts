@@ -52,3 +52,16 @@ export function labelAnchor3d(sizeCells: number | undefined): readonly [number, 
   const { height, baseThickness } = standeeDimensions(sizeCells);
   return [0, baseThickness + height + LABEL_GAP, 0];
 }
+
+/**
+ * M1-34: centre of a small facing marker on the base rim, in the base's local frame (the base
+ * sits at the origin, its top at y = baseThickness). The base is a symmetric cylinder, so the
+ * token's yaw is only visible through this marker; the TokenStandee base group rotates it with yaw.
+ */
+export function facingMarkerPosition(
+  sizeCells: number | undefined,
+): readonly [number, number, number] {
+  // Forward (+Z) edge, inset slightly so the marker stays on the disc and clear of the image quad.
+  const { baseRadius, baseThickness } = standeeDimensions(sizeCells);
+  return [0, baseThickness, baseRadius * 0.82];
+}
