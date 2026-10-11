@@ -1,0 +1,13 @@
+{
+  "t": "presence",
+  "seats": [
+    {
+      "seatId": "AAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "displayName": "Test player",
+      "connected": true,
+      "latencyMs": 42
+    },
+    { "seatId": "BBBBBBBBBBBBBBBBBBBBBBBBBB", "connected": false, "latencyMs": null }
+  ],
+  "spectators": 0
+}

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ServerMessage } from '@mythic/protocol';
 import { createEngine } from './engine.js';
 import { buildHostPresence } from './presence.js';
@@ -47,6 +47,7 @@ describe('buildHostPresence', () => {
       seatId: T.seatA,
       displayName: 'Alice',
       connected: true,
+      latencyMs: null,
     });
     expect(p.seats.find((s) => s.seatId === T.seatB)?.connected).toBe(false);
   });
@@ -119,5 +120,62 @@ describe('engine roster (M1-11, PERM-03)', () => {
         .at(-1)
         ?.seats.find((s) => s.seatId === T.seatB)?.connected,
     ).toBe(false);
+  });
+});
+
+describe('presence latency (UX-06)', () => {
+  it('reports a seat RTT and clears it when its identity goes offline', () => {
+    const alice = Object.assign(named(T.alice, 'Alice'), { latencyMs: 42 });
+    const state = fixtureCampaign();
+    expect(
+      buildHostPresence(state, [alice]).seats.find((seat) => seat.seatId === T.seatA),
+    ).toMatchObject({ connected: true, latencyMs: 42 });
+    expect(
+      buildHostPresence(state, []).seats.find((seat) => seat.seatId === T.seatA),
+    ).toMatchObject({ connected: false, latencyMs: null });
+  });
+  it('coalesces telemetry across seats, keeps the roster private, and publishes offline immediately', async () => {
+    vi.useFakeTimers();
+    try {
+      const engine = setup();
+      const host = named(T.host, 'DM', { isHost: true });
+      const alice = Object.assign(named(T.alice, 'Alice'), { latencyMs: 10 });
+      const observer = named(T.bob, 'Bob');
+      await engine.onConnect(host);
+      await engine.onConnect(alice);
+      await engine.onConnect(observer);
+      host.clear();
+      alice.clear();
+      observer.clear();
+      for (let n = 0; n < 50; n++) {
+        alice.latencyMs = n;
+        engine.onLatency?.(alice);
+      }
+      await vi.advanceTimersByTimeAsync(999);
+      expect(presenceOf(host)).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(presenceOf(host)).toHaveLength(1);
+      expect(presenceOf(host)[0]?.seats.find((seat) => seat.seatId === T.seatA)?.latencyMs).toBe(
+        49,
+      );
+      expect(presenceOf(alice)).toEqual([]);
+      expect(presenceOf(observer)).toEqual([]);
+      expect(alice.wire()).not.toContain(T.bob);
+      engine.onLatency?.(alice);
+      engine.onDisconnect(alice);
+      expect(
+        presenceOf(host)
+          .at(-1)
+          ?.seats.find((seat) => seat.seatId === T.seatA),
+      ).toMatchObject({ connected: false, latencyMs: null });
+      const count = presenceOf(host).length;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(presenceOf(host)).toHaveLength(count);
+      engine.onLatency?.(alice);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(presenceOf(host)).toHaveLength(count);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

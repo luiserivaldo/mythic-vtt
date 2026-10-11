@@ -360,3 +360,37 @@ describe('commitTransform (D34)', () => {
     expect(await pending).toBe(true);
   });
 });
+
+describe('battlemap gizmo bounds (M1-42)', () => {
+  const map = entity({
+    layer: 'map',
+    image: { asset: { source: 'local', kind: 'image', hash: 'a'.repeat(64) }, calibrated: true },
+    transform: { ...entity().transform, scale: { x: 4, y: 4, z: 4 } },
+  });
+  it('matches rectangular texture dimensions rather than a square placeholder', () => {
+    expect(entityExtents(map, 2)).toEqual({ width: 8, depth: 4 });
+    expect(entityExtents(map, 0.5)).toEqual({ width: 2, depth: 4 });
+  });
+  it('falls back safely before texture load or for invalid aspect', () => {
+    for (const aspect of [undefined, 0, -1, NaN, Infinity])
+      expect(entityExtents(map, aspect)).toEqual({ width: 4, depth: 4 });
+  });
+  it('allows only authorized viewers to transform a selected map', () => {
+    const campaign = Campaign.parse({
+      ...makeCampaign(),
+      activeSceneId: S,
+      scenes: {
+        [S]: {
+          id: S,
+          name: 'Map',
+          grid: grid(),
+          environment: { background: '#000' },
+          layers: {},
+          entities: { [map.id]: map },
+        },
+      },
+    });
+    expect(resolveGizmoTarget(campaign, [map.id], { kind: 'host' })?.entity).toEqual(map);
+    expect(resolveGizmoTarget(campaign, [map.id], null)).toBeNull();
+  });
+});

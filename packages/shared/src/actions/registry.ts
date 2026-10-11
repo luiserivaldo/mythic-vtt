@@ -1,3 +1,5 @@
+import { tokenSetRings } from './token.setRings.js';
+import { sceneSetOverlay } from './scene.setOverlay.js';
 import { prefabSave } from './prefab.save.js';
 import { prefabRemove } from './prefab.remove.js';
 import { prefabPlace } from './prefab.place.js';
@@ -49,6 +51,8 @@ export const allActions: readonly AnyAction[] = [
   aoeUpdate,
   aoeRemove,
   tokenSetElevation,
+  sceneSetOverlay,
+  tokenSetRings,
   prefabSave,
   prefabRemove,
   prefabPlace,

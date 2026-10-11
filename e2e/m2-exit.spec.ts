@@ -68,7 +68,7 @@ test('DM, player and spectator keep shared state and privacy across independent 
   await player.page.getByLabel('Display name').fill('Player');
   await player.page.getByRole('button', { name: 'Continue' }).click();
   await player.page.getByRole('radio', { name: /Wizard/ }).check();
-  await player.page.getByRole('button', { name: 'Join seat', exact: true }).click();
+  await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
   for (const page of pages) {
     await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
     await expect(
