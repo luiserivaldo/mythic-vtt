@@ -11,6 +11,8 @@ function copy(prefab: Prefab, id: string, to: z.infer<typeof Vec3>) {
     ),
     id,
     owners: [],
+    // MV-177: a hidden source places hidden copies; other instance grants are not inherited.
+    ...(prefab.entity.perms?.view === false ? { perms: { view: false } } : {}),
     transform: { ...prefab.entity.transform, position: to },
   });
 }

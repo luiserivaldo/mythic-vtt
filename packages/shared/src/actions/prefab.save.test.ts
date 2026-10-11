@@ -109,6 +109,38 @@ describe('campaign prefabs', () => {
     expect(removed.prefabs?.[prefabId]).toBeUndefined();
     expect(removed.scenes[targetId]?.entities[copyId]).toEqual(copy);
   });
+  it('places hidden copies of a hidden source and keeps character links (MV-177)', () => {
+    const before = fixture(),
+      source = before.scenes[IDS.scene]?.entities[IDS.entity];
+    if (!source) throw new Error('entity');
+    source.perms = { view: false, edit: true };
+    source.token = {
+      sizeCells: 1,
+      heightCells: 1,
+      labelVisibility: 'all',
+      characterInstanceId: testId(15),
+    };
+    const saved = reduceAction(before, action).state;
+    const placed = reduceAction(saved, {
+      ...action,
+      type: 'prefab.place',
+      payload: { sceneId: targetId, prefabId, entityId: copyId, to: { x: 5, y: 0, z: 5 } },
+    });
+    const copy = placed.state.scenes[targetId]?.entities[copyId];
+    expect(copy?.perms).toEqual({ view: false });
+    expect(copy?.owners).toEqual([]);
+    expect(copy?.token?.characterInstanceId).toBe(testId(15));
+    for (const audience of [
+      { kind: 'spectators' },
+      { kind: 'seat', seatId: IDS.owner },
+      { kind: 'seat', seatId: IDS.other },
+    ] as const) {
+      expect(visibleTo(audience, placed.state).scenes[targetId]?.entities[copyId]).toBeUndefined();
+      expect(
+        JSON.stringify(patchesFor(audience, saved, placed.state, placed.patches)),
+      ).not.toContain(copyId);
+    }
+  });
   it('enforces destination bounds, locks, collisions and co-DM layer limits', () => {
     const saved = reduceAction(fixture(), action).state;
     const payload = { sceneId: targetId, prefabId, entityId: copyId, to: { x: 5, y: 0, z: 5 } };
