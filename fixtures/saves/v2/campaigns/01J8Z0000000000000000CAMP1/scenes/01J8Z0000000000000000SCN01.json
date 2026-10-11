@@ -49,7 +49,27 @@
         "sizeCells": 1,
         "heightCells": 1,
         "labelVisibility": "all",
-        "facing": 90
+        "facing": 90,
+        "statusMarkers": [
+          {
+            "kind": "icon",
+            "icon": "blinded"
+          },
+          {
+            "kind": "text",
+            "text": "Marked by the moon"
+          }
+        ],
+        "rings": [
+          {
+            "radius": 10,
+            "color": "#55aaff"
+          },
+          {
+            "radius": 30,
+            "color": "#ff9900"
+          }
+        ]
       }
     },
     "01J8Z0000000000000000ENT02": {
@@ -110,6 +130,11 @@
         "walkable": false
       }
     }
+  },
+  "overlay": {
+    "tint": "#8090ff",
+    "tintOpacity": 0.15,
+    "darkness": 0.2
   },
   "initiative": {
     "round": 2,

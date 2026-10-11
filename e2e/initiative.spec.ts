@@ -99,6 +99,36 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   expect(initiative(player)?.order).toEqual([hero, beast]);
   expect(await player.intent('initiative.advance', { sceneId })).toMatchObject({ t: 'reject' });
   expect(initiative(player)?.activeEntityId).toBe(beast);
+  // MV-171 / PERM-03: entity-only actions must also update the roster and current turn.
+  for (const hidden of [true, false]) {
+    expect(
+      await host.intent('entity.setLayer', {
+        sceneId,
+        entityId: beast,
+        layer: hidden ? 'dm' : 'tokens',
+      }),
+    ).toMatchObject({ t: 'ack' });
+    await player.waitForSeq(host.lastSeq);
+    expect(initiative(player)?.order).toEqual(hidden ? [hero] : [hero, beast]);
+    expect(initiative(player)?.activeEntityId).toBe(hidden ? null : beast);
+    await expect(readonly.getByRole('listitem')).toHaveCount(hidden ? 1 : 2);
+  }
+  expect(
+    await host.intent('entity.setOwners', { sceneId, entityId: beast, owners: [] }),
+  ).toMatchObject({ t: 'ack' });
+  for (const hidden of [true, false]) {
+    expect(
+      await host.intent('entity.update', {
+        sceneId,
+        entityId: beast,
+        changes: { perms: { view: !hidden } },
+      }),
+    ).toMatchObject({ t: 'ack' });
+    await player.waitForSeq(host.lastSeq);
+    expect(initiative(player)?.order).toEqual(hidden ? [hero] : [hero, beast]);
+    expect(initiative(player)?.activeEntityId).toBe(hidden ? null : beast);
+    await expect(readonly.getByRole('listitem')).toHaveCount(hidden ? 1 : 2);
+  }
   expect(player.frames.join('\n')).not.toMatch(new RegExp(`${secret}|Secret combatant`));
   await page.getByRole('button', { name: '3D view' }).click();
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();

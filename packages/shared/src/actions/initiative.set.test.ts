@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { applyPatches } from 'immer';
+import fc from 'fast-check';
 import { patchesFor, reduceAction, visibleTo, type ActionEnvelope } from '../index.js';
 import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix } from './testing.js';
 import { initiativeSet } from './initiative.set.js';
@@ -115,16 +117,52 @@ describe('initiative actions and visibility', () => {
       visibleTo({ kind: 'seat', seatId: IDS.coDm }, next.state).scenes[IDS.scene]?.initiative
         ?.order,
     ).toEqual(initiative.order);
-    const privateLayer = reduceAction(result.state, {
-      ...envelope,
-      type: 'entity.setLayer',
-      payload: { sceneId: IDS.scene, entityId: IDS.entity, layer: 'dm' },
-    });
-    expect(visibleTo(audience, privateLayer.state).scenes[IDS.scene]?.initiative?.order).toEqual(
-      [],
+  });
+  it('keeps audience patches equal to the filtered state when active combatants hide or reveal', () => {
+    fc.assert(
+      fc.property(fc.boolean(), fc.integer({ min: 1, max: 1000000 }), (hidden, round) => {
+        for (const change of ['layer', 'view'] as const) {
+          const initial = fixture();
+          const entity = initial.scenes[IDS.scene]?.entities[IDS.entity];
+          if (!entity) throw new Error('missing combatant');
+          if (change === 'layer') entity.layer = hidden ? 'dm' : 'tokens';
+          else entity.perms = { view: !hidden };
+          const before = reduceAction(initial, {
+            ...envelope,
+            payload: { ...payload, initiative: { ...initiative, round } },
+          }).state;
+          const action =
+            change === 'layer'
+              ? {
+                  type: 'entity.setLayer',
+                  payload: {
+                    sceneId: IDS.scene,
+                    entityId: IDS.entity,
+                    layer: hidden ? 'tokens' : 'dm',
+                  },
+                }
+              : {
+                  type: 'entity.update',
+                  payload: {
+                    sceneId: IDS.scene,
+                    entityId: IDS.entity,
+                    changes: { perms: { view: hidden } },
+                  },
+                };
+          const result = reduceAction(before, { ...envelope, ...action });
+          for (const audience of [
+            { kind: 'spectators' },
+            { kind: 'seat', seatId: IDS.owner },
+            { kind: 'seat', seatId: IDS.other },
+            { kind: 'seat', seatId: IDS.coDm },
+          ] as const) {
+            const patches = patchesFor(audience, before, result.state, result.patches);
+            expect(applyPatches(visibleTo(audience, before), patches)).toEqual(
+              visibleTo(audience, result.state),
+            );
+          }
+        }
+      }),
     );
-    expect(
-      JSON.stringify(patchesFor(audience, result.state, privateLayer.state, privateLayer.patches)),
-    ).not.toContain(hiddenId);
   });
 });

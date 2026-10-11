@@ -1,4 +1,4 @@
-import { canPerform, type Campaign, type Entity, type Scene } from '@mythic/shared';
+import { canPerform, SEAT_TEMPLATES, type Campaign, type Entity, type Scene } from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
 import { createClientStore } from '../store/store.js';
 import { makeCampaign, tid } from '../testing.js';
@@ -20,7 +20,13 @@ import { layerRows, moveTargets, toggleHidden } from './layer-panel.js';
 import { sceneRows, isValidSceneName } from './scene-list.js';
 import { connectedIdentityRows, isValidIdentityId, isValidLabel, seatRows } from './seat-panel.js';
 import { toolbarItems } from './toolbar-items.js';
-import { canManageSeats, identitySummary, isAdminRole, viewerRole } from './viewer.js';
+import {
+  canManageSeats,
+  identitySummary,
+  isAdminRole,
+  isReadOnlyViewer,
+  viewerRole,
+} from './viewer.js';
 
 const S = tid(2);
 const E = tid(3);
@@ -105,12 +111,19 @@ describe('viewerRole', () => {
     expect(canManageSeats('codm')).toBe(false);
     expect(toolbarItems('player')).toEqual([]);
     expect(toolbarItems('observer')).toEqual([]);
-    expect(toolbarItems('codm').map((i) => i.id)).toEqual(['scenes', 'layers', 'map', 'entities']);
+    expect(toolbarItems('codm').map((i) => i.id)).toEqual([
+      'scenes',
+      'layers',
+      'map',
+      'entities',
+      'prefabs',
+    ]);
     expect(toolbarItems('host').map((i) => i.id)).toEqual([
       'scenes',
       'layers',
       'map',
       'entities',
+      'prefabs',
       'seats',
       'share',
     ]);
@@ -138,6 +151,25 @@ describe('viewerRole', () => {
       roleLabel: 'Spectator',
       seatLabel: 'Spectator',
     });
+  });
+  it('treats seat-less observers and no-action player slots as camera-only viewers', () => {
+    const campaign = world();
+    expect(isReadOnlyViewer({ isHost: false, seatId: null, campaign })).toBe(true);
+    expect(isReadOnlyViewer({ isHost: true, seatId: null, campaign })).toBe(false);
+    expect(isReadOnlyViewer({ isHost: false, seatId: C, campaign })).toBe(false);
+    const player = campaign.seats[P];
+    if (!player) throw new Error('missing player fixture');
+    const readOnlyCampaign = {
+      ...campaign,
+      seats: {
+        ...campaign.seats,
+        [P]: {
+          ...player,
+          permissions: { view: true, move: false, edit: false, delete: false },
+        },
+      },
+    };
+    expect(isReadOnlyViewer({ isHost: false, seatId: P, campaign: readOnlyCampaign })).toBe(true);
   });
 });
 
@@ -190,6 +222,11 @@ describe('view models', () => {
       ['Pia', 'Player', false, false],
     ]);
     expect(seatRows(world(), null).every((r) => !r.connected)).toBe(true);
+    const readOnly = world();
+    const player = readOnly.seats[P];
+    if (!player) throw new Error('missing player fixture');
+    player.permissions = { view: true, move: false, edit: false, delete: false };
+    expect(seatRows(readOnly, null).find((row) => row.id === P)?.roleLabel).toBe('Spectator');
   });
   it('joins the host-only roster to seat labels and includes unseated spectators', () => {
     expect(
@@ -249,12 +286,28 @@ describe('intent specs are accepted by the shared actions', () => {
     });
     expect(seatAssignIntent(P, ` ${tid(13)} `).payload).toEqual({ seatId: P, identityId: tid(13) });
   });
-  it('a co-DM may manage scenes and layers but not seats', () => {
+  it('builds an accepted atomic create intent for every role template', () => {
+    for (const [index, template] of SEAT_TEMPLATES.entries()) {
+      const spec = seatCreateIntent(
+        tid(20 + index),
+        template.label,
+        template.role,
+        template.permissions,
+      );
+      expect(canPerform(state, host, spec.type, spec.payload)).toBe(true);
+      expect(spec.payload).toMatchObject({
+        label: template.label,
+        role: template.role,
+        permissions: template.permissions,
+      });
+    }
+  });
+  it('a co-DM may manage layers but cannot activate the players scene or manage seats', () => {
     const coDm = { kind: 'seat', seatId: C } as const;
     expect(canPerform(state, coDm, 'layer.lock', layerLockIntent(S, 'map', true).payload)).toBe(
       true,
     );
-    expect(canPerform(state, coDm, 'scene.activate', sceneActivateIntent(S).payload)).toBe(true);
+    expect(canPerform(state, coDm, 'scene.activate', sceneActivateIntent(S).payload)).toBe(false);
     expect(canPerform(state, coDm, 'seat.update', seatRoleIntent(P, 'codm').payload)).toBe(false);
   });
 });

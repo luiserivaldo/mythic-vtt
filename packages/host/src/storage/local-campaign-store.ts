@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { desc } from 'drizzle-orm';
-import { mkdir, open, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, stat, rm } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -165,6 +165,16 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       join(this.folder(campaignId), 'scenes', `${safeId(parsed.id)}.json`),
       JSON.stringify({ ...parsed, schemaVersion: CURRENT_SCHEMA_VERSION }),
     );
+  }
+  async pruneScenes(campaignId: Id, keep: ReadonlySet<string>): Promise<void> {
+    const folder = join(this.folder(campaignId), 'scenes');
+    for (const name of await readdir(folder).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    })) {
+      if (name.endsWith('.json') && !keep.has(name.slice(0, -5)))
+        await rm(join(folder, name), { force: true });
+    }
   }
   async appendLog(campaignId: Id, sessionId: Id, entries: LogEntry[]): Promise<void> {
     if (entries.length === 0) return;

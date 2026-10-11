@@ -1,5 +1,12 @@
 import { initiativeSet } from './initiative.set.js';
 import { initiativeAdvance } from './initiative.advance.js';
+import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
+import { tokenSetRings } from './token.setRings.js';
+import { sceneDelete } from './scene.delete.js';
+import { sceneSetOverlay } from './scene.setOverlay.js';
+import { prefabSave } from './prefab.save.js';
+import { prefabRemove } from './prefab.remove.js';
+import { prefabPlace } from './prefab.place.js';
 import type { AnyAction } from './define.js';
 import { aoePlace } from './aoe.place.js';
 import { aoeRemove } from './aoe.remove.js';
@@ -48,6 +55,13 @@ export const allActions: readonly AnyAction[] = [
   aoeUpdate,
   aoeRemove,
   tokenSetElevation,
+  sceneSetOverlay,
+  tokenSetRings,
+  tokenSetStatusMarkers,
+  prefabSave,
+  prefabRemove,
+  prefabPlace,
+  sceneDelete,
   initiativeSet,
   initiativeAdvance,
 ];

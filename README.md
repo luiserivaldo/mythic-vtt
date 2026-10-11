@@ -14,13 +14,20 @@ Built by **MythicTomes**. Self-hosting is free and fully featured; optional host
 
 - **Join by link.** Players enter a name and sit down. No accounts, no installs.
 - **Seats and permissions.** One DM and up to 10 players, with per-token control over who can move what.
-- **Grid and measuring.** Square grid, custom units, diagonal rules, and a ruler that reports horizontal, vertical and total distance.
+- **Grid and measuring.** Square grid, custom units and diagonal rules. The Ruler panel combines 2D/3D distance measurement and AoE shapes, with snapping, Instant/Linger fade, movement readouts and optional ruler broadcasting. Placed AoEs remain shared.
+- **Status markers.** Select a token and open its Token panel to add condition icons or custom text. Editing follows token permissions; markers share the token label’s visibility.
 - **Battlemaps.** Upload an image, calibrate it to the grid and place tokens.
 - **Rounds.** The DM configures initiative, advances turns and tracks rounds. Private combatants stay out of other clients’ rosters.
 - **Layers and secrets.** Map, token and DM-only layers. Hidden information is never sent to players.
 - **Safe by default.** Every change is recorded: autosave, crash recovery and JSON export.
 - **2D ↔ 3D in one click.** Elevation, platforms, primitive shapes, drop lines and a clamped camera. Everything works in 2D too; 3D only adds information.
 - **Area templates.** Sphere, cylinder, cone, cube and line.
+- **Clear token sightlines.** In 3D, select a token to fade primitives blocking it from your camera. They return to normal when the camera moves clear or selection changes. Each browser handles fading independently; 2D footprints stay unchanged.
+- **Scene filters.** DM/co-DM tint and darkness washes work in 2D and 3D while keeping labels clear.
+
+### Identity backup and transfer
+
+Identity backup and transfer is available on the join screen and while connected. Download the JSON backup and import it in another browser to keep the same identity and campaign seat. The file contains your identity secret: keep it private. Import replaces this browser’s identity and reloads; the file is handled locally and never uploaded.
 
 ## Running a game
 
@@ -67,4 +74,8 @@ Found a bug or have an idea? Please open an issue. If you want to help build Myt
 
 Mythic VTT is licensed under the [GNU Affero General Public License v3.0](LICENSE). "Mythic VTT" and "MythicTomes" are trademarks of MythicTomes.
 
-Identity backup and transfer is available on the join screen and while connected. Download the JSON backup and import it in another browser to keep the same identity and campaign seat. The file contains your identity secret: keep it private. Import replaces this browser’s identity and reloads; the file is handled locally and never uploaded.
+Prefab library: DM/co-DM tools save entity configurations per campaign and place independent copies across scenes, including their referenced assets in campaign exports.
+
+Selected tokens have a Token panel for persistent reach/aura rings. Set each radius in scene units and choose its colour; rings follow the token in 2D and 3D. Editing requires token edit permission. Saves use schema version 3; version 1 and 2 campaigns and sessions migrate without losing data.
+
+New campaigns start with one blank active scene. The DM can browse scenes locally without moving players, and create DM-only scenes that players and spectators never receive. Only the DM activates a public scene for players. The last scene cannot be deleted; deleting the players' active scene leaves their board empty and blocks new joins until another public scene is activated.

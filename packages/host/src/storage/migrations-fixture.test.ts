@@ -11,10 +11,10 @@ import { LocalCampaignStore } from './local-campaign-store.js';
 const fixture = fileURLToPath(new URL('../../../../fixtures/saves/v1', import.meta.url));
 const campaignId = '01J8Z0000000000000000CAMP1';
 const roots: string[] = [];
-const copyFixture = async (): Promise<string> => {
+const copyFixture = async (version = 'v1'): Promise<string> => {
   const root = mkdtempSync(join(tmpdir(), 'mythic-golden-'));
   roots.push(root);
-  await cp(join(fixture, 'campaigns'), join(root, 'campaigns'), { recursive: true });
+  await cp(join(fixture, '..', version, 'campaigns'), join(root, 'campaigns'), { recursive: true });
   return root;
 };
 afterEach(async () => {
@@ -50,6 +50,26 @@ describe('golden save v1 through the shared migrate hook', () => {
       expect(await store.readSessions(campaignId)).toEqual([
         { schemaVersion: CURRENT_SCHEMA_VERSION, sessionId, startedAt: 123 },
       ]);
+    } finally {
+      await store.close();
+    }
+  });
+  it('preserves v2 icon and text markers through load and save', async () => {
+    const store = new LocalCampaignStore(await copyFixture('v2'), storeMigrate);
+    try {
+      const loaded = await store.load(campaignId);
+      const scene = loaded.scenes[0];
+      if (!scene) throw new Error('missing fixture scene');
+      const expected = [
+        { kind: 'icon', icon: 'blinded' },
+        { kind: 'text', text: 'Marked by the moon' },
+      ];
+      expect(scene.entities['01J8Z0000000000000000ENT01']?.token?.statusMarkers).toEqual(expected);
+      await store.saveScene(campaignId, scene);
+      expect(
+        (await store.load(campaignId)).scenes[0]?.entities['01J8Z0000000000000000ENT01']?.token
+          ?.statusMarkers,
+      ).toEqual(expected);
     } finally {
       await store.close();
     }
