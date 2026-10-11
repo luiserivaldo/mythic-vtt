@@ -43,6 +43,8 @@ export interface RenderEntity {
     entityLayer: Entity['layer'];
     perms: Entity['perms'];
     labelVisibility: 'all' | 'owner' | 'dm';
+    /** M1-34: token image Y-rotation in radians, from transform.rotation. */
+    yaw: number;
   };
 }
 
@@ -169,6 +171,7 @@ export function mapScene(scene: Scene): RenderScene {
                 entityLayer: entity.layer,
                 perms: entity.perms,
                 labelVisibility: entity.token.labelVisibility,
+                yaw: yawFromQuaternion(entity.transform.rotation),
               },
             }
           : {}),

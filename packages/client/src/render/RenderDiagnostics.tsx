@@ -6,6 +6,7 @@ const DIAGNOSTICS_ENABLED = import.meta.env.DEV || import.meta.env.MODE === 'tes
 /** Development-only renderer counters used by the performance e2e. */
 export function RenderDiagnostics() {
   const gl = useThree((state) => state.gl);
+  const scene = useThree((state) => state.scene);
   const frames = useRef(0);
 
   useFrame(() => {
@@ -22,12 +23,19 @@ export function RenderDiagnostics() {
         lines: gl.info.render.lines,
         points: gl.info.render.points,
       }),
+      getObjectCount: (name: string) => {
+        let count = 0;
+        scene.traverse((object) => {
+          if (object.name === name) count += 1;
+        });
+        return count;
+      },
     };
     window.__mythicRender = diagnostics;
     return () => {
       if (window.__mythicRender === diagnostics) delete window.__mythicRender;
     };
-  }, [gl]);
+  }, [gl, scene]);
 
   return null;
 }

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { connectAoEPlacer } from './aoe-fixture.js';
 import { RawClient, startTable, testUlid, type Table } from './harness.js';
 
 let table: Table;
@@ -27,6 +28,7 @@ test('host board renders received AoEs, hides the effects layer, and survives 2D
       },
   );
   const host = await RawClient.connect(table, { name: 'aoe-host', ...identity });
+  const placers: RawClient[] = [];
   try {
     await host.waitFor('host snapshot', () => host.state !== undefined);
     const sceneId = testUlid('SCENE', 303);
@@ -59,9 +61,11 @@ test('host board renders received AoEs, hides the effects layer, and survives 2D
       { kind: 'line', width: 1.5, height: 2, length: 5, color: '#55ff77' },
     ];
     for (const [i, aoe] of shapes.entries()) {
+      const placer = await connectAoEPlacer(table, host, testUlid('AOE', i + 1), i + 1);
+      placers.push(placer);
       expect(
         (
-          await host.intent('aoe.place', {
+          await placer.intent('aoe.place', {
             sceneId,
             entity: {
               id: testUlid('AOE', i + 1),
@@ -114,6 +118,7 @@ test('host board renders received AoEs, hides the effects layer, and survives 2D
     await canvas.screenshot({ path: '/tmp/mythic-m3-03-aoe-3d.png' });
     expect(errors).toEqual([]);
   } finally {
+    await Promise.all(placers.map((placer) => placer.close()));
     await host.close();
     await context.close();
   }
