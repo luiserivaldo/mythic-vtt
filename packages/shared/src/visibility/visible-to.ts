@@ -1,4 +1,5 @@
-import type { Campaign, Entity, Scene, Seat } from '../schema/index.js';
+import { canReadTokenLabel } from './token-label.js';
+import type { Campaign, Entity, Prefab, Scene, Seat } from '../schema/index.js';
 import { audienceKey, type Audience } from './audience.js';
 
 // PERM-03: filtering happens on the host before serialization. Anything an audience may not see
@@ -48,11 +49,41 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
     if (entity.perms?.view === false && !owner) return null;
     // D35 / TOK-04 + PERM-03: a name the audience may not see on the label is never sent. The
     // schema requires a string, so the neutral placeholder is the empty string.
-    const label = entity.token?.labelVisibility;
-    const coDm = audience.kind === 'seat' && seat?.role === 'codm';
-    const hideName = label === 'dm' ? !coDm : label === 'owner' ? !(owner || coDm) : false;
-    return hideName && entity.name !== '' ? { ...entity, name: '' } : entity;
+    const hideName = !canReadTokenLabel(audience, entity, seat);
+    const hidePin =
+      entity.pin !== undefined &&
+      typeof entity.pin.reveal === 'object' &&
+      !(audience.kind === 'seat' && seat?.role === 'codm');
+    const hideLegacy = 'legacyPin' in entity;
+    if (!hideName && !hidePin && !hideLegacy) return entity;
+    const view = { ...entity };
+    // PERM-03 / MV-166: proximity notes and migration backups never reach players.
+    if (hidePin) delete view.pin;
+    if (hideLegacy) delete view.legacyPin;
+    if (hideName) {
+      view.name = '';
+      if (entity.token?.statusMarkers !== undefined) {
+        view.token = { ...entity.token };
+        delete view.token.statusMarkers;
+      }
+    }
+    return view;
   });
+}
+
+/** PERM-03: a library entry retains the source entity's visibility/ownership policy. */
+export function viewPrefab(audience: Audience, prefab: Prefab, seat?: Seat): Prefab | null {
+  if (audience.kind === 'host') return prefab;
+  if (audience.kind !== 'seat' || seat?.role !== 'codm' || !seat.permissions.view) return null;
+  // Older experimental blueprints did not capture visibility; keep them host-only.
+  if (prefab.entity.owners === undefined) return null;
+  const entity = { ...prefab.entity, id: prefab.id, owners: prefab.entity.owners };
+  const view = viewEntity(audience, entity, seat);
+  if (view === null) return null;
+  if (view === entity) return prefab;
+  const blueprint = { ...view };
+  Reflect.deleteProperty(blueprint, 'id');
+  return { ...prefab, entity: blueprint };
 }
 
 function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
@@ -79,10 +110,40 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
     const scenes: Campaign['scenes'] = {};
     let changed = false;
     for (const [id, scene] of Object.entries(state.scenes)) {
+      if (scene.dmOnly && seat?.role !== 'codm') {
+        changed = true;
+        continue;
+      }
       const view = viewScene(audience, scene, seat);
       scenes[id] = view;
       if (view !== scene) changed = true;
     }
-    return changed ? { ...state, scenes } : state;
+    // PERM-03: prefab blueprints may contain DM-layer content and private labels.
+    const mayReadPrefabs =
+      audience.kind === 'seat' && seat?.role === 'codm' && seat.permissions.view;
+    const activeSceneId =
+      state.activeSceneId && scenes[state.activeSceneId] ? state.activeSceneId : null;
+    const view =
+      changed || activeSceneId !== state.activeSceneId
+        ? { ...state, scenes, activeSceneId }
+        : state;
+    if (state.prefabs && !mayReadPrefabs) {
+      const withoutPrefabs = { ...view };
+      delete withoutPrefabs.prefabs;
+      return withoutPrefabs;
+    }
+    if (state.prefabs) {
+      const prefabs: NonNullable<Campaign['prefabs']> = {};
+      let hidden = false;
+      for (const [id, prefab] of Object.entries(state.prefabs)) {
+        const allowed = viewPrefab(audience, prefab, seat);
+        if (allowed) {
+          prefabs[id] = allowed;
+          if (allowed !== prefab) hidden = true;
+        } else hidden = true;
+      }
+      if (hidden) return { ...view, prefabs };
+    }
+    return view;
   });
 }

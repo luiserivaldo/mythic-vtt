@@ -203,8 +203,12 @@ export function createEngine(options: EngineOptions): Engine {
     }
   }
 
+  let presenceLatencyTimer: ReturnType<typeof setTimeout> | undefined;
+
   /** M1-11: the roster goes to host connections only; it carries identity ids (PERM-03). */
   function publishPresence(): void {
+    if (presenceLatencyTimer) clearTimeout(presenceLatencyTimer);
+    presenceLatencyTimer = undefined;
     let message: ServerMessage | undefined;
     for (const member of members.values()) {
       if (!member.conn.isHost) continue;
@@ -317,6 +321,17 @@ export function createEngine(options: EngineOptions): Engine {
         const member: Member = { conn, audience, key: audienceViewKey(state, placeOf(conn)) };
         members.set(conn.connectionId, member);
         greet(member);
+        if (
+          !conn.isHost &&
+          state.activeSceneId === null &&
+          (audience.kind !== 'seat' || state.seats[audience.seatId]?.role !== 'codm')
+        )
+          conn.send({
+            t: 'notice',
+            level: 'warning',
+            code: 'no-active-scene',
+            message: 'No active scene. Ask the DM to activate a scene before joining.',
+          });
         publishPresence();
       });
     },
@@ -345,7 +360,21 @@ export function createEngine(options: EngineOptions): Engine {
      */
     onJoin(conn, msg: Of<'join'>) {
       return serialize(async () => {
-        if (!members.has(conn.connectionId) || msg.seatId === undefined) return;
+        if (!members.has(conn.connectionId)) return;
+        if (
+          state.activeSceneId === null &&
+          !conn.isHost &&
+          (!msg.seatId || state.seats[msg.seatId]?.role !== 'codm')
+        ) {
+          conn.send({
+            t: 'error',
+            code: 'seat-unavailable',
+            message: 'No active scene. Ask the DM to activate a scene before joining.',
+            fatal: false,
+          });
+          return;
+        }
+        if (msg.seatId === undefined) return;
         const outcome = await apply(
           conn,
           'session.join',
@@ -371,6 +400,17 @@ export function createEngine(options: EngineOptions): Engine {
         if (!members.has(conn.connectionId)) return;
         ephemeralRelay.relay(conn, msg, state, members.values());
       });
+    },
+
+    onLatency(conn) {
+      if (!members.has(conn.connectionId) || presenceLatencyTimer) return;
+      // UX-06: coalesce all seats' telemetry to at most one presence update per second.
+      // Roster changes still publish immediately and include the newest measured values.
+      presenceLatencyTimer = setTimeout(() => {
+        presenceLatencyTimer = undefined;
+        publishPresence();
+      }, 1000);
+      presenceLatencyTimer.unref();
     },
 
     onDisconnect(conn) {

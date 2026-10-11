@@ -15,9 +15,9 @@ test.afterAll(async () => {
 });
 
 async function addSeat(dm: Page, label: string): Promise<void> {
-  await dm.getByPlaceholder('New seat name').fill(label);
-  await dm.getByRole('button', { name: 'Add seat' }).click();
-  await expect(dm.getByRole('heading', { name: 'Seats and permissions' })).toBeVisible();
+  await dm.getByPlaceholder('Custom participant name').fill(label);
+  await dm.getByRole('button', { name: 'Add custom participant' }).click();
+  await expect(dm.getByRole('heading', { name: 'Participants and permissions' })).toBeVisible();
   await expect(dm.getByText(label, { exact: true }).first()).toBeVisible();
 }
 
@@ -35,7 +35,7 @@ test('a new visitor joins by name and seat; the DM sees them and seats a spectat
   await expect(dm.getByLabel('Current identity')).toContainText('Host');
   // The DM link skips the join screen.
   await expect(dm.getByRole('dialog')).toHaveCount(0);
-  await dm.getByRole('button', { name: 'Seats' }).click();
+  await dm.getByRole('button', { name: 'Participants' }).click();
   await addSeat(dm, 'Wizard');
   await addSeat(dm, 'Rogue');
 
@@ -66,10 +66,10 @@ test('a new visitor joins by name and seat; the DM sees them and seats a spectat
   }
 
   // The DM roster lists the unseated visitor under the name they chose.
-  await expect(dm.getByLabel('Connected player for Wizard')).toContainText('Zara the Bold');
+  await expect(dm.getByLabel('Connected participant for Wizard')).toContainText('Zara the Bold');
 
   await zara.page.getByRole('radio', { name: /Wizard/ }).check();
-  await zara.page.getByRole('button', { name: 'Join seat' }).click();
+  await zara.page.getByRole('button', { name: 'Join participant slot' }).click();
   await expect(zara.page.getByRole('dialog')).toHaveCount(0);
   await expect(zara.page.getByRole('status')).toHaveText('Connected to New campaign');
   await expect(zara.page.getByLabel('Current identity')).toContainText('Zara the Bold');
@@ -103,10 +103,10 @@ test('a new visitor joins by name and seat; the DM sees them and seats a spectat
 
   // The DM seats the spectator from the dropdown, not by typing an identity id.
   const rogue = dm
-    .getByRole('list', { name: 'Seats' })
+    .getByRole('list', { name: 'Participants' })
     .getByRole('listitem')
     .filter({ hasText: 'Rogue' });
-  const picker = rogue.getByLabel('Connected player for Rogue');
+  const picker = rogue.getByLabel('Connected participant for Rogue');
   const value = await picker.locator('option', { hasText: 'Quinn' }).getAttribute('value');
   await picker.selectOption(value ?? '');
   await rogue.getByRole('button', { name: 'Assign' }).click();

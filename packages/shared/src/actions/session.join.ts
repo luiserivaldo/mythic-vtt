@@ -7,6 +7,7 @@ export const sessionJoin = defineAction({
   schema: z.strictObject({ seatId: Id, identityId: Id }),
   permission: (state, actor, p) => {
     const seat = state.seats[p.seatId];
+    if (state.activeSceneId === null && !isHost(actor) && seat?.role !== 'codm') return false;
     if (!seat || (seat.identityId !== null && seat.identityId !== p.identityId)) return false;
     if (
       Object.values(state.seats).some(

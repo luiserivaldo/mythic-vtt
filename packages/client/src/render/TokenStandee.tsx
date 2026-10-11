@@ -5,7 +5,12 @@ import { DoubleSide, type Group } from 'three';
 import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
 import { TokenLabel, TokenMaterial } from './TokenSprite.js';
-import { billboardYaw, standeeDimensions, labelAnchor3d } from './token-standee.js';
+import {
+  billboardYaw,
+  facingMarkerPosition,
+  standeeDimensions,
+  labelAnchor3d,
+} from './token-standee.js';
 import { SELECTION_COLOR } from './canvas-style.js';
 
 const SELECTED = SELECTION_COLOR;
@@ -45,15 +50,23 @@ export function TokenStandee({
 
   return (
     <group position={[x, y, z]}>
-      <mesh
-        name={entity.id}
-        position={[0, dims.baseThickness / 2, 0]}
-        renderOrder={renderOrder}
-        onClick={onClick}
-      >
-        <cylinderGeometry args={[dims.baseRadius, dims.baseRadius, dims.baseThickness, 32]} />
-        <meshStandardMaterial color={selected ? SELECTED : '#2b3643'} />
-      </mesh>
+      {/* M1-34: the base turns with the token's yaw; the marker shows which way it faces. */}
+      <group rotation={[0, entity.token?.yaw ?? 0, 0]}>
+        <mesh
+          name={entity.id}
+          position={[0, dims.baseThickness / 2, 0]}
+          renderOrder={renderOrder}
+          onClick={onClick}
+        >
+          <cylinderGeometry args={[dims.baseRadius, dims.baseRadius, dims.baseThickness, 32]} />
+          <meshStandardMaterial color={selected ? SELECTED : '#2b3643'} />
+        </mesh>
+        {/* Not pickable: it must never intercept clicks meant for the token. */}
+        <mesh raycast={() => null} position={[...facingMarkerPosition(entity.sizeCells)]}>
+          <sphereGeometry args={[dims.baseRadius * 0.12, 12, 8]} />
+          <meshBasicMaterial color={SELECTED} />
+        </mesh>
+      </group>
       {selected && (
         // Not pickable: it must never intercept clicks meant for the token.
         <mesh raycast={() => null} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>

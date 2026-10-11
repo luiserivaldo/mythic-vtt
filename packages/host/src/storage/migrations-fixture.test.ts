@@ -1,3 +1,4 @@
+import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { mkdtempSync } from 'node:fs';
@@ -10,10 +11,10 @@ import { LocalCampaignStore } from './local-campaign-store.js';
 const fixture = fileURLToPath(new URL('../../../../fixtures/saves/v1', import.meta.url));
 const campaignId = '01J8Z0000000000000000CAMP1';
 const roots: string[] = [];
-const copyFixture = async (): Promise<string> => {
+const copyFixture = async (version = 'v1'): Promise<string> => {
   const root = mkdtempSync(join(tmpdir(), 'mythic-golden-'));
   roots.push(root);
-  await cp(join(fixture, 'campaigns'), join(root, 'campaigns'), { recursive: true });
+  await cp(join(fixture, '..', version, 'campaigns'), join(root, 'campaigns'), { recursive: true });
   return root;
 };
 afterEach(async () => {
@@ -28,7 +29,7 @@ describe('golden save v1 through the shared migrate hook', () => {
       expect(campaign).toMatchObject({
         id: campaignId,
         name: 'The Sunken Chapel',
-        schemaVersion: 1,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
       });
       expect(Object.keys(campaign.seats)).toHaveLength(2);
       expect(scenes.map((s) => s.name)).toEqual(['Flooded Nave']);
@@ -37,6 +38,61 @@ describe('golden save v1 through the shared migrate hook', () => {
       await store.close();
     }
   });
+  it('migrates version 1 session metadata without discarding the session', async () => {
+    const root = await copyFixture();
+    const sessionId = '01J8Z0000000000000000SESS1';
+    await writeFile(
+      join(root, 'campaigns', campaignId, 'sessions', sessionId, 'meta.json'),
+      JSON.stringify({ schemaVersion: 1, sessionId, startedAt: 123 }),
+    );
+    const store = new LocalCampaignStore(root, storeMigrate);
+    try {
+      expect(await store.readSessions(campaignId)).toEqual([
+        { schemaVersion: CURRENT_SCHEMA_VERSION, sessionId, startedAt: 123 },
+      ]);
+    } finally {
+      await store.close();
+    }
+  });
+  it('preserves v2 icon and text markers through load and save', async () => {
+    const store = new LocalCampaignStore(await copyFixture('v2'), storeMigrate);
+    try {
+      const loaded = await store.load(campaignId);
+      const scene = loaded.scenes[0];
+      if (!scene) throw new Error('missing fixture scene');
+      const expected = [
+        { kind: 'icon', icon: 'blinded' },
+        { kind: 'text', text: 'Marked by the moon' },
+      ];
+      expect(scene.entities['01J8Z0000000000000000ENT01']?.token?.statusMarkers).toEqual(expected);
+      await store.saveScene(campaignId, scene);
+      expect(
+        (await store.load(campaignId)).scenes[0]?.entities['01J8Z0000000000000000ENT01']?.token
+          ?.statusMarkers,
+      ).toEqual(expected);
+    } finally {
+      await store.close();
+    }
+  });
+  it.each(['v1', 'v2', 'v3', 'v4'])(
+    'loads every golden version %s through the complete chain',
+    async (version) => {
+      const store = new LocalCampaignStore(await copyFixture(version), storeMigrate);
+      try {
+        const loaded = await store.load(campaignId);
+        expect(loaded.campaign.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+        if (version === 'v4') {
+          const scene = loaded.scenes[0];
+          if (!scene) throw new Error('scene');
+          expect(scene.entities['01J8Z0000000000000000ENT01']?.pin?.reveal).toBe('click');
+          await store.saveScene(campaignId, scene);
+          expect((await store.load(campaignId)).scenes[0]).toEqual(scene);
+        }
+      } finally {
+        await store.close();
+      }
+    },
+  );
   it('still rejects a newer schemaVersion as unsupported', async () => {
     const root = await copyFixture();
     const path = join(root, 'campaigns', campaignId);

@@ -48,7 +48,7 @@ describe(`${T} schema`, () => {
     expect(
       entityUpdate.schema.safeParse({
         ...payload,
-        changes: { pin: { text: 'x', reveal: 'click' } },
+        changes: { pin: { text: '', reveal: 'click' } },
       }).success,
     ).toBe(false);
     expect(entityUpdate.schema.safeParse({ ...payload, extra: true }).success).toBe(false);
@@ -65,6 +65,17 @@ describe(`${T} token colour (D38)`, () => {
 });
 
 describe(`${T} permissions`, () => {
+  it('rejects archived pin writes from every live actor', () => {
+    for (const changes of [
+      { pin: { text: 'x', reveal: 'click' as const } },
+      { legacyPin: { text: 'old' } },
+    ]) {
+      expect(
+        Object.values(permissionMatrix(stateWithEntity(), T, { ...payload, changes })),
+      ).toEqual([false, false, false, false, false, false]);
+    }
+  });
+
   it('lets admins and an owner with move permission transform an entity', () => {
     expect(permissionMatrix(stateWithEntity(), T, payload)).toEqual({
       host: true,

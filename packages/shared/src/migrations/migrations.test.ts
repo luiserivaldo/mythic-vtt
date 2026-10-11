@@ -49,7 +49,7 @@ describe('runMigrations', () => {
     const order: number[] = [];
     const spy = chain.map((s) => ({
       ...s,
-      migrate: (p: unknown, k: 'campaign' | 'scene' | 'snapshot') => {
+      migrate: (p: unknown, k: 'campaign' | 'scene' | 'snapshot' | 'session') => {
         order.push(s.from);
         return s.migrate(p, k);
       },

@@ -1,3 +1,4 @@
+import { CURRENT_SCHEMA_VERSION } from '../schema/index.js';
 import type { Campaign } from '../schema/index.js';
 import type { Actor } from './envelope.js';
 import { canPerform } from './run.js';
@@ -36,7 +37,7 @@ export function makeCampaign(): Campaign {
   return {
     id: IDS.campaign,
     name: 'Test campaign',
-    schemaVersion: 1,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     settings: {
       defaultBinding: 'persistent',
       instanceMode: 'linked',

@@ -15,6 +15,7 @@ test.afterAll(async () => {
 });
 
 interface Snapshot {
+  activeSceneId: string;
   scenes: Record<string, { entities: Record<string, { transform: { position: { y: number } } }> }>;
 }
 
@@ -52,7 +53,7 @@ test('selecting a prop in 3D mounts the gizmo without errors and a typed value c
   await reader.waitFor('snapshot', () => reader.state !== undefined);
   const elevation = () => {
     const s = reader.state as Snapshot;
-    return Object.values(Object.values(s.scenes)[0]?.entities ?? {})[0]?.transform.position.y;
+    return Object.values(s.scenes[s.activeSceneId]?.entities ?? {})[0]?.transform.position.y;
   };
 
   const y = panel.getByLabel(/^Y /);

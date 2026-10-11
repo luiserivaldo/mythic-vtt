@@ -9,6 +9,47 @@ import { Transform } from './math.js';
 // D38: optional additive placeholder colour for tokens without an image (no schemaVersion bump).
 export const TokenColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
+export const StatusIcon = z.enum([
+  'blinded',
+  'charmed',
+  'deafened',
+  'frightened',
+  'grappled',
+  'incapacitated',
+  'invisible',
+  'paralyzed',
+  'petrified',
+  'poisoned',
+  'prone',
+  'restrained',
+  'stunned',
+  'unconscious',
+  'exhaustion',
+]);
+export type StatusIcon = z.infer<typeof StatusIcon>;
+export const TokenStatusMarker = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('icon'), icon: StatusIcon }),
+  z.strictObject({ kind: z.literal('text'), text: z.string().trim().min(1).max(80) }),
+]);
+export type TokenStatusMarker = z.infer<typeof TokenStatusMarker>;
+export const TokenStatusMarkers = z
+  .array(TokenStatusMarker)
+  .max(32)
+  .refine(
+    (markers) =>
+      new Set(
+        markers.map((marker) =>
+          marker.kind === 'icon' ? `icon:${marker.icon}` : `text:${marker.text}`,
+        ),
+      ).size === markers.length,
+    { message: 'duplicate status marker' },
+  );
+export const TokenRing = z.strictObject({
+  radius: z.number().positive().max(10000),
+  color: TokenColor,
+});
+export type TokenRing = z.infer<typeof TokenRing>;
+
 const TokenComponent = z.object({
   sizeCells: z.number().positive(),
   heightCells: z.number().positive(),
@@ -17,6 +58,8 @@ const TokenComponent = z.object({
   labelVisibility: z.enum(['all', 'owner', 'dm']),
   facing: z.number().optional(),
   characterInstanceId: Id.optional(),
+  statusMarkers: TokenStatusMarkers.optional(),
+  rings: z.array(TokenRing).max(8).optional(),
 });
 
 const ShapeComponent = z.object({
@@ -94,6 +137,8 @@ export const Entity = z.object({
   aoe: AoEComponent.optional(),
   aura: z.object({ radius: z.number().positive(), color: z.string() }).optional(),
   pin: PinComponent.optional(),
+  // MV-166: lossless migration backup, host-only and never writable by live entity.update.
+  legacyPin: z.unknown().optional(),
 });
 export type Entity = z.infer<typeof Entity>;
 

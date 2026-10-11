@@ -3,7 +3,7 @@ import { ActionEnvelope, Campaign, Id, Scene } from '@mythic/shared';
 import type { Patch } from 'immer';
 import type { Readable } from 'node:stream';
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 export const CampaignFile = Campaign.omit({ scenes: true });
 export type CampaignFile = z.infer<typeof CampaignFile>;
 export const Snapshot = z.object({
@@ -32,7 +32,7 @@ export const AssetMeta = z.object({
 export type AssetMeta = z.infer<typeof AssetMeta>;
 
 export type Migration = (
-  kind: 'campaign' | 'scene' | 'snapshot',
+  kind: 'campaign' | 'scene' | 'snapshot' | 'session',
   version: number,
   payload: unknown,
 ) => unknown;

@@ -295,6 +295,9 @@ describe('campaign export and import over HTTP', () => {
       headers: header(HOST_ID),
     });
     expect(again.status).toBe(200);
+    // Drain the streamed archive before teardown: headers alone leave an active HTTP request.
+    const reexported = new Uint8Array(await again.arrayBuffer());
+    expect(Buffer.from(reexported.subarray(0, 2)).toString()).toBe('PK');
   });
 
   it('rejects bad ids, unknown campaigns, wrong types, garbage archives and oversize bodies', async () => {

@@ -1,4 +1,4 @@
-import { Campaign, reduceAction } from '@mythic/shared';
+import { Campaign, migrateLegacyPinEnvelope, reduceAction } from '@mythic/shared';
 import { CampaignFile, StorageDataError, type Snapshot } from '../storage/types.js';
 import type { LocalCampaignStore } from '../storage/local-campaign-store.js';
 
@@ -34,7 +34,7 @@ export async function recoverCampaign(
     if (envelope.seq !== seq + 1)
       throw new StorageDataError(`Log sequence gap after ${String(seq)}`, 'corrupt');
     try {
-      state = Campaign.parse(reduceAction(state, envelope).state);
+      state = Campaign.parse(reduceAction(state, migrateLegacyPinEnvelope(envelope)).state);
     } catch (error) {
       throw new StorageDataError(
         `Cannot replay action ${String(envelope.seq)}: ${String(error)}`,
@@ -58,4 +58,5 @@ export async function saveCampaignCheckpoint(
   await store.writeSnapshot(campaign.id, sessionId, label, { seq, state: campaign });
   await store.saveCampaign(campaign.id, CampaignFile.parse(campaign));
   for (const scene of Object.values(campaign.scenes)) await store.saveScene(campaign.id, scene);
+  await store.pruneScenes(campaign.id, new Set(Object.keys(campaign.scenes)));
 }
