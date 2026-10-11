@@ -1,3 +1,4 @@
+import { TokenStatusPanel } from './TokenStatusPanel.js';
 import { TokenRingsPanel } from './TokenRingsPanel.js';
 import type { Campaign, Scene } from '@mythic/shared';
 import { lazy, Suspense, type ReactNode } from 'react';
@@ -128,8 +129,14 @@ export function ToolPanelDock({
       )}
       {showToken && (
         <PanelFrame id="token" label="Token" collapsed={collapsed.token}>
+          <TokenStatusPanel
+            key={`status-${selectedEntity.id}`}
+            campaign={campaign}
+            scene={scene}
+            entity={selectedEntity}
+          />
           <TokenRingsPanel
-            key={selectedEntity.id}
+            key={`rings-${selectedEntity.id}`}
             campaign={campaign}
             scene={scene}
             entity={selectedEntity}

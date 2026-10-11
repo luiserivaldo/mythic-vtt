@@ -1,3 +1,4 @@
+import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import { tokenSetRings } from './token.setRings.js';
 import { sceneSetOverlay } from './scene.setOverlay.js';
 import { prefabSave } from './prefab.save.js';
@@ -53,6 +54,7 @@ export const allActions: readonly AnyAction[] = [
   tokenSetElevation,
   sceneSetOverlay,
   tokenSetRings,
+  tokenSetStatusMarkers,
   prefabSave,
   prefabRemove,
   prefabPlace,
