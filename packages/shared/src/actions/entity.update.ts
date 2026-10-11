@@ -30,6 +30,15 @@ export const entityUpdate = defineAction({
     if (p.changes.token?.statusMarkers !== undefined && !canReadEntityLabel(state, actor, entity))
       return false;
 
+    // PERM-03: an editor who cannot read the label may not change who can (a widening would
+    // reveal the hidden markers and real name on the next patch).
+    if (
+      p.changes.token &&
+      p.changes.token.labelVisibility !== entity.token?.labelVisibility &&
+      !canReadEntityLabel(state, actor, entity)
+    )
+      return false;
+
     const keys = Object.keys(p.changes);
     const needsMove = keys.includes('transform');
     const needsEdit = keys.some((key) => key !== 'transform');

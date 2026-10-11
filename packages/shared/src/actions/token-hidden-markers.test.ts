@@ -72,8 +72,39 @@ describe('hidden marker preservation', () => {
         ).toMatchObject({ ok: false, reason: 'forbidden' });
       expect(checkIntent(state, ACTORS.host, 'token.setStatusMarkers', markers).ok).toBe(true);
       expect(checkIntent(state, ACTORS.coDm, 'token.setStatusMarkers', markers).ok).toBe(true);
+
+      // An editor who cannot read the label may not widen (or otherwise change) it.
+      for (const labelVisibility of ['all', 'owner', 'dm'] as const) {
+        if (labelVisibility === label) continue;
+        const relabel = { ...resize, changes: { token: { ...filtered, labelVisibility } } };
+        expect(checkIntent(state, ACTORS.owner, 'entity.update', relabel)).toMatchObject({
+          ok: false,
+          reason: 'forbidden',
+        });
+        expect(checkIntent(state, ACTORS.host, 'entity.update', relabel).ok).toBe(true);
+        expect(checkIntent(state, ACTORS.coDm, 'entity.update', relabel).ok).toBe(true);
+      }
     },
   );
+  it('lets an editor who can read the label change it', () => {
+    const state = makeCampaign(),
+      scene = state.scenes[IDS.scene],
+      owner = state.seats[IDS.owner];
+    if (!scene || !owner) throw new Error('fixture');
+    owner.permissions = { ...owner.permissions, edit: true };
+    scene.entities[IDS.entity] = makeEntity(IDS.entity, {
+      owners: [IDS.owner],
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'owner', statusMarkers: hidden },
+    });
+    for (const labelVisibility of ['all', 'dm'] as const)
+      expect(
+        checkIntent(state, ACTORS.owner, 'entity.update', {
+          sceneId: IDS.scene,
+          entityId: IDS.entity,
+          changes: { token: { sizeCells: 1, heightCells: 1, labelVisibility } },
+        }).ok,
+      ).toBe(true);
+  });
   it('allows a visible owner to edit/remove markers and preserves omitted markers for all actors', () => {
     const state = makeCampaign(),
       scene = state.scenes[IDS.scene],
