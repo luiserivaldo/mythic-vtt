@@ -298,6 +298,7 @@ export interface RawClientOptions {
   identityId: string;
   identitySecret: string;
   hostToken?: string;
+  watchToken?: string;
   lastSeq?: number;
   /** State kept from the previous connection; replayed patches apply on top of it. */
   initialState?: unknown;
@@ -357,7 +358,9 @@ export class RawClient {
   }
 
   static async connect(table: Pick<Table, 'hostPort'>, opts: RawClientOptions): Promise<RawClient> {
-    const ws = new WebSocket(`ws://127.0.0.1:${String(table.hostPort)}/ws`);
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${String(table.hostPort)}/ws${opts.watchToken === undefined ? '' : `?watch=${encodeURIComponent(opts.watchToken)}`}`,
+    );
     const client = new RawClient(opts, ws);
     await new Promise<void>((resolve, reject) => {
       ws.addEventListener('open', () => {
@@ -456,6 +459,10 @@ export class RawClient {
 
   ephemeral(channel: string, data: unknown): void {
     this.ws.send(JSON.stringify({ t: 'ephemeral', channel, data }));
+  }
+
+  get closed(): boolean {
+    return this.ws.readyState === WebSocket.CLOSED;
   }
 
   close(): Promise<void> {

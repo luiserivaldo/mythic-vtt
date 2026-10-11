@@ -9,6 +9,8 @@ export interface JoinEnv {
   identityId: string;
   /** DM-link or remembered host: skips the join screen entirely. */
   hostVisitor: boolean;
+  /** SES-11: credential-bound spectators cannot switch identities or claim seats. */
+  readOnlyVisitor?: boolean;
   initialProfile: Profile | null;
 }
 

@@ -23,7 +23,7 @@ import './join-screen.css';
 /** SES-01: name, optional avatar and seat choice, shown to every visitor except the host. */
 export function JoinScreen() {
   const env = useJoinEnv();
-  return env ? <JoinFlow env={env} /> : null;
+  return env && !env.readOnlyVisitor ? <JoinFlow env={env} /> : null;
 }
 
 function JoinFlow({ env }: { env: JoinEnv }) {
