@@ -50,6 +50,16 @@
         "heightCells": 1,
         "labelVisibility": "all",
         "facing": 90,
+        "statusMarkers": [
+          {
+            "kind": "icon",
+            "icon": "blinded"
+          },
+          {
+            "kind": "text",
+            "text": "Marked by the moon"
+          }
+        ],
         "rings": [
           {
             "radius": 10,

@@ -1,3 +1,4 @@
+import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import { tokenSetRings } from './token.setRings.js';
 import { sceneSetOverlay } from './scene.setOverlay.js';
 import type { AnyAction } from './define.js';
@@ -50,6 +51,7 @@ export const allActions: readonly AnyAction[] = [
   tokenSetElevation,
   sceneSetOverlay,
   tokenSetRings,
+  tokenSetStatusMarkers,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

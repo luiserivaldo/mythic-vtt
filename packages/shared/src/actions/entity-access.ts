@@ -1,3 +1,5 @@
+import { viewEntity } from '../visibility/visible-to.js';
+import { canReadTokenLabel } from '../visibility/token-label.js';
 import type { Campaign, Entity, LayerId, Scene } from '../schema/index.js';
 import type { Actor } from './envelope.js';
 import { isCoDm, isHost, seatOf } from './define.js';
@@ -45,4 +47,13 @@ export function canUseEntity(
  */
 export function isAdminOn(state: Campaign, actor: Actor, layer: LayerId): boolean {
   return isHost(actor) || (isCoDm(state, actor) && layer !== 'dm');
+}
+
+/** PERM-03: editing a replacement marker list requires seeing the existing list. */
+export function canReadEntityLabel(state: Campaign, actor: Actor, entity: Entity): boolean {
+  if (isHost(actor)) return true;
+  if (actor.kind !== 'seat' || !actor.seatId) return false;
+  const audience = { kind: 'seat' as const, seatId: actor.seatId };
+  const seat = seatOf(state, actor);
+  return viewEntity(audience, entity, seat) !== null && canReadTokenLabel(audience, entity, seat);
 }
