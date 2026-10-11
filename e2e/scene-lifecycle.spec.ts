@@ -36,7 +36,7 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     await player.page.getByLabel('Display name').fill('Aria');
     await player.page.getByRole('button', { name: 'Continue', exact: true }).click();
     await player.page.getByRole('radio', { name: /Player/ }).check();
-    await player.page.getByRole('button', { name: 'Join seat', exact: true }).click();
+    await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
     const privateId = testUlid('SECRET', 90);
     expect(
