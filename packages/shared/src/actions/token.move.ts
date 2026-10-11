@@ -15,6 +15,8 @@ export const tokenMove = defineAction({
       entity?.token !== undefined &&
       // D37: a move may not leave the canvas.
       isWithinBounds(resolveSceneBounds(scene), p.to) &&
+      // TOK-03: a flying token's height is locked; only `token.setElevation` changes it.
+      (!entity.token.flying || p.to.y === entity.transform.position.y) &&
       !isLayerLocked(scene, entity.layer) &&
       canUseEntity(state, actor, entity, 'move')
     );

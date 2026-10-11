@@ -28,6 +28,7 @@ import { seatUpdate } from './seat.update.js';
 import { sessionJoin } from './session.join.js';
 import { tokenMove } from './token.move.js';
 import { tokenSetElevation } from './token.setElevation.js';
+import { tokenSetFlying } from './token.setFlying.js';
 
 /** Append-only: add new actions at the end to keep merges painless. */
 export const allActions: readonly AnyAction[] = [
@@ -60,6 +61,7 @@ export const allActions: readonly AnyAction[] = [
   prefabRemove,
   prefabPlace,
   sceneDelete,
+  tokenSetFlying,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

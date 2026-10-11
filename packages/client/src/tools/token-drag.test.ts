@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { RenderScene } from '../render/scene-model.js';
 import { makeCampaign, tid } from '../testing.js';
 import {
+  cursorSurface,
   dragStarted,
   dragRulerPaths,
   groundPoint,
@@ -88,13 +89,53 @@ describe('tokenDrop', () => {
     expect(tokenDrop(sc, tiny, { x: -2, y: 0, z: -2 })).toMatchObject({ x: 0.25, z: 0.25 });
     expect(tokenDrop(sc, tiny, { x: 20, y: 0, z: 20 })).toMatchObject({ x: 9.75, z: 7.75 });
   });
-  it('takes the exact surface height over a walkable platform (D25)', () => {
+  it('keeps the elevation: no gravity without a surface under the cursor (TOK-03)', () => {
     const sc = scene(true, { [PLATFORM]: platform() });
     const e = sc.entities[E] as Entity;
-    const onDais = tokenDrop(sc, e, { x: 6, y: 0, z: 4 });
-    const off = tokenDrop(sc, e, { x: 1.5, y: 0, z: 1.5 });
-    expect(off.y).toBe(0);
-    expect(onDais.y).toBeGreaterThanOrEqual(0);
+    expect(tokenDrop(sc, e, { x: 1.5, y: 3, z: 1.5 }).y).toBe(3);
+    // Over the dais but with no pick (cursor not on its top): still keeps its height.
+    expect(tokenDrop(sc, e, { x: 6, y: 3, z: 4 }).y).toBe(3);
+    expect(tokenDrop(sc, e, { x: 6, y: 0, z: 4 }).y).toBe(0);
+  });
+  it('takes the exact height of the surface under the cursor, up or down (D25)', () => {
+    const sc = scene(true, { [PLATFORM]: platform() });
+    const e = sc.entities[E] as Entity;
+    expect(tokenDrop(sc, e, { x: 6, y: 0, z: 4 }, 2).y).toBe(2);
+    expect(tokenDrop(sc, e, { x: 6, y: 5, z: 4 }, 2).y).toBe(2);
+  });
+  it('a flying token keeps its height whatever is under the cursor', () => {
+    const sc = scene(true, { [PLATFORM]: platform() });
+    const flying = entity({
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all', flying: true },
+    });
+    expect(tokenDrop(sc, flying, { x: 6, y: 4.5, z: 4 }, 2).y).toBe(4.5);
+    expect(tokenDrop(sc, flying, { x: 1.5, y: 4.5, z: 1.5 }).y).toBe(4.5);
+  });
+});
+
+describe('cursorSurface', () => {
+  const down = { origin: { x: 6, y: 20, z: 4 }, direction: { x: 0, y: -1, z: 0 } };
+  const sc = () => scene(true, { [PLATFORM]: platform() });
+
+  it('2D: the highest walkable under the cursor, else nothing', () => {
+    expect(cursorSurface(sc(), '2d', down, [])).toBe(2);
+    expect(
+      cursorSurface(sc(), '2d', { ...down, origin: { x: 1, y: 20, z: 1 } }, []),
+    ).toBeUndefined();
+  });
+  it('3D: the first walkable hit decides, and only a top face counts', () => {
+    expect(cursorSurface(sc(), '3d', down, [{ entityId: PLATFORM, y: 2, normalY: 1 }])).toBe(2);
+    expect(
+      cursorSurface(sc(), '3d', down, [{ entityId: PLATFORM, y: 1, normalY: 0 }]),
+    ).toBeUndefined();
+    // Hits that are not walkable (other tokens, the dragged token) are skipped.
+    expect(
+      cursorSurface(sc(), '3d', down, [
+        { entityId: E, y: 1, normalY: 1 },
+        { entityId: PLATFORM, y: 2, normalY: 0.9 },
+      ]),
+    ).toBe(2);
+    expect(cursorSurface(sc(), '3d', down, [])).toBeUndefined();
   });
 });
 
