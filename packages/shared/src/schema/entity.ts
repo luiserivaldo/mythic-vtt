@@ -44,6 +44,11 @@ export const TokenStatusMarkers = z
       ).size === markers.length,
     { message: 'duplicate status marker' },
   );
+export const TokenRing = z.strictObject({
+  radius: z.number().positive().max(10000),
+  color: TokenColor,
+});
+export type TokenRing = z.infer<typeof TokenRing>;
 
 const TokenComponent = z.object({
   sizeCells: z.number().positive(),
@@ -54,6 +59,7 @@ const TokenComponent = z.object({
   facing: z.number().optional(),
   characterInstanceId: Id.optional(),
   statusMarkers: TokenStatusMarkers.optional(),
+  rings: z.array(TokenRing).max(8).optional(),
 });
 
 const ShapeComponent = z.object({

@@ -126,7 +126,12 @@ export function seatChoices(
       return {
         id: seat.id,
         label: seat.label,
-        roleLabel: seat.role === 'codm' ? 'Co-DM' : 'Player',
+        roleLabel:
+          seat.role === 'codm'
+            ? 'Co-DM'
+            : !seat.permissions.move && !seat.permissions.edit && !seat.permissions.delete
+              ? 'Spectator'
+              : 'Player',
         state,
         previous: seat.id === lastSeatId || state === 'mine',
         disabled: state === 'taken',

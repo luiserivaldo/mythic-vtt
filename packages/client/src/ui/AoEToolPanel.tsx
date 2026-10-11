@@ -10,14 +10,25 @@ import {
   type AoEKind,
 } from '../tools/aoe-placement.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
+import { rulerStore } from '../tools/ruler-store.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { useJoinEnv } from './join-context.js';
 import { useSubmit } from './submit.js';
 
 const KINDS: AoEKind[] = ['sphere', 'cylinder', 'cone', 'cube', 'line'];
 /** All controls are DOM labels. The tool draft and preview are local to this browser. */
-export function AoEToolPanel({ scene }: { scene: Scene | null }) {
+export function AoEToolPanel({
+  scene,
+  unified = false,
+}: {
+  scene: Scene | null;
+  unified?: boolean;
+}) {
   const join = useJoinEnv();
+  const snap = useStore(rulerStore, (s) => s.snap);
+  const measuredScene = scene
+    ? { ...scene, grid: { ...scene.grid, snap: snap && scene.grid.snap } }
+    : null;
   const campaign = useClientStore((s) => s.campaign);
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
@@ -47,14 +58,19 @@ export function AoEToolPanel({ scene }: { scene: Scene | null }) {
       campaign,
       actor,
       'aoe.place',
-      aoePlacePayload(scene.id, join.identityId, draft, scene),
+      aoePlacePayload(scene.id, join.identityId, draft, measuredScene ?? scene),
     );
   const canUpdate =
     !!campaign &&
     !!scene &&
     !!actor &&
     !!entity &&
-    canPerform(campaign, actor, 'aoe.update', aoeUpdatePayload(scene.id, entity, draft, scene));
+    canPerform(
+      campaign,
+      actor,
+      'aoe.update',
+      aoeUpdatePayload(scene.id, entity, draft, measuredScene ?? scene),
+    );
   const canRemove =
     !!campaign &&
     !!scene &&
@@ -79,7 +95,7 @@ export function AoEToolPanel({ scene }: { scene: Scene | null }) {
     try {
       const ok = await send({
         type: 'aoe.update',
-        payload: aoeUpdatePayload(scene.id, entity, draft, scene),
+        payload: aoeUpdatePayload(scene.id, entity, draft, measuredScene ?? scene),
         sceneId: scene.id,
       });
       if (ok) aoeToolStore.getState().setError(null);
@@ -89,34 +105,38 @@ export function AoEToolPanel({ scene }: { scene: Scene | null }) {
   };
   return (
     <section className="ui-panel ui-overlay ui-aoe-tool" aria-label="AoE tool">
-      <button
-        type="button"
-        aria-pressed={active}
-        disabled={!canPlace}
-        onClick={() => {
-          aoeToolStore.getState().setActive(!active);
-        }}
-      >
-        AoE placement
-      </button>
+      {!unified && (
+        <button
+          type="button"
+          aria-pressed={active}
+          disabled={!canPlace}
+          onClick={() => {
+            aoeToolStore.getState().setActive(!active);
+          }}
+        >
+          AoE placement
+        </button>
+      )}
       {active && (
         <>
-          <label>
-            Shape{' '}
-            <select
-              aria-label="AoE shape"
-              value={draft.kind}
-              onChange={(e) => {
-                aoeToolStore.getState().setDraft({ kind: e.target.value as AoEKind });
-              }}
-            >
-              {KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {kind}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!unified && (
+            <label>
+              Shape{' '}
+              <select
+                aria-label="AoE shape"
+                value={draft.kind}
+                onChange={(e) => {
+                  aoeToolStore.getState().setDraft({ kind: e.target.value as AoEKind });
+                }}
+              >
+                {KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {kind}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             Size ({unit}){' '}
             <input

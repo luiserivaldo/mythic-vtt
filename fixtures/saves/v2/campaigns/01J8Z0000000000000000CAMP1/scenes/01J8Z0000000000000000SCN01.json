@@ -59,6 +59,16 @@
             "kind": "text",
             "text": "Marked by the moon"
           }
+        ],
+        "rings": [
+          {
+            "radius": 10,
+            "color": "#55aaff"
+          },
+          {
+            "radius": 30,
+            "color": "#ff9900"
+          }
         ]
       }
     },

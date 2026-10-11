@@ -28,6 +28,7 @@ import { pointerClaims } from './pointer-claims.js';
 import type { OrthographicCamera } from 'three';
 import { RulerPath } from './RulerPath.js';
 import { rulerOwnerName } from '../tools/ruler.js';
+import { rulerStore } from '../tools/ruler-store.js';
 
 const SETTLE_TIMEOUT_MS = 2000;
 
@@ -56,7 +57,7 @@ function entityIdAt(object: Object3D | null, scene: Scene): string | null {
  * others; release sends ONE `token.move` and nothing is applied locally until the host's patch
  * lands (D34).
  */
-export function TokenDrag() {
+export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
@@ -66,6 +67,7 @@ export function TokenDrag() {
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const mode = useViewMode();
+  const measureMovement = useStore(rulerStore, (s) => s.measureMovement);
   const local = useStore(tokenDragStore, (s) => s.local);
   const remote = useStore(tokenDragStore, (s) => s.remote);
 
@@ -126,6 +128,8 @@ export function TokenDrag() {
   }, [settling, storedPosition]);
 
   useEffect(() => {
+    // Keep remote drag previews visible to spectators without enabling local movement.
+    if (readOnly) return;
     const el = gl.domElement;
     let press: Press | null = null;
     let swallowClick = false;
@@ -297,7 +301,7 @@ export function TokenDrag() {
       el.removeEventListener('click', onClickCapture, true);
       window.removeEventListener('keydown', onKey);
     };
-  }, [gl, invalidate, getState]);
+  }, [gl, invalidate, getState, readOnly]);
 
   const ghosts = visibleGhosts(remote, scene, Date.now());
   const rulers = dragRulerPaths(local, remote, scene, Date.now());
@@ -319,6 +323,7 @@ export function TokenDrag() {
         ))}
       </group>
       {scene &&
+        measureMovement &&
         rulers.map((ruler) => (
           <RulerPath
             key={ruler.key}
