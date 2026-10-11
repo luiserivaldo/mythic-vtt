@@ -1,3 +1,4 @@
+import { canReadChat } from './chat.js';
 import { canReadTokenLabel } from './token-label.js';
 import type { Campaign, Entity, Prefab, Scene, Seat } from '../schema/index.js';
 import { audienceKey, type Audience } from './audience.js';
@@ -113,10 +114,16 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
       audience.kind === 'seat' && seat?.role === 'codm' && seat.permissions.view;
     const activeSceneId =
       state.activeSceneId && scenes[state.activeSceneId] ? state.activeSceneId : null;
-    const view =
+    let view =
       changed || activeSceneId !== state.activeSceneId
         ? { ...state, scenes, activeSceneId }
         : state;
+    if (state.chat) {
+      view = {
+        ...view,
+        chat: state.chat.filter((message) => canReadChat(audience, state, message)),
+      };
+    }
     if (state.prefabs && !mayReadPrefabs) {
       const withoutPrefabs = { ...view };
       delete withoutPrefabs.prefabs;

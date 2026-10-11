@@ -1,0 +1,29 @@
+{
+  "t": "patch",
+  "seq": 3,
+  "patches": [
+    {
+      "op": "add",
+      "path": [
+        "chat"
+      ],
+      "value": [
+        {
+          "id": "01J8Z0000000000000000CHAT1",
+          "sessionId": "01J8Z0000000000000000SESS1",
+          "seq": 3,
+          "ts": 1760000010000,
+          "author": {
+            "kind": "host",
+            "label": "DM"
+          },
+          "kind": "text",
+          "audience": {
+            "kind": "public"
+          },
+          "text": "Welcome to the chapel"
+        }
+      ]
+    }
+  ]
+}

@@ -46,5 +46,5 @@ export function actorFor(state: Campaign, p: Participant): Actor {
 export function audienceViewKey(state: Campaign, p: Participant): string {
   const audience = audienceFor(state, p);
   if (audience.kind !== 'seat') return audienceKey(audience);
-  return `${audienceKey(audience)}:${state.seats[audience.seatId]?.role ?? 'player'}`;
+  return `${audienceKey(audience)}:${state.seats[audience.seatId]?.role ?? 'player'}:view=${state.seats[audience.seatId]?.permissions.view === false ? 'off' : 'on'}`;
 }

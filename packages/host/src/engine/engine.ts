@@ -1,6 +1,8 @@
 import type { Patch } from 'immer';
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import {
+  canPostChat,
+  DiceRecord,
   checkIntent,
   patchesFor,
   reduceAction,
@@ -66,6 +68,8 @@ export interface Engine extends GatewayHandler {
   ephemeralStats(): EphemeralRelayStats;
   /** Ends this Session, releasing only per-session seat bindings through durable actions. */
   endSession(): Promise<void>;
+  /** M4-20: trusted host evaluator output; M4-23 supplies the evaluator and dice.roll intent. */
+  recordRoll(actor: Actor, payload: DiceRecord, rng: readonly number[]): Promise<void>;
   /** Resolves once every queued connect/intent/join has been processed. */
   idle(): Promise<void>;
 }
@@ -227,11 +231,18 @@ export function createEngine(options: EngineOptions): Engine {
     conn: GatewayConnection | undefined,
     type: string,
     payload: unknown,
-    extra: { actor?: Actor; clientRef?: string; sceneId?: string },
+    extra: { actor?: Actor; clientRef?: string; sceneId?: string; rollRng?: readonly number[] },
   ): Promise<Outcome> {
     const actor = extra.actor ?? (conn === undefined ? undefined : actorFor(state, placeOf(conn)));
     if (actor === undefined) return { ok: false, reason: 'forbidden' };
-    const check = checkIntent(state, actor, type, payload);
+    const internalRoll =
+      conn === undefined && type === 'dice.record' && extra.rollRng !== undefined;
+    const parsedRoll = internalRoll ? DiceRecord.safeParse(payload) : undefined;
+    const check = internalRoll
+      ? parsedRoll?.success && canPostChat(state, actor, parsedRoll.data.audience)
+        ? { ok: true as const, payload: parsedRoll.data }
+        : { ok: false as const, reason: 'invalid-payload' as const }
+      : checkIntent(state, actor, type, payload);
     if (!check.ok) {
       // zod messages echo client input; keep the detail generic.
       return {
@@ -242,7 +253,9 @@ export function createEngine(options: EngineOptions): Engine {
     }
 
     const ts = clock();
-    const rng = randomFloats(rngCount(type, check.payload), random);
+    const rng = extra.rollRng
+      ? [...extra.rollRng]
+      : randomFloats(rngCount(type, check.payload), random);
     const envelope: ActionEnvelope = {
       id: ulid(ts, random),
       type,
@@ -297,6 +310,12 @@ export function createEngine(options: EngineOptions): Engine {
     state: () => state,
     seq: () => seq,
     ephemeralStats: () => ephemeralRelay.stats(),
+    recordRoll(actor, payload, rng) {
+      return serialize(async () => {
+        const outcome = await apply(undefined, 'dice.record', payload, { actor, rollRng: rng });
+        if (!outcome.ok) throw new Error(`roll not recorded: ${outcome.reason}`);
+      });
+    },
     endSession() {
       return serialize(async () => {
         const seatIds = Object.values(state.seats)
