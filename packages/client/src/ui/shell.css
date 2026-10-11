@@ -712,3 +712,13 @@ main [tabindex]:focus-visible {
     transform: none;
   }
 }
+/* History lives in the right dock like the other panels: it scrolls with the dock and never overlaps it. */
+.ui-history-tools {
+  margin-top: 0.5rem;
+}
+.ui-history-tools code {
+  overflow-wrap: anywhere;
+}
+.ui-history-tools .ui-panel ol {
+  padding-left: 1.1rem;
+}

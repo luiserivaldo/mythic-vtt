@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { HistoryTools } from './ui/HistoryTools.js';
 import { useClientStore } from './store/react.js';
 import { DmPanels } from './ui/DmPanels.js';
 import { JoinScreen } from './ui/JoinScreen.js';
@@ -74,6 +75,7 @@ export function App() {
           </div>
           <div className="ui-right-dock-content" hidden={collapsed}>
             <DmPanels />
+            <HistoryTools />
             <details className="ui-settings">
               <summary>Settings</summary>
               <fieldset>
