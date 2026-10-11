@@ -135,6 +135,35 @@ describe('history projection', () => {
     expect(JSON.stringify(view)).not.toContain(IDS.identity);
     expect(f.state.seats[IDS.owner]?.identityId).toBe(IDS.identity);
   });
+  it('reports only what an action changed: a move is the position and nothing else', () => {
+    const f = fixture();
+    const move = ['scenes', IDS.scene, 'entities', IDS.entity, 'transform', 'position', 'x'];
+    for (const audience of [
+      { kind: 'host' },
+      spectator,
+      { kind: 'seat', seatId: IDS.owner },
+    ] as const) {
+      const entry = historyPage(f.state, 2, f.log, audience, { limit: 50 }).entries.find(
+        (item) => item.type === 'token.move',
+      );
+      // No phantom `owners` (or any other array) replacement from separately cloned before/after.
+      expect(entry?.changes, audience.kind).toEqual([{ op: 'replace', path: move, value: 1 }]);
+    }
+  });
+  it('still reports a real ownership change', () => {
+    const f = fixture();
+    f.apply('entity.setOwners', { sceneId: IDS.scene, entityId: IDS.entity, owners: [IDS.other] });
+    const entry = historyPage(f.state, 3, f.log, { kind: 'host' }, { limit: 50 }).entries.find(
+      (item) => item.type === 'entity.setOwners',
+    );
+    expect(entry?.changes).toEqual([
+      {
+        op: 'replace',
+        path: ['scenes', IDS.scene, 'entities', IDS.entity, 'owners'],
+        value: [IDS.other],
+      },
+    ]);
+  });
 });
 
 describe('history work budgets and checkpoints', () => {

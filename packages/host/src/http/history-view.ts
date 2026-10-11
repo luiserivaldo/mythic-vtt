@@ -75,6 +75,40 @@ function projection(
   return { ...visibleTo(audience, { ...filtered, scenes }), seats };
 }
 
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const keys = Object.keys(left);
+  return (
+    keys.length === Object.keys(right).length &&
+    keys.every((key) => key in right && sameValue(left[key], right[key]))
+  );
+}
+
+function valueAt(root: unknown, path: Patch['path']): unknown {
+  let value = root;
+  for (const key of path) {
+    if (typeof value !== 'object' || value === null) return undefined;
+    value = (value as Record<string | number, unknown>)[key];
+  }
+  return value;
+}
+
+/**
+ * What changed between two projections, compared by value. `diffPatches` trusts reference equality
+ * to skip unchanged subtrees, but the before and after states here are cloned separately, so every
+ * array (owners, rings) is a fresh object and would show up as a change that never happened. An
+ * action's diff is its audit trail, so a replacement with an identical value is dropped.
+ */
+export function valueChanges(before: unknown, after: unknown): Patch[] {
+  return diffPatches(before, after).filter(
+    (change) => !(change.op === 'replace' && sameValue(valueAt(before, change.path), change.value)),
+  );
+}
+
 function plain<T extends object>(value: T): T {
   return structuredClone(isDraft(value) ? plainDraft(value) : value);
 }
@@ -250,7 +284,7 @@ export function scanHistory(
           work,
           paths.some((path) => path[0] === 'seats'),
         );
-        const changes = diffPatches(before, after).filter((change) =>
+        const changes = valueChanges(before, after).filter((change) =>
           relevant(paths, change, query.entityId),
         );
         if (changes.length)
