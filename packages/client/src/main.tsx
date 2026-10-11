@@ -59,7 +59,11 @@ const session = createSession({
 });
 const hostVisitor = hostToken !== undefined || remembered;
 const initialProfile = loadProfile(localStorage);
-if (hostVisitor) session.start({ displayName: initialProfile?.displayName ?? 'DM' });
+if (hostVisitor)
+  session.start({
+    displayName: initialProfile?.displayName ?? 'DM',
+    ...(initialProfile?.color !== undefined ? { color: initialProfile.color } : {}),
+  });
 else if (initialProfile) session.start(initialProfile);
 
 const rootEl = document.getElementById('root');
@@ -72,6 +76,7 @@ createRoot(rootEl).render(
           <EphemeralContext.Provider
             value={{
               identityId: identity.identityId,
+              color: () => session.currentProfile()?.color,
               send: session.sendEphemeral,
               on: session.onEphemeral,
             }}

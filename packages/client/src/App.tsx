@@ -16,7 +16,6 @@ export function App() {
 
   return (
     <main>
-      <h1>Mythic VTT</h1>
       <p role="status">
         {fatalError ??
           (ready ? `Connected to ${campaign?.name ?? 'table'}` : `Connection: ${connection}`)}

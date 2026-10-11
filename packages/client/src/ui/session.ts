@@ -20,10 +20,10 @@ export interface SessionDeps {
  * Changing the name later stops the client and starts a new one.
  */
 export interface Session {
-  start: (profile: Pick<Profile, 'displayName' | 'avatar'>) => void;
+  start: (profile: Pick<Profile, 'displayName' | 'avatar' | 'color'>) => void;
   stop: () => void;
   started: () => boolean;
-  currentProfile: () => Pick<Profile, 'displayName' | 'avatar'> | null;
+  currentProfile: () => Pick<Profile, 'displayName' | 'avatar' | 'color'> | null;
   subscribe: (listener: () => void) => () => void;
   joinSeat: (seatId: string) => void;
   /** Stable for the whole page, so contexts never change; fails fast until a client exists. */
@@ -34,7 +34,7 @@ export interface Session {
 
 export function createSession(deps: SessionDeps): Session {
   let client: GameClient | undefined;
-  let currentProfile: Pick<Profile, 'displayName' | 'avatar'> | null = null;
+  let currentProfile: Pick<Profile, 'displayName' | 'avatar' | 'color'> | null = null;
   const listeners = new Set<() => void>();
   const notify = () => {
     for (const l of listeners) l();
@@ -47,6 +47,7 @@ export function createSession(deps: SessionDeps): Session {
         url: deps.url,
         identity: deps.identity,
         displayName: profile.displayName,
+        ...(profile.color !== undefined ? { color: profile.color } : {}),
         ...(profile.avatar !== undefined ? { avatar: profile.avatar } : {}),
         ...(deps.hostToken !== undefined ? { hostToken: deps.hostToken } : {}),
         store: deps.store,

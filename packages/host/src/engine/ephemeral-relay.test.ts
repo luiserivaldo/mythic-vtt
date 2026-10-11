@@ -129,3 +129,31 @@ describe('ephemeral relay', () => {
     expect(relay.stats().dropped['spectator-rate-limited']).toBe(1);
   });
 });
+
+it('shares the validated profile colour for rulers and cursors instead of a spoofed preview colour', () => {
+  const state = fixtureCampaign();
+  const alice = { ...fakeConnection(T.alice), color: '#ab1234' };
+  const host = fakeConnection(T.host, { isHost: true });
+  const relay = createEphemeralRelay(() => 1000);
+  for (const channel of ['ruler.preview', 'cursor']) {
+    const data =
+      channel === 'ruler.preview'
+        ? {
+            sceneId: T.scene,
+            points: [
+              { x: 1, y: 0, z: 1 },
+              { x: 2, y: 0, z: 1 },
+            ],
+            phase: 'active',
+            color: '#ffffff',
+          }
+        : { x: 1, color: '#ffffff' };
+    relay.relay(alice, { t: 'ephemeral', channel, data }, state, recipients(state, [host]));
+    expect(host.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel,
+      from: T.alice,
+      data: { color: '#ab1234' },
+    });
+  }
+});

@@ -90,13 +90,19 @@ export function RulerTool({
       if (m.from === ephemeral.identityId) return;
       const parsed = RulerPreview.shape.data.safeParse(m.data);
       if (!parsed.success) return;
-      const { sceneId: sid, points: pts, phase: ph } = parsed.data;
-      rulerStore
-        .getState()
-        .setRemote(
-          m.from,
-          ph === 'cancelled' ? null : { sceneId: sid, points: pts, phase: ph, at: Date.now() },
-        );
+      const { sceneId: sid, points: pts, phase: ph, color } = parsed.data;
+      rulerStore.getState().setRemote(
+        m.from,
+        ph === 'cancelled'
+          ? null
+          : {
+              sceneId: sid,
+              points: pts,
+              phase: ph,
+              at: Date.now(),
+              ...(color !== undefined ? { color } : {}),
+            },
+      );
     });
     const timer = setInterval(() => {
       rulerStore.getState().pruneRemote((r) => rulerExpired(r, Date.now()));
@@ -385,7 +391,7 @@ export function RulerTool({
       <RulerPath
         points={localPoints}
         scene={scene}
-        color={RULER_LOCAL_COLOR}
+        color={ephemeral?.color?.() ?? RULER_LOCAL_COLOR}
         owner={null}
         mode={measurementMode}
       />
@@ -394,7 +400,7 @@ export function RulerTool({
           key={from}
           points={r.points}
           scene={scene}
-          color={RULER_REMOTE_COLOR}
+          color={r.color ?? RULER_REMOTE_COLOR}
           owner={rulerOwnerName(seats ?? {}, from)}
           mode={mode}
         />
