@@ -302,12 +302,12 @@ describe('intent specs are accepted by the shared actions', () => {
       });
     }
   });
-  it('a co-DM may manage scenes and layers but not seats', () => {
+  it('a co-DM may manage layers but cannot activate the players scene or manage seats', () => {
     const coDm = { kind: 'seat', seatId: C } as const;
     expect(canPerform(state, coDm, 'layer.lock', layerLockIntent(S, 'map', true).payload)).toBe(
       true,
     );
-    expect(canPerform(state, coDm, 'scene.activate', sceneActivateIntent(S).payload)).toBe(true);
+    expect(canPerform(state, coDm, 'scene.activate', sceneActivateIntent(S).payload)).toBe(false);
     expect(canPerform(state, coDm, 'seat.update', seatRoleIntent(P, 'codm').payload)).toBe(false);
   });
 });

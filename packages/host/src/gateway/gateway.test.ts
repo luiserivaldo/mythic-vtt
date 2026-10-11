@@ -449,7 +449,7 @@ describe('transport RTT (UX-06)', () => {
     expect(await c.next()).toMatchObject({
       t: 'error',
       code: 'protocol-mismatch',
-      supportedVersion: 2,
+      supportedVersion: PROTOCOL_VERSION,
       fatal: true,
     });
     await c.closed;

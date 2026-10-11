@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { useClientStore } from '../store/react.js';
@@ -36,6 +37,7 @@ const PrefabPanel = lazy(async () => {
 /** Toolbar plus the DM panels. Renders nothing for players and observers (D24, PERM-02). */
 export function DmPanels() {
   const campaign = useClientStore((s) => s.campaign);
+  const viewed = useViewedCampaign();
   const ready = useClientStore((s) => s.ready);
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
@@ -102,10 +104,10 @@ export function DmPanels() {
           <Suspense fallback={<p role="status">Loading panel…</p>}>
             {shown === 'scenes' && <ScenePanel campaign={campaign} />}
             {shown === 'prefabs' && (
-              <PrefabPanel key={campaign.activeSceneId} campaign={campaign} />
+              <PrefabPanel key={(viewed ?? campaign).activeSceneId} campaign={viewed ?? campaign} />
             )}
-            {shown === 'layers' && <LayerPanel campaign={campaign} />}
-            {shown === 'map' && <MapPanel campaign={campaign} />}
+            {shown === 'layers' && <LayerPanel campaign={viewed ?? campaign} />}
+            {shown === 'map' && <MapPanel campaign={viewed ?? campaign} />}
             {shown === 'seats' && (
               <SeatPanel
                 campaign={campaign}

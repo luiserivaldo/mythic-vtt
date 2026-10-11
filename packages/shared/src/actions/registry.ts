@@ -1,5 +1,6 @@
 import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import { tokenSetRings } from './token.setRings.js';
+import { sceneDelete } from './scene.delete.js';
 import { sceneSetOverlay } from './scene.setOverlay.js';
 import { prefabSave } from './prefab.save.js';
 import { prefabRemove } from './prefab.remove.js';
@@ -58,6 +59,7 @@ export const allActions: readonly AnyAction[] = [
   prefabSave,
   prefabRemove,
   prefabPlace,
+  sceneDelete,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

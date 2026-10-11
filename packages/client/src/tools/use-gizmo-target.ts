@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import type { Actor } from '@mythic/shared';
 import { useMemo } from 'react';
 import { useStore } from 'zustand';
@@ -10,7 +11,7 @@ import { resolveGizmoTarget, type GizmoTarget } from './transform-gizmo.js';
  * store-owned references only: a fresh object per read would loop React forever.
  */
 export function useGizmoTarget(): GizmoTarget | null {
-  const campaign = useClientStore((s) => s.campaign);
+  const campaign = useViewedCampaign();
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const ids = useStore(selectionStore, (s) => s.ids);

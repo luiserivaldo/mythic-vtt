@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { SceneOverlay } from './SceneOverlay.js';
 import { Canvas, useThree } from '@react-three/fiber';
 import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
@@ -154,7 +155,7 @@ export function BoardCanvas() {
   const viewMode = useViewMode();
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
-  const campaign = useClientStore((state) => state.campaign);
+  const campaign = useViewedCampaign();
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
@@ -180,6 +181,9 @@ export function BoardCanvas() {
       }}
       className="ui-board"
     >
+      <span className="ui-visually-hidden" aria-label="Current scene">
+        {source?.name ?? ''}
+      </span>
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
         <ViewToggle />
         {!readOnly && <RulerToggle />}

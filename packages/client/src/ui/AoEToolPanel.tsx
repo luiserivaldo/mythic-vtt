@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { AoEEntity, canPerform, type Actor, type Scene } from '@mythic/shared';
 import { useMemo } from 'react';
 import { useStore } from 'zustand';
@@ -29,7 +30,7 @@ export function AoEToolPanel({
   const measuredScene = scene
     ? { ...scene, grid: { ...scene.grid, snap: snap && scene.grid.snap } }
     : null;
-  const campaign = useClientStore((s) => s.campaign);
+  const campaign = useViewedCampaign();
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const selected = useStore(selectionStore, (s) => s.ids);
