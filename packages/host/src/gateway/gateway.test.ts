@@ -442,14 +442,14 @@ describe('transport RTT (UX-06)', () => {
     expect(samples[0]).toBeLessThanOrEqual(30_000);
     expect(c.received).toEqual([]);
   });
-  it('rejects version 1 after the presence contract upgrade', async () => {
+  it('rejects version 1 after the quick-field contract upgrade', async () => {
     await start();
     const c = await connect();
     c.send(hello({ v: 1 }));
     expect(await c.next()).toMatchObject({
       t: 'error',
       code: 'protocol-mismatch',
-      supportedVersion: 2,
+      supportedVersion: PROTOCOL_VERSION,
       fatal: true,
     });
     await c.closed;

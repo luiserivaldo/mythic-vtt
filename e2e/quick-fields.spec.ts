@@ -16,7 +16,9 @@ test('quick fields stay private across updates, ownership changes and reconnects
     await client.waitFor('snapshot', () => client.state !== undefined);
     return client;
   };
-  const ok = async (reply: Promise<Reply>) => expect(await reply).toMatchObject({ t: 'ack' });
+  const ok = async (reply: Promise<Reply>) => {
+    expect(await reply).toMatchObject({ t: 'ack' });
+  };
   try {
     const host = await connect('HOST', { hostToken: table.hostToken });
     const sceneId = testUlid('SCENE', 1);
