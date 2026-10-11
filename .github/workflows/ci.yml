@@ -63,7 +63,7 @@ jobs:
       # System libraries are not in the browser cache. Install them on cache hits too.
       - name: Install Chromium and system dependencies
         run: pnpm --filter @mythic/e2e exec playwright install --with-deps chromium
-      # The harness starts the built host and serves the built client.
+      # The harness starts the built host and a Vite client dev server.
       - name: Build
         run: pnpm build
       - name: Playwright suite

@@ -8,9 +8,8 @@ export default defineConfig({
   timeout: 30_000,
   forbidOnly: true,
   // Software-rendered multi-client scenes compete for CPU on CI runners.
-  workers: process.env.CI ? 1 : undefined,
+  ...(process.env.CI ? { workers: 1, globalTimeout: 20 * 60_000 } : {}),
   retries: 0,
-  globalTimeout: process.env.CI ? 20 * 60_000 : undefined,
   reporter: process.env.CI ? [['line'], ['html', { open: 'never' }]] : 'list',
   use: { trace: 'retain-on-failure' },
 });
