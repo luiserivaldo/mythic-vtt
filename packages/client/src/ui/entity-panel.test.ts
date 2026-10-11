@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { makeCampaign, tid } from '../testing.js';
 import {
   entityDeleteIntent,
+  entityCreateLayers,
   entityRenameIntent,
   entityShowGridOnTopIntent,
   entityRows,
@@ -223,6 +224,11 @@ describe('token form defaults (M1-30)', () => {
 });
 
 describe('entity panel view model', () => {
+  it('offers the map layer for fixed objects without changing the existing effects option', () => {
+    expect(entityCreateLayers(false)).toEqual(['tokens', 'props', 'map', 'effects']);
+    expect(entityCreateLayers(true)).toEqual(['tokens', 'props', 'map', 'effects', 'dm']);
+  });
+
   it('lists entities by layer then name with kind and owner labels', () => {
     const state = world();
     const scene = sceneOf(state);

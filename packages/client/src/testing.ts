@@ -1,3 +1,4 @@
+import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 import { Campaign } from '@mythic/shared';
 import type { SocketLike } from './net/connection.js';
 
@@ -9,7 +10,7 @@ export function makeCampaign(name = 'Test'): Campaign {
   return Campaign.parse({
     id: tid(1),
     name,
-    schemaVersion: 1,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     settings: {
       defaultBinding: 'persistent',
       instanceMode: 'linked',

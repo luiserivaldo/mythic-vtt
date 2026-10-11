@@ -45,6 +45,15 @@ export function viewerRole({ isHost, seatId, campaign }: ViewerInput): ViewerRol
   return seat.role === 'codm' ? 'codm' : 'player';
 }
 
+/** M1-44: seat-less spectators and read-only player-view slots only get camera controls. */
+export function isReadOnlyViewer({ isHost, seatId, campaign }: ViewerInput): boolean {
+  if (isHost) return false;
+  const seat = seatId === null ? undefined : campaign?.seats[seatId];
+  if (!seat) return true;
+  if (seat.role === 'codm') return false;
+  return !seat.permissions.move && !seat.permissions.edit && !seat.permissions.delete;
+}
+
 /** Scenes, layers and permissions: host or co-DM (matches the shared `isAdmin`). */
 export const isAdminRole = (role: ViewerRole): boolean => role === 'host' || role === 'codm';
 

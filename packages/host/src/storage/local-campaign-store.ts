@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { desc } from 'drizzle-orm';
-import { mkdir, open, opendir, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdir, open, opendir, readFile, readdir, stat, rm } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -82,14 +82,14 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
   /** @internal used by campaign-archive */
   readFile<T>(
     path: string,
-    kind: 'campaign' | 'scene' | 'snapshot',
+    kind: 'campaign' | 'scene' | 'snapshot' | 'session',
     schema: z.ZodType<T>,
   ): Promise<T> {
     return this.read(path, kind, schema);
   }
   private async read<T>(
     path: string,
-    kind: 'campaign' | 'scene' | 'snapshot',
+    kind: 'campaign' | 'scene' | 'snapshot' | 'session',
     schema: z.ZodType<T>,
   ): Promise<T> {
     let raw: unknown;
@@ -110,7 +110,7 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       );
     try {
       const payload =
-        kind === 'campaign'
+        kind === 'campaign' || kind === 'session'
           ? disk.data
           : Object.fromEntries(
               Object.entries(disk.data).filter(([key]) => key !== 'schemaVersion'),
@@ -165,6 +165,16 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       join(this.folder(campaignId), 'scenes', `${safeId(parsed.id)}.json`),
       JSON.stringify({ ...parsed, schemaVersion: CURRENT_SCHEMA_VERSION }),
     );
+  }
+  async pruneScenes(campaignId: Id, keep: ReadonlySet<string>): Promise<void> {
+    const folder = join(this.folder(campaignId), 'scenes');
+    for (const name of await readdir(folder).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    })) {
+      if (name.endsWith('.json') && !keep.has(name.slice(0, -5)))
+        await rm(join(folder, name), { force: true });
+    }
   }
   async appendLog(campaignId: Id, sessionId: Id, entries: LogEntry[]): Promise<void> {
     if (entries.length === 0) return;
@@ -258,7 +268,8 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
         throw error;
       }
-      const meta = SessionMeta.parse(JSON.parse(raw) as unknown);
+      const disk = SessionMeta.parse(JSON.parse(raw) as unknown);
+      const meta = SessionMeta.parse(this.migrate('session', disk.schemaVersion, disk));
       if (meta.sessionId !== name || meta.schemaVersion !== CURRENT_SCHEMA_VERSION)
         throw new StorageDataError(`Invalid session metadata: ${path}`, 'corrupt');
       sessions.push(meta);

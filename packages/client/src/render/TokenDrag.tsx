@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { TokenDragPreview } from '@mythic/protocol';
 import { useThree } from '@react-three/fiber';
 import { useContext, useEffect, useMemo, useRef } from 'react';
@@ -19,7 +20,7 @@ import {
 } from '../tools/token-drag.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { tokenDragStore } from '../tools/token-drag-store.js';
-import { EphemeralContext } from '../ui/ephemeral-context.js';
+import { EphemeralContext, isRemoteEphemeralSender } from '../ui/ephemeral-context.js';
 import { SubmitContext } from '../ui/submit.js';
 import { useViewMode } from './view-mode-store.js';
 import { GHOST_COLOR } from './canvas-style.js';
@@ -28,6 +29,7 @@ import { pointerClaims } from './pointer-claims.js';
 import type { OrthographicCamera } from 'three';
 import { RulerPath } from './RulerPath.js';
 import { rulerOwnerName } from '../tools/ruler.js';
+import { rulerStore } from '../tools/ruler-store.js';
 
 const SETTLE_TIMEOUT_MS = 2000;
 
@@ -56,16 +58,17 @@ function entityIdAt(object: Object3D | null, scene: Scene): string | null {
  * others; release sends ONE `token.move` and nothing is applied locally until the host's patch
  * lands (D34).
  */
-export function TokenDrag() {
+export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
   const submit = useContext(SubmitContext);
   const ephemeral = useContext(EphemeralContext);
-  const campaign = useClientStore((s) => s.campaign);
+  const campaign = useViewedCampaign();
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const mode = useViewMode();
+  const measureMovement = useStore(rulerStore, (s) => s.measureMovement);
   const local = useStore(tokenDragStore, (s) => s.local);
   const remote = useStore(tokenDragStore, (s) => s.remote);
 
@@ -81,7 +84,12 @@ export function TokenDrag() {
   useEffect(() => {
     const store = tokenDragStore.getState();
     const off = ephemeral?.on((m) => {
-      if (m.channel !== 'token.drag-preview' || !m.from) return;
+      if (
+        m.channel !== 'token.drag-preview' ||
+        !isRemoteEphemeralSender(m.from, ephemeral.identityId)
+      ) {
+        return;
+      }
       const parsed = TokenDragPreview.shape.data.safeParse(m.data);
       if (!parsed.success) return;
       store.setRemote(m.from, { ...parsed.data, at: Date.now() });
@@ -121,6 +129,8 @@ export function TokenDrag() {
   }, [settling, storedPosition]);
 
   useEffect(() => {
+    // Keep remote drag previews visible to spectators without enabling local movement.
+    if (readOnly) return;
     const el = gl.domElement;
     let press: Press | null = null;
     let swallowClick = false;
@@ -292,7 +302,7 @@ export function TokenDrag() {
       el.removeEventListener('click', onClickCapture, true);
       window.removeEventListener('keydown', onKey);
     };
-  }, [gl, invalidate, getState]);
+  }, [gl, invalidate, getState, readOnly]);
 
   const ghosts = visibleGhosts(remote, scene, Date.now());
   const rulers = dragRulerPaths(local, remote, scene, Date.now());
@@ -302,6 +312,7 @@ export function TokenDrag() {
         {ghosts.map((g) => (
           <mesh
             key={g.key}
+            name="token-drag-ghost"
             position={[g.to.x, g.to.y + 0.03, g.to.z]}
             rotation={[-Math.PI / 2, 0, 0]}
             renderOrder={900}
@@ -313,6 +324,7 @@ export function TokenDrag() {
         ))}
       </group>
       {scene &&
+        measureMovement &&
         rulers.map((ruler) => (
           <RulerPath
             key={ruler.key}

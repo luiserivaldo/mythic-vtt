@@ -10,6 +10,8 @@ import {
   type AoEDraft,
 } from '../tools/aoe-placement.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
+import { rulerStore } from '../tools/ruler-store.js';
+import { measurementScene } from '../tools/measurement-tool.js';
 import { useJoinEnv } from '../ui/join-context.js';
 import { describeFailure, SubmitContext } from '../ui/submit.js';
 import { AoEVolume } from './AoEVolume.js';
@@ -24,6 +26,7 @@ export function AoEPlacementCanvas({ scene, mode }: { scene: Scene | null; mode:
   const submit = useContext(SubmitContext);
   const identityId = useJoinEnv()?.identityId ?? null;
   const active = useStore(aoeToolStore, (s) => s.active);
+  const snap = useStore(rulerStore, (s) => s.snap);
   const draft = useStore(aoeToolStore, (s) => s.draft);
   const preview = useStore(aoeToolStore, (s) => s.preview);
   const busy = useStore(aoeToolStore, (s) => s.busy);
@@ -39,9 +42,9 @@ export function AoEPlacementCanvas({ scene, mode }: { scene: Scene | null; mode:
   );
   const volume = useMemo(() => {
     if (!scene || !active || !preview || !validAoEDraft(preview, scene.grid)) return null;
-    const { shape, transform } = placeDraft(preview, scene);
+    const { shape, transform } = placeDraft(preview, measurementScene(scene));
     return { shape, position: transform.position, rotation: transform.rotation };
-  }, [scene, active, preview]);
+  }, [scene, active, preview, snap]);
   useEffect(() => {
     invalidate();
   }, [volume, invalidate]);
@@ -174,7 +177,12 @@ export function AoEPlacementCanvas({ scene, mode }: { scene: Scene | null; mode:
       const d = aoeToolStore.getState().preview ?? current.origin;
       if (!state.scene || !state.submit || !validAoEDraft(d, state.scene.grid)) return;
       if (!state.identityId) return;
-      const payload = aoePlacePayload(state.scene.id, state.identityId, d, state.scene);
+      const payload = aoePlacePayload(
+        state.scene.id,
+        state.identityId,
+        d,
+        measurementScene(state.scene),
+      );
       aoeToolStore.getState().setBusy(true);
       void state
         .submit('aoe.place', payload, state.scene.id)

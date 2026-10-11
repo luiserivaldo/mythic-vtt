@@ -72,7 +72,7 @@ export function quaternionFromYaw(yaw: number): Transform['rotation'] {
 }
 
 /** Footprint box in cells (before the gizmo's own scale factor). */
-export function entityExtents(entity: Entity): { width: number; depth: number } {
+export function entityExtents(entity: Entity, imageAspect = 1): { width: number; depth: number } {
   if (entity.shape) {
     const { width, depth } = primitiveDimensions(entity.shape.kind, entity.transform.scale);
     return { width, depth };
@@ -80,6 +80,11 @@ export function entityExtents(entity: Entity): { width: number; depth: number } 
   if (entity.token) {
     const size = footprintCells(entity.token.sizeCells);
     return { width: size, depth: size };
+  }
+  if (entity.layer === 'map' && entity.image) {
+    // ENV-01: scale.x is image height; texture dimensions determine width.
+    const aspect = Number.isFinite(imageAspect) && imageAspect > 0 ? imageAspect : 1;
+    return { width: entity.transform.scale.x * aspect, depth: entity.transform.scale.x };
   }
   return { width: 1, depth: 1 };
 }

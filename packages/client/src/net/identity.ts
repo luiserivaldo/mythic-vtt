@@ -11,7 +11,7 @@ export interface KeyValueStore {
   setItem(key: string, value: string): void;
 }
 
-const KEY = 'mythic.identity.v1';
+export const IDENTITY_STORAGE_KEY = 'mythic.identity.v1';
 
 function isIdentity(v: unknown): v is Identity {
   if (typeof v !== 'object' || v === null) return false;
@@ -19,13 +19,13 @@ function isIdentity(v: unknown): v is Identity {
   return typeof o['identityId'] === 'string' && typeof o['identitySecret'] === 'string';
 }
 
-/** SES-02: generated on first visit and persisted; the secret never leaves except in `hello`. */
+/** SES-02: generated on first visit and persisted; the secret travels only in `hello` or an explicit SES-09 backup. */
 export function loadOrCreateIdentity(
   store: KeyValueStore,
   nowMs: number,
   randomByte: () => number,
 ): Identity {
-  const raw = store.getItem(KEY);
+  const raw = store.getItem(IDENTITY_STORAGE_KEY);
   if (raw) {
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -38,6 +38,6 @@ export function loadOrCreateIdentity(
     identityId: ulid(nowMs, randomByte),
     identitySecret: randomSecret(32, randomByte),
   };
-  store.setItem(KEY, JSON.stringify(identity));
+  store.setItem(IDENTITY_STORAGE_KEY, JSON.stringify(identity));
   return identity;
 }

@@ -1,3 +1,4 @@
+import { SceneOverlay } from './scene-overlay.js';
 import { z } from 'zod';
 import { AssetRef } from './asset.js';
 import { Entity } from './entity.js';
@@ -36,6 +37,7 @@ export type SceneBounds = z.infer<typeof SceneBounds>;
 export const Scene = z.object({
   id: Id,
   name: z.string(),
+  dmOnly: z.boolean().optional(),
   grid: Grid,
   // D37: optional additive (no schemaVersion bump); read through resolveSceneBounds().
   bounds: SceneBounds.optional(),
@@ -48,6 +50,7 @@ export const Scene = z.object({
   }),
   layers: z.partialRecord(LayerId, z.object({ locked: z.boolean() })),
   entities: z.record(Id, Entity),
+  overlay: SceneOverlay.optional(),
 });
 export type Scene = z.infer<typeof Scene>;
 

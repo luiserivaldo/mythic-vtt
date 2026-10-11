@@ -1,3 +1,4 @@
+import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 import type { ServerMessage } from '@mythic/protocol';
 import type { Campaign, Entity } from '@mythic/shared';
 import type { GatewayConnection } from '../gateway/engine-seam.js';
@@ -61,7 +62,7 @@ export function fixtureCampaign(): Campaign {
   return {
     id: T.campaign,
     name: 'Engine test',
-    schemaVersion: 1,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     settings: {
       defaultBinding: 'persistent',
       instanceMode: 'linked',
