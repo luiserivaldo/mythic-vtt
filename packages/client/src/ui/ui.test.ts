@@ -111,12 +111,19 @@ describe('viewerRole', () => {
     expect(canManageSeats('codm')).toBe(false);
     expect(toolbarItems('player')).toEqual([]);
     expect(toolbarItems('observer')).toEqual([]);
-    expect(toolbarItems('codm').map((i) => i.id)).toEqual(['scenes', 'layers', 'map', 'entities']);
+    expect(toolbarItems('codm').map((i) => i.id)).toEqual([
+      'scenes',
+      'layers',
+      'map',
+      'entities',
+      'prefabs',
+    ]);
     expect(toolbarItems('host').map((i) => i.id)).toEqual([
       'scenes',
       'layers',
       'map',
       'entities',
+      'prefabs',
       'seats',
       'share',
     ]);
