@@ -1,3 +1,4 @@
+import { TokenRingsPanel } from './TokenRingsPanel.js';
 import type { Campaign, Scene } from '@mythic/shared';
 import { lazy, Suspense, type ReactNode } from 'react';
 import { useStore } from 'zustand';
@@ -100,7 +101,9 @@ export function ToolPanelDock({
   const showAoE = scene !== null && !aoeActive && selectedEntity?.aoe !== undefined;
   const showRuler = scene !== null && (rulerActive || aoeActive);
 
-  if (readOnly || (!showEntities && !showTransform && !showAoE && !showRuler)) return null;
+  const showToken = campaign !== null && scene !== null && selectedEntity?.token !== undefined;
+  if (readOnly || (!showEntities && !showTransform && !showAoE && !showToken && !showRuler))
+    return null;
   return (
     <aside className="ui-tool-dock" aria-label="Tool panels">
       {showEntities && (
@@ -121,6 +124,16 @@ export function ToolPanelDock({
         <PanelFrame id="aoe" label="AoE" collapsed={collapsed.aoe}>
           <AoEToolPanel scene={scene} unified />
           <AoEAffectedPanel scene={scene} />
+        </PanelFrame>
+      )}
+      {showToken && (
+        <PanelFrame id="token" label="Token" collapsed={collapsed.token}>
+          <TokenRingsPanel
+            key={selectedEntity.id}
+            campaign={campaign}
+            scene={scene}
+            entity={selectedEntity}
+          />
         </PanelFrame>
       )}
       {showRuler && (
