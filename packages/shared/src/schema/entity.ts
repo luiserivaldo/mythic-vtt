@@ -1,14 +1,55 @@
+import { QuickFields } from './quick-fields.js';
 import { z } from 'zod';
 import { AssetRef } from './asset.js';
 import { Id, LayerId } from './ids.js';
 import { EntityPermissions } from './permissions.js';
-import { QuickFields } from './quick-fields.js';
 import { Transform } from './math.js';
 
 // Components over inheritance: an entity is defined by which components it has.
 // MVP components only; later ones (trigger, wall, light, anim, fx, modData) are added as optional fields.
 // D38: optional additive placeholder colour for tokens without an image (no schemaVersion bump).
 export const TokenColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+export const StatusIcon = z.enum([
+  'blinded',
+  'charmed',
+  'deafened',
+  'frightened',
+  'grappled',
+  'incapacitated',
+  'invisible',
+  'paralyzed',
+  'petrified',
+  'poisoned',
+  'prone',
+  'restrained',
+  'stunned',
+  'unconscious',
+  'exhaustion',
+]);
+export type StatusIcon = z.infer<typeof StatusIcon>;
+export const TokenStatusMarker = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('icon'), icon: StatusIcon }),
+  z.strictObject({ kind: z.literal('text'), text: z.string().trim().min(1).max(80) }),
+]);
+export type TokenStatusMarker = z.infer<typeof TokenStatusMarker>;
+export const TokenStatusMarkers = z
+  .array(TokenStatusMarker)
+  .max(32)
+  .refine(
+    (markers) =>
+      new Set(
+        markers.map((marker) =>
+          marker.kind === 'icon' ? `icon:${marker.icon}` : `text:${marker.text}`,
+        ),
+      ).size === markers.length,
+    { message: 'duplicate status marker' },
+  );
+export const TokenRing = z.strictObject({
+  radius: z.number().positive().max(10000),
+  color: TokenColor,
+});
+export type TokenRing = z.infer<typeof TokenRing>;
 
 const TokenComponent = z.object({
   sizeCells: z.number().positive(),
@@ -19,6 +60,8 @@ const TokenComponent = z.object({
   facing: z.number().optional(),
   characterInstanceId: Id.optional(),
   quickFields: QuickFields.optional(),
+  statusMarkers: TokenStatusMarkers.optional(),
+  rings: z.array(TokenRing).max(8).optional(),
 });
 
 const ShapeComponent = z.object({

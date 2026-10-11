@@ -88,6 +88,14 @@ test('quick fields stay private across updates, ownership changes and reconnects
     const lastSeq = owner.lastSeq;
     const initialState = owner.state;
     await owner.close();
+    await ok(
+      host.intent('token.setQuickField', {
+        sceneId,
+        entityId,
+        fieldId: 'hp',
+        field: { value: 847576, visibility: 'owner' },
+      }),
+    );
     const replay = await RawClient.connect(table, {
       name: 'OWNER',
       identityId: testUlid('OWNER', 1),
@@ -98,7 +106,8 @@ test('quick fields stay private across updates, ownership changes and reconnects
     clients.push(replay);
     await replay.waitForSeq(host.lastSeq);
     for (const c of [spectator, fresh, replay])
-      expect(c.frames.join('\n')).not.toMatch(/817263|918274|928375|837465|a1b2c3|d4e5f6/);
+      expect(c.frames.join('\n')).not.toMatch(/817263|918274|928375|837465|847576|a1b2c3|d4e5f6/);
+    expect(replay.frames.some((frame) => frame.includes('"t":"patch"'))).toBe(true);
     expect(owner.frames.join('\n')).not.toMatch(/918274|928375|837465|d4e5f6/);
     expect(host.frames.join('\n')).toContain('928375');
   } finally {

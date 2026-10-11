@@ -140,3 +140,31 @@ it('preserves unseen fields during generic token edits and rejects field-edit by
     }),
   ).toBe(false);
 });
+
+it('filters hidden markers and quick fields together without restoring either private field', () => {
+  const state = produce(fixture(), (s) => {
+    const t = token(s);
+    if (t) {
+      t.labelVisibility = 'dm';
+      t.statusMarkers = [{ kind: 'text', text: 'SECRET-MARKER' }];
+    }
+  });
+  for (const audience of [
+    { kind: 'seat' as const, seatId: IDS.other },
+    { kind: 'spectators' as const },
+  ]) {
+    const view = JSON.stringify(visibleTo(audience, state));
+    expect(view).not.toMatch(/817263|aabbcc|SECRET-MARKER/);
+  }
+  const changed = reduceAction(state, {
+    ...envelope,
+    type: 'entity.update',
+    payload: {
+      sceneId: IDS.scene,
+      entityId: IDS.entity,
+      changes: { token: { sizeCells: 2, heightCells: 1, labelVisibility: 'dm' } },
+    },
+  }).state;
+  expect(token(changed)?.quickFields).toEqual(token(state)?.quickFields);
+  expect(token(changed)?.statusMarkers).toEqual(token(state)?.statusMarkers);
+});

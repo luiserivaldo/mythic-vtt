@@ -11,13 +11,22 @@ export const sceneCreate = defineAction({
     name: z.string().trim().min(1).max(120),
     background: z.string().min(1).max(64).optional(),
     bounds: SceneBounds.optional(),
+    dmOnly: z.boolean().optional(),
   }),
   permission: (state, actor, p) =>
     !(p.sceneId in state.scenes) && (isHost(actor) || isCoDm(state, actor)),
   reduce: (draft, a) => {
+    // Keep the original first-scene workflow when the untouched bootstrap scene is active.
+    const initial = draft.scenes[draft.id];
+    const bootstrapActive =
+      draft.activeSceneId === draft.id &&
+      Object.keys(draft.scenes).length === 1 &&
+      initial?.name === 'Blank scene' &&
+      Object.keys(initial.entities).length === 0;
     draft.scenes[a.payload.sceneId] = {
       id: a.payload.sceneId,
       name: a.payload.name,
+      dmOnly: a.payload.dmOnly ?? false,
       grid: {
         type: 'square',
         sizePx: 70,
@@ -32,7 +41,8 @@ export const sceneCreate = defineAction({
       entities: {},
     };
     // First scene of a campaign becomes the active one so the table is never empty.
-    if (draft.activeSceneId === null) draft.activeSceneId = a.payload.sceneId;
+    if ((draft.activeSceneId === null || bootstrapActive) && !a.payload.dmOnly && isHost(a.actor))
+      draft.activeSceneId = a.payload.sceneId;
   },
   modExposed: false,
 });

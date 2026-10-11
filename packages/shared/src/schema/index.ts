@@ -9,3 +9,6 @@ export * from './scene.js';
 export * from './seat.js';
 export * from './token-size.js';
 export * from './scene-overlay.js';
+export * from './prefab.js';
+
+export { blankScene } from './blank-scene.js';
