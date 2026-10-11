@@ -41,6 +41,8 @@ export interface Gateway {
 // WebSocket close codes: 1008 policy violation, 1002 protocol error.
 const CLOSE_POLICY = 1008;
 const CLOSE_PROTOCOL = 1002;
+/** How long `close()` lets in-flight HTTP requests finish before cutting their connections. */
+const HTTP_CLOSE_GRACE_MS = 500;
 
 export function createGateway(options: GatewayOptions = {}): Gateway {
   const handler = options.handler ?? noopHandler;
@@ -288,7 +290,17 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
     async close() {
       for (const ws of sockets) ws.terminate();
       wss.close();
-      await app.close();
+      // `app.close()` waits for every in-flight HTTP request. A client that never reads its
+      // response (a streamed export, a stalled import) would hold shutdown forever, so after a
+      // short grace period the remaining connections are cut.
+      const forceTimer = setTimeout(() => {
+        app.server.closeAllConnections();
+      }, HTTP_CLOSE_GRACE_MS);
+      try {
+        await app.close();
+      } finally {
+        clearTimeout(forceTimer);
+      }
     },
     connectionCount: () => sockets.size,
   };
