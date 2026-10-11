@@ -30,6 +30,13 @@ export function RenderDiagnostics() {
         lines: gl.info.render.lines,
         points: gl.info.render.points,
       }),
+      getObjectCount: (name: string) => {
+        let count = 0;
+        scene.traverse((object) => {
+          if (object.name === name) count += 1;
+        });
+        return count;
+      },
     };
     window.__mythicRender = diagnostics;
     return () => {

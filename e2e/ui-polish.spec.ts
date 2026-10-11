@@ -91,7 +91,7 @@ test('at phone width the board still fills the window and the drawer is a bottom
   const before = await board.boundingBox();
   expect(Math.round((before?.y ?? 0) + (before?.height ?? 0))).toBe(844);
 
-  await page.getByRole('button', { name: 'Seats', exact: true }).click();
+  await page.getByRole('button', { name: 'Participants', exact: true }).click();
   const drawer = page.locator('.ui-drawer');
   await expect(drawer).toBeVisible();
   expect(await board.boundingBox()).toEqual(before);

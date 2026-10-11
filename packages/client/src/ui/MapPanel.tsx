@@ -4,6 +4,7 @@ import { useStore } from 'zustand';
 import { UploadError, uploadFailureMessage, type ImageUploader } from '../assets/image-upload.js';
 import { solveCalibration, type CalibrationUnit } from '../tools/battlemap-calibration.js';
 import { calibrationStore } from '../tools/battlemap-store.js';
+import { selectionStore } from '../tools/selection-store.js';
 import { defaultUploader } from './default-uploader.js';
 import { newId } from './ids.js';
 import { fileLabel, mapCalibrateIntent, mapPlaceIntent, mapRows } from './map-panel.js';
@@ -26,6 +27,8 @@ export function MapPanel({
   const { send, error } = useSubmit();
   const calibratingId = useStore(calibrationStore, (s) => s.entityId);
   const points = useStore(calibrationStore, (s) => s.points);
+  const selectionSceneId = useStore(selectionStore, (s) => s.sceneId);
+  const selectedIds = useStore(selectionStore, (s) => s.ids);
   const [distance, setDistance] = useState('');
   const [unit, setUnit] = useState<CalibrationUnit>('scene');
   const [snap, setSnap] = useState(true);
@@ -109,6 +112,7 @@ export function MapPanel({
   return (
     <section aria-labelledby="ui-map-h" className="ui-panel">
       <h2 id="ui-map-h">Battlemap</h2>
+      <p>Battlemaps are placed on the Map layer, below tokens and movable props.</p>
       <div className="ui-row ui-file-field" role="group" aria-labelledby={`${imageInputId}-title`}>
         <span id={`${imageInputId}-title`}>Upload image</span>
         <input
@@ -131,7 +135,16 @@ export function MapPanel({
       <ul className="ui-list">
         {rows.map((row) => (
           <li key={row.id} className="ui-row">
-            <strong>{row.name}</strong>
+            <button
+              type="button"
+              aria-pressed={selectionSceneId === scene.id && selectedIds.includes(row.id)}
+              onClick={() => {
+                selectionStore.getState().pick(scene.id, row.id, false);
+              }}
+            >
+              {row.name}
+            </button>
+            <span className="ui-badge">Map layer</span>
             <span className="ui-badge">{row.calibrated ? 'Calibrated' : 'Not calibrated'}</span>
             <button
               type="button"

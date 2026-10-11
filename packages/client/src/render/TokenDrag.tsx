@@ -19,7 +19,7 @@ import {
 } from '../tools/token-drag.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { tokenDragStore } from '../tools/token-drag-store.js';
-import { EphemeralContext } from '../ui/ephemeral-context.js';
+import { EphemeralContext, isRemoteEphemeralSender } from '../ui/ephemeral-context.js';
 import { SubmitContext } from '../ui/submit.js';
 import { useViewMode } from './view-mode-store.js';
 import { GHOST_COLOR } from './canvas-style.js';
@@ -56,7 +56,7 @@ function entityIdAt(object: Object3D | null, scene: Scene): string | null {
  * others; release sends ONE `token.move` and nothing is applied locally until the host's patch
  * lands (D34).
  */
-export function TokenDrag() {
+export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
@@ -81,7 +81,12 @@ export function TokenDrag() {
   useEffect(() => {
     const store = tokenDragStore.getState();
     const off = ephemeral?.on((m) => {
-      if (m.channel !== 'token.drag-preview' || !m.from) return;
+      if (
+        m.channel !== 'token.drag-preview' ||
+        !isRemoteEphemeralSender(m.from, ephemeral.identityId)
+      ) {
+        return;
+      }
       const parsed = TokenDragPreview.shape.data.safeParse(m.data);
       if (!parsed.success) return;
       store.setRemote(m.from, { ...parsed.data, at: Date.now() });
@@ -121,6 +126,8 @@ export function TokenDrag() {
   }, [settling, storedPosition]);
 
   useEffect(() => {
+    // Keep remote drag previews visible to spectators without enabling local movement.
+    if (readOnly) return;
     const el = gl.domElement;
     let press: Press | null = null;
     let swallowClick = false;
@@ -292,7 +299,7 @@ export function TokenDrag() {
       el.removeEventListener('click', onClickCapture, true);
       window.removeEventListener('keydown', onKey);
     };
-  }, [gl, invalidate, getState]);
+  }, [gl, invalidate, getState, readOnly]);
 
   const ghosts = visibleGhosts(remote, scene, Date.now());
   const rulers = dragRulerPaths(local, remote, scene, Date.now());
@@ -302,6 +309,7 @@ export function TokenDrag() {
         {ghosts.map((g) => (
           <mesh
             key={g.key}
+            name="token-drag-ghost"
             position={[g.to.x, g.to.y + 0.03, g.to.z]}
             rotation={[-Math.PI / 2, 0, 0]}
             renderOrder={900}

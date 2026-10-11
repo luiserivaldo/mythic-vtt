@@ -83,6 +83,7 @@ describe('dropLinesFor', () => {
         entityLayer: 'tokens',
         perms: {},
         labelVisibility: 'all',
+        yaw: 0,
       },
     };
     const scene = (w: boolean): RenderScene => ({

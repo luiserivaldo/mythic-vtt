@@ -30,6 +30,7 @@ async function cellToPixel(page: Page) {
 test('the ruler measures in scene units and a second client sees it with the sender name', async ({
   browser,
 }) => {
+  test.setTimeout(60_000);
   const scene = testUlid('SCENE', 1);
   const seat = testUlid('SEAT', 1);
   const token = testUlid('TOKEN', 1);
@@ -151,6 +152,22 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await dm.mouse.click(tokenAt.x, tokenAt.y);
   await expect(dm.getByRole('button', { name: 'Ruler' })).toHaveAttribute('aria-pressed', 'false');
   await expect(dm.getByRole('region', { name: 'Transform: Ruler target' })).toBeVisible();
+
+  // A finished ruler consumes the first Escape and broadcasts its cancel. The selected token
+  // remains until a second Escape reaches BoardCanvas.
+  await dm.getByRole('button', { name: 'Ruler' }).click();
+  await dm.mouse.move(a.x, a.y);
+  await dm.mouse.down();
+  await dm.mouse.move(b.x, b.y, { steps: 5 });
+  await dm.mouse.up();
+  await expect(player.getByTestId('remote-ruler-total')).toHaveText('DM: 30 ft');
+  await dm.getByLabel('Scene board').focus();
+  await dm.keyboard.press('Escape');
+  await expect(dm.getByTestId('ruler-total')).toHaveCount(0);
+  await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
+  await expect(dm.getByRole('region', { name: 'Transform: Ruler target' })).toBeVisible();
+  await dm.keyboard.press('Escape');
+  await expect(dm.getByRole('region', { name: 'Transform: Ruler target' })).toHaveCount(0);
 
   expect(errors).toEqual([]);
   await setup.close();

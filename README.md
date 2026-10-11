@@ -20,6 +20,12 @@ Built by **MythicTomes**. Self-hosting is free and fully featured; optional host
 - **Safe by default.** Every change is recorded: autosave, crash recovery and JSON export.
 - **2D ↔ 3D in one click.** Elevation, platforms, primitive shapes, drop lines and a clamped camera. Everything works in 2D too; 3D only adds information.
 - **Area templates.** Sphere, cylinder, cone, cube and line.
+- **Clear token sightlines.** In 3D, select a token to fade primitives blocking it from your camera. They return to normal when the camera moves clear or selection changes. Each browser handles fading independently; 2D footprints stay unchanged.
+- **Scene filters.** DM/co-DM tint and darkness washes work in 2D and 3D while keeping labels clear.
+
+### Identity backup and transfer
+
+Identity backup and transfer is available on the join screen and while connected. Download the JSON backup and import it in another browser to keep the same identity and campaign seat. The file contains your identity secret: keep it private. Import replaces this browser’s identity and reloads; the file is handled locally and never uploaded.
 
 ## Running a game
 

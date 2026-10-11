@@ -1,3 +1,4 @@
+import { IdentityTransfer } from './IdentityTransfer.js';
 import { useEffect, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
 import { useClientStore } from '../store/react.js';
 import {
@@ -105,7 +106,7 @@ function JoinFlow({ env }: { env: JoinEnv }) {
           update(withoutSpectator(profile));
         }}
       >
-        Spectating: choose a seat
+        Spectating: choose a participant slot
       </button>
     );
   }
@@ -230,6 +231,7 @@ function NameStep({
           Continue
         </button>
       </form>
+      <IdentityTransfer />
     </Card>
   );
 }
@@ -272,9 +274,9 @@ function SeatStep({
         }}
       >
         <fieldset>
-          <legend>Choose a seat</legend>
+          <legend>Choose a participant slot</legend>
           {choices.length === 0 && (
-            <p>The DM has not created any seats yet. You can watch as a spectator.</p>
+            <p>The DM has not created any participant slots yet. You can watch as a spectator.</p>
           )}
           {choices.map((c) => (
             <label key={c.id} className={c.disabled ? 'join-seat join-seat-taken' : 'join-seat'}>
@@ -292,17 +294,17 @@ function SeatStep({
                 {c.label} <small>({c.roleLabel})</small>
               </span>
               {c.disabled && <span className="join-badge">Taken</span>}
-              {c.previous && !c.disabled && <span className="join-badge">Your seat</span>}
+              {c.previous && !c.disabled && <span className="join-badge">Your slot</span>}
               {c.previous && c.disabled && (
-                <span className="join-badge">Your previous seat, taken</span>
+                <span className="join-badge">Your previous slot, taken</span>
               )}
             </label>
           ))}
         </fieldset>
-        {lost && <p role="alert">That seat was just taken. Please pick another.</p>}
+        {lost && <p role="alert">That slot was just taken. Please pick another.</p>}
         <div className="join-actions">
           <button type="submit" disabled={chosen === null}>
-            Join seat
+            Join participant slot
           </button>
           <button type="button" onClick={onSpectate}>
             Join as spectator

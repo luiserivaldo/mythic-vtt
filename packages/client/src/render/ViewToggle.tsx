@@ -1,10 +1,6 @@
 import { useEffect } from 'react';
 import { useViewMode, viewModeStore } from './view-mode-store.js';
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
-}
+import { isTypingTarget } from './typing-target.js';
 
 /** Board toolbar button plus the `3` shortcut for the 2D <-> 3D toggle. Available to everyone. */
 export function ViewToggle() {
