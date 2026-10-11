@@ -14,7 +14,7 @@ Built by **MythicTomes**. Self-hosting is free and fully featured; optional host
 
 - **Join by link.** Players enter a name and sit down. No accounts, no installs.
 - **Seats and permissions.** One DM and up to 10 players, with per-token control over who can move what.
-- **Grid and measuring.** Square grid, custom units, diagonal rules, and a ruler that reports horizontal, vertical and total distance.
+- **Grid and measuring.** Square grid, custom units and diagonal rules. The Ruler panel combines 2D/3D distance measurement and AoE shapes, with snapping, Instant/Linger fade, movement readouts and optional ruler broadcasting. Placed AoEs remain shared.
 - **Battlemaps.** Upload an image, calibrate it to the grid and place tokens.
 - **Layers and secrets.** Map, token and DM-only layers. Hidden information is never sent to players.
 - **Safe by default.** Every change is recorded: autosave, crash recovery and JSON export.
