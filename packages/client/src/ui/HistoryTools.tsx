@@ -33,10 +33,19 @@ function HistoryPanel() {
       if (seatId) query.set('seatId', seatId);
       if (entityId) query.set('entityId', entityId);
       if (older && before !== undefined) query.set('before', String(before));
-      const response = await fetch(`/api/history?${query.toString()}`, {
-        headers: { Authorization: `Mythic ${identity.identityId}.${identity.identitySecret}` },
-        ...(signal ? { signal } : {}),
-      });
+      // The host runs one history query at a time and answers 429 to an overlapping one. Our own
+      // aborted request (a remount when the viewer's role settles) can still be running there, so
+      // a busy answer is retried briefly instead of being shown as a failure.
+      let response: Response;
+      for (let attempt = 0; ; attempt++) {
+        response = await fetch(`/api/history?${query.toString()}`, {
+          headers: { Authorization: `Mythic ${identity.identityId}.${identity.identitySecret}` },
+          ...(signal ? { signal } : {}),
+        });
+        if (response.status !== 429 || attempt >= 4) break;
+        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+        if (signal?.aborted) return;
+      }
       if (response.status === 409 || response.status === 410) {
         setBefore(undefined);
         setError('History changed or the page expired. Refresh history to continue.');
