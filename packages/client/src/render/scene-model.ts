@@ -46,6 +46,8 @@ export interface RenderEntity {
     labelVisibility: 'all' | 'owner' | 'dm';
     /** M1-34: token image Y-rotation in radians, from transform.rotation. */
     yaw: number;
+    /** TOK-03: height is locked; drawn with a flying indicator. */
+    flying?: boolean;
   };
 }
 
@@ -181,6 +183,7 @@ export function mapScene(scene: Scene): RenderScene {
                 perms: entity.perms,
                 labelVisibility: entity.token.labelVisibility,
                 yaw: yawFromQuaternion(entity.transform.rotation),
+                ...(entity.token.flying ? { flying: true } : {}),
               },
             }
           : {}),

@@ -198,7 +198,8 @@ export function BoardCanvas() {
               Reset view
             </button>
             <span className="ui-camera-hint">
-              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom
+              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom ·
+              middle-click a selected token to lock its height
             </span>
           </>
         )}

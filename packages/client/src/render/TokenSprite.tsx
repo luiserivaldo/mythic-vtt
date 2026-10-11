@@ -166,8 +166,11 @@ export function ElevationBadge({ entity, actor }: { entity: RenderEntity; actor:
     },
     actor,
   );
-  const text = visible ? formatElevation(entity.position[1], grid) : null;
-  if (text === null) return null;
+  const elevation = visible ? formatElevation(entity.position[1], grid) : null;
+  // A flying token is marked even at ground level, where there is no elevation text to show.
+  const flying = visible && token.flying === true;
+  if (elevation === null && !flying) return null;
+  const text = [flying ? '✈ Flying' : null, elevation].filter(Boolean).join(' ');
   return (
     <Html
       center

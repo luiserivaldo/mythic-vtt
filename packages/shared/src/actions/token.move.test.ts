@@ -91,6 +91,34 @@ describe(`${T} permissions`, () => {
   });
 });
 
+describe(`${T} flying lock (TOK-03)`, () => {
+  const flyingState = () => {
+    const state = stateWithToken();
+    const entity = state.scenes[IDS.scene]?.entities[IDS.entity];
+    if (entity?.token) {
+      entity.token.flying = true;
+      entity.transform.position = { x: 1, y: 3, z: 1 };
+    }
+    return state;
+  };
+  const at = (y: number) => ({ ...payload, to: { x: 2.25, y, z: 3.75 } });
+
+  it('moves sideways at the stored height', () => {
+    expect(tokenMove.permission(flyingState(), ACTORS.owner, at(3))).toBe(true);
+  });
+
+  it('rejects a move that changes the height, for owners and admins alike', () => {
+    for (const actor of [ACTORS.owner, ACTORS.host]) {
+      expect(tokenMove.permission(flyingState(), actor, at(0))).toBe(false);
+      expect(tokenMove.permission(flyingState(), actor, at(3.5))).toBe(false);
+    }
+  });
+
+  it('leaves non-flying tokens free to change height', () => {
+    expect(tokenMove.permission(stateWithToken(), ACTORS.owner, at(4))).toBe(true);
+  });
+});
+
 describe(`${T} bounds (D37)`, () => {
   const at = (x: number, z: number) => ({ ...payload, to: { x, y: 0, z } });
   const withBounds = (width: number, height: number) => {
