@@ -124,14 +124,28 @@ export const dockTabs = createRegistry<DockTab>([
 ]);
 
 export const tokenQuickFields = createRegistry<TokenQuickField>([
-  { id: 'hp', label: 'HP', icon: 'heart', group: 'default', allowed: canView, field: 'hp' },
-  { id: 'ac', label: 'AC', icon: 'shield', group: 'default', allowed: canView, field: 'ac' },
+  {
+    id: 'hp',
+    label: 'HP',
+    icon: 'heart',
+    group: 'default',
+    allowed: (role, permissions) => role === 'observer' || canView(role, permissions),
+    field: 'hp',
+  },
+  {
+    id: 'ac',
+    label: 'AC',
+    icon: 'shield',
+    group: 'default',
+    allowed: (role, permissions) => role === 'observer' || canView(role, permissions),
+    field: 'ac',
+  },
   {
     id: 'speed',
     label: 'Speed',
     icon: 'speed',
     group: 'default',
-    allowed: canView,
+    allowed: (role, permissions) => role === 'observer' || canView(role, permissions),
     field: 'speed',
   },
 ]);

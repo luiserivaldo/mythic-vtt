@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { AssetRef } from './asset.js';
 import { Id, LayerId } from './ids.js';
 import { EntityPermissions } from './permissions.js';
+import { QuickFields } from './quick-fields.js';
 import { Transform } from './math.js';
 
 // Components over inheritance: an entity is defined by which components it has.
@@ -17,6 +18,7 @@ const TokenComponent = z.object({
   labelVisibility: z.enum(['all', 'owner', 'dm']),
   facing: z.number().optional(),
   characterInstanceId: Id.optional(),
+  quickFields: QuickFields.optional(),
 });
 
 const ShapeComponent = z.object({

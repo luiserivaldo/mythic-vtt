@@ -51,7 +51,19 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
     const label = entity.token?.labelVisibility;
     const coDm = audience.kind === 'seat' && seat?.role === 'codm';
     const hideName = label === 'dm' ? !coDm : label === 'owner' ? !(owner || coDm) : false;
-    return hideName && entity.name !== '' ? { ...entity, name: '' } : entity;
+    let view = hideName && entity.name !== '' ? { ...entity, name: '' } : entity;
+    if (entity.token?.quickFields) {
+      // UX-07 / PERM-03: omit the entire private field, including its colour and policy.
+      const entries = Object.entries(entity.token.quickFields);
+      const shared = entries.filter(
+        ([, field]) =>
+          field.visibility === 'all' || coDm || (field.visibility === 'owner' && owner),
+      );
+      if (shared.length !== entries.length) {
+        view = { ...view, token: { ...entity.token, quickFields: Object.fromEntries(shared) } };
+      }
+    }
+    return view;
   });
 }
 
