@@ -9,7 +9,7 @@ import { useGizmoTarget3D } from '../tools/use-gizmo-target-3d.js';
 import { AoEAffectedPanel } from './AoEAffectedPanel.js';
 import { AoEToolPanel } from './AoEToolPanel.js';
 import { toolPanelLayoutStore, type ToolPanelId } from './tool-panel-layout.js';
-import { viewerRole } from './viewer.js';
+import { isReadOnlyViewer, viewerRole } from './viewer.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { RulerPanel } from './RulerPanel.js';
 
@@ -89,6 +89,7 @@ export function ToolPanelDock({
   const selected = useStore(selectionStore, (state) => state.ids);
   const target2d = useGizmoTarget();
   const target3d = useGizmoTarget3D();
+  const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
   const role = campaign ? viewerRole({ isHost, seatId, campaign }) : 'observer';
   const canAdmin = role === 'host' || role === 'codm';
   const showEntities = canAdmin && campaign !== null && entities !== 'hidden';
@@ -99,7 +100,7 @@ export function ToolPanelDock({
   const showAoE = scene !== null && !aoeActive && selectedEntity?.aoe !== undefined;
   const showRuler = scene !== null && (rulerActive || aoeActive);
 
-  if (!showEntities && !showTransform && !showAoE && !showRuler) return null;
+  if (readOnly || (!showEntities && !showTransform && !showAoE && !showRuler)) return null;
   return (
     <aside className="ui-tool-dock" aria-label="Tool panels">
       {showEntities && (

@@ -25,13 +25,9 @@ import { pointerClaims } from './pointer-claims.js';
 import { RulerPath } from './RulerPath.js';
 import { RULER_LOCAL_COLOR, RULER_REMOTE_COLOR } from './canvas-style.js';
 import type { ViewMode } from './view-mode-store.js';
+import { isTypingTarget } from './typing-target.js';
 
 const NO_REMOTE: readonly never[] = [];
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
-}
 
 /**
  * MEAS-01/02: the multi-waypoint ruler uses the ground plane in 2D and ray-hit surfaces in 3D.
@@ -50,7 +46,13 @@ function entityIdForObject(object: Object3D, scene: Scene): string | undefined {
   return undefined;
 }
 
-export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
+export function RulerTool({
+  mode = '2d',
+  readOnly = false,
+}: {
+  mode?: ViewMode;
+  readOnly?: boolean;
+}) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
@@ -106,6 +108,8 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
   }, [ephemeral]);
 
   useEffect(() => {
+    // Read-only viewers still receive rulers; only pointer and publishing handlers are disabled.
+    if (readOnly) return;
     const el = gl.domElement;
     const raycaster = new Raycaster();
     let down: {
@@ -368,7 +372,7 @@ export function RulerTool({ mode = '2d' }: { mode?: ViewMode }) {
       window.removeEventListener('contextmenu', onContextMenu, true);
       window.removeEventListener('keydown', onKey);
     };
-  }, [gl, getState]);
+  }, [gl, getState, readOnly]);
 
   const localPoints = useMemo(
     () => (phase === 'idle' ? NO_REMOTE : phase === 'active' ? withCursor(points, cursor) : points),
