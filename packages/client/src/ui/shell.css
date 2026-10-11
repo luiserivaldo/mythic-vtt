@@ -541,3 +541,174 @@ main [tabindex]:focus-visible {
   margin-bottom: 0.25rem;
   overflow-wrap: anywhere;
 }
+
+/* UI-SHELL-01: the dock participates in layout, so its width changes the board viewport. */
+.ui-app {
+  --ui-page: #0c1a2c;
+  --ui-bg: #172b45;
+  --ui-bg-raised: #213954;
+  --ui-control: #29425e;
+  --ui-control-hover: #365573;
+  --ui-input: #102238;
+  --ui-border: #58708a;
+  --ui-fg: #f1f5fa;
+  --ui-muted: #bac9d8;
+  color: var(--ui-fg);
+  overflow: hidden;
+  background: var(--ui-page);
+}
+.ui-app[data-theme='light'] {
+  color-scheme: light;
+  --ui-page: #dce8f2;
+  --ui-bg: #f4f8fc;
+  --ui-bg-raised: #e6eef6;
+  --ui-control: #e4ecf4;
+  --ui-control-hover: #cfdfed;
+  --ui-input: #ffffff;
+  --ui-border: #758ca5;
+  --ui-fg: #172b45;
+  --ui-muted: #36506a;
+  --ui-accent: #9b5717;
+  --ui-on-accent: #ffffff;
+  --ui-danger: #a12626;
+}
+.ui-top-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 1rem;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0.25rem 0.75rem;
+  background: var(--ui-bg);
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-scene-heading {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-top-bar .ui-identity-status {
+  margin-left: auto;
+  padding: 0;
+}
+.ui-app-body {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+}
+.ui-app-body > .ui-board {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: auto;
+}
+.ui-right-dock {
+  flex: 0 0 19rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--ui-bg);
+  border-left: 1px solid var(--ui-border);
+  transition: flex-basis 150ms ease;
+}
+.ui-right-dock[data-collapsed='true'] {
+  flex-basis: 3rem;
+}
+.ui-right-dock-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-right-dock-head button {
+  min-width: 2rem;
+  padding-inline: 0;
+}
+.ui-right-dock-content {
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.5rem;
+}
+.ui-right-dock-content[hidden] {
+  display: none;
+}
+.ui-right-dock .ui-shell {
+  padding: 0;
+}
+.ui-right-dock .ui-toolbar {
+  flex-direction: column;
+}
+.ui-right-dock .ui-toolbar button {
+  text-align: left;
+}
+.ui-app .ui-tool-dock {
+  position: static;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+}
+.ui-context-panel-slot {
+  margin-top: 0.75rem;
+}
+.ui-shell-error {
+  position: fixed;
+  z-index: 60;
+  top: 3.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 0.8rem;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-danger);
+  border-radius: 5px;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 40%);
+}
+.ui-settings {
+  margin-top: 0.8rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--ui-border);
+}
+.ui-settings fieldset {
+  margin-top: 0.6rem;
+  border: 1px solid var(--ui-border);
+}
+.ui-settings fieldset label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-right: 0.8rem;
+}
+/* Existing board controls provide the first floating rail; UX-15 replaces its entries. */
+.ui-app .ui-board-controls {
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 10rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.ui-app .ui-board-controls .ui-camera-hint {
+  white-space: normal;
+}
+@media (max-width: 40rem) {
+  .ui-right-dock {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    width: min(19rem, 75vw);
+    max-height: 70%;
+    border-top: 1px solid var(--ui-border);
+  }
+  .ui-right-dock[data-collapsed='true'] {
+    width: 3rem;
+  }
+  .ui-app .ui-board-controls {
+    top: 0.5rem;
+    transform: none;
+  }
+}
