@@ -29,8 +29,7 @@ export type SeatColors = Readonly<Record<string, string | undefined>>;
 export const NEUTRAL_ROLL_COLOR = '#7d8b99';
 
 export const CHAT_EMPTY_STATE = 'No messages yet.';
-export const CHAT_COMING_SOON =
-  'Chat is coming soon. Messages and dice rolls arrive with ACT-01 and ACT-02.';
+export const CHAT_COMING_SOON = 'Chat is coming soon. Messages and dice rolls will appear here.';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
