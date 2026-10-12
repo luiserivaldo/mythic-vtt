@@ -186,8 +186,10 @@ test('elevated tokens keep their height; flying locks it; a spectator cannot tog
   expect(entity()?.token?.flying).toBe(true);
 
   // 6. The panel checkbox releases the lock again.
-  await panel.getByRole('checkbox', { name: 'Flying' }).uncheck();
+  // The host controls this value; the click sends an intent and its patch updates the checkbox.
+  await panel.getByRole('checkbox', { name: 'Flying' }).click();
   await expect.poll(() => entity()?.token?.flying, { timeout: 10_000 }).toBeUndefined();
+  await expect(panel.getByRole('checkbox', { name: 'Flying' })).not.toBeChecked();
   await expect(page.getByTestId('elevation-badge')).not.toContainText('Flying');
 
   expect(errors).toEqual([]);

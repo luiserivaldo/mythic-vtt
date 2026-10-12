@@ -101,6 +101,8 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await panel.getByRole('button', { name: 'Add to initiative' }).click();
   await expect(panel.getByRole('listitem')).toHaveCount(3);
   await panel.getByRole('button', { name: 'Earlier 3', exact: true }).click();
+  // Wait for the reordered roster before choosing a position whose occupant has changed.
+  await expect(panel.getByRole('listitem').nth(1)).toContainText('Beast');
   await panel.getByRole('button', { name: 'Current turn 2', exact: true }).click();
   await player.waitFor('public current turn', () => initiative(player)?.activeEntityId === beast);
   expect(initiative(player)?.order).toEqual([hero, beast]);
