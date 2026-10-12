@@ -234,7 +234,17 @@ export function createEphemeralRelay(
         }
       }
 
-      const relayedMessage: RelayedEphemeral = { ...message, from: sender.identityId };
+      // UI-JOIN-01: shared tool colours come from the validated connection profile, not a spoofed preview.
+      const coloredTool = message.channel === 'ruler.preview' || message.channel === 'cursor';
+      const data =
+        coloredTool &&
+        sender.color !== undefined &&
+        typeof message.data === 'object' &&
+        message.data !== null &&
+        !Array.isArray(message.data)
+          ? { ...message.data, color: sender.color }
+          : message.data;
+      const relayedMessage: RelayedEphemeral = { ...message, data, from: sender.identityId };
       let frame: string;
       try {
         frame = encodeServerMessage(relayedMessage);

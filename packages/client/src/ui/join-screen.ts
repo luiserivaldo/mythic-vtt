@@ -1,3 +1,4 @@
+import { PlayerColor } from '@mythic/protocol';
 import type { Campaign } from '@mythic/shared';
 import type { KeyValueStore } from '../net/identity.js';
 
@@ -6,12 +7,14 @@ import type { KeyValueStore } from '../net/identity.js';
 // avatar and two UI hints. The identity secret lives in `net/identity.ts` and is never touched here.
 
 export const DISPLAY_NAME_MAX = 40;
+export const DEFAULT_PLAYER_COLOR = '#4f86c6';
 /** A hello carries the avatar, so keep it small (the protocol caps it at 32768 characters). */
 export const AVATAR_MAX_CHARS = 24_000;
 export const AVATAR_PIXELS = 96;
 
 export interface Profile {
   displayName: string;
+  color?: string;
   /** Small image data URL; absent when the visitor chose none. */
   avatar?: string;
   /** The visitor explicitly chose to watch; skips the seat picker on later visits. */
@@ -57,10 +60,12 @@ export function parseProfile(raw: string | null): Profile | null {
     const displayName =
       typeof o['displayName'] === 'string' ? cleanDisplayName(o['displayName']) : null;
     if (displayName === null) return null;
+    const color = PlayerColor.safeParse(o['color']);
     const avatar = o['avatar'];
     const lastSeatId = o['lastSeatId'];
     return {
       displayName,
+      ...(color.success ? { color: color.data.toLowerCase() } : {}),
       ...(typeof avatar === 'string' && isValidAvatar(avatar) ? { avatar } : {}),
       ...(o['spectator'] === true ? { spectator: true } : {}),
       ...(typeof lastSeatId === 'string' && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(lastSeatId)
@@ -92,6 +97,7 @@ export function saveProfile(storage: Pick<KeyValueStore, 'setItem'>, profile: Pr
 export function withoutSpectator(profile: Profile): Profile {
   return {
     displayName: profile.displayName,
+    ...(profile.color !== undefined ? { color: profile.color } : {}),
     ...(profile.avatar !== undefined ? { avatar: profile.avatar } : {}),
     ...(profile.lastSeatId !== undefined ? { lastSeatId: profile.lastSeatId } : {}),
   };

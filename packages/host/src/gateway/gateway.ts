@@ -291,6 +291,7 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         identityId: hello.identityId,
         displayName: hello.displayName,
         avatar: hello.avatar,
+        ...(hello.color !== undefined ? { color: hello.color } : {}),
         isHost,
         lastSeq: hello.lastSeq,
         get latencyMs() {

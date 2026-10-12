@@ -70,7 +70,11 @@ const session = createSession({
 const hostVisitor = !watchVisitor && (hostToken !== undefined || remembered);
 const initialProfile = loadProfile(localStorage);
 if (watchVisitor) session.start({ displayName: 'Spectator' });
-else if (hostVisitor) session.start({ displayName: initialProfile?.displayName ?? 'DM' });
+else if (hostVisitor)
+  session.start({
+    displayName: initialProfile?.displayName ?? 'DM',
+    ...(initialProfile?.color !== undefined ? { color: initialProfile.color } : {}),
+  });
 else if (seatInvite) {
   // The host learns this identity from `hello`, so connect first, then redeem the invite. The
   // seat arrives through the normal patch stream; a failure leaves the usual join screen.
@@ -95,6 +99,7 @@ createRoot(rootEl).render(
           <EphemeralContext.Provider
             value={{
               identityId: identity.identityId,
+              color: () => session.currentProfile()?.color,
               send: session.sendEphemeral,
               on: session.onEphemeral,
             }}
