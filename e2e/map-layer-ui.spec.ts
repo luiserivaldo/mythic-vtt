@@ -58,13 +58,13 @@ test('the map layer is explained, selectable for fixed objects, and shown on bat
   await page.goto(table.clientUrl);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
 
-  await page.getByRole('button', { name: 'Layers', exact: true }).click();
+  await page.getByRole('tab', { name: 'Layers', exact: true }).click();
   const layers = page.getByRole('region', { name: 'Layers' });
   await expect(
     layers.getByText('Battlemap images, ground, terrain and fixed objects'),
   ).toBeVisible();
 
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await expect(page.getByRole('form', { name: 'Create token' }).getByLabel('Layer')).toContainText(
     'Map',
   );
@@ -76,7 +76,7 @@ test('the map layer is explained, selectable for fixed objects, and shown on bat
   const fixedWall = entityList.getByRole('listitem').filter({ hasText: 'Fixed wall' });
   await expect(fixedWall.getByText('Map', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Map', exact: true }).click();
+  await page.getByRole('tab', { name: 'Map', exact: true }).click();
   const mapPanel = page.getByRole('region', { name: 'Battlemap' });
   await expect(mapPanel).toContainText(
     'Battlemaps are placed on the Map layer, below tokens and movable props.',

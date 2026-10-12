@@ -128,7 +128,8 @@ main > p {
   background: var(--ui-bg);
   border-bottom: 1px solid var(--ui-border);
 }
-.ui-drawer .ui-panel {
+.ui-drawer .ui-panel,
+.ui-dock-tab-body .ui-panel {
   max-height: none;
   overflow: visible;
 }
@@ -141,7 +142,8 @@ main > p {
   border-radius: 6px;
   padding: 0.6rem;
 }
-.ui-drawer .ui-panel {
+.ui-drawer .ui-panel,
+.ui-dock-tab-body .ui-panel {
   border: 0;
   padding: 0;
   background: transparent;
@@ -606,7 +608,7 @@ main [tabindex]:focus-visible {
   width: auto;
 }
 .ui-right-dock {
-  flex: 0 0 19rem;
+  flex: 0 0 22rem;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -637,14 +639,41 @@ main [tabindex]:focus-visible {
 .ui-right-dock-content[hidden] {
   display: none;
 }
-.ui-right-dock .ui-shell {
-  padding: 0;
+/* UI-DOCK-01: the tab strip is a row of icons that becomes a column when the dock collapses. */
+.ui-dock-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--ui-border);
 }
-.ui-right-dock .ui-toolbar {
+.ui-right-dock[data-collapsed='true'] .ui-dock-tabs {
   flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-y: auto;
+  border-bottom: 0;
 }
-.ui-right-dock .ui-toolbar button {
-  text-align: left;
+.ui-right-dock[data-collapsed='true'] .ui-dock-tabs [role='tab'] {
+  width: 2.25rem;
+}
+.ui-dock-tabs [role='tab'] {
+  min-width: 2rem;
+  padding-inline: 0.3rem;
+}
+.ui-dock-tabs [role='tab'][aria-selected='true'] {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+.ui-dock-placeholder h2 {
+  margin: 0 0 0.4rem;
+}
+.ui-dock-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-right: 0.8rem;
 }
 .ui-app .ui-tool-dock {
   position: static;
@@ -668,21 +697,6 @@ main [tabindex]:focus-visible {
   border-radius: 5px;
   box-shadow: 0 4px 18px rgb(0 0 0 / 40%);
 }
-.ui-settings {
-  margin-top: 0.8rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--ui-border);
-}
-.ui-settings fieldset {
-  margin-top: 0.6rem;
-  border: 1px solid var(--ui-border);
-}
-.ui-settings fieldset label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  margin-right: 0.8rem;
-}
 /* Existing board controls provide the first floating rail; UX-15 replaces its entries. */
 .ui-app .ui-board-controls {
   flex-direction: column;
@@ -700,7 +714,7 @@ main [tabindex]:focus-visible {
     right: 0;
     bottom: 0;
     z-index: 5;
-    width: min(19rem, 75vw);
+    width: min(22rem, 75vw);
     max-height: 70%;
     border-top: 1px solid var(--ui-border);
   }

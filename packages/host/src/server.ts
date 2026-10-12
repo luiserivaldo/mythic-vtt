@@ -34,7 +34,14 @@ import {
 } from './gateway/index.js';
 import { recoverCampaign, saveCampaignCheckpoint } from './engine/recovery.js';
 import { playerJoinUrls, type PlayerJoinUrl } from './lan.js';
-import { LocalAssetStore, LocalCampaignStore, type ImportLimits } from './storage/index.js';
+import {
+  LocalAssetStore,
+  LocalCampaignStore,
+  backfillAssetLinks,
+  scopedAssetStore,
+  type CampaignMeta,
+  type ImportLimits,
+} from './storage/index.js';
 
 export interface RunningHost {
   readonly gateway: Gateway;
@@ -54,12 +61,16 @@ export interface StartHostOptions {
   importLimits?: Partial<ImportLimits>;
   hostToken?: string;
   publicUrl?: string;
+  /** HOST-03: asked when several campaigns exist and none was selected; undefined = newest. */
+  chooseCampaign?: (campaigns: readonly CampaignMeta[]) => Promise<string | undefined>;
   clock?: Clock;
   random?: RandomSource;
 }
 
 /**
- * Game host: gateway + engine room for one campaign, persisted in `config.dataDir` (§8.2).
+ * Game host: gateway + engine room for one campaign, persisted in `config.dataDir` (§8.2). The
+ * data dir may hold several campaigns (HOST-03); the one to open is chosen at start and the
+ * others stay untouched and unreachable (their assets included).
  * The host secret is created on first run and is never logged.
  */
 export async function startHost(
@@ -83,10 +94,15 @@ export async function startHost(
   let engine: Engine;
   let reportedJoinUrls: PlayerJoinUrl[] = [];
   try {
+    await store.reindex();
+    await backfillAssetLinks(assetStore, store);
     const savedFiles = await loadOrCreateCampaign(store, {
       clock,
       random,
       ...(config.campaignId !== undefined ? { campaignId: config.campaignId } : {}),
+      ...(config.campaign !== undefined ? { campaign: config.campaign } : {}),
+      ...(config.newCampaign !== undefined ? { newCampaign: config.newCampaign } : {}),
+      ...(options.chooseCampaign ? { choose: options.chooseCampaign } : {}),
     });
     const { campaign, seq } = await recoverCampaign(store, savedFiles);
     const startedAt = clock();
@@ -161,8 +177,9 @@ export async function startHost(
     state: () => engine.state(),
     claimSeat: (identityId, seatId) => engine.claimSeat(identityId, seatId),
   });
+  // HOST-03: HTTP only sees this campaign's assets; the raw pool stays with import/export.
   registerAssetRoutes(gateway.app, {
-    assetStore,
+    assetStore: scopedAssetStore(assetStore, engine.state().id),
     uploadAuthorizer:
       options.uploadAuthorizer ?? createSeatUploadAuthorizer(httpAuth, { now: clock }),
     maxUploadBytes: config.maxImageUploadBytes,

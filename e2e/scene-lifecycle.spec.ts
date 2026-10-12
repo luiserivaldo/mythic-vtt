@@ -64,7 +64,7 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
         },
       }),
     ).toMatchObject({ t: 'ack' });
-    await dm.getByRole('button', { name: 'Scenes', exact: true }).click();
+    await dm.getByRole('tab', { name: 'Scenes', exact: true }).click();
     const secret = dm.getByRole('listitem').filter({ hasText: 'SECRET-PRIVATE-SCENE' });
     await secret.getByRole('button', { name: 'Browse', exact: true }).click();
     await expect(dm.getByLabel('Current scene', { exact: true })).toHaveText(

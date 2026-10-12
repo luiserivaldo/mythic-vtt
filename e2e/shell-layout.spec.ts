@@ -43,7 +43,7 @@ test('the dock widens the board when collapsed and appearance is per viewer', as
   );
   await page.getByRole('button', { name: 'Expand dock' }).click();
 
-  await page.getByText('Settings', { exact: true }).click();
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await page.getByRole('radio', { name: 'Light' }).check();
   await expect(page.locator('main')).toHaveAttribute('data-theme', 'light');
   await expect(page.locator('main')).toHaveCSS('color', 'rgb(23, 43, 69)');

@@ -63,7 +63,7 @@ test('DM saves a private library and places independent configured copies across
     errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(table.clientUrl);
-  await page.getByRole('button', { name: 'Prefabs', exact: true }).click();
+  await page.getByRole('tab', { name: 'Prefabs', exact: true }).click();
   const panel = page.getByRole('region', { name: 'Prefab library' });
   await panel.getByLabel('Source entity').selectOption(entityId);
   await panel.getByLabel('Prefab name').fill('Private library template');
@@ -126,11 +126,11 @@ test('DM saves a private library and places independent configured copies across
   expect(JSON.stringify(observer.frames)).not.toContain('Hidden blueprint');
   expect(JSON.stringify(observer.frames)).not.toContain('Secret pillar');
   expect(await host.intent('scene.activate', { sceneId: targetId })).toMatchObject({ t: 'ack' });
-  await page.getByRole('button', { name: 'Close Prefabs panel' }).click();
+  await page.getByRole('tab', { name: 'Chat', exact: true }).click();
   await page.getByRole('button', { name: '3D view', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await page.reload();
-  await page.getByRole('button', { name: 'Prefabs', exact: true }).click();
+  await page.getByRole('tab', { name: 'Prefabs', exact: true }).click();
   await expect(panel.getByLabel('Saved prefab').locator('option')).toHaveCount(3);
   await panel.getByLabel('Saved prefab').selectOption(saved.id);
   await panel.getByRole('button', { name: 'Delete prefab' }).click();

@@ -24,7 +24,7 @@ test('the host toggles 2D <-> 3D from the toolbar and the 3 key without errors',
 
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-  await page.getByRole('button', { name: 'Scenes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   await page.getByPlaceholder('New scene name').fill('Keep');
   await page.getByRole('button', { name: 'Create scene' }).click();
   await expect(page.getByText('Active', { exact: true })).toBeVisible();

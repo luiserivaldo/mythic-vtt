@@ -66,12 +66,12 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
 
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-  await page.getByRole('button', { name: 'Scenes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   await page.getByLabel('New scene name').fill('Vertical test');
   await page.getByRole('button', { name: 'Create scene' }).click();
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   const prop = page.getByRole('form', { name: 'Create prop' });
   await prop.getByLabel('Prop name').fill('High platform');
   await prop.getByLabel('Width (cells)').fill('6');

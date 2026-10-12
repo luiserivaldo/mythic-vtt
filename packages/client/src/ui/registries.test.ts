@@ -49,6 +49,8 @@ describe('UI-SHELL-03 registries', () => {
 
   it('maps existing panel ids to dock tabs and declares the default quick fields', () => {
     expect(dockTabs.all().map(({ id, panel }) => [id, panel])).toEqual([
+      ['chat', 'chat'],
+      ['sheet', 'sheet'],
       ['scenes', 'scenes'],
       ['layers', 'layers'],
       ['map', 'map'],
@@ -56,6 +58,8 @@ describe('UI-SHELL-03 registries', () => {
       ['prefabs', 'prefabs'],
       ['seats', 'seats'],
       ['share', 'share'],
+      ['help', 'help'],
+      ['settings', 'settings'],
     ]);
     expect(tokenQuickFields.all().map(({ id }) => id)).toEqual(['hp', 'ac', 'speed']);
     expect(tokenQuickFields.allowed('player', { ...permissions, view: false })).toEqual([]);
