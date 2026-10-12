@@ -38,7 +38,6 @@ test('identity backup transfers an occupied seat to another browser without uplo
   );
 
   const second = await openClient(browser, table, 'destination', { joinScreen: true });
-  await second.page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await second.page.getByText('Identity backup and transfer', { exact: true }).click();
   const before = await second.page.evaluate(() => localStorage.getItem('mythic.identity.v1'));
   const uploads: string[] = [];
