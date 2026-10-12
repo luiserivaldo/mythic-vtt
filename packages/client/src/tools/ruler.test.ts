@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Grid, Scene } from '@mythic/shared';
 import {
   appendWaypoint,
+  finiteRulerPoint,
   formatRulerDistance,
   measureRuler,
   MAX_RULER_POINTS,
@@ -9,8 +10,10 @@ import {
   rulerDragStarted,
   rulerExpired,
   rulerOwnerName,
+  rulerRightClick,
   shouldSendRuler,
   withCursor,
+  type RulerRightClickContext,
 } from './ruler.js';
 
 const grid: Grid = {
@@ -128,5 +131,95 @@ describe('ruler path helpers (MEAS-01)', () => {
     const seats = { s1: { label: 'Aria', identityId: 'IDENT' } };
     expect(rulerOwnerName(seats, 'IDENT')).toBe('Aria');
     expect(rulerOwnerName(seats, 'OTHER')).toBe('DM');
+  });
+});
+
+describe('ruler right-click branching (M1-45, MEAS-08/Q31)', () => {
+  const armed: RulerRightClickContext = {
+    tool: true,
+    aoeActive: false,
+    mode: '2d',
+    measuring: true,
+  };
+
+  it('turns a right click into a waypoint only while a 2D ruler is measuring', () => {
+    expect(rulerRightClick(armed)).toBe('waypoint');
+    expect(rulerRightClick({ ...armed, mode: '3d' })).toBe('clear');
+    expect(rulerRightClick({ ...armed, measuring: false })).toBe('clear');
+    expect(rulerRightClick({ ...armed, mode: '3d', measuring: false })).toBe('clear');
+  });
+
+  it('leaves the right click alone for an AoE draft or a disarmed ruler (M1-41)', () => {
+    expect(rulerRightClick({ ...armed, aoeActive: true })).toBe('ignore');
+    expect(rulerRightClick({ ...armed, aoeActive: true, mode: '3d', measuring: false })).toBe(
+      'ignore',
+    );
+    expect(rulerRightClick({ ...armed, tool: false })).toBe('ignore');
+    expect(rulerRightClick({ ...armed, tool: false, measuring: false })).toBe('ignore');
+    expect(rulerRightClick({ ...armed, tool: false, aoeActive: true })).toBe('ignore');
+  });
+
+  it('sums waypoint legs cumulatively in scene units instead of measuring from the start', () => {
+    // Two right clicks on cell centres: 6 cells east, then 6 cells south of that waypoint.
+    const start = { x: 0.5, y: 0, z: 0.5 };
+    const corner = { x: 6.5, y: 0, z: 0.5 };
+    const cursor = { x: 6.5, y: 0, z: 6.5 };
+    const path = withCursor(withCursor(appendWaypoint([start], corner), cursor), cursor);
+    const measured = measureRuler(path, grid);
+    expect(measured.segments.map((segment) => segment.cells)).toEqual([6, 6]);
+    expect(measured.segments.map((segment) => segment.label)).toEqual(['30 ft', '30 ft']);
+    expect(measured.totalCells).toBe(12);
+    expect(measured.totalLabel).toBe('60 ft');
+    // The straight start→cursor line is shorter, so the total really follows the waypoint path.
+    expect(measureRuler([start, cursor], grid).totalLabel).toBe('45 ft');
+  });
+
+  it('applies the scene diagonal rule and unit scale to every leg of the path', () => {
+    const path = [
+      { x: 0, y: 0, z: 0 },
+      { x: 2, y: 0, z: 5 },
+      { x: 5, y: 0, z: 4 },
+    ];
+    expect(measureRuler(path, grid).segments.map((segment) => segment.cells)).toEqual([6, 3]);
+    expect(measureRuler(path, { ...grid, diagonal: 'chebyshev' }).totalLabel).toBe('40 ft');
+    expect(measureRuler(path, { ...grid, diagonal: 'manhattan' }).totalLabel).toBe('55 ft');
+    expect(measureRuler(path, { ...grid, unitsPerCell: 1, unitLabel: 'm' }).totalLabel).toBe('9 m');
+  });
+
+  it('refuses a non-finite waypoint or cursor instead of poisoning the total', () => {
+    const points = [{ x: 1, y: 0, z: 1 }];
+    expect(finiteRulerPoint({ x: 0, y: 0, z: 0 })).toBe(true);
+    expect(finiteRulerPoint({ x: -2, y: 0, z: -3 })).toBe(true);
+    expect(finiteRulerPoint({ x: Number.NaN, y: 0, z: 1 })).toBe(false);
+    expect(finiteRulerPoint({ x: 1, y: Number.POSITIVE_INFINITY, z: 1 })).toBe(false);
+    expect(finiteRulerPoint({ x: 1, y: 0, z: Number.NEGATIVE_INFINITY })).toBe(false);
+
+    expect(appendWaypoint(points, { x: Number.NaN, y: 0, z: 1 })).toBe(points);
+    expect(appendWaypoint(points, { x: 1, y: 0, z: Number.POSITIVE_INFINITY })).toBe(points);
+    expect(withCursor(points, { x: Number.NEGATIVE_INFINITY, y: 0, z: 1 })).toBe(points);
+    expect(withCursor(points, { x: Number.NaN, y: 0, z: Number.NaN })).toBe(points);
+
+    const measured = measureRuler(appendWaypoint(points, { x: Number.NaN, y: 0, z: 1 }), grid);
+    expect(measured.segments).toEqual([]);
+    expect(measured.totalLabel).toBe('0 ft');
+  });
+
+  it('treats zero-length, negative and grid-aligned waypoints as valid but length-less legs', () => {
+    const start = { x: 2, y: 0, z: 2 };
+    // A right click that lands on the previous waypoint adds no second point and no length.
+    expect(appendWaypoint([start], { ...start })).toEqual([start]);
+    expect(withCursor([start], { ...start })).toEqual([start]);
+
+    const measured = measureRuler(
+      [
+        { x: 0, y: 0, z: 0 },
+        { x: 2, y: 0, z: 0 },
+        { x: 2, y: 0, z: -3 },
+        { x: 2, y: 0, z: -3 },
+      ],
+      grid,
+    );
+    expect(measured.segments.map((segment) => segment.cells)).toEqual([2, 3, 0]);
+    expect(measured.totalLabel).toBe('25 ft');
   });
 });
