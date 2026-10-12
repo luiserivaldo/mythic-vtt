@@ -507,3 +507,42 @@ describe('switching the audience of one state (M4-02 cache safety)', () => {
     expect(applyPatches(visibleTo(seatView, before), asSeat)).toEqual(visibleTo(seatView, after));
   });
 });
+
+describe('UI-TOP-01 scene privacy', () => {
+  it('projects only the active scene and filters inactive edits and activation patches', () => {
+    const inactiveId = testId(24);
+    const state = produce(makeCampaign(), (draft) => {
+      const active = draft.scenes[IDS.scene];
+      if (!active) throw new Error('fixture scene missing');
+      draft.scenes[inactiveId] = {
+        ...structuredClone(current(active)),
+        id: inactiveId,
+        name: 'Unvisited public scene',
+      };
+    });
+    expect(Object.keys(visibleTo({ kind: 'host' }, state).scenes)).toHaveLength(2);
+    expect(Object.keys(visibleTo({ kind: 'seat', seatId: IDS.coDm }, state).scenes)).toHaveLength(
+      2,
+    );
+    const [edited, rawEdit] = produceWithPatches(state, (draft) => {
+      const scene = draft.scenes[inactiveId];
+      if (!scene) throw new Error('fixture scene missing');
+      scene.name = 'Still private to current players';
+      scene.entities[pubId] = makeEntity(pubId, { name: 'Inactive entity' });
+    });
+    const [activated, rawActivation] = produceWithPatches(edited, (draft) => {
+      draft.activeSceneId = inactiveId;
+    });
+    for (const audience of Object.values(audiences)) {
+      const before = visibleTo(audience, state);
+      expect(Object.keys(before.scenes)).toEqual([IDS.scene]);
+      expect(JSON.stringify(before)).not.toContain(inactiveId);
+      expect(patchesFor(audience, state, edited, rawEdit)).toEqual([]);
+      const patches = patchesFor(audience, edited, activated, rawActivation);
+      const after = applyPatches(before, patches);
+      expect(after).toEqual(visibleTo(audience, activated));
+      expect(Object.keys(after.scenes)).toEqual([inactiveId]);
+      expect(visibleTo(audience, { ...activated, activeSceneId: null }).scenes).toEqual({});
+    }
+  });
+});

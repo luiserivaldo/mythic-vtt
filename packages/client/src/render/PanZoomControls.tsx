@@ -21,7 +21,15 @@ import { pointerClaims } from './pointer-claims.js';
  * Renders nothing; it only drives the default camera and invalidates the
  * on-demand frame loop. Maths lives in camera-2d.ts.
  */
-export function PanZoomControls({ bounds, frameKey }: { bounds: CanvasSize; frameKey: string }) {
+export function PanZoomControls({
+  bounds,
+  frameKey,
+  initialView,
+}: {
+  bounds: CanvasSize;
+  frameKey: string;
+  initialView?: View2D | undefined;
+}) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
@@ -30,6 +38,7 @@ export function PanZoomControls({ bounds, frameKey }: { bounds: CanvasSize; fram
   // Kept in a ref so the long-lived listeners below always clamp to the current canvas.
   const boundsRef = useRef(bounds);
   boundsRef.current = bounds;
+  const restored = useRef(initialView);
   const framed = useRef<{ camera: unknown; key: string } | null>(null);
   // Until the user pans or zooms, a resize (e.g. the header changing height) keeps the whole
   // canvas framed instead of leaving the camera at its old zoom.
@@ -42,9 +51,11 @@ export function PanZoomControls({ bounds, frameKey }: { bounds: CanvasSize; fram
     if (!cam.isOrthographicCamera || size.width <= 0 || size.height <= 0) return;
     const same = framed.current?.camera === cam && framed.current.key === frameKey;
     if (same && touched.current) return;
+    // UI-TOP-04: returning from 3D must retain focus instead of framing the whole scene.
+    const restore = framed.current === null ? restored.current : undefined;
     framed.current = { camera: cam, key: frameKey };
-    touched.current = false;
-    const v = frameBounds({ width: size.width, height: size.height }, boundsRef.current);
+    touched.current = restore !== undefined;
+    const v = restore ?? frameBounds({ width: size.width, height: size.height }, boundsRef.current);
     cam.position.x = v.centerX;
     cam.position.z = v.centerZ;
     cam.zoom = v.zoom;
