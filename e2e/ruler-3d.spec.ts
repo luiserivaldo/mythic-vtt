@@ -1,24 +1,11 @@
-import { expect, test, type Page } from '@playwright/test';
-import { openClient, startTable, type Table } from './harness.js';
-
-interface CameraPose {
-  targetX: number;
-  targetY: number;
-  targetZ: number;
-  azimuth: number;
-  polar: number;
-  distance: number;
-}
-
-async function cameraPose(page: Page): Promise<CameraPose> {
-  return page.evaluate(() => {
-    const scope = globalThis as typeof globalThis & {
-      __mythicCamera?: { getPose(): CameraPose };
-    };
-    if (!scope.__mythicCamera) throw new Error('3D camera diagnostics are not mounted');
-    return scope.__mythicCamera.getPose();
-  });
-}
+import { expect, test } from '@playwright/test';
+import {
+  openClient,
+  settledCameraPose,
+  startTable,
+  type CameraPose,
+  type Table,
+} from './harness.js';
 
 function projectToCanvas(
   pose: CameraPose,
@@ -92,7 +79,7 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   const canvas = page.locator('canvas');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('no canvas box');
-  const pose = await cameraPose(page);
+  const pose = await settledCameraPose(page);
   const ground = projectToCanvas(pose, box, { x: 20, y: 0, z: 25 });
   const platformTop = projectToCanvas(pose, box, { x: 20, y: 10, z: 15 });
   await page.getByRole('button', { name: 'Ruler', exact: true }).click();
