@@ -20,8 +20,13 @@ async function expectChatPanel(page: Page): Promise<void> {
   await expect(panel.getByLabel('Message', { exact: true })).toBeDisabled();
   await expect(panel.getByRole('button', { name: 'Send' })).toBeDisabled();
   await expect(panel.getByText(/Chat is coming soon/)).toBeVisible();
+  // UX-35 / UI-CHAT-02: the game-log toggle is visible but inert until the variable API lands.
+  const logToggle = panel.getByRole('button', { name: 'Game log (work in progress)' });
+  await expect(logToggle).toBeVisible();
+  await expect(logToggle).toBeDisabled();
+  await expect(logToggle).toContainText('WIP');
   // No dice hotkey chips: the composer holds nothing but the send button.
-  await expect(panel.getByRole('button')).toHaveCount(1);
+  await expect(panel.getByRole('button')).toHaveCount(2);
 }
 
 test('the DM and a player both open the Chat tab and find a disabled composer', async ({

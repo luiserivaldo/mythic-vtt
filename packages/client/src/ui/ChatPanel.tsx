@@ -1,6 +1,8 @@
 import {
   CHAT_COMING_SOON,
   CHAT_EMPTY_STATE,
+  CHAT_LOG_ICON,
+  CHAT_LOG_TEXT,
   rollColor,
   rollTextColor,
   type ChatEntry,
@@ -46,6 +48,16 @@ export function ChatPanel({ entries, seatColors }: Props) {
         )}
       </div>
       <p className="ui-chat-note">{CHAT_COMING_SOON}</p>
+      {/* UI-CHAT-02: the game-log view arrives with the variable API; until then the toggle is inert. */}
+      <button
+        type="button"
+        className="ui-chat-log-toggle"
+        aria-label="Game log (work in progress)"
+        title="Game log: work in progress"
+        disabled
+      >
+        <span aria-hidden="true">{CHAT_LOG_ICON}</span> {CHAT_LOG_TEXT}
+      </button>
       <div className="ui-chat-composer">
         <input type="text" aria-label="Message" placeholder="Chat unlocks later" disabled />
         <button type="button" disabled>
