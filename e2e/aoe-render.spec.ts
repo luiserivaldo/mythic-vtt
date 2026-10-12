@@ -105,14 +105,14 @@ test('host board renders received AoEs, hides the effects layer, and survives 2D
       .getByRole('listitem')
       .filter({ hasText: 'Effects' })
       .getByRole('checkbox', { name: 'Show Effects' })
-      .check();
+      .uncheck();
     const hidden = await canvas.screenshot();
     expect(hidden.equals(moved)).toBe(false);
     await page
       .getByRole('listitem')
       .filter({ hasText: 'Effects' })
       .getByRole('checkbox', { name: 'Show Effects' })
-      .uncheck();
+      .check();
     await page.getByRole('button', { name: /3D/i }).click();
     await page.waitForTimeout(450);
     await canvas.screenshot({ path: '/tmp/mythic-m3-03-aoe-3d.png' });
