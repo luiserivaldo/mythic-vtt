@@ -4,6 +4,7 @@ import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { ChatPanel } from './ChatPanel.js';
 import { seatColorsOf } from './chat-panel.js';
 import { DEFAULT_DOCK_TAB, DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
+import { SettingsPanel } from './SettingsPanel.js';
 import { HistoryTools } from './HistoryTools.js';
 import { IdentityTransfer } from './IdentityTransfer.js';
 import { joinUrlsFromNotices } from './share-panel.js';
@@ -77,22 +78,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'settings':
         return (
           <>
-            <fieldset className="ui-dock-settings">
-              <legend>Appearance</legend>
-              {(['dark', 'light'] as const).map((value) => (
-                <label key={value}>
-                  <input
-                    type="radio"
-                    name="theme"
-                    checked={theme === value}
-                    onChange={() => {
-                      onThemeChange(value);
-                    }}
-                  />
-                  {value === 'dark' ? 'Dark' : 'Light'}
-                </label>
-              ))}
-            </fieldset>
+            <SettingsPanel theme={theme} onThemeChange={onThemeChange} />
             {ready && <IdentityTransfer />}
             <HistoryTools />
           </>
