@@ -1,5 +1,13 @@
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
-import { checkIntent, seatOf, viewEntity, type Audience, type Campaign } from '@mythic/shared';
+import {
+  canUseSceneToggle,
+  checkIntent,
+  seatOf,
+  TOGGLE_FOR_CHANNEL,
+  viewEntity,
+  type Audience,
+  type Campaign,
+} from '@mythic/shared';
 import type { GatewayConnection } from '../gateway/engine-seam.js';
 import { actorFor, audienceFor } from './audience.js';
 import type { Clock } from './sources.js';
@@ -103,6 +111,12 @@ function entityReferences(data: unknown): EntityReference[] | undefined {
   return visit(data) ? found : undefined;
 }
 
+function sceneIdOf(data: unknown): string | undefined {
+  if (data === null || typeof data !== 'object') return undefined;
+  const sceneId = (data as { sceneId?: unknown }).sceneId;
+  return typeof sceneId === 'string' ? sceneId : undefined;
+}
+
 function rate(
   defaults: TokenBucketConfig,
   override?: Partial<TokenBucketConfig>,
@@ -162,6 +176,15 @@ export function createEphemeralRelay(
       if (seatOf(state, senderActor)?.interactionEnabled === false) {
         drop('forbidden');
         return;
+      }
+      // PERM-05: scene toggles gate the channel (host and co-DM exempt, see canUseSceneToggle).
+      const toggle = TOGGLE_FOR_CHANNEL[message.channel];
+      if (toggle !== undefined) {
+        const sceneId = sceneIdOf(message.data);
+        if (sceneId === undefined || !canUseSceneToggle(state, senderActor, sceneId, toggle)) {
+          drop('forbidden');
+          return;
+        }
       }
       const kind =
         senderActor.seatId === undefined && senderActor.kind !== 'host' ? 'spectator' : 'active';

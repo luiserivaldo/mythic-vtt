@@ -30,3 +30,5 @@ export { prefabRemove } from './prefab.remove.js';
 export { prefabPlace } from './prefab.place.js';
 export { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 export { canReadEntityLabel } from './entity-access.js';
+export { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
+export { canUseSceneToggle, TOGGLE_FOR_CHANNEL } from './scene-toggles.js';

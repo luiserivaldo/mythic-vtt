@@ -6,13 +6,13 @@ import { activateMeasurement } from '../tools/measurement-tool.js';
 import { isTypingTarget } from './typing-target.js';
 
 /** Board toolbar button plus the `R` shortcut for the Ruler tool (MEAS-01). Available to everyone. */
-export function RulerToggle() {
+export function RulerToggle({ disabledReason }: { disabledReason?: string | undefined }) {
   const armed = useStore(rulerStore, (s) => s.tool);
   const aoeActive = useStore(aoeToolStore, (s) => s.active);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'r' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
-      if (isTypingTarget(e.target)) return;
+      if (isTypingTarget(e.target) || disabledReason !== undefined) return;
       activateMeasurement(
         rulerStore.getState().tool || aoeToolStore.getState().active ? null : 'distance',
       );
@@ -21,13 +21,17 @@ export function RulerToggle() {
     return () => {
       window.removeEventListener('keydown', onKey);
     };
-  }, []);
+  }, [disabledReason]);
   return (
     <>
       <button
         type="button"
         aria-pressed={armed || aoeActive}
-        title="Measure distance (R). Drag for a quick measure; click for waypoints; Esc clears"
+        disabled={disabledReason !== undefined}
+        title={
+          disabledReason ??
+          'Measure distance (R). Drag for a quick measure; click for waypoints; Esc clears'
+        }
         onClick={() => {
           activateMeasurement(armed || aoeActive ? null : 'distance');
         }}
