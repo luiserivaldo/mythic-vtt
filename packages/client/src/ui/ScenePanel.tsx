@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useClientStore } from '../store/react.js';
 import { sceneBrowseStore, useViewedCampaign } from '../store/viewed-campaign.js';
 import { SceneOverlayForm } from './SceneOverlayForm.js';
+import { SceneTogglesForm } from './SceneTogglesForm.js';
 import type { Campaign } from '@mythic/shared';
 import { newId } from './ids.js';
 import {
@@ -84,6 +85,12 @@ export function ScenePanel({ campaign }: { campaign: Campaign }) {
             {row.id === viewedId && campaign.scenes[row.id] && (
               <SceneOverlayForm
                 key={`${row.id}:${JSON.stringify(campaign.scenes[row.id]?.overlay)}`}
+                scene={campaign.scenes[row.id] ?? null}
+              />
+            )}
+            {row.id === viewedId && (
+              <SceneTogglesForm
+                key={`${row.id}:${JSON.stringify(campaign.scenes[row.id]?.playerToggles)}`}
                 scene={campaign.scenes[row.id] ?? null}
               />
             )}
