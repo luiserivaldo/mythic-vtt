@@ -45,7 +45,7 @@ test('the DM replaces and quick-deletes their persistent AoE without page errors
     const sceneId = testUlid('SCENE', 404);
     expect((await host.intent('scene.create', { sceneId, name: 'AoE tool board' })).t).toBe('ack');
     const tool = page.getByRole('region', { name: 'AoE tool' });
-    await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+    await page.getByRole('button', { name: 'Measure', exact: true }).click();
     await page.getByText('Measurement shapes', { exact: true }).click();
     await page.getByLabel('Measurement shape').selectOption('cone');
     await tool.getByLabel('AoE rotation').fill('90');
@@ -107,7 +107,7 @@ test('placing an AoE snaps the origin to the cell centre, and off stores the exa
     const sceneId = testUlid('SCENE', 405);
     const created = await host.intent('scene.create', { sceneId, name: 'AoE snap board' });
     expect(created.t, JSON.stringify(created)).toBe('ack');
-    await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+    await page.getByRole('button', { name: 'Measure', exact: true }).click();
     await page.getByText('Measurement shapes', { exact: true }).click();
     await page.getByLabel('Measurement shape').selectOption('sphere');
     const canvas = page.locator('canvas');

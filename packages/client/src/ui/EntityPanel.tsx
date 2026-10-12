@@ -241,7 +241,7 @@ function TokenForm({
   );
 }
 
-function PropForm({
+export function PropForm({
   scene,
   isHost,
   send,

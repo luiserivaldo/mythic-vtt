@@ -90,7 +90,15 @@ test('the DM adds role templates and the spectator preset receives a read-only p
   await expect(viewer.getByTestId('token-label').filter({ hasText: 'PUBLIC TOKEN' })).toBeVisible();
   await expect(viewer.getByText('SECRET TEMPLATE TOKEN')).toHaveCount(0);
   await expect(viewer.getByRole('button', { name: 'Multi-select' })).toHaveCount(0);
-  await expect(viewer.getByRole('button', { name: 'Ruler' })).toHaveCount(0);
+  // UX-15: tools stay on the rail for a spectator, disabled with a reason; only Pan is usable.
+  await expect(viewer.getByRole('button', { name: 'Measure', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect(viewer.getByRole('button', { name: 'Pan', exact: true })).not.toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
   await expect(viewer.getByRole('button', { name: 'AoE placement' })).toHaveCount(0);
   await expect(viewer.getByRole('button', { name: 'Apply' })).toHaveCount(0);
   await expect(viewer.getByRole('button', { name: '3D view' })).toBeVisible();

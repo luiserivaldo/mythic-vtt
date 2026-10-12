@@ -76,7 +76,7 @@ test('the DM link shows live AoE affected tokens in 2D and 3D', async ({ browser
     ).toBe('ack');
 
     // M3-15: AoE controls and affected-token readouts live in the unified Ruler panel.
-    await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+    await page.getByRole('button', { name: 'Measure', exact: true }).click();
     await page.getByText('Measurement shapes', { exact: true }).click();
     await page.getByLabel('Measurement shape', { exact: true }).selectOption('sphere');
     const panel = page.getByRole('region', { name: 'Affected tokens' });
@@ -244,7 +244,7 @@ test('D35: a player sees a placeholder for an unreadable label and nothing for a
     await expect(player.locator('canvas')).toBeVisible();
 
     // The DM view is unfiltered, which also proves the AoE really covers all three tokens.
-    await dm.getByRole('button', { name: 'Ruler', exact: true }).click();
+    await dm.getByRole('button', { name: 'Measure', exact: true }).click();
     const dmPanel = dm.getByRole('region', { name: 'Affected tokens' });
     await expect(dmPanel.getByText('Readable hero', { exact: true })).toBeVisible();
     await expect(dmPanel.getByText('Owner-only hero', { exact: true })).toBeVisible();
