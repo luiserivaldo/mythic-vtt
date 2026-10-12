@@ -13,7 +13,12 @@ import {
 } from '@mythic/shared';
 import { formatRulerDistance } from '../tools/ruler.js';
 import type { SelectionActor } from '../tools/selection.js';
-import { HIDDEN_TOKEN_NAME, labelState, type LabelSubject, type TokenLabelState } from './token-labels.js';
+import {
+  HIDDEN_TOKEN_NAME,
+  labelState,
+  type LabelSubject,
+  type TokenLabelState,
+} from './token-labels.js';
 
 export interface AoEHighlightOverride {
   /** Replaces this stored AoE while it is edited; omitted for a new placement preview. */

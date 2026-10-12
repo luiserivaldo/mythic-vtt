@@ -82,15 +82,20 @@ describe('labelState (D35 affected-token panel)', () => {
     expect(labelState(subject({ labelVisibility: 'owner' }), { kind: 'spectator' })).toBe('hidden');
     expect(labelState(subject({ layer: 'dm' }), { kind: 'spectator' })).toBe('invisible');
     expect(labelState(subject({ labelVisibility: 'dm' }), { kind: 'host' })).toBe('visible');
-    expect(labelState(subject({ labelVisibility: 'owner' }), { kind: 'seat', seat: { ...seat, role: 'codm' } })).toBe(
-      'visible',
-    );
+    expect(
+      labelState(subject({ labelVisibility: 'owner' }), {
+        kind: 'seat',
+        seat: { ...seat, role: 'codm' },
+      }),
+    ).toBe('visible');
   });
 
   it('keeps labelVisible consistent with the three states', () => {
     for (const s of [subject(), subject({ labelVisibility: 'owner' }), subject({ layer: 'dm' })]) {
       for (const actor of [player, { kind: 'host' } as const, { kind: 'spectator' } as const]) {
-        expect(labelVisible(s, actor)).toBe(labelState(s, actor) === 'visible' && s.name.trim() !== '');
+        expect(labelVisible(s, actor)).toBe(
+          labelState(s, actor) === 'visible' && s.name.trim() !== '',
+        );
       }
     }
   });

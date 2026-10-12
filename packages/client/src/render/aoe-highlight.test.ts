@@ -216,8 +216,8 @@ describe('affectedDistanceLabel (MEAS-01/MEAS-04)', () => {
     expect(affectedDistanceLabel(1, { unitsPerCell: 0, unitLabel: 'ft' })).toBe('');
     expect(affectedDistanceLabel(1, { unitsPerCell: -5, unitLabel: 'ft' })).toBe('');
     expect(affectedDistanceLabel(1, { unitsPerCell: Number.NaN, unitLabel: 'ft' })).toBe('');
-    expect(affectedDistanceLabel(1, { unitsPerCell: Number.POSITIVE_INFINITY, unitLabel: 'ft' })).toBe(
-      '',
-    );
+    expect(
+      affectedDistanceLabel(1, { unitsPerCell: Number.POSITIVE_INFINITY, unitLabel: 'ft' }),
+    ).toBe('');
   });
 });
