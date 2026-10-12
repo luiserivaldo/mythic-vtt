@@ -38,6 +38,16 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     await player.page.getByRole('radio', { name: /Player/ }).check();
     await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
+    const inactiveId = testUlid('INACTIVE', 91);
+    expect(
+      await host.intent('scene.create', { sceneId: inactiveId, name: 'UNVISITED-PUBLIC-SCENE' }),
+    ).toMatchObject({ t: 'ack' });
+    expect(
+      await host.intent('scene.rename', { sceneId: inactiveId, name: 'UNVISITED-RENAMED-SCENE' }),
+    ).toMatchObject({ t: 'ack' });
+    await player.page.reload();
+    await expect(player.page.getByRole('status')).toHaveText('Connected to New campaign');
+    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Blank scene');
     const privateId = testUlid('SECRET', 90);
     expect(
       await host.intent('scene.create', {
@@ -97,6 +107,7 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     await expect(dm.getByLabel('Current scene', { exact: true })).toHaveText(
       'SECRET-PRIVATE-SCENE',
     );
+    expect(await host.intent('scene.delete', { sceneId: inactiveId })).toMatchObject({ t: 'ack' });
     expect(await host.intent('scene.delete', { sceneId: privateId })).toMatchObject({
       t: 'reject',
     });
@@ -109,6 +120,9 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     await player.page.reload();
     await expect(player.page.getByRole('alert')).toContainText('No active scene');
     for (const received of [frames, lateFrames]) {
+      expect(received.join('\n')).not.toContain(inactiveId);
+      expect(received.join('\n')).not.toContain('UNVISITED-PUBLIC-SCENE');
+      expect(received.join('\n')).not.toContain('UNVISITED-RENAMED-SCENE');
       expect(received.join('\n')).not.toContain(privateId);
       expect(received.join('\n')).not.toContain('SECRET-PRIVATE-SCENE');
       expect(received.join('\n')).not.toContain(privateEntity);
