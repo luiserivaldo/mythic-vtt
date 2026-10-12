@@ -43,7 +43,7 @@ it('resolves a roll colour from the roller, the seat, or the neutral fallback', 
     NEUTRAL_ROLL_COLOR,
   );
   expect(rollColor(roll(), {})).toBe(NEUTRAL_ROLL_COLOR);
-  expect(rollColor(roll({ seatId: undefined }))).toBe(NEUTRAL_ROLL_COLOR);
+  expect(rollColor({})).toBe(NEUTRAL_ROLL_COLOR);
   expect(rollColor(roll(), { [SEAT]: 'not-a-colour' })).toBe(NEUTRAL_ROLL_COLOR);
 });
 

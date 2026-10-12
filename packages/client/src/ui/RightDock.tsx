@@ -1,6 +1,8 @@
 import { lazy, Suspense, useId, useState, type Ref } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
+import { ChatPanel } from './ChatPanel.js';
+import { seatColorsOf } from './chat-panel.js';
 import { DEFAULT_DOCK_TAB, DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
 import { HistoryTools } from './HistoryTools.js';
 import { IdentityTransfer } from './IdentityTransfer.js';
@@ -62,11 +64,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
   const content = () => {
     switch (active) {
       case 'chat':
-        return (
-          <Placeholder title="Chat">
-            Chat is coming soon. Rolls and messages will appear here.
-          </Placeholder>
-        );
+        return <ChatPanel entries={[]} seatColors={seatColorsOf(presence?.seats)} />;
       case 'sheet':
         return <Placeholder title="Sheet">Character sheets are coming soon.</Placeholder>;
       case 'help':

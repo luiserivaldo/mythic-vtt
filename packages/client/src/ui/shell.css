@@ -669,6 +669,53 @@ main [tabindex]:focus-visible {
 .ui-dock-placeholder h2 {
   margin: 0 0 0.4rem;
 }
+/* UI-CHAT-01: the message list scrolls, the composer stays under it, rolls carry their own colour. */
+.ui-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ui-chat-log {
+  min-height: 4rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.ui-chat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-chat-row {
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  background: var(--ui-bg-raised);
+  overflow-wrap: anywhere;
+}
+.ui-chat-roll {
+  font-weight: 600;
+}
+.ui-chat-empty,
+.ui-chat-note {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
+.ui-chat-composer {
+  display: flex;
+  gap: 0.4rem;
+}
+.ui-chat-composer input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.35rem 0.4rem;
+  color: var(--ui-fg);
+  background: var(--ui-input);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+}
 .ui-dock-settings label {
   display: inline-flex;
   align-items: center;

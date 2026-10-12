@@ -33,7 +33,9 @@ export function ChatPanel({ entries, seatColors }: Props) {
                   key={entry.id}
                   className={`ui-chat-row ui-chat-${entry.kind}`}
                   style={
-                    color === undefined ? undefined : { background: color, color: rollTextColor(color) }
+                    color === undefined
+                      ? undefined
+                      : { background: color, color: rollTextColor(color) }
                   }
                 >
                   <strong>{entry.author}</strong> <span>{entry.text}</span>
