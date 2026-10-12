@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, seedProfile, startTable, testUlid, type Table } from './harness.js';
+import { RawClient, startTable, testUlid, type Table } from './harness.js';
 
 let table: Table;
 
@@ -140,7 +140,9 @@ test('the DM link shows live AoE affected tokens in 2D and 3D', async ({ browser
 test('D35: a player sees a placeholder for an unreadable label and nothing for an invisible token', async ({
   browser,
 }) => {
+  // The host token is single use (D24), so this test owns its table instead of sharing the file's.
   test.setTimeout(60_000);
+  const d35Table = await startTable();
   const sceneId = testUlid('SCENE', 506);
   const seatId = testUlid('SEAT', 506);
   const dmIdentity = { identityId: testUlid('HOST', 506), identitySecret: 'aoe-d35-host-secret' };
@@ -157,10 +159,10 @@ test('D35: a player sees a placeholder for an unreadable label and nothing for a
     rotation: { x: 0, y: 0, z: 0, w: 1 },
     scale: { x: 1, y: 1, z: 1 },
   });
-  const host = await RawClient.connect(table, {
+  const host = await RawClient.connect(d35Table, {
     name: 'aoe-d35-host',
     ...dmIdentity,
-    hostToken: table.hostToken,
+    hostToken: d35Table.hostToken,
   });
   const dmContext = await browser.newContext();
   const playerContext = await browser.newContext();
@@ -220,17 +222,23 @@ test('D35: a player sees a placeholder for an unreadable label and nothing for a
       localStorage.setItem('mythic.identity.v1', JSON.stringify(identity));
       localStorage.setItem('mythic.host', '1');
     }, dmIdentity);
-    await seedProfile(dmContext, 'dm');
     const dm = await dmContext.newPage();
-    await playerContext.addInitScript((identity) => {
-      localStorage.setItem('mythic.identity.v1', JSON.stringify(identity));
-    }, playerIdentity);
-    await seedProfile(playerContext, 'player');
+    // A saved profile skips the join screen; the host binds the seat by identity (SES-04).
+    await playerContext.addInitScript(
+      ({ identity, seat }: { identity: typeof playerIdentity; seat: string }) => {
+        localStorage.setItem('mythic.identity.v1', JSON.stringify(identity));
+        localStorage.setItem(
+          'mythic.profile.v1',
+          JSON.stringify({ displayName: 'Aria', lastSeatId: seat }),
+        );
+      },
+      { identity: playerIdentity, seat: seatId },
+    );
     const player = await playerContext.newPage();
     const errors: string[] = [];
     for (const page of [dm, player]) page.on('pageerror', (error) => errors.push(error.message));
-    await dm.goto(table.clientUrl);
-    await player.goto(table.clientUrl);
+    await dm.goto(d35Table.clientUrl);
+    await player.goto(d35Table.clientUrl);
     await expect(dm.locator('canvas')).toBeVisible();
     await expect(player.locator('canvas')).toBeVisible();
 
@@ -287,5 +295,6 @@ test('D35: a player sees a placeholder for an unreadable label and nothing for a
     await host.close();
     await dmContext.close();
     await playerContext.close();
+    await d35Table.stop();
   }
 });
