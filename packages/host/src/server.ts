@@ -33,6 +33,7 @@ import {
   type Gateway,
 } from './gateway/index.js';
 import { recoverCampaign, saveCampaignCheckpoint } from './engine/recovery.js';
+import { readHistoryChunk, type HistoryPosition } from './storage/history-log-reader.js';
 import { playerJoinUrls, type PlayerJoinUrl } from './lan.js';
 import {
   LocalAssetStore,
@@ -123,6 +124,19 @@ export async function startHost(
       clock,
       random,
       initialSeq: seq,
+      // HIST-07: rollback walks the on-disk log backwards, newest first, across Sessions.
+      readLog: async function* () {
+        await store.flushLogs();
+        const sessions = (await store.readSessions(campaign.id, 1024))
+          .reverse()
+          .map((session) => session.sessionId);
+        let position: HistoryPosition | undefined = { session: 0 };
+        while (position) {
+          const chunk = await readHistoryChunk(store.folder(campaign.id), sessions, position);
+          yield chunk.entries;
+          position = chunk.next;
+        }
+      },
       hostJoinUrls: () => reportedJoinUrls,
       onApplied: async (state, appliedSeq) => {
         if (appliedSeq % config.autosaveEvery === 0)

@@ -7,6 +7,7 @@ import {
   visibleTo,
   type ActionEnvelope,
   UndoRequest,
+  RollbackRequest,
   type Actor,
   type Audience,
   type Campaign,
@@ -21,6 +22,7 @@ import {
   type EphemeralRelayStats,
 } from './ephemeral-relay.js';
 import { buildHostPresence } from './presence.js';
+import { planRollback, type LogReader } from './rollback.js';
 import { JOURNAL_LIMIT, planUndo, type JournalEntry } from './undo.js';
 import {
   cryptoRandom,
@@ -42,6 +44,8 @@ export interface EngineOptions {
   sessionId: string;
   /** Only the log append is used here; scene/campaign autosave is M0-11. */
   store: Pick<CampaignStore, 'appendLog'>;
+  /** HIST-07: the on-disk action log, newest first. Without it a rollback is refused. */
+  readLog?: LogReader;
   clock?: Clock;
   random?: RandomSource;
   /** Last `seq` already used by this campaign (M0-11 passes the recovered value). Default 0. */
@@ -258,6 +262,27 @@ export function createEngine(options: EngineOptions): Engine {
       }
       payload = plan.payload;
     }
+    if (type === 'history.rollback') {
+      // HIST-07: as with undo, the logged payload is built here; whatever the client sent beyond
+      // the target point is discarded, so a rollback can only ever replay what this host logged.
+      const request = RollbackRequest.safeParse(payload);
+      if (!request.success) return { ok: false, reason: 'invalid-payload' };
+      const plan = await planRollback({
+        state,
+        seq,
+        actor,
+        request: request.data,
+        readLog: options.readLog,
+      });
+      if (!plan.ok) {
+        return {
+          ok: false,
+          reason: plan.reason,
+          ...(plan.detail !== undefined ? { detail: plan.detail } : {}),
+        };
+      }
+      payload = plan.payload;
+    }
     const check = checkIntent(state, actor, type, payload);
     if (!check.ok) {
       // zod messages echo client input; keep the detail generic.
@@ -301,6 +326,8 @@ export function createEngine(options: EngineOptions): Engine {
       seq = entry.seq;
       history.push(entry);
       if (history.length > replayLimit) history.shift();
+      // The journal's inverse patches describe states a rollback has just replaced.
+      if (type === 'history.rollback') journal.length = 0;
       journal.push({
         seq: entry.seq,
         actor,

@@ -12,7 +12,7 @@ export const UndoRequest = z.strictObject({
 });
 export type UndoRequest = z.infer<typeof UndoRequest>;
 
-const UndoPatch = z.strictObject({
+export const UndoPatch = z.strictObject({
   op: z.enum(['add', 'replace', 'remove']),
   path: z.array(z.union([z.string(), z.number()])),
   value: z.unknown().optional(),
