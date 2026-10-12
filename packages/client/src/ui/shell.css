@@ -722,3 +722,22 @@ main [tabindex]:focus-visible {
 .ui-history-tools .ui-panel ol {
   padding-left: 1.1rem;
 }
+/* HIST-04: DM selection and the right-click menu in the History log. */
+.ui-history-tools li[data-selected] {
+  background: color-mix(in srgb, var(--ui-accent, #7dd3fc) 18%, transparent);
+}
+.ui-history-tools li > input[type='checkbox'] {
+  margin-right: 0.35rem;
+}
+.ui-history-menu {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 9rem;
+  padding: 0.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.4rem;
+  background: var(--ui-panel-bg, Canvas);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
+}

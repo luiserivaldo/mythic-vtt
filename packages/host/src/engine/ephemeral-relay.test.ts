@@ -33,6 +33,44 @@ describe('ephemeral relay', () => {
     expect(host.received).toHaveLength(1);
   });
 
+  it('gates ruler previews on the scene measure toggle: players dropped, host and co-DM unaffected', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    if (!scene || !coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const relay = createEphemeralRelay(() => 1_000);
+    const ruler = {
+      t: 'ephemeral' as const,
+      channel: 'ruler.preview',
+      data: { sceneId: T.scene, points: [{ x: 0, y: 0, z: 0 }], phase: 'active' },
+    };
+    const send = (from: FakeConnection) => {
+      relay.relay(from, ruler, state, recipients(state, [watcher]));
+    };
+
+    scene.playerToggles = { measure: false };
+    send(alice);
+    expect(watcher.received).toHaveLength(0);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+    send(host);
+    send(coDm);
+    expect(watcher.received).toHaveLength(2);
+
+    scene.playerToggles = { measure: true };
+    send(alice);
+    expect(watcher.received).toHaveLength(3);
+    const seat = state.seats[T.seatA];
+    if (!seat) throw new Error('missing seat');
+    seat.interactionEnabled = false; // both gates must allow
+    send(alice);
+    expect(watcher.received).toHaveLength(3);
+  });
+
   it('filters entity previews by current audience, including D32 co-DM visibility', () => {
     const state = fixtureCampaign();
     const coDmSeat = state.seats[T.coDm];
@@ -150,4 +188,32 @@ describe('ephemeral relay', () => {
     relay.relay(alice, { t: 'ephemeral', channel: 'cursor', data: { x: 3 } }, state, targets);
     expect(relay.stats().dropped['spectator-rate-limited']).toBe(1);
   });
+});
+
+it('shares the validated profile colour for rulers and cursors instead of a spoofed preview colour', () => {
+  const state = fixtureCampaign();
+  const alice = { ...fakeConnection(T.alice), color: '#ab1234' };
+  const host = fakeConnection(T.host, { isHost: true });
+  const relay = createEphemeralRelay(() => 1000);
+  for (const channel of ['ruler.preview', 'cursor']) {
+    const data =
+      channel === 'ruler.preview'
+        ? {
+            sceneId: T.scene,
+            points: [
+              { x: 1, y: 0, z: 1 },
+              { x: 2, y: 0, z: 1 },
+            ],
+            phase: 'active',
+            color: '#ffffff',
+          }
+        : { x: 1, color: '#ffffff' };
+    relay.relay(alice, { t: 'ephemeral', channel, data }, state, recipients(state, [host]));
+    expect(host.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel,
+      from: T.alice,
+      data: { color: '#ab1234' },
+    });
+  }
 });
