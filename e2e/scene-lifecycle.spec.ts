@@ -38,6 +38,19 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     await player.page.getByRole('radio', { name: /Player/ }).check();
     await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
+    expect(
+      await host.intent('scene.rename', { sceneId: active, name: 'Player scene' }),
+    ).toMatchObject({ t: 'ack' });
+    const inactiveId = testUlid('INACTIVE', 91);
+    expect(
+      await host.intent('scene.create', { sceneId: inactiveId, name: 'UNVISITED-PUBLIC-SCENE' }),
+    ).toMatchObject({ t: 'ack' });
+    expect(
+      await host.intent('scene.rename', { sceneId: inactiveId, name: 'UNVISITED-RENAMED-SCENE' }),
+    ).toMatchObject({ t: 'ack' });
+    await player.page.reload();
+    await expect(player.page.getByRole('status')).toHaveText('Connected to New campaign');
+    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Player scene');
     const privateId = testUlid('SECRET', 90);
     expect(
       await host.intent('scene.create', {
@@ -65,13 +78,25 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
       }),
     ).toMatchObject({ t: 'ack' });
     await dm.getByRole('tab', { name: 'Scenes', exact: true }).click();
+    await dm.getByRole('button', { name: 'Collapse dock' }).click();
+    await dm.getByRole('button', { name: 'Open scene picker' }).click();
+    await expect(dm.getByRole('tab', { name: 'Scenes', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(dm.getByRole('button', { name: 'Collapse dock' })).toBeVisible();
+    await expect(player.page.getByRole('button', { name: 'Open scene picker' })).toHaveCount(0);
+    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Player scene');
     const secret = dm.getByRole('listitem').filter({ hasText: 'SECRET-PRIVATE-SCENE' });
     await secret.getByRole('button', { name: 'Browse', exact: true }).click();
     await expect(dm.getByLabel('Current scene', { exact: true })).toHaveText(
       'SECRET-PRIVATE-SCENE',
     );
     await expect(player.page.getByLabel('Current scene', { exact: true })).toHaveText(
-      'Blank scene',
+      'Player scene',
+    );
+    await expect(dm.getByRole('button', { name: 'Open scene picker' })).toHaveText(
+      'SECRET-PRIVATE-SCENE',
     );
     await dm.getByRole('button', { name: '3D view', exact: true }).click();
     await player.page.getByRole('button', { name: '3D view', exact: true }).click();
@@ -80,10 +105,12 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     });
     expect(await host.intent('scene.delete', { sceneId: active })).toMatchObject({ t: 'ack' });
     await expect(player.page.getByLabel('Current scene', { exact: true })).toHaveText('');
+    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('');
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
     await expect(dm.getByLabel('Current scene', { exact: true })).toHaveText(
       'SECRET-PRIVATE-SCENE',
     );
+    expect(await host.intent('scene.delete', { sceneId: inactiveId })).toMatchObject({ t: 'ack' });
     expect(await host.intent('scene.delete', { sceneId: privateId })).toMatchObject({
       t: 'reject',
     });
@@ -96,6 +123,9 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     await player.page.reload();
     await expect(player.page.getByRole('alert')).toContainText('No active scene');
     for (const received of [frames, lateFrames]) {
+      expect(received.join('\n')).not.toContain(inactiveId);
+      expect(received.join('\n')).not.toContain('UNVISITED-PUBLIC-SCENE');
+      expect(received.join('\n')).not.toContain('UNVISITED-RENAMED-SCENE');
       expect(received.join('\n')).not.toContain(privateId);
       expect(received.join('\n')).not.toContain('SECRET-PRIVATE-SCENE');
       expect(received.join('\n')).not.toContain(privateEntity);

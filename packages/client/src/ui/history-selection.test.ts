@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isUndoableType, prune, select, type Selection } from './history-selection.js';
+import {
+  canRollbackTo,
+  isUndoableType,
+  prune,
+  select,
+  type Selection,
+} from './history-selection.js';
 
 const order = [9, 8, 7, 6, 5];
 const empty: Selection = { selected: new Set() };
@@ -48,5 +54,16 @@ describe('history selection', () => {
       expect(isUndoableType(type)).toBe(false);
     for (const type of ['token.move', 'entity.create', 'scene.rename'])
       expect(isUndoableType(type)).toBe(true);
+  });
+});
+
+describe('canRollbackTo', () => {
+  it('offers only points before the newest action, once the client has a seq', () => {
+    expect(canRollbackTo(3, 5)).toBe(true);
+    expect(canRollbackTo(4, 5)).toBe(true);
+    expect(canRollbackTo(5, 5)).toBe(false);
+    expect(canRollbackTo(6, 5)).toBe(false);
+    expect(canRollbackTo(0, 5)).toBe(false);
+    expect(canRollbackTo(3, null)).toBe(false);
   });
 });
