@@ -1,7 +1,7 @@
 import { Seat } from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
 import { tid } from '../testing.js';
-import { labelVisible, type LabelSubject } from './token-labels.js';
+import { labelState, labelVisible, type LabelSubject } from './token-labels.js';
 import type { SelectionActor } from '../tools/selection.js';
 
 const seat = Seat.parse({
@@ -52,5 +52,46 @@ describe('labelVisible (TOK-04)', () => {
   });
   it('hides blank names', () => {
     expect(labelVisible(subject({ name: '  ' }), { kind: 'host' })).toBe(false);
+  });
+});
+
+describe('labelState (D35 affected-token panel)', () => {
+  it('separates a label the viewer may not read from a token the viewer may not see', () => {
+    expect(labelState(subject({ labelVisibility: 'owner' }), player)).toBe('hidden');
+    expect(labelState(subject({ labelVisibility: 'dm' }), player)).toBe('hidden');
+    expect(labelState(subject({ layer: 'dm' }), player)).toBe('invisible');
+    expect(labelState(subject({ perms: { view: false } }), player)).toBe('invisible');
+    expect(
+      labelState(subject(), {
+        kind: 'seat',
+        seat: { ...seat, permissions: { ...seat.permissions, view: false } },
+      }),
+    ).toBe('invisible');
+  });
+
+  it('never reads a host-redacted blank name as an invisible token', () => {
+    // PERM-03: the host blanks the name of a label the audience may not read, so a blank name
+    // alone must not be mistaken for an absent token.
+    expect(labelState(subject({ name: '', labelVisibility: 'owner' }), player)).toBe('hidden');
+    expect(labelState(subject({ name: '' }), player)).toBe('visible');
+    expect(labelState(subject({ name: '' }), { kind: 'host' })).toBe('visible');
+  });
+
+  it('gives spectators a label only for "all", and hosts and co-DMs every label', () => {
+    expect(labelState(subject(), { kind: 'spectator' })).toBe('visible');
+    expect(labelState(subject({ labelVisibility: 'owner' }), { kind: 'spectator' })).toBe('hidden');
+    expect(labelState(subject({ layer: 'dm' }), { kind: 'spectator' })).toBe('invisible');
+    expect(labelState(subject({ labelVisibility: 'dm' }), { kind: 'host' })).toBe('visible');
+    expect(labelState(subject({ labelVisibility: 'owner' }), { kind: 'seat', seat: { ...seat, role: 'codm' } })).toBe(
+      'visible',
+    );
+  });
+
+  it('keeps labelVisible consistent with the three states', () => {
+    for (const s of [subject(), subject({ labelVisibility: 'owner' }), subject({ layer: 'dm' })]) {
+      for (const actor of [player, { kind: 'host' } as const, { kind: 'spectator' } as const]) {
+        expect(labelVisible(s, actor)).toBe(labelState(s, actor) === 'visible' && s.name.trim() !== '');
+      }
+    }
   });
 });
