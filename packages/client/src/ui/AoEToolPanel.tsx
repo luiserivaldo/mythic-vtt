@@ -105,7 +105,7 @@ export function AoEToolPanel({
     }
   };
   return (
-    <section className="ui-panel ui-overlay ui-aoe-tool" aria-label="AoE tool">
+    <section className="ui-panel ui-overlay ui-aoe-tool" aria-label="AoE tool" aria-busy={busy}>
       {!unified && (
         <button
           type="button"
