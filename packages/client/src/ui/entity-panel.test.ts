@@ -10,6 +10,7 @@ import {
   isValidEntityName,
   isValidColour,
   isValidPropSize,
+  layerForCreate,
   ownerOptions,
   placementPosition,
   SPAWN_STEPS,
@@ -227,6 +228,17 @@ describe('entity panel view model', () => {
   it('offers the map layer for fixed objects without changing the existing effects option', () => {
     expect(entityCreateLayers(false)).toEqual(['tokens', 'props', 'map', 'effects']);
     expect(entityCreateLayers(true)).toEqual(['tokens', 'props', 'map', 'effects', 'dm']);
+  });
+
+  it('defaults creation to the active layer, falling back when the viewer may not create there', () => {
+    expect(layerForCreate('props', entityCreateLayers(true), TOKEN_FORM_DEFAULTS.layer)).toBe(
+      'props',
+    );
+    // A co-DM's active DM layer is not one they may create on, so the form keeps its own default.
+    expect(layerForCreate('dm', entityCreateLayers(false), TOKEN_FORM_DEFAULTS.layer)).toBe(
+      'tokens',
+    );
+    expect(layerForCreate('dm', entityCreateLayers(true), 'props')).toBe('dm');
   });
 
   it('lists entities by layer then name with kind and owner labels', () => {

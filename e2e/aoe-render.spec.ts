@@ -104,14 +104,14 @@ test('host board renders received AoEs, hides the effects layer, and survives 2D
     await page
       .getByRole('listitem')
       .filter({ hasText: 'Effects' })
-      .getByLabel('Hidden (this screen only)')
+      .getByRole('checkbox', { name: 'Show Effects' })
       .check();
     const hidden = await canvas.screenshot();
     expect(hidden.equals(moved)).toBe(false);
     await page
       .getByRole('listitem')
       .filter({ hasText: 'Effects' })
-      .getByLabel('Hidden (this screen only)')
+      .getByRole('checkbox', { name: 'Show Effects' })
       .uncheck();
     await page.getByRole('button', { name: /3D/i }).click();
     await page.waitForTimeout(450);
