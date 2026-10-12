@@ -32,3 +32,5 @@ export { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 export { canReadEntityLabel } from './entity-access.js';
 export { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
 export { canUseSceneToggle, TOGGLE_FOR_CHANNEL } from './scene-toggles.js';
+
+export { aoePersist } from './aoe.persist.js';

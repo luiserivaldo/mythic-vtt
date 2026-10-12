@@ -196,3 +196,16 @@ describe('v2 presence latency', () => {
     expect(valid({ ...seat, identitySecret: 'not-a-real-secret' })).toBe(false);
   });
 });
+
+describe('v6 lasting AoE', () => {
+  it('round-trips the synthetic lasting placement intent', () => {
+    const raw = readFileSync(
+      new URL('../../../fixtures/protocol/v6/lasting-aoe.json', import.meta.url),
+      'utf8',
+    );
+    const decoded = decodeClientMessage(raw);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) throw new Error('invalid golden fixture');
+    expect(decodeClientMessage(encodeClientMessage(decoded.message))).toEqual(decoded);
+  });
+});

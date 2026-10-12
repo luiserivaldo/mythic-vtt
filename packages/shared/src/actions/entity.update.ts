@@ -4,7 +4,14 @@ import { Entity, Id, resolveSceneBounds } from '../schema/index.js';
 import { defineAction } from './define.js';
 import { canUseEntity, canReadEntityLabel, isLayerLocked } from './entity-access.js';
 
-const EntityChanges = Entity.omit({ id: true, layer: true, owners: true, perms: true })
+const EntityChanges = Entity.omit({
+  id: true,
+  layer: true,
+  owners: true,
+  perms: true,
+  lastingAoE: true,
+  measuringAoE: true,
+})
   .partial()
   .strict()
   .refine((changes) => Object.keys(changes).length > 0, {

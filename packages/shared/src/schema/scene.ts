@@ -31,6 +31,8 @@ export const DEFAULT_SCENE_WIDTH = 40;
 export const DEFAULT_SCENE_HEIGHT = 30;
 
 const BoundsCells = z.number().int().min(1).max(MAX_SCENE_CELLS);
+export const DEFAULT_LASTING_AOE_LIMIT = 1;
+export const LastingAoELimit = z.number().int().min(0).max(50);
 export const SceneBounds = z.strictObject({ width: BoundsCells, height: BoundsCells });
 export type SceneBounds = z.infer<typeof SceneBounds>;
 
@@ -74,6 +76,7 @@ export const Scene = z.object({
   entities: z.record(Id, Entity),
   overlay: SceneOverlay.optional(),
   playerToggles: ScenePlayerToggles.optional(),
+  maxLastingAoEsPerPlayer: LastingAoELimit.optional(),
 });
 export type Scene = z.infer<typeof Scene>;
 

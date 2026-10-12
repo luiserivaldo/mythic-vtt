@@ -31,7 +31,7 @@ function ownsEntity(audience: Audience, entity: Entity): boolean {
 
 function viewKey(audience: Audience, seat?: Seat): string {
   const role = seat?.role === 'codm' ? 'codm' : 'player';
-  return `${audienceKey(audience)}:view=${seat?.permissions.view === false ? 'off' : 'on'}:${role}`;
+  return `${audienceKey(audience)}:view=${seat?.permissions.view === false ? 'off' : 'on'}:${role}:identity=${seat?.identityId ?? ''}`;
 }
 
 /** The audience's view of one entity, or null if it must not be sent at all. */
@@ -50,14 +50,20 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
     // D35 / TOK-04 + PERM-03: a name the audience may not see on the label is never sent. The
     // schema requires a string, so the neutral placeholder is the empty string.
     const hideName = !canReadTokenLabel(audience, entity, seat);
-    if (!hideName) return entity;
+    // PERM-03: placement provenance is host/placer-private, including after seat reassignment.
+    const projected =
+      entity.lastingAoE?.creatorIdentityId !== undefined &&
+      seat?.identityId !== entity.lastingAoE.creatorIdentityId
+        ? { ...entity, lastingAoE: {} }
+        : entity;
+    if (!hideName) return projected;
     // TOK-06 / PERM-03: status markers share the label's audience, even for unnamed tokens.
     if (entity.token?.statusMarkers !== undefined) {
       const token = { ...entity.token };
       delete token.statusMarkers;
-      return { ...entity, name: '', token };
+      return { ...projected, name: '', token };
     }
-    return entity.name !== '' ? { ...entity, name: '' } : entity;
+    return entity.name !== '' ? { ...projected, name: '' } : projected;
   });
 }
 
@@ -67,12 +73,14 @@ export function viewPrefab(audience: Audience, prefab: Prefab, seat?: Seat): Pre
   if (audience.kind !== 'seat' || seat?.role !== 'codm' || !seat.permissions.view) return null;
   // Older experimental blueprints did not capture visibility; keep them host-only.
   if (prefab.entity.owners === undefined) return null;
-  return viewEntity(
+  const view = viewEntity(
     audience,
     { ...prefab.entity, id: prefab.id, owners: prefab.entity.owners },
     seat,
-  ) === null
-    ? null
+  );
+  if (!view) return null;
+  return view.lastingAoE && view.lastingAoE !== prefab.entity.lastingAoE
+    ? { ...prefab, entity: { ...prefab.entity, lastingAoE: view.lastingAoE } }
     : prefab;
 }
 

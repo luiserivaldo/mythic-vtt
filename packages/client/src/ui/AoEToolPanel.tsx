@@ -1,6 +1,6 @@
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { AoEEntity, canPerform, type Actor, type Scene } from '@mythic/shared';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from 'zustand';
 import { useClientStore } from '../store/react.js';
 import {
@@ -15,6 +15,7 @@ import { rulerStore } from '../tools/ruler-store.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { useJoinEnv } from './join-context.js';
 import { useSubmit } from './submit.js';
+import { newId } from './ids.js';
 
 const KINDS: AoEKind[] = ['sphere', 'cylinder', 'cone', 'cube', 'line'];
 /** All controls are DOM labels. The tool draft and preview are local to this browser. */
@@ -39,6 +40,7 @@ export function AoEToolPanel({
   const busy = useStore(aoeToolStore, (s) => s.busy);
   const error = useStore(aoeToolStore, (s) => s.error);
   const { send, error: submitError } = useSubmit();
+  const [lastingId, setLastingId] = useState(newId);
   const actor: Actor | null = isHost
     ? { kind: 'host', identityId: join?.identityId }
     : seatId
@@ -78,6 +80,23 @@ export function AoEToolPanel({
     !!actor &&
     !!entity &&
     canPerform(campaign, actor, 'aoe.remove', { sceneId: scene.id, entityId: entity.id });
+  const persistPayload =
+    scene && join ? { sceneId: scene.id, sourceId: join.identityId, entityId: lastingId } : null;
+  const canPersist =
+    !!campaign &&
+    !!actor &&
+    !!persistPayload &&
+    canPerform(campaign, actor, 'aoe.persist', persistPayload);
+  const persist = async () => {
+    if (!scene || !persistPayload || !canPersist || busy) return;
+    aoeToolStore.getState().setBusy(true);
+    try {
+      if (await send({ type: 'aoe.persist', sceneId: scene.id, payload: persistPayload }))
+        setLastingId(newId());
+    } finally {
+      aoeToolStore.getState().setBusy(false);
+    }
+  };
   if (!scene || (!canPlace && !entity)) return null;
   const unit = scene.grid.unitLabel;
   const perCell = scene.grid.unitsPerCell;
@@ -120,6 +139,10 @@ export function AoEToolPanel({
       )}
       {active && (
         <>
+          <button type="button" disabled={busy || !canPersist} onClick={() => void persist()}>
+            Place AoE
+          </button>
+          <p>Place AoE keeps your measured template until it is deleted.</p>
           {!unified && (
             <label>
               Shape{' '}

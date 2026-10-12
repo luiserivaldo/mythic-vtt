@@ -70,6 +70,8 @@ test('the DM replaces and quick-deletes their persistent AoE without page errors
         .not.toBe(firstPosition);
     }).toPass();
     expect(aoeCount()).toBe(1);
+    // The observer's patch can precede the measuring browser's acknowledgement.
+    await expect(tool.getByRole('button', { name: 'Place AoE', exact: true })).toBeEnabled();
     await page.mouse.click(second.x, second.y, { button: 'right' });
     await expect.poll(() => ownAoE()).toBeUndefined();
     expect(aoeCount()).toBe(0);

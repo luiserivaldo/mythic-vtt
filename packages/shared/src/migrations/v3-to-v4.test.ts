@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { storeMigrate } from './registry.js';
+import { createStoreMigrate, MIGRATION_STEPS } from './registry.js';
+const storeMigrate = createStoreMigrate(
+  MIGRATION_STEPS.filter((step) => step.from < 4),
+  4,
+);
 import { makeCampaign, IDS } from '../actions/testing.js';
 import { Campaign } from '../schema/index.js';
 

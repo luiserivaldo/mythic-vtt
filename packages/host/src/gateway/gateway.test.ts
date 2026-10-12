@@ -462,10 +462,10 @@ describe('transport RTT (UX-06)', () => {
     expect(samples[0]).toBeLessThanOrEqual(30_000);
     expect(c.received).toEqual([]);
   });
-  it('rejects version 1 after the presence contract upgrade', async () => {
+  it.each([1, 4, 5])('rejects version %i after the lasting-AoE protocol upgrade', async (v) => {
     await start();
     const c = await connect();
-    c.send(hello({ v: 1 }));
+    c.send(hello({ v }));
     expect(await c.next()).toMatchObject({
       t: 'error',
       code: 'protocol-mismatch',

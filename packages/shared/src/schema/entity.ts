@@ -127,6 +127,9 @@ export const Entity = z.object({
   model: z.object({ asset: AssetRef }).optional(),
   image: z.object({ asset: AssetRef, calibrated: z.boolean() }).optional(),
   aoe: AoEComponent.optional(),
+  // MEAS-03: an immutable marker separates lasting objects from measuring templates.
+  lastingAoE: z.strictObject({ creatorIdentityId: Id.optional() }).optional(),
+  measuringAoE: z.literal(true).optional(),
   aura: z.object({ radius: z.number().positive(), color: z.string() }).optional(),
   pin: PinComponent.optional(),
 });
@@ -141,5 +144,7 @@ export const AoEEntity = z.strictObject({
   perms: EntityPermissions.partial().optional(),
   transform: Transform,
   aoe: AoEShape,
+  lastingAoE: z.strictObject({ creatorIdentityId: Id.optional() }).optional(),
+  measuringAoE: z.literal(true).optional(),
 });
 export type AoEEntity = z.infer<typeof AoEEntity>;
