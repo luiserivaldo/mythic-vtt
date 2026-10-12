@@ -290,6 +290,46 @@ export function recordPageFrames(page: Page): string[] {
   return frames;
 }
 
+/** The 3D orbit pose the client exposes through `__mythicCamera` (M2-05). */
+export interface CameraPose {
+  targetX: number;
+  targetY: number;
+  targetZ: number;
+  azimuth: number;
+  polar: number;
+  distance: number;
+}
+
+/**
+ * The pose the 3D camera lands on: entering or leaving 3D plays an M2-05 tween (250 ms), and
+ * `__mythicCamera` reports every step of it. Projecting world points through a pose read mid-tween
+ * aims at pixels the board has not reached yet, so wait until the pose stops changing.
+ */
+export async function settledCameraPose(page: Page): Promise<CameraPose> {
+  const read = () =>
+    page.evaluate(() => {
+      const scope = globalThis as typeof globalThis & {
+        __mythicCamera?: { getPose(): CameraPose };
+      };
+      if (!scope.__mythicCamera) throw new Error('3D camera diagnostics are not mounted');
+      return scope.__mythicCamera.getPose();
+    });
+  let previous = await read();
+  for (let attempt = 0; attempt < 50; attempt++) {
+    await page.waitForTimeout(40);
+    const next = await read();
+    if (
+      next.targetX === previous.targetX &&
+      next.azimuth === previous.azimuth &&
+      next.polar === previous.polar &&
+      next.distance === previous.distance
+    )
+      return next;
+    previous = next;
+  }
+  return previous;
+}
+
 // ---------- raw protocol clients (no browser) ----------
 
 export interface RawClientOptions {
