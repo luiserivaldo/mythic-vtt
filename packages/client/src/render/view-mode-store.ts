@@ -5,6 +5,8 @@ export type ViewMode = '2d' | '3d';
 
 interface ViewModeState {
   mode: ViewMode;
+  resetToken: number;
+  reset(): void;
   toggle(): void;
   set(mode: ViewMode): void;
 }
@@ -20,6 +22,10 @@ export function initialViewMode(search: string): ViewMode {
  */
 export const viewModeStore = createStore<ViewModeState>()((set, get) => ({
   mode: typeof window === 'undefined' ? '2d' : initialViewMode(window.location.search),
+  resetToken: 0,
+  reset: () => {
+    set((state) => ({ resetToken: state.resetToken + 1 }));
+  },
   toggle() {
     set({ mode: get().mode === '2d' ? '3d' : '2d' });
   },

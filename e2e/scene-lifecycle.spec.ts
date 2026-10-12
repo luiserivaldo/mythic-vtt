@@ -65,6 +65,15 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
       }),
     ).toMatchObject({ t: 'ack' });
     await dm.getByRole('tab', { name: 'Scenes', exact: true }).click();
+    await dm.getByRole('button', { name: 'Collapse dock' }).click();
+    await dm.getByRole('button', { name: 'Open scene picker' }).click();
+    await expect(dm.getByRole('tab', { name: 'Scenes', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(dm.getByRole('button', { name: 'Collapse dock' })).toBeVisible();
+    await expect(player.page.getByRole('button', { name: 'Open scene picker' })).toHaveCount(0);
+    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Blank scene');
     const secret = dm.getByRole('listitem').filter({ hasText: 'SECRET-PRIVATE-SCENE' });
     await secret.getByRole('button', { name: 'Browse', exact: true }).click();
     await expect(dm.getByLabel('Current scene', { exact: true })).toHaveText(
@@ -73,6 +82,9 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     await expect(player.page.getByLabel('Current scene', { exact: true })).toHaveText(
       'Blank scene',
     );
+    await expect(dm.getByRole('button', { name: 'Open scene picker' })).toHaveText(
+      'SECRET-PRIVATE-SCENE',
+    );
     await dm.getByRole('button', { name: '3D view', exact: true }).click();
     await player.page.getByRole('button', { name: '3D view', exact: true }).click();
     expect(await host.intent('scene.activate', { sceneId: privateId })).toMatchObject({
@@ -80,6 +92,7 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     });
     expect(await host.intent('scene.delete', { sceneId: active })).toMatchObject({ t: 'ack' });
     await expect(player.page.getByLabel('Current scene', { exact: true })).toHaveText('');
+    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('');
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
     await expect(dm.getByLabel('Current scene', { exact: true })).toHaveText(
       'SECRET-PRIVATE-SCENE',

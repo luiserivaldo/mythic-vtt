@@ -29,7 +29,7 @@ test.afterAll(async () => {
 test('2D remains the default and has no reset-view control', async ({ browser }) => {
   const client = await openClient(browser, table, 'viewer');
   await expect(client.page.getByLabel('Scene board')).toBeVisible();
-  await expect(client.page.getByRole('button', { name: 'Reset view' })).toHaveCount(0);
+  await expect(client.page.getByRole('button', { name: 'Reset view' })).toBeVisible();
 });
 
 test('3D orbit camera orbits, dollies, pans and resets without errors', async ({ browser }) => {

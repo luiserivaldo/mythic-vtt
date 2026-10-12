@@ -816,3 +816,22 @@ main [tabindex]:focus-visible {
   background: var(--ui-panel-bg, Canvas);
   box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
 }
+
+.ui-view-mode {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+.ui-view-mode button {
+  border-radius: 0;
+}
+.ui-view-mode button:first-child {
+  border-radius: 0.3rem 0 0 0.3rem;
+}
+.ui-view-mode button:last-child {
+  border-radius: 0 0.3rem 0.3rem 0;
+}
+.ui-scene-heading {
+  min-width: 0;
+  max-width: 35%;
+}

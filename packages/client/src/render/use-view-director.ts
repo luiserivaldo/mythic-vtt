@@ -32,6 +32,7 @@ export interface ViewDirector {
   keepInitialOrbit: boolean;
   /** 2D framing to restore when the orthographic camera is (re)mounted. */
   view2d: View2D;
+  restored2d: boolean;
 }
 
 const reducedMotion = () =>
@@ -47,6 +48,7 @@ const reducedMotion = () =>
 export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): ViewDirector {
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
+  const [restored2d, setRestored2d] = useState(false);
   const [rendered, setRendered] = useState<ViewMode>(target);
   const [view2d, setView2d] = useState<View2D>(DEFAULT_VIEW);
   const initialSize = getState().size;
@@ -80,6 +82,7 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
         resting3d.current = dest;
         setKeep(true);
         setView2d(view);
+        setRestored2d(true);
         tween.current = { from, to: dest, startedAt: null, direction: 'in' };
         setRendered('3d');
       } else {
@@ -128,5 +131,5 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
     invalidate();
   });
 
-  return { rendered, orbitRef, applyRef, keepInitialOrbit, view2d };
+  return { rendered, orbitRef, applyRef, keepInitialOrbit, view2d, restored2d };
 }
