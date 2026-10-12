@@ -16,10 +16,17 @@ import {
   seatRoleIntent,
   type IntentSpec,
 } from './intent-specs.js';
-import { layerRows, moveTargets, toggleHidden } from './layer-panel.js';
+import {
+  DEFAULT_ACTIVE_LAYER,
+  LAYER_ROWS,
+  layerRows,
+  moveTargets,
+  toggleHidden,
+} from './layer-panel.js';
 import { sceneRows, isValidSceneName } from './scene-list.js';
 import { connectedIdentityRows, isValidIdentityId, isValidLabel, seatRows } from './seat-panel.js';
 import { toolbarItems } from './toolbar-items.js';
+import { createUiStore } from './ui-store.js';
 import {
   canManageSeats,
   identitySummary,
@@ -188,17 +195,51 @@ describe('store host hint', () => {
   });
 });
 
+describe('ui store active layer (UI-LAY-01)', () => {
+  it('starts on Tokens and moves locally without an action', () => {
+    const store = createUiStore();
+    expect(store.getState().activeLayer).toBe(DEFAULT_ACTIVE_LAYER);
+    store.getState().setActiveLayer('props');
+    expect(store.getState().activeLayer).toBe('props');
+  });
+});
+
 describe('view models', () => {
-  it('lists layers with lock and local hidden state', () => {
-    const rows = layerRows(sceneOf(world()), new Set(['dm'] as const));
-    expect(rows.map((r) => r.layer)).toEqual(['map', 'props', 'tokens', 'dm', 'effects']);
-    expect(rows.find((r) => r.layer === 'props')?.locked).toBe(true);
+  it('lists layers top row first, highest draw band first (UI-LAY-01)', () => {
+    expect(LAYER_ROWS).toEqual(['effects', 'tokens', 'props', 'dm', 'map']);
+  });
+  it('lists rows with lock, local hidden and the active layer, DM row included for the host', () => {
+    const rows = layerRows(sceneOf(world()), new Set(['dm'] as const), {
+      role: 'host',
+      activeLayer: 'props',
+    });
+    expect(rows.map((r) => r.layer)).toEqual(['effects', 'tokens', 'props', 'dm', 'map']);
+    expect(rows.find((r) => r.layer === 'props')).toMatchObject({
+      locked: true,
+      active: true,
+      lockDisabledReason: null,
+    });
+    expect(rows.filter((r) => r.active)).toHaveLength(1);
     expect(rows.find((r) => r.layer === 'dm')?.hidden).toBe(true);
     expect(rows.find((r) => r.layer === 'map')).toMatchObject({
       description: 'Battlemap images, ground, terrain and fixed objects',
       locked: false,
       hidden: false,
     });
+  });
+  it('never shows the DM row to a player or spectator, and offers neither a lock', () => {
+    for (const role of ['player', 'observer'] as const) {
+      const rows = layerRows(sceneOf(world()), new Set(), { role, activeLayer: 'tokens' });
+      expect(rows.map((r) => r.layer)).toEqual(['effects', 'tokens', 'props', 'map']);
+      expect(rows.every((r) => r.lockDisabledReason !== null)).toBe(true);
+    }
+  });
+  it('shows a co-DM the DM row read-only: locking it stays host-only (LAY-06, D32)', () => {
+    const rows = layerRows(sceneOf(world()), new Set(), { role: 'codm', activeLayer: 'dm' });
+    expect(rows.map((r) => r.layer)).toContain('dm');
+    expect(rows.find((r) => r.layer === 'dm')).toMatchObject({ active: true });
+    expect(rows.find((r) => r.layer === 'dm')?.lockDisabledReason).toMatch(/host/i);
+    expect(rows.find((r) => r.layer === 'tokens')?.lockDisabledReason).toBeNull();
   });
   it('toggles hidden without mutating the input', () => {
     const a = new Set(['dm'] as const);

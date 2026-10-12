@@ -49,6 +49,9 @@ export interface EphemeralRecipient {
   readonly audience: Audience;
 }
 
+const isSpectatorTarget = (target: EphemeralRecipient): boolean =>
+  target.audience.kind === 'spectators' || target.conn.isSpectator === true;
+
 export interface EphemeralRelay {
   relay(
     sender: GatewayConnection,
@@ -270,9 +273,8 @@ export function createEphemeralRelay(
       });
       drop('hidden-entity', targets.length - visibleTargets.length);
 
-      const spectatorTargets = visibleTargets.filter(
-        (target) => target.audience.kind === 'spectators',
-      );
+      // M4-02: a spectator watching through a seat has a seat audience but is still a spectator.
+      const spectatorTargets = visibleTargets.filter(isSpectatorTarget);
       let sendToSpectators = true;
       if (spectatorTargets.length > 0) {
         spectatorDelivery ??= new TokenBucket(spectatorDeliveryRate, now);
@@ -281,7 +283,7 @@ export function createEphemeralRelay(
       }
 
       for (const target of visibleTargets) {
-        if (target.audience.kind === 'spectators' && !sendToSpectators) continue;
+        if (isSpectatorTarget(target) && !sendToSpectators) continue;
         target.conn.sendRaw(frame);
         relayed += 1;
       }

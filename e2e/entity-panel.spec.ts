@@ -77,7 +77,7 @@ test('the host creates a scene, a token and a box from the Entities panel and se
 
   const propName = page.getByLabel('Prop name');
   await propName.fill('Crate');
-  await page.getByRole('button', { name: 'Create prop' }).click();
+  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
   await expect(propName).toHaveValue('');
   await expect(propName).toBeFocused();
 
