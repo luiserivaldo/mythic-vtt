@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
 import { useStore } from 'zustand';
 import type { Scene } from '@mythic/shared';
+import { useClientStore } from '../store/react.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { placeDraft } from '../tools/aoe-placement.js';
 import { selectionStore } from '../tools/selection-store.js';
+import type { SelectionActor } from '../tools/selection.js';
 import { useUiStore } from '../ui/ui-store.js';
 import {
   deriveAoEHighlights,
@@ -11,7 +13,13 @@ import {
   type AoEHighlightResult,
 } from './aoe-highlight.js';
 
-const EMPTY_RESULT: AoEHighlightResult = { cells: [], tokenIds: [], tokenNames: [], aoeCount: 0 };
+const EMPTY_RESULT: AoEHighlightResult = {
+  cells: [],
+  tokenIds: [],
+  tokenNames: [],
+  aoeCount: 0,
+  groups: [],
+};
 
 /** Shares the same derivation between the WebGL overlay and the compact HTML list. */
 export function useAoEHighlights(scene: Scene | null): AoEHighlightResult {
@@ -21,6 +29,15 @@ export function useAoEHighlights(scene: Scene | null): AoEHighlightResult {
   const preview = useStore(aoeToolStore, (state) => state.preview);
   const selected = useStore(selectionStore, (state) => state.ids);
   const hiddenLayers = useUiStore((state) => state.hiddenLayers);
+  const isHost = useClientStore((state) => state.isHost);
+  // D35: the same viewer identity the board renders with decides the affected-token names.
+  const seat = useClientStore((state) =>
+    state.seatId === null ? undefined : state.campaign?.seats[state.seatId],
+  );
+  const actor = useMemo<SelectionActor>(
+    () => (isHost ? { kind: 'host' } : seat ? { kind: 'seat', seat } : { kind: 'spectator' }),
+    [isHost, seat],
+  );
 
   return useMemo(() => {
     if (!scene) return EMPTY_RESULT;
@@ -43,6 +60,6 @@ export function useAoEHighlights(scene: Scene | null): AoEHighlightResult {
         aoe: { ...shape, position: transform.position, rotation: transform.rotation },
       };
     }
-    return deriveAoEHighlights(scene, { hiddenLayers, override });
-  }, [scene, active, editingEntityId, draft, preview, selected, hiddenLayers]);
+    return deriveAoEHighlights(scene, { hiddenLayers, override, actor });
+  }, [scene, active, editingEntityId, draft, preview, selected, hiddenLayers, actor]);
 }

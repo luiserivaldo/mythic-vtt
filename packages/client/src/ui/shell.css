@@ -266,6 +266,20 @@ main > p {
   margin: 0.3rem 0 0;
   padding-left: 1.1rem;
 }
+/* MEAS-04: one row per affected token, with its distance in scene units beside the name. */
+.ui-aoe-affected ul ul {
+  margin-top: 0.15rem;
+  padding-left: 0.9rem;
+}
+.ui-aoe-affected-distance {
+  margin-left: 0.35rem;
+  color: var(--ui-muted);
+}
+/* D35: the viewer sees the token but may not read this name. */
+.ui-aoe-affected-hidden .ui-aoe-affected-name {
+  font-style: italic;
+  opacity: 0.75;
+}
 .ui-field {
   display: block;
   margin-bottom: 0.35rem;

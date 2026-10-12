@@ -134,7 +134,9 @@ export function ToolPanelDock({
       {showRuler && (
         <PanelFrame id="ruler" label="Ruler" collapsed={collapsed.ruler}>
           <RulerPanel scene={scene} />
-          {aoeActive && <AoEAffectedPanel scene={scene} />}
+          {/* MEAS-04: a live readout of every stored AoE, for any viewer the ruler panel is open to
+              (the AoE frame above already carries it whenever an AoE is selected). */}
+          {!showAoE && <AoEAffectedPanel scene={scene} />}
         </PanelFrame>
       )}
     </aside>,
