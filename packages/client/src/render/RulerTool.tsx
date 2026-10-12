@@ -2,7 +2,7 @@ import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { RulerPreview } from '@mythic/protocol';
 import { useThree } from '@react-three/fiber';
 import { useContext, useEffect, useMemo, useRef } from 'react';
-import { Raycaster, Vector2, type Object3D } from 'three';
+import { Raycaster, Vector2 } from 'three';
 import { useStore } from 'zustand';
 import type { Scene, Vec3 } from '@mythic/shared';
 import { rulerStore } from '../tools/ruler-store.js';
@@ -22,6 +22,7 @@ import {
 import { prepareRulerPoint3d } from '../tools/ruler-3d.js';
 import { EphemeralContext } from '../ui/ephemeral-context.js';
 import { pointerClaims } from './pointer-claims.js';
+import { entityIdForObject } from './pick-entity.js';
 import { RulerPath } from './RulerPath.js';
 import { RULER_LOCAL_COLOR, RULER_REMOTE_COLOR } from './canvas-style.js';
 import type { ViewMode } from './view-mode-store.js';
@@ -37,15 +38,6 @@ const NO_REMOTE: readonly never[] = [];
  * normal selection handler can run. Right-click or Esc clears. The path is render-local plus an
  * ephemeral relay; nothing is an action.
  */
-function entityIdForObject(object: Object3D, scene: Scene): string | undefined {
-  let current: Object3D | null = object;
-  while (current) {
-    if (current.name && scene.entities[current.name]) return current.name;
-    current = current.parent;
-  }
-  return undefined;
-}
-
 export function RulerTool({
   mode = '2d',
   readOnly = false,

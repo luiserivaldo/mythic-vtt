@@ -16,6 +16,7 @@ import { withLocalDrag } from '../tools/token-drag.js';
 import { useClientStore } from '../store/react.js';
 import { activeRenderScene, type RenderScene } from './scene-model.js';
 import { PickableEntities } from './PickableEntities.js';
+import { RangeReadout } from './RangeReadout.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
@@ -138,6 +139,8 @@ function BoardScene({
       <RulerTool mode={mode3d ? '3d' : '2d'} readOnly={readOnly} />
       {!aoeActive && <TokenDrag readOnly={readOnly} />}
       <PickableEntities rendered={shown} scene={source} mode={mode3d ? '3d' : '2d'} grid={grid} />
+      {/* MEAS-05: hovering a token with one token selected shows the token-to-token range. */}
+      <RangeReadout scene={source} />
       {mode3d && <OcclusionFade rendered={shown} />}
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       <SceneOverlay overlay={source?.overlay} />
