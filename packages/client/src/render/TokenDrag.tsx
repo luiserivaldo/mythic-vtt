@@ -10,6 +10,7 @@ import {
   cursorSurface,
   dragStarted,
   dragRulerPaths,
+  appendCheckpoint,
   groundPoint,
   movableToken,
   pressOnGizmoHandle,
@@ -46,6 +47,8 @@ interface Press {
   grab: { x: number; z: number };
   startY: number;
   base: Vec3;
+  /** UX-21/UI-TOKEN-06: checkpoints dropped with a left click while this press drags. */
+  checkpoints: readonly Vec3[];
   moving: boolean;
   lastSentAt: number | null;
 }
@@ -272,15 +275,35 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
       });
     };
 
+    /**
+     * UX-21/UI-TOKEN-06: a left click while a token is being dragged commits the live position as a
+     * checkpoint and the drag keeps measuring from it (total in scene units, diagonal rule). The
+     * drag owns the pointer, so the press is swallowed rather than handed to picking.
+     */
+    const addCheckpoint = () => {
+      const drag = tokenDragStore.getState().local;
+      if (!press || !drag || drag.settling || !rulerStore.getState().measureMovement) return;
+      const checkpoints = appendCheckpoint(drag.base, press.checkpoints, drag.to);
+      if (checkpoints === press.checkpoints) return;
+      press.checkpoints = checkpoints;
+      tokenDragStore.getState().setLocal({ ...drag, checkpoints });
+      invalidate();
+    };
+
     const onDown = (e: PointerEvent) => {
       if (e.target !== el) return;
-      swallowClick = false;
       if (e.pointerType === 'mouse' && e.button === 1) {
         onMiddleDown(e);
         return;
       }
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (press || pointerClaims.isClaimed(e.pointerId)) return;
+      if (press) {
+        e.stopPropagation();
+        addCheckpoint();
+        return;
+      }
+      swallowClick = false;
+      if (pointerClaims.isClaimed(e.pointerId)) return;
       const { campaign: c, actor: a, scene: sc, mode: m } = latest.current;
       if (!sc || tokenDragStore.getState().local) return;
       const under = tokenUnder(e, sc);
@@ -310,6 +333,7 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         grab: { x: ground.x - pos.x, z: ground.z - pos.z },
         startY: pos.y,
         base: pos,
+        checkpoints: [],
         moving: false,
         lastSentAt: null,
       };
@@ -344,6 +368,7 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         sceneId: press.sceneId,
         entityId: press.entityId,
         base: press.base,
+        checkpoints: press.checkpoints,
         to,
         settling: false,
       });
