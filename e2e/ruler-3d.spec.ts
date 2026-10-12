@@ -82,7 +82,7 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   const pose = await settledCameraPose(page);
   const ground = projectToCanvas(pose, box, { x: 20, y: 0, z: 25 });
   const platformTop = projectToCanvas(pose, box, { x: 20, y: 10, z: 15 });
-  await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+  await page.getByRole('button', { name: 'Measure', exact: true }).click();
   await page.getByLabel('Measurement mode').selectOption('3d');
   await page.getByLabel('Ruler fade').selectOption('linger');
   // The platform spawns at scene centre. Project known world points through the live pose so this

@@ -35,7 +35,7 @@ test('selecting a prop in 3D mounts the gizmo without errors and a typed value c
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Prop name').fill('Crate');
-  await page.getByRole('button', { name: 'Create prop' }).click();
+  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
   const list = page.getByRole('list', { name: 'Entities in this scene' });
   await list.getByRole('button', { name: 'Crate', exact: true }).click();
 

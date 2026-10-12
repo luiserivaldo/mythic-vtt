@@ -3,11 +3,14 @@ import { layerLockIntent, entityMoveLayerIntent } from './intent-specs.js';
 import { layerRows, moveTargets } from './layer-panel.js';
 import { useSubmit } from './submit.js';
 import { useUiStore } from './ui-store.js';
+import type { ViewerRole } from './viewer.js';
 
-export function LayerPanel({ campaign }: { campaign: Campaign }) {
+export function LayerPanel({ campaign, role }: { campaign: Campaign; role: ViewerRole }) {
   const { send, error } = useSubmit();
   const hidden = useUiStore((s) => s.hiddenLayers);
   const toggleHidden = useUiStore((s) => s.toggleLayerHidden);
+  const activeLayer = useUiStore((s) => s.activeLayer);
+  const setActiveLayer = useUiStore((s) => s.setActiveLayer);
   const selectedId = useUiStore((s) => s.selectedEntityId);
   const scene = campaign.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;
   if (!scene) {
@@ -22,33 +25,45 @@ export function LayerPanel({ campaign }: { campaign: Campaign }) {
   return (
     <section aria-labelledby="ui-layers-h" className="ui-panel">
       <h2 id="ui-layers-h">Layers</h2>
-      <ul className="ui-list">
-        {layerRows(scene, hidden).map((row) => (
+      <ul className="ui-list" aria-label="Layers, top row drawn above the rows beneath it">
+        {layerRows(scene, hidden, { role, activeLayer }).map((row) => (
           <li key={row.layer} className="ui-row">
-            <span>
+            <button
+              type="button"
+              aria-pressed={row.active}
+              title={`Draw new entities on ${row.label}`}
+              onClick={() => {
+                setActiveLayer(row.layer);
+              }}
+            >
               <strong>{row.label}</strong>
               {row.description && <> — {row.description}</>}
-            </span>
+            </button>
+            <label>
+              <input
+                type="checkbox"
+                checked={!row.hidden}
+                aria-label={`Show ${row.label}`}
+                onChange={() => {
+                  toggleHidden(row.layer);
+                }}
+              />{' '}
+              Visible
+            </label>
             <label>
               <input
                 type="checkbox"
                 checked={row.locked}
+                disabled={row.lockDisabledReason !== null}
+                aria-label={`Lock ${row.label}`}
+                title={row.lockDisabledReason ?? `Lock ${row.label} against editing`}
                 onChange={(e) => {
                   void send(layerLockIntent(scene.id, row.layer, e.target.checked));
                 }}
               />{' '}
               Locked
             </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={row.hidden}
-                onChange={() => {
-                  toggleHidden(row.layer);
-                }}
-              />{' '}
-              Hidden (this screen only)
-            </label>
+            {row.lockDisabledReason && <span>{row.lockDisabledReason}</span>}
           </li>
         ))}
       </ul>
