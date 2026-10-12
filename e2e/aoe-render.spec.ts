@@ -100,7 +100,7 @@ test('host board renders received AoEs, hides the effects layer, and survives 2D
       'ack',
     );
     await expect.poll(async () => (await canvas.screenshot()).equals(moved)).toBe(false);
-    await page.getByRole('button', { name: 'Layers', exact: true }).click();
+    await page.getByRole('tab', { name: 'Layers', exact: true }).click();
     await page
       .getByRole('listitem')
       .filter({ hasText: 'Effects' })

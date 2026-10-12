@@ -37,7 +37,11 @@ export class ArchiveError extends Error {
 }
 
 /** An asset store that can also report stored metadata (needed to name/typed entries on export). */
-export type AssetSource = AssetStore & { meta(hash: string): Promise<AssetMeta | undefined> };
+export type AssetSource = AssetStore & {
+  meta(hash: string): Promise<AssetMeta | undefined>;
+  /** HOST-03: grants the imported campaign access to the asset (the bytes stay shared). */
+  link?(campaignId: string, hash: string): void;
+};
 
 export interface ImportLimits {
   maxArchiveBytes: number;
@@ -547,6 +551,7 @@ export async function importCampaign(
           size: wanted.size,
           ext: wanted.ext,
         });
+      if (wanted) host.assets?.link?.(campaign.id, item.kind.hash);
     }
     createdCampaign = campaign.id;
     for (const scene of scenes) await host.saveScene(campaign.id, scene);

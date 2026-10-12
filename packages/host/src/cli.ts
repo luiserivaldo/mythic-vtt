@@ -12,9 +12,13 @@ export const HELP = `Usage: mythic-host [options]
   --lan             Bind 0.0.0.0 so players on your network can join (env MYTHIC_LAN=1)
   --data-dir <dir>  Where campaigns and secrets live (default ./data; env MYTHIC_DATA_DIR)
   --config <file>   JSON config file (default <data-dir>/${CONFIG_FILE_NAME})
+  --campaign <c>    Open this campaign: its id, its name, or a unique id prefix (env MYTHIC_CAMPAIGN)
+  --new-campaign <name>  Create a campaign with this name and open it (env MYTHIC_NEW_CAMPAIGN)
+  --list-campaigns  Print the campaigns in the data dir and exit
   --help            Show this help
 
-Precedence: flags > environment > config file > defaults.`;
+With several campaigns and no choice made, a terminal gets a numbered picker; otherwise the most
+recently played campaign opens. Precedence: flags > environment > config file > defaults.`;
 
 export interface CliFlags {
   port?: string;
@@ -22,6 +26,9 @@ export interface CliFlags {
   lan?: boolean;
   dataDir?: string;
   config?: string;
+  campaign?: string;
+  newCampaign?: string;
+  listCampaigns?: boolean;
   help?: boolean;
 }
 
@@ -30,6 +37,8 @@ const VALUE_FLAGS: Record<string, keyof CliFlags> = {
   '--host': 'host',
   '--data-dir': 'dataDir',
   '--config': 'config',
+  '--campaign': 'campaign',
+  '--new-campaign': 'newCampaign',
 };
 
 export function parseArgs(argv: readonly string[]): CliFlags {
@@ -40,6 +49,7 @@ export function parseArgs(argv: readonly string[]): CliFlags {
       ? (raw.split(/=(.*)/s) as [string, string?])
       : [raw];
     if (name === '--lan') flags.lan = true;
+    else if (name === '--list-campaigns') flags.listCampaigns = true;
     else if (name === '--help' || name === '-h') flags.help = true;
     else if (name in VALUE_FLAGS) {
       const value = inline ?? argv[++i];
@@ -58,12 +68,15 @@ const ConfigFile = z
     lan: z.boolean(),
     maxImageUploadBytes: z.number().int().positive(),
     campaignId: z.string().min(1),
+    campaign: z.string().min(1),
     publicUrl: z.string().min(1),
     clientDir: z.string().min(1),
   })
   .partial()
   .strict();
 export type ConfigFile = z.infer<typeof ConfigFile>;
+
+const SELECTION = ['MYTHIC_CAMPAIGN_ID', 'MYTHIC_CAMPAIGN', 'MYTHIC_NEW_CAMPAIGN'] as const;
 
 export interface ResolvedCli {
   config: HostConfig;
@@ -103,12 +116,23 @@ export async function resolveConfig(
   // Lowest first; later layers overwrite.
   set('MYTHIC_PORT', file.port);
   set('MYTHIC_MAX_IMAGE_UPLOAD_BYTES', file.maxImageUploadBytes);
-  set('MYTHIC_CAMPAIGN_ID', file.campaignId);
   set('MYTHIC_CLIENT_DIR', file.clientDir);
   set('MYTHIC_PUBLIC_URL', file.publicUrl);
-  for (const [k, v] of Object.entries(env)) if (k.startsWith('MYTHIC_') && v) layered[k] = v;
+  for (const [k, v] of Object.entries(env))
+    if (k.startsWith('MYTHIC_') && v && !(SELECTION as readonly string[]).includes(k))
+      layered[k] = v;
   set('MYTHIC_DATA_DIR', dataDir);
   set('MYTHIC_PORT', flags.port);
+  // Campaign choice: the highest layer that names one wins whole, so `--campaign` on the command
+  // line replaces a MYTHIC_CAMPAIGN_ID in the environment instead of conflicting with it.
+  const fromEnv = Object.fromEntries(SELECTION.map((k) => [k, env[k] || undefined]));
+  const layers: Record<string, string | undefined>[] = [
+    { MYTHIC_CAMPAIGN_ID: file.campaignId, MYTHIC_CAMPAIGN: file.campaign },
+    fromEnv,
+    { MYTHIC_CAMPAIGN: flags.campaign, MYTHIC_NEW_CAMPAIGN: flags.newCampaign },
+  ];
+  const chosen = layers.reverse().find((layer) => SELECTION.some((k) => layer[k] !== undefined));
+  if (chosen) for (const k of SELECTION) set(k, chosen[k]);
   // Host: per layer, an explicit host beats that layer's lan; layers go flags > env > file.
   const wildcard = '0.0.0.0';
   const host =
