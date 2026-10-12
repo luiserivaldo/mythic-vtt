@@ -1,4 +1,5 @@
 import { seatArchive } from './seat.archive.js';
+import { tokenSetQuickField } from './token.setQuickField.js';
 import { historyUndo } from './history.undo.js';
 import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import { tokenSetRings } from './token.setRings.js';
@@ -67,6 +68,7 @@ export const allActions: readonly AnyAction[] = [
   tokenSetFlying,
   sceneSetPlayerToggles,
   historyUndo,
+  tokenSetQuickField,
   seatArchive,
 ];
 

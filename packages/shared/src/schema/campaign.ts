@@ -5,7 +5,7 @@ import { Scene } from './scene.js';
 import { Seat } from './seat.js';
 
 /** Bumped by the `schema-change` skill; migrations live in `../migrations`. */
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 export const Campaign = z.object({
   id: Id,

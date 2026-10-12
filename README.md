@@ -53,16 +53,28 @@ See the **[Internet Play Guide](docs/internet-play.md)** for tunnels (recommende
 
 Campaigns are saved automatically in the data directory (set with `--data-dir`). The server checkpoints regularly and on a clean shutdown, and replays its action log after a crash. Log writes are synced to disk every 500 ms, so a sudden power loss can lose up to half a second of recent actions. Stop the server normally when you can, and keep backups of the data directory.
 
+### Several campaigns on one host
+
+One data directory can hold any number of campaigns. Each has its own seats, scenes, session history and uploaded images, and the host opens exactly one of them per run, so players never see another campaign's data.
+
+- `--list-campaigns` prints what is in the data directory and exits.
+- `--campaign <name|id>` opens a campaign by name, id or unique id prefix. `--new-campaign "Name"` creates one and opens it.
+- With neither flag, a terminal gets a numbered picker when there is more than one campaign. Without a terminal (a service, a script), the most recently saved campaign opens, as before.
+
+Existing single-campaign data directories work unchanged: nothing is rewritten, and the campaign is picked up automatically.
+
 ### Configuration
 
-| Setting                     | Flag         | Env var                   | Config file key |
-| --------------------------- | ------------ | ------------------------- | --------------- |
-| Port (default 8787)         | `--port`     | `MYTHIC_PORT`             | `port`          |
-| Bind address                | `--host`     | `MYTHIC_HOST`             | `host`          |
-| Listen on LAN               | `--lan`      | `MYTHIC_LAN=1`            | `lan`           |
-| Data directory              | `--data-dir` | `MYTHIC_DATA_DIR`         | n/a             |
-| Autosave interval (actions) | n/a          | `MYTHIC_AUTOSAVE_ACTIONS` | n/a             |
-| Public URL for the DM link  | n/a          | `MYTHIC_PUBLIC_URL`       | `publicUrl`     |
+| Setting                     | Flag             | Env var                                                     | Config file key              |
+| --------------------------- | ---------------- | ----------------------------------------------------------- | ---------------------------- |
+| Port (default 8787)         | `--port`         | `MYTHIC_PORT`                                               | `port`                       |
+| Bind address                | `--host`         | `MYTHIC_HOST`                                               | `host`                       |
+| Listen on LAN               | `--lan`          | `MYTHIC_LAN=1`                                              | `lan`                        |
+| Data directory              | `--data-dir`     | `MYTHIC_DATA_DIR`                                           | n/a                          |
+| Campaign to open            | `--campaign`     | `MYTHIC_CAMPAIGN` (or `MYTHIC_CAMPAIGN_ID` for an exact id) | `campaign` (or `campaignId`) |
+| Create and open a campaign  | `--new-campaign` | `MYTHIC_NEW_CAMPAIGN`                                       | n/a                          |
+| Autosave interval (actions) | n/a              | `MYTHIC_AUTOSAVE_ACTIONS`                                   | n/a                          |
+| Public URL for the DM link  | n/a              | `MYTHIC_PUBLIC_URL`                                         | `publicUrl`                  |
 
 Precedence is flags, then environment variables, then the config file, then defaults. The config file is `mythic.config.json` in the data directory, or the path given to `--config`.
 

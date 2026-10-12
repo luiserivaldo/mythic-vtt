@@ -1,41 +1,47 @@
 import { describe, expect, it } from 'vitest';
-import { Campaign } from '../schema/index.js';
-import { IDS, makeCampaign } from '../actions/testing.js';
 import { createStoreMigrate } from './registry.js';
+import { makeCampaign, IDS } from '../actions/testing.js';
+import { Campaign } from '../schema/index.js';
 
-const migrate = createStoreMigrate(undefined, 5);
+const storeMigrate = createStoreMigrate(undefined, 5);
 
-describe('v4 to v5 seat archive migration', () => {
-  it.each([true, false, undefined])(
-    'preserves interaction %s and archived history through a round trip',
-    (interactionEnabled) => {
-      const state = { ...makeCampaign(), schemaVersion: 4 };
-      const seat = state.seats[IDS.owner];
-      if (!seat) throw new Error('missing seat');
-      if (interactionEnabled !== undefined) seat.interactionEnabled = interactionEnabled;
-      seat.archived = true;
-      seat.identityId = IDS.identity;
-      const before = structuredClone(state);
-      const expected = { ...state, schemaVersion: 5 };
-      const campaign = migrate('campaign', 4, state);
-      expect(campaign).toEqual(expected);
-      expect(Campaign.parse(JSON.parse(JSON.stringify(campaign)))).toEqual(expected);
-      expect(migrate('snapshot', 4, { schemaVersion: 4, state, seq: 42 })).toEqual({
-        schemaVersion: 5,
-        state: expected,
-        seq: 42,
-      });
-      expect(state).toEqual(before);
-    },
-  );
-  it('keeps old seats active without fabricating archive records and preserves other roots', () => {
+describe('v4 to v5 quick-fields migration', () => {
+  it('leaves tokens without quick fields instead of inventing statistics', () => {
     const state = { ...makeCampaign(), schemaVersion: 4 };
-    expect(migrate('campaign', 4, state)).toEqual({ ...state, schemaVersion: 5 });
-    const scene = { name: 'scene' };
-    expect(migrate('scene', 4, scene)).toBe(scene);
-    expect(migrate('session', 4, { schemaVersion: 4, name: 'session' })).toEqual({
+    const old = structuredClone(state);
+    const next = Campaign.parse(storeMigrate('campaign', 4, state));
+    expect(next.schemaVersion).toBe(5);
+    expect(next.scenes[IDS.scene]?.entities).toEqual({});
+    expect(next.seats).toEqual(state.seats);
+    expect(state).toEqual(old);
+  });
+  it('bumps the schema version of persisted snapshots and keeps the sequence number', () => {
+    const state = { ...makeCampaign(), schemaVersion: 4 };
+    expect(storeMigrate('snapshot', 4, { schemaVersion: 4, state, seq: 42 })).toMatchObject({
       schemaVersion: 5,
-      name: 'session',
+      seq: 42,
+      state: { schemaVersion: 5, seats: state.seats },
     });
+  });
+  it('leaves scene payloads unchanged', () => {
+    const scene = { name: 'Old scene' };
+    expect(storeMigrate('scene', 4, scene)).toBe(scene);
+  });
+  it('migrates every older snapshot version through the whole chain', () => {
+    for (const version of [1, 2, 3, 4]) {
+      const state = { ...makeCampaign(), schemaVersion: version };
+      const result = storeMigrate('snapshot', version, {
+        schemaVersion: version,
+        seq: 14,
+        state,
+      }) as {
+        schemaVersion: number;
+        state: unknown;
+        seq: number;
+      };
+      expect(result.schemaVersion).toBe(5);
+      expect(result.seq).toBe(14);
+      expect(Campaign.parse(result.state).schemaVersion).toBe(5);
+    }
   });
 });

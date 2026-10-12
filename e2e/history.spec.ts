@@ -69,6 +69,7 @@ test('history filters, survives restart and excludes private REST content', asyn
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(table.clientUrl);
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'History', exact: true }).click();
   const history = page.getByRole('region', { name: 'Action history' });
   await expect(history.getByText('entity.create', { exact: false }).first()).toBeVisible();
@@ -97,6 +98,7 @@ test('history filters, survives restart and excludes private REST content', asyn
         responses.push(body);
       });
   });
+  await spectator.page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await spectator.page.getByRole('button', { name: 'History', exact: true }).click();
   const spectatorHistory = spectator.page.getByRole('region', { name: 'Action history' });
   await expect(spectatorHistory.locator('summary').first()).toBeVisible();
@@ -147,6 +149,7 @@ test('history filters, survives restart and excludes private REST content', asyn
   await table.restart();
   await page.reload();
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'History', exact: true }).click();
   await history.getByLabel('History seat').selectOption(seatId);
   await history.getByRole('button', { name: 'Refresh history' }).click();

@@ -1,11 +1,11 @@
-# UX-03 seat archive (MV-191)
+# UX-07 token quick fields (MV-195)
 
-Save schema v5 adds optional `Seat.archived` (absent means active) and the
-host-only `seat.archive` action. The pure v4-to-v5 migration preserves seats,
-login history and `interactionEnabled`, including nested snapshot state.
-The accepted v3-to-v4 interaction migration and v1-v4 fixtures are unchanged.
-This fixture includes an archived seat with interaction disabled.
+State/save schema v5 adds optional `token.quickFields` (a record of numeric fields, each with
+a visibility of `all`, `owner` or `dm`). Absent means no quick fields, and the v4-to-v5 migration
+never invents statistics: it only advances the version, including nested snapshots. This fixture
+keeps the v4 seat interaction and scene lifecycle data and gives one token an `all` and an
+`owner` field.
 
-Matched protocol v6 follows develop protocol v5 (join profile colour and seat
-invites). Archived records never enter non-host snapshots or patches. Archive
-removes entity ownership without deleting tokens or character links.
+Protocol v6 requires matching host and client (new `token.setQuickField` intent, and a
+per-viewer filtered `quickFields` in token views). Older fixture versions remain supported
+through the migration chain.

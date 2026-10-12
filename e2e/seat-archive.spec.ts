@@ -46,7 +46,12 @@ test('archive hands back entities and immediately removes co-DM access without l
             rotation: { x: 0, y: 0, z: 0, w: 1 },
             scale: { x: 1, y: 1, z: 1 },
           },
-          token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+          token: {
+            sizeCells: 1,
+            heightCells: 1,
+            labelVisibility: 'all',
+            quickFields: { secretstat: { value: 191, visibility: 'owner' } },
+          },
         },
       });
     }
@@ -60,6 +65,7 @@ test('archive hands back entities and immediately removes co-DM access without l
     await guest.waitFor('co-DM secret', () =>
       JSON.stringify(guest.state).includes('SECRET ARCHIVE TOKEN'),
     );
+    expect(JSON.stringify(guest.state)).toContain('secretstat');
     const base = `http://127.0.0.1:${String(table.hostPort)}`;
     const guestHeaders = {
       authorization: `Mythic ${guestIdentity.identityId}.${guestIdentity.identitySecret}`,
@@ -71,7 +77,7 @@ test('archive hands back entities and immediately removes co-DM access without l
     expect(inviteResponse.status).toBe(200);
     const { token: inviteToken } = (await inviteResponse.json()) as { token: string };
     guest.frames.length = 0;
-    await dm.getByRole('button', { name: 'Participants', exact: true }).click();
+    await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
     const participant = dm.getByRole('listitem', { name: 'Retiring co-DM participant' });
     const interaction = participant.getByRole('checkbox', { name: 'Enable Interaction' });
     await expect(interaction).toBeChecked();
@@ -99,6 +105,8 @@ test('archive hands back entities and immediately removes co-DM access without l
     expect((host.state as Campaign).scenes[sceneId]?.entities[tokenId]?.owners).toEqual([]);
     expect(guest.frames.join('\n')).not.toContain('SECRET ARCHIVE TOKEN');
     expect(guest.frames.join('\n')).not.toContain('archived');
+    expect(guest.frames.join('\n')).not.toContain('secretstat');
+    expect(JSON.stringify(host.state)).toContain('secretstat');
     expect((host.state as Campaign).seats[seatId]?.interactionEnabled).toBe(false);
     const redeem = await fetch(`${base}/api/seat-invites/redeem`, {
       method: 'POST',
@@ -128,6 +136,7 @@ test('archive hands back entities and immediately removes co-DM access without l
     const again = await RawClient.connect(table, { name: 'guest', ...guestIdentity });
     await again.waitFor('reconnect snapshot', () => again.state !== undefined);
     expect(again.frames.join('\n')).not.toContain('SECRET ARCHIVE TOKEN');
+    expect(again.frames.join('\n')).not.toContain('secretstat');
     expect((again.state as Campaign).seats[seatId]).toBeUndefined();
     again.join(seatId);
     await host.intent('scene.rename', { sceneId, name: 'Still archived' });

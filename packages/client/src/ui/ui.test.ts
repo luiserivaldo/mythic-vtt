@@ -109,16 +109,21 @@ describe('viewerRole', () => {
     expect(isAdminRole('codm')).toBe(true);
     expect(isAdminRole('player')).toBe(false);
     expect(canManageSeats('codm')).toBe(false);
-    expect(toolbarItems('player')).toEqual([]);
-    expect(toolbarItems('observer')).toEqual([]);
+    const everyone = ['chat', 'sheet'];
+    const info = ['help', 'settings'];
+    expect(toolbarItems('player').map((i) => i.id)).toEqual([...everyone, ...info]);
+    expect(toolbarItems('observer').map((i) => i.id)).toEqual([...everyone, ...info]);
     expect(toolbarItems('codm').map((i) => i.id)).toEqual([
+      ...everyone,
       'scenes',
       'layers',
       'map',
       'entities',
       'prefabs',
+      ...info,
     ]);
     expect(toolbarItems('host').map((i) => i.id)).toEqual([
+      ...everyone,
       'scenes',
       'layers',
       'map',
@@ -126,6 +131,7 @@ describe('viewerRole', () => {
       'prefabs',
       'seats',
       'share',
+      ...info,
     ]);
   });
   it('describes the current identity, role and seat', () => {

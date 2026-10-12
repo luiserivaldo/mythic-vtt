@@ -26,7 +26,7 @@
       "id": "01J8Z0000000000000000ENT01",
       "layer": "tokens",
       "name": "Mira",
-      "owners": [],
+      "owners": ["01J8Z0000000000000000SEAT2"],
       "transform": {
         "position": {
           "x": 4,
@@ -49,7 +49,18 @@
         "sizeCells": 1,
         "heightCells": 1,
         "labelVisibility": "all",
-        "facing": 90
+        "facing": 90,
+        "quickFields": {
+          "hp": {
+            "value": 18,
+            "visibility": "all",
+            "color": "#c0392b"
+          },
+          "ac": {
+            "value": 15,
+            "visibility": "owner"
+          }
+        }
       }
     },
     "01J8Z0000000000000000ENT02": {
