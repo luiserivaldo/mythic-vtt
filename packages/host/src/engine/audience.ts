@@ -5,6 +5,7 @@ export interface Participant {
   readonly identityId: string;
   /** D24: the bound host identity (admin privileges). */
   readonly isHost: boolean;
+  readonly isSpectator?: boolean;
 }
 
 /** The seat this identity currently occupies (SES-03: at most one), if any. */
@@ -20,6 +21,7 @@ export function seatIdOf(state: Campaign, identityId: string): string | undefine
  * `audienceViewKey` below carries the role to force a fresh snapshot when it changes.
  */
 export function audienceFor(state: Campaign, p: Participant): Audience {
+  if (p.isSpectator) return { kind: 'spectators' };
   if (p.isHost) return { kind: 'host' };
   const seatId = seatIdOf(state, p.identityId);
   return seatId === undefined ? { kind: 'spectators' } : { kind: 'seat', seatId };
@@ -31,6 +33,7 @@ export function audienceFor(state: Campaign, p: Participant): Audience {
  * claiming a free seat for its own identity via `session.join`.
  */
 export function actorFor(state: Campaign, p: Participant): Actor {
+  if (p.isSpectator) return { kind: 'seat' };
   if (p.isHost) return { kind: 'host', identityId: p.identityId };
   const seatId = seatIdOf(state, p.identityId);
   return seatId === undefined

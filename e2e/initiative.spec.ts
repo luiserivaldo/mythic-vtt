@@ -71,6 +71,12 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await page.goto(table.clientUrl);
   await page.getByRole('button', { name: 'Rounds', exact: true }).click();
   const panel = page.getByRole('region', { name: 'Rounds and initiative' });
+  const dock = page.getByRole('complementary', { name: 'Right dock' });
+  await expect(dock.getByRole('region', { name: 'Rounds and initiative' })).toBeVisible();
+  await page.getByRole('button', { name: 'Collapse dock' }).click();
+  await expect(panel).toBeHidden();
+  await page.getByRole('button', { name: 'Expand dock' }).click();
+  await expect(panel).toBeVisible();
   for (const id of [hero, secret]) {
     await panel.getByLabel('Initiative token').selectOption(id);
     await panel.getByRole('button', { name: 'Add to initiative' }).click();
@@ -90,6 +96,7 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await expect(readonly).not.toContainText('Secret combatant');
   await panel.getByRole('button', { name: 'Next turn' }).click();
   await expect(panel).toContainText('Round 2 · Turn 1');
+  await expect(panel.getByLabel('Set round')).toHaveValue('2');
   await panel.getByLabel('Initiative token').selectOption(beast);
   await panel.getByRole('button', { name: 'Add to initiative' }).click();
   await expect(panel.getByRole('listitem')).toHaveCount(3);
@@ -138,6 +145,38 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await page.getByRole('button', { name: 'Rounds', exact: true }).click();
   await expect(panel.getByRole('listitem')).toHaveCount(3);
   await expect(panel).toContainText('Round 2 · Turn 2');
+  // The history endpoint must report the viewer's public position, not the host's index.
+  expect(
+    await host.intent('initiative.set', {
+      sceneId,
+      initiative: { round: 2, order: [secret, hero, beast], activeEntityId: beast },
+    }),
+  ).toMatchObject({ t: 'ack' });
+  expect(
+    await host.intent('token.move', {
+      sceneId,
+      entityId: beast,
+      to: { x: 23, y: 0, z: 15 },
+    }),
+  ).toMatchObject({ t: 'ack' });
+  const history = await fetch(
+    `http://127.0.0.1:${String(table.hostPort)}/api/history?entityId=${beast}&limit=1`,
+    {
+      headers: {
+        Authorization: `Mythic ${playerIdentity.identityId}.${playerIdentity.identitySecret}`,
+      },
+    },
+  );
+  expect(history.status).toBe(200);
+  const body: unknown = await history.json();
+  expect(body).toMatchObject({ entries: [{ type: 'token.move', round: 2, turn: 2 }] });
+  expect(JSON.stringify(body)).not.toMatch(new RegExp(`${secret}|Secret combatant`));
+  expect(
+    await host.intent('initiative.set', {
+      sceneId,
+      initiative: { round: 2, order: [hero, beast, secret], activeEntityId: beast },
+    }),
+  ).toMatchObject({ t: 'ack' });
   expect(await host.intent('entity.delete', { sceneId, entityId: beast })).toMatchObject({
     t: 'ack',
   });
@@ -150,6 +189,10 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await expect(readonly).toContainText('Round 4');
   await panel.getByRole('button', { name: 'Reset encounter' }).click();
   await expect(readonly.getByRole('listitem')).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Apply round' }).focus();
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Rounds', exact: true })).toBeFocused();
   expect(errors).toEqual([]);
   await spectator.context.close();
   await context.close();

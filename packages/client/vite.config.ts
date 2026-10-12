@@ -12,6 +12,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/ws': { target: `ws://127.0.0.1:${hostPort}`, ws: true },
+      // Most specific first: the spectator link keeps its own settings, the rest of /api (history) is plain.
+      '/api/spectator-link': { target: `http://127.0.0.1:${hostPort}`, changeOrigin: false },
+      '/api': `http://127.0.0.1:${hostPort}`,
       '/assets': `http://127.0.0.1:${hostPort}`,
     },
   },

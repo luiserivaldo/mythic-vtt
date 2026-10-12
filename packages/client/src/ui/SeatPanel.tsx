@@ -75,6 +75,19 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
                     <option value="codm">Co-DM</option>
                   </select>
                 </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={row.interactionEnabled}
+                    onChange={(e) => {
+                      void send({
+                        type: 'seat.update',
+                        payload: { seatId: row.id, interactionEnabled: e.target.checked },
+                      });
+                    }}
+                  />{' '}
+                  Enable Interaction
+                </label>
                 {row.occupied && (
                   <button
                     type="button"

@@ -1,5 +1,5 @@
 import { canPerform, Initiative, type Campaign, type Scene } from '@mythic/shared';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useSubmit } from './submit.js';
 
@@ -8,7 +8,9 @@ function InitiativePanel({ campaign, scene }: { campaign: Campaign; scene: Scene
   const seatId = useClientStore((state) => state.seatId);
   const { send, error } = useSubmit();
   const current: Initiative = scene.initiative ?? { round: 1, order: [], activeEntityId: null };
-  const [round, setRound] = useState(String(current.round));
+  // A round draft belongs to the round it edits; advancing/wrapping refreshes the field.
+  const [roundDraft, setRoundDraft] = useState<{ base: number; value: string } | null>(null);
+  const round = roundDraft?.base === current.round ? roundDraft.value : String(current.round);
   const [selected, setSelected] = useState('');
   const actor = isHost
     ? { kind: 'host' as const }
@@ -154,7 +156,7 @@ function InitiativePanel({ campaign, scene }: { campaign: Campaign; scene: Scene
               max="1000000"
               value={round}
               onChange={(event) => {
-                setRound(event.target.value);
+                setRoundDraft({ base: current.round, value: event.target.value });
               }}
             />
           </label>
@@ -171,7 +173,7 @@ function InitiativePanel({ campaign, scene }: { campaign: Campaign; scene: Scene
             type="button"
             onClick={() => {
               save({ round: 1, order: [], activeEntityId: null });
-              setRound('1');
+              setRoundDraft(null);
             }}
           >
             Reset encounter
@@ -186,12 +188,24 @@ function InitiativePanel({ campaign, scene }: { campaign: Campaign; scene: Scene
 export function InitiativeTools() {
   const campaign = useClientStore((state) => state.campaign);
   const [open, setOpen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
   const scene = campaign?.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;
   if (!campaign || !scene) return null;
+  const close = () => {
+    setOpen(false);
+    toggle.current?.focus();
+  };
   return (
-    <aside className="ui-initiative-tools" aria-label="Initiative tools">
+    <aside
+      className="ui-initiative-tools"
+      aria-label="Initiative tools"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && open) close();
+      }}
+    >
       <button
         type="button"
+        ref={toggle}
         aria-expanded={open}
         onClick={() => {
           setOpen(!open);
@@ -200,14 +214,8 @@ export function InitiativeTools() {
         Rounds
       </button>
       {open && (
-        <div className="ui-drawer" style={{ top: '8rem' }}>
-          <button
-            type="button"
-            aria-label="Close Rounds panel"
-            onClick={() => {
-              setOpen(false);
-            }}
-          >
+        <div className="ui-initiative-body">
+          <button type="button" aria-label="Close Rounds panel" onClick={close}>
             Close
           </button>
           <InitiativePanel key={scene.id} campaign={campaign} scene={scene} />

@@ -17,7 +17,8 @@ Built by **MythicTomes**. Self-hosting is free and fully featured; optional host
 - **Grid and measuring.** Square grid, custom units and diagonal rules. The Ruler panel combines 2D/3D distance measurement and AoE shapes, with snapping, Instant/Linger fade, movement readouts and optional ruler broadcasting. Placed AoEs remain shared.
 - **Status markers.** Select a token and open its Token panel to add condition icons or custom text. Editing follows token permissions; markers share the token label’s visibility.
 - **Battlemaps.** Upload an image, calibrate it to the grid and place tokens.
-- **Rounds.** The DM configures initiative, advances turns and tracks rounds. Private combatants stay out of other clients’ rosters.
+- **Rounds.** Open Rounds in the right dock to configure initiative, advance turns and track rounds. Private combatants stay out of other clients’ rosters and history turn indices; the host log retains the full order.
+- **History.** Browse host-filtered action diffs, with seat/entity filters and older pages. Private content stays on the host. History pages scan bounded log windows; filters may return an empty page with older results available. Refresh after campaign changes or expired pages.
 - **Layers and secrets.** Map, token and DM-only layers. Hidden information is never sent to players.
 - **Safe by default.** Every change is recorded: autosave, crash recovery and JSON export.
 - **2D ↔ 3D in one click.** Elevation, platforms, primitive shapes, drop lines and a clamped camera. Everything works in 2D too; 3D only adds information.

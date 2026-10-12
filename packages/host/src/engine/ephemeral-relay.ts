@@ -1,5 +1,5 @@
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
-import { checkIntent, viewEntity, type Audience, type Campaign } from '@mythic/shared';
+import { checkIntent, seatOf, viewEntity, type Audience, type Campaign } from '@mythic/shared';
 import type { GatewayConnection } from '../gateway/engine-seam.js';
 import { actorFor, audienceFor } from './audience.js';
 import type { Clock } from './sources.js';
@@ -158,6 +158,11 @@ export function createEphemeralRelay(
     relay(sender, message, state, recipients) {
       const now = clock();
       const senderActor = actorFor(state, sender);
+      // UI-SEAT-05: tool previews, rulers and pings cannot bypass the durable gate.
+      if (seatOf(state, senderActor)?.interactionEnabled === false) {
+        drop('forbidden');
+        return;
+      }
       const kind =
         senderActor.seatId === undefined && senderActor.kind !== 'host' ? 'spectator' : 'active';
       let senderLimit = senders.get(sender.connectionId);
