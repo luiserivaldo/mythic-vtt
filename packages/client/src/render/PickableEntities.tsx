@@ -8,6 +8,8 @@ import { pickEntity, validSelection, type SelectionActor } from '../tools/select
 import { selectionStore } from '../tools/selection-store.js';
 import { MapImageMesh } from './MapImage.js';
 import { ElevationBadge, SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { TokenStatusMarkers } from './TokenStatusMarkers.js';
+import { markerAnchor2d } from './status-markers.js';
 import { entityFill } from './token-fill.js';
 import { TOKEN_GROUND_FRAME } from './token-frame.js';
 import { PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
@@ -216,6 +218,11 @@ export function PickableEntities({
                     <group rotation={TOKEN_GROUND_FRAME}>
                       <TokenLabel entity={entity} actor={actor} />
                       <ElevationBadge entity={entity} actor={actor} />
+                      <TokenStatusMarkers
+                        entity={entity}
+                        actor={actor}
+                        anchor={markerAnchor2d(entity.sizeCells)}
+                      />
                     </group>
                   </group>
                 </Fragment>

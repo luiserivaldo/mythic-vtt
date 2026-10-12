@@ -5,6 +5,8 @@ import { DoubleSide, type Group } from 'three';
 import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
 import { TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { TokenStatusMarkers } from './TokenStatusMarkers.js';
+import { markerAnchor3d } from './status-markers.js';
 import {
   billboardYaw,
   facingMarkerPosition,
@@ -94,6 +96,7 @@ export function TokenStandee({
         </mesh>
       </group>
       <TokenLabel entity={entity} actor={actor} anchor={labelAnchor3d(entity.sizeCells)} />
+      <TokenStatusMarkers entity={entity} actor={actor} anchor={markerAnchor3d(entity.sizeCells)} />
     </group>
   );
 }

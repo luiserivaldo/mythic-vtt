@@ -1,6 +1,16 @@
 import { Campaign } from '../packages/shared/src/index.js';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { RawClient, startTable, testUlid, type Table } from './harness.js';
+
+/** Distance in screen pixels between two overlays' centres. */
+async function overlayGap(first: Locator, second: Locator): Promise<number> {
+  const [a, b] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+  if (!a || !b) throw new Error('missing an overlay box');
+  return Math.hypot(
+    a.x + a.width / 2 - (b.x + b.width / 2),
+    a.y + a.height / 2 - (b.y + b.height / 2),
+  );
+}
 
 let table: Table | undefined;
 test.beforeAll(async () => {
@@ -73,6 +83,25 @@ test('the marker picker syncs, persists and never sends private markers', async 
     { kind: 'icon', icon: 'blinded' },
     { kind: 'text', text: 'Moon marked' },
   ]);
+  // M4-19: the same markers render on the token. The strip is screen-projected, so it is readable
+  // at every zoom (CAM-04) instead of shrinking with the board.
+  const strip = page.getByTestId('token-status-markers');
+  await expect(strip).toBeVisible();
+  await expect(page.getByTestId('status-marker')).toHaveText(['◉', 'Moon marked']);
+  const stripBox = await strip.boundingBox();
+  const canvasBox = await page.locator('canvas').boundingBox();
+  if (!stripBox || !canvasBox) throw new Error('missing box for the strip or the canvas');
+  const gapBefore = await overlayGap(strip, page.getByTestId('token-label'));
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  await page.mouse.wheel(0, 300);
+  await page.mouse.wheel(0, 300);
+  await expect(strip).toBeVisible();
+  // The camera did zoom out: the token's two screen anchors moved closer together...
+  expect(await overlayGap(strip, page.getByTestId('token-label'))).toBeLessThan(gapBefore);
+  // ...while the strip keeps the same readable screen size.
+  const zoomedBox = await strip.boundingBox();
+  expect(zoomedBox?.width).toBeCloseTo(stripBox.width, 0);
+  expect(zoomedBox?.height).toBeCloseTo(stripBox.height, 0);
   const publicToken = token(host);
   if (!publicToken) throw new Error('missing host token');
   expect(
@@ -88,6 +117,8 @@ test('the marker picker syncs, persists and never sends private markers', async 
   await panel.getByLabel('Custom marker').fill('Secret curse');
   await panel.getByRole('button', { name: 'Add custom marker' }).click();
   await host.waitFor('private marker edit', () => token(host)?.statusMarkers?.length === 3);
+  // M4-19: the DM still sees the marker only they may read.
+  await expect(page.getByTestId('status-marker')).toHaveCount(3);
   await observer.waitForSeq(host.lastSeq);
   expect(token(observer)?.statusMarkers).toBeUndefined();
   expect(observer.frames.slice(frameStart).join('\n')).not.toMatch(
@@ -156,6 +187,8 @@ test('the marker picker syncs, persists and never sends private markers', async 
   await playerPage.getByRole('button', { name: 'Restore Token panel' }).click();
   await expect(playerPage.getByRole('region', { name: 'Token status markers' })).toHaveCount(0);
   await expect(playerPage.getByRole('button', { name: 'Add custom marker' })).toHaveCount(0);
+  // M4-19: the host strips the markers for this viewer, so nothing is drawn on their token either.
+  await expect(playerPage.getByTestId('token-status-markers')).toHaveCount(0);
   await playerPage.getByLabel('Size (cells)').fill('2');
   await playerPage.getByLabel('Size (cells)').press('Enter');
   await host.waitFor('owner resize', () => token(host)?.sizeCells === 2);
@@ -177,12 +210,17 @@ test('the marker picker syncs, persists and never sends private markers', async 
   ).toMatchObject({ t: 'ack' });
   await observer.waitFor('revealed markers', () => token(observer)?.statusMarkers?.length === 3);
   await expect(playerPage.getByRole('region', { name: 'Token status markers' })).toBeVisible();
+  // M4-19: once the markers are readable for this audience they appear on the player's token too.
+  await expect(playerPage.getByTestId('token-status-markers')).toBeVisible();
   await expect(panel.getByRole('list')).toContainText('Secret curse');
   await panel.getByRole('button', { name: 'Remove marker 3' }).click();
   await observer.waitFor('marker removed', () => token(observer)?.statusMarkers?.length === 2);
   await page.getByRole('button', { name: '3D view' }).click();
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await expect(panel.getByRole('listitem')).toHaveCount(2);
+  // M4-19: the 3D standee carries the same strip, one chip per marker.
+  await expect(page.getByTestId('token-status-markers')).toBeVisible();
+  await expect(page.getByTestId('status-marker')).toHaveText(['◉', 'Moon marked']);
   await page.reload();
   await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Hero', exact: true }).click();
