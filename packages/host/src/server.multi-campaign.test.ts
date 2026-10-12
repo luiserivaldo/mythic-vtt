@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { loadConfig, type HostConfig } from './config.js';
 import { CampaignSelectionError, newCampaign } from './engine/index.js';
+import { createSeatInvites } from './gateway/seat-invites.js';
 import { createSpectatorLinks } from './gateway/spectator-links.js';
 import { startHost, type RunningHost } from './server.js';
 import { CampaignFile, LocalAssetStore, LocalCampaignStore } from './storage/index.js';
@@ -125,6 +126,25 @@ describe('host with several campaigns (HOST-03)', () => {
       const token = forA.rotate();
       expect(forA.valid(token)).toBe(true);
       expect(forB.valid(token)).toBe(false);
+    } finally {
+      forA.close();
+      forB.close();
+    }
+  });
+
+  it("keeps a campaign's seat invites out of the other campaigns, even for the same seat id (leak)", () => {
+    const index = join(dir, 'index.sqlite');
+    const forA = createSeatInvites(index, A);
+    const forB = createSeatInvites(index, B);
+    try {
+      const seat = '01J00000000000000000000S01';
+      const token = forA.rotate(seat);
+      expect(forA.valid(seat, token)).toBe(true);
+      expect(forB.valid(seat, token)).toBe(false);
+      expect(forB.seatIds()).toEqual([]);
+      const own = forB.rotate(seat);
+      expect(forA.valid(seat, own)).toBe(false);
+      expect(forA.valid(seat, token)).toBe(true);
     } finally {
       forA.close();
       forB.close();

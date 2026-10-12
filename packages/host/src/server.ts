@@ -1,3 +1,4 @@
+import { createSeatInvites } from './gateway/seat-invites.js';
 import { createSpectatorLinks } from './gateway/spectator-links.js';
 import { registerSpectatorRoutes } from './http/spectator-routes.js';
 import { mkdir } from 'node:fs/promises';
@@ -10,6 +11,7 @@ import {
   registerAssetRoutes,
   registerCampaignRoutes,
   registerHistoryRoutes,
+  registerSeatInviteRoutes,
   registerStaticClient,
   type UploadAuthorizer,
 } from './http/index.js';
@@ -139,6 +141,7 @@ export async function startHost(
     join(config.dataDir, 'index.sqlite'),
     engine.state().id,
   );
+  const seatInvites = createSeatInvites(join(config.dataDir, 'index.sqlite'), engine.state().id);
   const gateway = createGateway({
     spectatorTokenValid: (token) => spectatorLinks.valid(token),
     hostToken,
@@ -168,6 +171,12 @@ export async function startHost(
       gateway.disconnectSpectators();
     },
   });
+  registerSeatInviteRoutes(gateway.app, {
+    auth: httpAuth,
+    invites: seatInvites,
+    state: () => engine.state(),
+    claimSeat: (identityId, seatId) => engine.claimSeat(identityId, seatId),
+  });
   // HOST-03: HTTP only sees this campaign's assets; the raw pool stays with import/export.
   registerAssetRoutes(gateway.app, {
     assetStore: scopedAssetStore(assetStore, engine.state().id),
@@ -196,6 +205,7 @@ export async function startHost(
   } catch (error) {
     await gateway.close();
     spectatorLinks.close();
+    seatInvites.close();
     await closeStores();
     throw error;
   }
@@ -228,6 +238,7 @@ export async function startHost(
           );
         } finally {
           spectatorLinks.close();
+          seatInvites.close();
           await closeStores();
         }
       }
