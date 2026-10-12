@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, startTable, testUlid, type Reply } from './harness.js';
+import { RawClient, recordPageFrames, startTable, testUlid, type Reply } from './harness.js';
 
 const ok = async (promise: Promise<Reply>) => {
   expect(await promise).toMatchObject({ t: 'ack' });
@@ -120,6 +120,80 @@ test('seat invite links seat a stranger, stay private, and revoke or regenerate 
         expect(client.frames.join('\n')).not.toContain(secret);
   } finally {
     await Promise.all(clients.map((client) => client.close()));
+    await table.stop();
+  }
+});
+
+// The DM drives the panel the way the seat panel offers it: copy a link, send it, revoke it.
+test('the DM copies a seat invite link, a second browser takes the seat with it, and revoke kills the link', async ({
+  browser,
+}) => {
+  const table = await startTable({ publicUrl: 'https://table.example/play' });
+  const dmContext = await browser.newContext();
+  const guestContext = await browser.newContext();
+  const lateContext = await browser.newContext();
+  try {
+    await dmContext.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const dm = await dmContext.newPage();
+    await dm.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
+    await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
+    await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
+    await dm.getByRole('button', { name: 'Add Player' }).click();
+    const row = dm.getByRole('listitem', { name: 'Invite link for Player', exact: true });
+    await expect(row).toContainText('No link');
+
+    await row.getByRole('button', { name: 'Copy link' }).click();
+    const invites = dm.getByRole('region', { name: 'Invite links' });
+    await expect(invites.getByRole('status')).toHaveText('Copied the invite link for Player.');
+    await expect(row).toContainText('Link active');
+    const copied = await dm.evaluate(() =>
+      (navigator as unknown as { clipboard: { readText(): Promise<string> } }).clipboard.readText(),
+    );
+    const hash = new URL(copied).hash;
+    expect(hash).toMatch(/^#invite=[0-9A-HJKMNP-TV-Z]{26}\.[A-Za-z0-9_-]{43}$/);
+    expect(await row.getByRole('link').getAttribute('href')).toBe(copied);
+
+    // The stranger holding the link takes the seat, and never sees a control or the token.
+    const guest = await guestContext.newPage();
+    const frames = recordPageFrames(guest);
+    await guest.goto(`${table.clientUrl.replace(/\/$/, '')}/${hash}`);
+    await expect(guest.getByRole('status')).toHaveText('Connected to New campaign');
+    await expect(
+      dm.getByRole('listitem', { name: 'Player participant', exact: true }),
+    ).toContainText('Online');
+    await expect(guest.getByRole('tab', { name: 'Participants', exact: true })).toHaveCount(0);
+    expect(frames.join('\n')).not.toContain(hash.slice(hash.indexOf('.') + 1));
+
+    // Regenerating asks first: dismissing the warning leaves the link alone.
+    const warning = new Promise<string>((resolve) => {
+      dm.once('dialog', (dialog) => {
+        resolve(dialog.message());
+        void dialog.dismiss();
+      });
+    });
+    await row.getByRole('button', { name: 'Regenerate' }).click();
+    expect(await warning).toContain(
+      'Regenerate the invite link for Player? The current link stops working.',
+    );
+    await expect(row).toContainText('Link active');
+
+    await row.getByRole('button', { name: 'Revoke' }).click();
+    await expect(invites.getByRole('status')).toHaveText('Invite link revoked.');
+    await expect(row).toContainText('No link');
+    await expect(row.getByRole('link')).toHaveCount(0);
+
+    // The same link is refused for the next visitor.
+    const late = await lateContext.newPage();
+    const refused = new Promise<string>((resolve) => {
+      late.once('dialog', (dialog) => {
+        resolve(dialog.message());
+        void dialog.dismiss();
+      });
+    });
+    await late.goto(`${table.clientUrl.replace(/\/$/, '')}/${hash}`);
+    expect(await refused).toContain('This invite link is no longer valid.');
+  } finally {
+    await Promise.all([dmContext.close(), guestContext.close(), lateContext.close()]);
     await table.stop();
   }
 });
