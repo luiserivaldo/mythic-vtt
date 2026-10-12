@@ -80,6 +80,20 @@ it('renders the empty state, a disabled composer and the coming-soon note', () =
   expect(html).toContain(CHAT_COMING_SOON);
 });
 
+it('offers a greyed game-log toggle above the composer, and no requirement IDs in view', () => {
+  const html = render([]);
+  const toggle = /<button[^>]*ui-chat-log-toggle[^>]*>.*?<\/button>/.exec(html)?.[0] ?? '';
+  expect(toggle).not.toBe('');
+  expect(toggle).toContain('disabled=""');
+  expect(toggle).toContain('aria-label="Game log (work in progress)"');
+  expect(toggle).toContain('title="Game log: work in progress"');
+  // The icon is decoration: the WIP text is what a sighted viewer reads, the label names the button.
+  expect(toggle).toContain('aria-hidden="true"');
+  expect(toggle).toMatch(/>\s*WIP\s*<\/button>/);
+  expect(html.indexOf('ui-chat-log-toggle')).toBeLessThan(html.indexOf('ui-chat-composer'));
+  expect(html).not.toMatch(/UI-CHAT-02|UX-35|HIST|§10/);
+});
+
 it('colours a roll row with the roller seat colour, giving it props', () => {
   const html = render([roll()], { [SEAT]: '#c04e32' });
   expect(html).not.toContain(CHAT_EMPTY_STATE);
