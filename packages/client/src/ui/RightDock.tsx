@@ -2,6 +2,7 @@ import { lazy, Suspense, useId, useState, type Ref } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { DEFAULT_DOCK_TAB, DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
+import { HelpPanel } from './HelpPanel.js';
 import { HistoryTools } from './HistoryTools.js';
 import { IdentityTransfer } from './IdentityTransfer.js';
 import { joinUrlsFromNotices } from './share-panel.js';
@@ -70,12 +71,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'sheet':
         return <Placeholder title="Sheet">Character sheets are coming soon.</Placeholder>;
       case 'help':
-        return (
-          <Placeholder title="Help">
-            Drag a token to move it, use the Ruler to measure, and drag with the right mouse button
-            to orbit the camera in 3D.
-          </Placeholder>
-        );
+        return <HelpPanel />;
       case 'settings':
         return (
           <>

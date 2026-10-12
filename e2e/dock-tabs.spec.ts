@@ -104,6 +104,14 @@ test('players get four tabs, never render DM tabs, and the DM sees them all', as
   expect(await guest.content()).not.toContain('SECRET DOCK TOKEN');
   expect(frames.join('\n')).not.toContain(secretId);
 
+  // UX-29: the Help tab is static text covering moving/measuring, the camera and token interaction
+  // (the UX-16 mapping). It replaces the board's old on-screen mouse hint.
+  await guest.getByRole('tab', { name: 'Help', exact: true }).click();
+  const help = guest.getByRole('region', { name: 'Help' });
+  for (const title of ['Moving and measuring', 'Camera controls', 'Token interaction'])
+    await expect(help.getByRole('heading', { name: title })).toBeVisible();
+  await expect(help.getByText('Middle drag', { exact: true })).toBeVisible();
+
   // Collapse leaves a column of icon tabs; picking one expands the dock again.
   const dock = dm.getByRole('complementary', { name: 'Right dock' });
   await dm.getByRole('button', { name: 'Collapse dock' }).click();

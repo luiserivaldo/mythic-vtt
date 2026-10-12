@@ -92,14 +92,6 @@ main > p {
   border: 1px solid var(--ui-border);
   border-radius: 6px;
 }
-.ui-camera-hint {
-  align-self: center;
-  padding: 0 0.25rem;
-  color: var(--ui-muted);
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
 /* DM panels open as a drawer over the board; `top` is set from the measured header height. */
 .ui-drawer {
   position: fixed;
@@ -675,6 +667,24 @@ main [tabindex]:focus-visible {
   gap: 0.2rem;
   margin-right: 0.8rem;
 }
+/* UX-29: the help tab is static reference text; the dt carries the input, the dd the action. */
+.ui-help-section h3 {
+  margin: 0.6rem 0 0.3rem;
+}
+.ui-help-list {
+  margin: 0;
+}
+.ui-help-row {
+  margin-bottom: 0.4rem;
+}
+.ui-help-row dt {
+  font-weight: 600;
+}
+.ui-help-row dd {
+  margin: 0.1rem 0 0;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
 .ui-app .ui-tool-dock {
   position: static;
   width: 100%;
@@ -704,9 +714,6 @@ main [tabindex]:focus-visible {
   max-width: 10rem;
   top: 50%;
   transform: translateY(-50%);
-}
-.ui-app .ui-board-controls .ui-camera-hint {
-  white-space: normal;
 }
 @media (max-width: 40rem) {
   .ui-right-dock {

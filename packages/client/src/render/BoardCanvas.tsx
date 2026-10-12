@@ -203,20 +203,14 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
         <ViewToggle />
         {!readOnly && <RulerToggle disabledReason={measureDisabledReason} />}
         {mode3d && (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                setResetToken((n) => n + 1);
-              }}
-            >
-              Reset view
-            </button>
-            <span className="ui-camera-hint">
-              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom ·
-              middle-click a selected token to lock its height
-            </span>
-          </>
+          <button
+            type="button"
+            onClick={() => {
+              setResetToken((n) => n + 1);
+            }}
+          >
+            Reset view
+          </button>
         )}
       </div>
       <ToolPanelDock
