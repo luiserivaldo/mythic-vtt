@@ -12,6 +12,7 @@ export interface GameClientOptions {
   identity: Identity;
   displayName: string;
   avatar?: string;
+  color?: string;
   /** D24/D29: host token, resent in hello until the first snapshot confirms the bind. */
   hostToken?: HostTokenHolder;
   store: StoreApi<ClientStore>;
@@ -55,6 +56,7 @@ export function createGameClient(options: GameClientOptions) {
         identityId: options.identity.identityId,
         identitySecret: options.identity.identitySecret,
         displayName: options.displayName,
+        ...(options.color !== undefined ? { color: options.color } : {}),
         ...(options.avatar !== undefined ? { avatar: options.avatar } : {}),
         ...(hostToken !== undefined ? { hostToken } : {}),
       };

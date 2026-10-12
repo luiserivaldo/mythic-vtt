@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid } from './harness.js';
 interface Campaign {
-  seats: Record<string, { archived?: boolean }>;
+  seats: Record<string, { archived?: boolean; interactionEnabled?: boolean }>;
   scenes: Record<string, { entities: Record<string, { owners: string[] }> }>;
 }
 
@@ -60,8 +60,27 @@ test('archive hands back entities and immediately removes co-DM access without l
     await guest.waitFor('co-DM secret', () =>
       JSON.stringify(guest.state).includes('SECRET ARCHIVE TOKEN'),
     );
+    const base = `http://127.0.0.1:${String(table.hostPort)}`;
+    const guestHeaders = {
+      authorization: `Mythic ${guestIdentity.identityId}.${guestIdentity.identitySecret}`,
+    };
+    const inviteResponse = await fetch(`${base}/api/seat-invites/${seatId}`, {
+      method: 'POST',
+      headers: { authorization: `Mythic ${identity.identityId}.${identity.identitySecret}` },
+    });
+    expect(inviteResponse.status).toBe(200);
+    const { token: inviteToken } = (await inviteResponse.json()) as { token: string };
     guest.frames.length = 0;
     await dm.getByRole('button', { name: 'Participants', exact: true }).click();
+    const participant = dm.getByRole('listitem', { name: 'Retiring co-DM participant' });
+    const interaction = participant.getByRole('checkbox', { name: 'Enable Interaction' });
+    await expect(interaction).toBeChecked();
+    await interaction.click();
+    await expect(interaction).not.toBeChecked();
+    await host.waitFor(
+      'interaction disabled',
+      () => (host.state as Campaign).seats[seatId]?.interactionEnabled === false,
+    );
     await dm
       .getByRole('listitem', { name: 'Retiring co-DM participant' })
       .getByRole('button', { name: 'Archive participant' })
@@ -80,6 +99,27 @@ test('archive hands back entities and immediately removes co-DM access without l
     expect((host.state as Campaign).scenes[sceneId]?.entities[tokenId]?.owners).toEqual([]);
     expect(guest.frames.join('\n')).not.toContain('SECRET ARCHIVE TOKEN');
     expect(guest.frames.join('\n')).not.toContain('archived');
+    expect((host.state as Campaign).seats[seatId]?.interactionEnabled).toBe(false);
+    const redeem = await fetch(`${base}/api/seat-invites/redeem`, {
+      method: 'POST',
+      headers: { ...guestHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({ seatId, token: inviteToken }),
+    });
+    expect(redeem.status).toBe(404);
+    expect(await redeem.json()).toEqual({ error: 'invite unavailable' });
+    const upload = await fetch(`${base}/assets/images`, {
+      method: 'POST',
+      headers: { ...guestHeaders, 'content-type': 'application/octet-stream' },
+      body: new Uint8Array([1, 2, 3]),
+    });
+    expect(upload.status).toBe(403);
+    await upload.text();
+    const history = await fetch(`${base}/api/history`, { headers: guestHeaders });
+    expect(history.status).toBe(200);
+    const historyWire = await history.text();
+    expect(historyWire).not.toContain('SECRET ARCHIVE TOKEN');
+    expect(historyWire).not.toContain('Retiring co-DM');
+    expect(historyWire).not.toContain('archived');
     expect(
       (await guest.intent('token.move', { sceneId, entityId: tokenId, to: { x: 11, y: 0, z: 10 } }))
         .t,

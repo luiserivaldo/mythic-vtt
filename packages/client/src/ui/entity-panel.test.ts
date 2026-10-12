@@ -257,6 +257,10 @@ describe('entity panel view model', () => {
       ['Zed', 'Token', 'Tokens', 'Pia'],
     ]);
     expect(ownerOptions(state)).toEqual([{ id: P, label: 'Pia' }]);
+    const seat = state.seats[P];
+    if (!seat) throw new Error('missing seat');
+    seat.archived = true;
+    expect(ownerOptions(state)).toEqual([]);
   });
 
   it('validates colours and sizes; only admins get the panel', () => {

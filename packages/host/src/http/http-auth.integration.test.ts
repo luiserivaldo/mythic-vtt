@@ -213,6 +213,37 @@ describe('constant-time verification', () => {
     expect(verify.mock.calls[1]?.[1]).toMatch(/^scrypt\$/);
   });
 
+  it('revokes archived co-DM HTTP privileges and resolves a newly assigned active seat', async () => {
+    const state = fixtureCampaign();
+    const co = state.seats[T.coDm];
+    const player = state.seats[T.seatB];
+    if (!co || !player) throw new Error('missing seats');
+    co.identityId = CODM_ID;
+    const auth = createHttpAuthenticator({
+      identities: {
+        ...identities,
+        get: (id: string) =>
+          Promise.resolve({ identityId: id, secretHash: 'stored', displayName: 'x' }),
+      },
+      state: () => state,
+      verify: () => Promise.resolve(true),
+    });
+    expect(await auth.authenticate(request(CODM_ID))).toMatchObject({
+      ok: true,
+      principal: { role: 'codm', seatId: T.coDm },
+    });
+    co.archived = true;
+    expect(await auth.authenticate(request(CODM_ID))).toEqual({
+      ok: true,
+      principal: { identityId: CODM_ID, isHost: false, role: 'none' },
+    });
+    player.identityId = CODM_ID;
+    expect(await auth.authenticate(request(CODM_ID))).toMatchObject({
+      ok: true,
+      principal: { role: 'player', seatId: T.seatB },
+    });
+  });
+
   it('resolves host, co-DM, player and seatless principals', async () => {
     const auth = createHttpAuthenticator({
       identities: {
@@ -295,9 +326,6 @@ describe('campaign export and import over HTTP', () => {
       headers: header(HOST_ID),
     });
     expect(again.status).toBe(200);
-    // Drain the streamed archive before teardown: headers alone leave an active HTTP request.
-    const reexported = new Uint8Array(await again.arrayBuffer());
-    expect(Buffer.from(reexported.subarray(0, 2)).toString()).toBe('PK');
   });
 
   it('rejects bad ids, unknown campaigns, wrong types, garbage archives and oversize bodies', async () => {

@@ -1,4 +1,5 @@
 import { seatArchive } from './seat.archive.js';
+import { historyUndo } from './history.undo.js';
 import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import { tokenSetRings } from './token.setRings.js';
 import { sceneDelete } from './scene.delete.js';
@@ -29,6 +30,8 @@ import { seatUpdate } from './seat.update.js';
 import { sessionJoin } from './session.join.js';
 import { tokenMove } from './token.move.js';
 import { tokenSetElevation } from './token.setElevation.js';
+import { tokenSetFlying } from './token.setFlying.js';
+import { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
 
 /** Append-only: add new actions at the end to keep merges painless. */
 export const allActions: readonly AnyAction[] = [
@@ -61,6 +64,9 @@ export const allActions: readonly AnyAction[] = [
   prefabRemove,
   prefabPlace,
   sceneDelete,
+  tokenSetFlying,
+  sceneSetPlayerToggles,
+  historyUndo,
   seatArchive,
 ];
 

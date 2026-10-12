@@ -179,3 +179,19 @@ describe('presence latency (UX-06)', () => {
     }
   });
 });
+
+it('preserves profile colour while archived logins return to the unseated roster', () => {
+  const state = fixtureCampaign();
+  const alice = Object.assign(named(T.alice, 'Alice'), { color: '#123456' });
+  expect(buildHostPresence(state, [alice]).seats.find((s) => s.seatId === T.seatA)).toMatchObject({
+    color: '#123456',
+  });
+  const seat = state.seats[T.seatA];
+  if (!seat) throw new Error('missing seat');
+  seat.archived = true;
+  const presence = buildHostPresence(state, [alice]);
+  expect(presence.seats.some((s) => s.seatId === T.seatA)).toBe(false);
+  expect(presence.unseated).toEqual([
+    { identityId: T.alice, displayName: 'Alice', color: '#123456' },
+  ]);
+});

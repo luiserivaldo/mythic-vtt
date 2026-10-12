@@ -1,6 +1,6 @@
 import { enablePatches, produceWithPatches, type Patch } from 'immer';
 import type { Campaign } from '../schema/index.js';
-import { isHost, isCoDm, type AnyAction } from './define.js';
+import { isHost, isCoDm, seatOf, type AnyAction } from './define.js';
 import type { Actor, ActionEnvelope } from './envelope.js';
 import { getAction } from './registry.js';
 
@@ -38,6 +38,9 @@ export function checkIntent(
     !isHost(actor) &&
     !isCoDm(state, actor)
   )
+    return { ok: false, reason: 'forbidden' };
+  // UI-SEAT-05: disabling interaction also applies to co-DMs; joining remains read-only.
+  if (type !== 'session.join' && seatOf(state, actor)?.interactionEnabled === false)
     return { ok: false, reason: 'forbidden' };
   if (!action.permission(state, actor, parsed.data)) return { ok: false, reason: 'forbidden' };
   return { ok: true, action, payload: parsed.data };

@@ -7,6 +7,7 @@ export interface SeatRow {
   id: string;
   label: string;
   role: Seat['role'];
+  interactionEnabled: boolean;
   roleLabel: string;
   occupied: boolean;
   /** From presence; false when unknown or offline. */
@@ -30,6 +31,7 @@ export function seatRows(
       id: seat.id,
       label: seat.label,
       role: seat.role,
+      interactionEnabled: seat.interactionEnabled !== false,
       // D24: the UI says "Co-DM" for the stored `codm` role.
       roleLabel:
         seat.role === 'codm'

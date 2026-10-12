@@ -8,6 +8,7 @@ type PresenceMessage = Extract<ServerMessage, { t: 'presence' }>;
 export interface PresenceConn {
   readonly identityId: string;
   readonly displayName: string;
+  readonly color?: string | undefined;
   readonly avatar: string | undefined;
   readonly isHost: boolean;
   readonly latencyMs?: number | null;
@@ -29,6 +30,7 @@ export function buildHostPresence(state: Campaign, conns: Iterable<PresenceConn>
         seatId: seat.id,
         ...(live ? { displayName: live.displayName } : {}),
         connected: live !== undefined,
+        ...(live?.color !== undefined ? { color: live.color } : {}),
         latencyMs: live?.latencyMs ?? null,
       };
     });
@@ -39,6 +41,7 @@ export function buildHostPresence(state: Campaign, conns: Iterable<PresenceConn>
     unseated.push({
       identityId: c.identityId,
       displayName: c.displayName,
+      ...(c.color !== undefined ? { color: c.color } : {}),
       ...(c.avatar !== undefined ? { avatar: c.avatar } : {}),
     });
   }

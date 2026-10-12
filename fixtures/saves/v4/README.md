@@ -1,11 +1,9 @@
-# UX-03 seat archive (MV-191)
+# UX-02 seat interaction (MV-190)
 
-State/save and protocol v4 add optional `Seat.archived` and host-only `seat.archive`.
-Absent means active; existing seats and nested snapshot history migrate without
-loss. Archive retains login history and entities, removes seat ownership, denies
-joins/assignments/stale actions, and excludes archived records from non-host views.
-Old fixture versions remain unchanged.
+State/save schema v4 adds optional Seat.interactionEnabled (absent means enabled).
+The v3-to-v4 migration defaults existing seats on in campaign files and nested
+snapshots, preserving explicit false and all other data. This fixture retains
+scene lifecycle v3 data and demonstrates explicit enabled seats.
 
-PR #43 also proposes v4 independently. Before the second schema PR merges, update
-it from develop, retain the merged migration unchanged, and advance its own schema,
-protocol and golden fixture to the next version. Do not reuse a released version.
+Protocol v4 requires matching host and client. Action envelopes and coordinates
+are unchanged. Older fixture versions remain supported through the migration chain.

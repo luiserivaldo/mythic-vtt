@@ -1,7 +1,13 @@
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { SceneOverlay } from './SceneOverlay.js';
 import { Canvas, useThree } from '@react-three/fiber';
-import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
+import {
+  canUseSceneToggle,
+  resolveSceneBounds,
+  type Actor,
+  type Scene,
+  type SceneBounds,
+} from '@mythic/shared';
 import { OrthographicCamera } from '@react-three/drei';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useStore } from 'zustand';
@@ -151,7 +157,7 @@ function BoardScene({
 }
 
 /** Single on-demand Three scene for the active host-filtered Scene. */
-export function BoardCanvas() {
+export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | null }) {
   const viewMode = useViewMode();
   const mode3d = viewMode === '3d';
   const [resetToken, setResetToken] = useState(0);
@@ -159,6 +165,15 @@ export function BoardCanvas() {
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
+  // PERM-05: a tool a seat may not use is disabled with a reason, never hidden.
+  const measureDisabledReason = useMemo(() => {
+    const sceneId = campaign?.activeSceneId;
+    if (!campaign || !sceneId || isHost) return undefined;
+    const actor: Actor = seatId !== null ? { kind: 'seat', seatId } : { kind: 'seat' };
+    return canUseSceneToggle(campaign, actor, sceneId, 'measure')
+      ? undefined
+      : 'Measuring is disabled in this scene';
+  }, [campaign, isHost, seatId]);
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
   const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
   const source = campaign?.activeSceneId ? (campaign.scenes[campaign.activeSceneId] ?? null) : null;
@@ -186,7 +201,7 @@ export function BoardCanvas() {
       </span>
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
         <ViewToggle />
-        {!readOnly && <RulerToggle />}
+        {!readOnly && <RulerToggle disabledReason={measureDisabledReason} />}
         {mode3d && (
           <>
             <button
@@ -198,12 +213,18 @@ export function BoardCanvas() {
               Reset view
             </button>
             <span className="ui-camera-hint">
-              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom
+              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom ·
+              middle-click a selected token to lock its height
             </span>
           </>
         )}
       </div>
-      <ToolPanelDock campaign={campaign} scene={source} mode3d={mode3d} />
+      <ToolPanelDock
+        campaign={campaign}
+        scene={source}
+        mode3d={mode3d}
+        container={panelContainer}
+      />
       <Canvas
         frameloop="demand"
         shadows={false}

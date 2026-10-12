@@ -6,9 +6,11 @@ import {
   reduceAction,
   visibleTo,
   type ActionEnvelope,
+  UndoRequest,
   type Actor,
   type Audience,
   type Campaign,
+  type HistoryUndoPayload,
 } from '@mythic/shared';
 import type { GatewayConnection, GatewayHandler } from '../gateway/engine-seam.js';
 import type { CampaignStore } from '../storage/types.js';
@@ -19,6 +21,7 @@ import {
   type EphemeralRelayStats,
 } from './ephemeral-relay.js';
 import { buildHostPresence } from './presence.js';
+import { JOURNAL_LIMIT, planUndo, type JournalEntry } from './undo.js';
 import {
   cryptoRandom,
   randomFloats,
@@ -64,6 +67,12 @@ export interface Engine extends GatewayHandler {
   state(): Campaign;
   seq(): number;
   ephemeralStats(): EphemeralRelayStats;
+  /**
+   * SES-04: seats an authenticated identity through the normal `session.join` pipeline (seat free
+   * or already theirs, one seat per identity, active scene). The caller has already verified an
+   * invite credential; every shared permission rule still applies.
+   */
+  claimSeat(identityId: string, seatId: string): Promise<boolean>;
   /** Ends this Session, releasing only per-session seat bindings through durable actions. */
   endSession(): Promise<void>;
   /** Resolves once every queued connect/intent/join has been processed. */
@@ -100,6 +109,8 @@ export function createEngine(options: EngineOptions): Engine {
   let seq = options.initialSeq ?? 0;
   /** Ring of recently applied actions, oldest first, contiguous in `seq`. */
   const history: Applied[] = [];
+  /** What `history.undo` may revert: this run's applied actions with their inverse patches. */
+  const journal: JournalEntry[] = [];
   const members = new Map<string, Member>();
   const ephemeralRelay = createEphemeralRelay(clock, options.ephemeral);
 
@@ -115,6 +126,7 @@ export function createEngine(options: EngineOptions): Engine {
   const placeOf = (conn: GatewayConnection) => ({
     identityId: conn.identityId,
     isHost: conn.isHost,
+    ...(conn.isSpectator ? { isSpectator: true } : {}),
   });
 
   function snapshotFor(audience: Audience): ServerMessage {
@@ -231,6 +243,21 @@ export function createEngine(options: EngineOptions): Engine {
   ): Promise<Outcome> {
     const actor = extra.actor ?? (conn === undefined ? undefined : actorFor(state, placeOf(conn)));
     if (actor === undefined) return { ok: false, reason: 'forbidden' };
+    if (type === 'history.undo') {
+      // HIST-04: the logged payload is built here from the journal. Whatever else the client sent
+      // (patches included) is discarded, so an undo can only ever replay what this host applied.
+      const request = UndoRequest.safeParse(payload);
+      if (!request.success) return { ok: false, reason: 'invalid-payload' };
+      const plan = planUndo({ journal, state, actor, request: request.data });
+      if (!plan.ok) {
+        return {
+          ok: false,
+          reason: plan.reason,
+          ...(plan.detail !== undefined ? { detail: plan.detail } : {}),
+        };
+      }
+      payload = plan.payload;
+    }
     const check = checkIntent(state, actor, type, payload);
     if (!check.ok) {
       // zod messages echo client input; keep the detail generic.
@@ -274,6 +301,17 @@ export function createEngine(options: EngineOptions): Engine {
       seq = entry.seq;
       history.push(entry);
       if (history.length > replayLimit) history.shift();
+      journal.push({
+        seq: entry.seq,
+        actor,
+        type,
+        inverse: result.inversePatches,
+        paths: result.patches.map((patch) => patch.path),
+        ...(type === 'history.undo'
+          ? { undoes: (check.payload as HistoryUndoPayload).targetSeqs }
+          : {}),
+      });
+      if (journal.length > JOURNAL_LIMIT) journal.shift();
       broadcast(entry, conn, extra.clientRef);
       if (options.onApplied) {
         try {
@@ -297,6 +335,19 @@ export function createEngine(options: EngineOptions): Engine {
     state: () => state,
     seq: () => seq,
     ephemeralStats: () => ephemeralRelay.stats(),
+    claimSeat(identityId, seatId) {
+      let claimed = false;
+      return serialize(async () => {
+        const outcome = await apply(
+          undefined,
+          'session.join',
+          { seatId, identityId },
+          { actor: { kind: 'seat', identityId } },
+        );
+        claimed = outcome.ok;
+      }).then(() => claimed);
+    },
+
     endSession() {
       return serialize(async () => {
         const seatIds = Object.values(state.seats)
@@ -341,6 +392,10 @@ export function createEngine(options: EngineOptions): Engine {
     onIntent(conn, msg: Of<'intent'>) {
       return serialize(async () => {
         if (!members.has(conn.connectionId)) return; // disconnected while queued
+        if (conn.isSpectator) {
+          conn.send({ t: 'reject', clientRef: msg.clientRef, reason: 'forbidden' });
+          return;
+        }
         const outcome = await apply(conn, msg.type, msg.payload, {
           clientRef: msg.clientRef,
           ...(msg.sceneId !== undefined ? { sceneId: msg.sceneId } : {}),
@@ -376,7 +431,7 @@ export function createEngine(options: EngineOptions): Engine {
           });
           return;
         }
-        if (msg.seatId === undefined) return;
+        if (conn.isSpectator || msg.seatId === undefined) return;
         const outcome = await apply(
           conn,
           'session.join',
@@ -400,7 +455,7 @@ export function createEngine(options: EngineOptions): Engine {
     onEphemeral(conn, msg) {
       return serialize(() => {
         if (!members.has(conn.connectionId)) return;
-        ephemeralRelay.relay(conn, msg, state, members.values());
+        if (!conn.isSpectator) ephemeralRelay.relay(conn, msg, state, members.values());
       });
     },
 

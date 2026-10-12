@@ -88,6 +88,7 @@ export interface OwnerOption {
 /** Seats an entity can be owned by, in a stable order (entity.create requires existing seats). */
 export function ownerOptions(campaign: Campaign): OwnerOption[] {
   return Object.values(campaign.seats)
+    .filter((seat) => !seat.archived)
     .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id))
     .map((s) => ({ id: s.id, label: s.label }));
 }

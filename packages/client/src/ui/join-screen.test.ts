@@ -14,6 +14,7 @@ import {
   saveProfile,
   seatChoices,
   validSelection,
+  withoutSpectator,
   type JoinFlowInput,
 } from './join-screen.js';
 import { rosterOptions } from './seat-panel.js';
@@ -166,5 +167,17 @@ describe('rosterOptions', () => {
     expect(rosterOptions([{ identityId: tid(10), displayName: 'Ana' }])).toEqual([
       { identityId: tid(10), label: `Ana (${tid(10).slice(-4)})` },
     ]);
+  });
+});
+
+it('validates and preserves the chosen colour across profile persistence and seat choice', () => {
+  const profile = parseProfile(
+    JSON.stringify({ displayName: 'Colour Guest', color: '#AABBCC', spectator: true }),
+  );
+  expect(profile?.color).toBe('#aabbcc');
+  if (!profile) throw new Error('profile missing');
+  expect(withoutSpectator(profile)).toEqual({ displayName: 'Colour Guest', color: '#aabbcc' });
+  expect(parseProfile(JSON.stringify({ displayName: 'Guest', color: 'url(secret)' }))).toEqual({
+    displayName: 'Guest',
   });
 });

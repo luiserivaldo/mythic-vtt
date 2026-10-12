@@ -24,6 +24,7 @@ const campaign = () => {
   const scene = state.scenes[IDS.scene];
   if (!seat || !scene) throw new Error('fixture incomplete');
   seat.identityId = IDS.identity;
+  seat.interactionEnabled = false;
   scene.entities[IDS.entity] = makeEntity(IDS.entity, {
     owners: [IDS.coDm],
     token: {
@@ -57,7 +58,11 @@ it('archives deterministically without deleting tokens, character links or login
   const before = campaign();
   const result = reduceAction(before, envelope);
   expect(result).toEqual(reduceAction(before, envelope));
-  expect(result.state.seats[IDS.coDm]).toMatchObject({ archived: true, identityId: IDS.identity });
+  expect(result.state.seats[IDS.coDm]).toMatchObject({
+    archived: true,
+    identityId: IDS.identity,
+    interactionEnabled: false,
+  });
   expect(result.state.scenes[IDS.scene]?.entities[IDS.entity]).toMatchObject({
     owners: [],
     token: { characterInstanceId: IDS.otherIdentity },
@@ -111,13 +116,13 @@ it('never sends archived seat data or DM data to player/spectator or stale co-DM
   }
 });
 it('migrates campaign and nested snapshots without losing historical seat data', () => {
-  const state = { ...campaign(), schemaVersion: 3 };
+  const state = { ...campaign(), schemaVersion: 4 };
   const before = structuredClone(state);
-  expect(storeMigrate('campaign', 3, state)).toEqual({
+  expect(storeMigrate('campaign', 4, state)).toEqual({
     ...state,
     schemaVersion: CURRENT_SCHEMA_VERSION,
   });
-  expect(storeMigrate('snapshot', 3, { seq: 10, state })).toEqual({
+  expect(storeMigrate('snapshot', 4, { seq: 10, state })).toEqual({
     seq: 10,
     state: { ...state, schemaVersion: CURRENT_SCHEMA_VERSION },
   });

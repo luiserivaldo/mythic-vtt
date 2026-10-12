@@ -95,7 +95,9 @@ export function PanZoomControls({ bounds, frameKey }: { bounds: CanvasSize; fram
       pointers.set(e.pointerId, local(e));
       if (pointers.size === 1) {
         pressStart = local(e);
-        dragging = e.pointerType === 'mouse' && e.button === 1;
+        // Every single press waits for the drag threshold, middle included: a middle click on a
+        // selected token toggles flying (TOK-03) and must not nudge the camera.
+        dragging = false;
       } else {
         dragging = true;
       }

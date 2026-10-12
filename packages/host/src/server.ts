@@ -1,3 +1,6 @@
+import { createSeatInvites } from './gateway/seat-invites.js';
+import { createSpectatorLinks } from './gateway/spectator-links.js';
+import { registerSpectatorRoutes } from './http/spectator-routes.js';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { storeMigrate } from '@mythic/shared';
@@ -7,6 +10,8 @@ import {
   createSeatUploadAuthorizer,
   registerAssetRoutes,
   registerCampaignRoutes,
+  registerHistoryRoutes,
+  registerSeatInviteRoutes,
   registerStaticClient,
   type UploadAuthorizer,
 } from './http/index.js';
@@ -116,7 +121,13 @@ export async function startHost(
   // Counts connections that completed `hello`, so tests can tell "socket open" from "authenticated".
   let authenticated = 0;
   const hostToken = options.hostToken ?? generateHostToken();
+  const spectatorLinks = createSpectatorLinks(
+    join(config.dataDir, 'index.sqlite'),
+    engine.state().id,
+  );
+  const seatInvites = createSeatInvites(join(config.dataDir, 'index.sqlite'), engine.state().id);
   const gateway = createGateway({
+    spectatorTokenValid: (token) => spectatorLinks.valid(token),
     hostToken,
     identities,
     handler: {
@@ -137,6 +148,19 @@ export async function startHost(
     state: () => engine.state(),
     now: clock,
   });
+  registerSpectatorRoutes(gateway.app, {
+    auth: httpAuth,
+    links: spectatorLinks,
+    disconnect: () => {
+      gateway.disconnectSpectators();
+    },
+  });
+  registerSeatInviteRoutes(gateway.app, {
+    auth: httpAuth,
+    invites: seatInvites,
+    state: () => engine.state(),
+    claimSeat: (identityId, seatId) => engine.claimSeat(identityId, seatId),
+  });
   registerAssetRoutes(gateway.app, {
     assetStore,
     uploadAuthorizer:
@@ -149,6 +173,7 @@ export async function startHost(
     now: clock,
     ...(options.importLimits ? { importLimits: options.importLimits } : {}),
   });
+  registerHistoryRoutes(gateway.app, { store, engine, auth: httpAuth, now: clock });
   if (config.testEndpoints) {
     gateway.app.get('/__test/connections', () => ({
       open: gateway.connectionCount(),
@@ -162,6 +187,8 @@ export async function startHost(
     port = await gateway.listen({ port: config.port, host: config.host });
   } catch (error) {
     await gateway.close();
+    spectatorLinks.close();
+    seatInvites.close();
     await closeStores();
     throw error;
   }
@@ -193,6 +220,8 @@ export async function startHost(
             'end',
           );
         } finally {
+          spectatorLinks.close();
+          seatInvites.close();
           await closeStores();
         }
       }
