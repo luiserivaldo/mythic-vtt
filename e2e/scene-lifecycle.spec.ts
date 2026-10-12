@@ -38,6 +38,9 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     await player.page.getByRole('radio', { name: /Player/ }).check();
     await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
+    expect(
+      await host.intent('scene.rename', { sceneId: active, name: 'Player scene' }),
+    ).toMatchObject({ t: 'ack' });
     const inactiveId = testUlid('INACTIVE', 91);
     expect(
       await host.intent('scene.create', { sceneId: inactiveId, name: 'UNVISITED-PUBLIC-SCENE' }),
@@ -47,7 +50,7 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     ).toMatchObject({ t: 'ack' });
     await player.page.reload();
     await expect(player.page.getByRole('status')).toHaveText('Connected to New campaign');
-    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Blank scene');
+    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Player scene');
     const privateId = testUlid('SECRET', 90);
     expect(
       await host.intent('scene.create', {
@@ -83,14 +86,14 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     );
     await expect(dm.getByRole('button', { name: 'Collapse dock' })).toBeVisible();
     await expect(player.page.getByRole('button', { name: 'Open scene picker' })).toHaveCount(0);
-    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Blank scene');
+    await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Player scene');
     const secret = dm.getByRole('listitem').filter({ hasText: 'SECRET-PRIVATE-SCENE' });
     await secret.getByRole('button', { name: 'Browse', exact: true }).click();
     await expect(dm.getByLabel('Current scene', { exact: true })).toHaveText(
       'SECRET-PRIVATE-SCENE',
     );
     await expect(player.page.getByLabel('Current scene', { exact: true })).toHaveText(
-      'Blank scene',
+      'Player scene',
     );
     await expect(dm.getByRole('button', { name: 'Open scene picker' })).toHaveText(
       'SECRET-PRIVATE-SCENE',

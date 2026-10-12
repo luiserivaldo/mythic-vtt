@@ -26,7 +26,7 @@ test.afterAll(async () => {
   await table.stop();
 });
 
-test('2D remains the default and has no reset-view control', async ({ browser }) => {
+test('2D remains the default and exposes Reset view', async ({ browser }) => {
   const client = await openClient(browser, table, 'viewer');
   await expect(client.page.getByLabel('Scene board')).toBeVisible();
   await expect(client.page.getByRole('button', { name: 'Reset view' })).toBeVisible();
