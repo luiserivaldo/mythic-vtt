@@ -610,3 +610,30 @@ describe('non-leak (PERM-03)', () => {
     expectView(host, { kind: 'host' });
   });
 });
+
+describe('claimSeat (SES-04)', () => {
+  it('seats a free seat through session.join and is idempotent for the same identity', async () => {
+    const { engine, log } = setup({});
+    expect(await engine.claimSeat(T.bob, T.seatB)).toBe(true);
+    expect(engine.state().seats[T.seatB]?.identityId).toBe(T.bob);
+    expect(await engine.claimSeat(T.bob, T.seatB)).toBe(true);
+    expect(log.entries.every((entry) => entry.envelope.type === 'session.join')).toBe(true);
+  });
+
+  it('refuses a seat held by someone else, a second seat for one identity and unknown seats', async () => {
+    const { engine } = setup({});
+    expect(await engine.claimSeat(T.bob, T.seatA)).toBe(false); // alice's
+    expect(await engine.claimSeat(T.alice, T.seatB)).toBe(false); // alice already seated
+    expect(await engine.claimSeat(T.bob, tid(30))).toBe(false);
+    expect(engine.state().seats[T.seatA]?.identityId).toBe(T.alice);
+    expect(engine.state().seats[T.seatB]?.identityId).toBeNull();
+  });
+
+  it('is refused while no scene is active, except for a co-DM seat', async () => {
+    const campaign = fixtureCampaign();
+    campaign.activeSceneId = null;
+    const { engine } = setup({ campaign });
+    expect(await engine.claimSeat(T.bob, T.seatB)).toBe(false);
+    expect(await engine.claimSeat(T.bob, T.coDm)).toBe(true);
+  });
+});

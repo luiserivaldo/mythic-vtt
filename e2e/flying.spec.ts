@@ -186,7 +186,7 @@ test('elevated tokens keep their height; flying locks it; a spectator cannot tog
   expect(entity()?.token?.flying).toBe(true);
 
   // 6. The panel checkbox releases the lock again.
-  // This controlled checkbox changes only after the host patch, not synchronously on click.
+  // The host controls the value: wait for its patch after sending the click intent.
   await panel.getByRole('checkbox', { name: 'Flying' }).click();
   await expect.poll(() => entity()?.token?.flying, { timeout: 10_000 }).toBeUndefined();
   await expect(panel.getByRole('checkbox', { name: 'Flying' })).not.toBeChecked();

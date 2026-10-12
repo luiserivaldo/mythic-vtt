@@ -127,6 +127,7 @@ export interface RemoteRuler {
   readonly points: readonly Vec3[];
   readonly phase: RulerPhase;
   readonly at: number;
+  readonly color?: string;
 }
 
 /** Adds a waypoint unless it repeats the previous one (a double-click lands two clicks). */

@@ -4,6 +4,8 @@ import { PROTOCOL_VERSION } from './version.js';
 
 // One WebSocket per client, JSON messages, discriminated by `t`.
 
+export const PlayerColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
 // ---------- client -> host ----------
 
 /** First message on a connection (SES-02). The secret is hashed by the host on first contact. */
@@ -13,6 +15,7 @@ export const Hello = z.strictObject({
   identityId: Ulid,
   identitySecret: z.string().min(1),
   displayName: z.string().trim().min(1).max(80),
+  color: PlayerColor.optional(),
   /** M1-11: small image data URL, or a short emoji/initial; capped so a hello stays small. */
   avatar: z.string().max(32_768).optional(),
   /** Last `seq` the client applied, for replay or a fresh snapshot on reconnect. */
@@ -65,6 +68,7 @@ export const RulerPreview = z.strictObject({
     sceneId: Ulid,
     points: z.array(RulerPoint).max(64),
     phase: z.enum(['active', 'finished', 'cancelled']),
+    color: PlayerColor.optional(),
   }),
   /** Set by the host when relaying; clients omit it. */
   from: Ulid.optional(),
@@ -139,6 +143,7 @@ export const Presence = z.strictObject({
     z.strictObject({
       seatId: Ulid,
       displayName: z.string().optional(),
+      color: PlayerColor.optional(),
       connected: z.boolean(),
       /** UX-06: host-measured RTT; null before the first sample or while offline. */
       latencyMs: z.number().int().min(0).max(30_000).nullable(),
@@ -154,6 +159,7 @@ export const Presence = z.strictObject({
       z.strictObject({
         identityId: Ulid,
         displayName: z.string(),
+        color: PlayerColor.optional(),
         avatar: z.string().max(32_768).optional(),
       }),
     )

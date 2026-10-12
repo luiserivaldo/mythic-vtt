@@ -5,3 +5,4 @@ export * from './http-auth.js';
 export * from './rate-limit.js';
 export * from './campaign-routes.js';
 export * from './history-routes.js';
+export * from './seat-invite-routes.js';
