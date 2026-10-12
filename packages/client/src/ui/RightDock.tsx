@@ -2,6 +2,7 @@ import { lazy, Suspense, useId, type Ref } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { ChatPanel } from './ChatPanel.js';
+import { SheetPanel } from './SheetPanel.js';
 import { seatColorsOf } from './chat-panel.js';
 import { DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
 import { HistoryTools } from './HistoryTools.js';
@@ -66,7 +67,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'chat':
         return <ChatPanel entries={[]} seatColors={seatColorsOf(presence?.seats)} />;
       case 'sheet':
-        return <Placeholder title="Sheet">Character sheets are coming soon.</Placeholder>;
+        return <SheetPanel />;
       case 'help':
         return (
           <Placeholder title="Help">

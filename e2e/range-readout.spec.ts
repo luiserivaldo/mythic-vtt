@@ -50,14 +50,41 @@ interface CameraPose {
   distance: number;
 }
 
-async function cameraPose(page: Page): Promise<CameraPose> {
+/** The live 3D pose, or null while the orbit camera is not mounted yet. */
+async function cameraPose(page: Page): Promise<CameraPose | null> {
   return page.evaluate(() => {
     const scope = globalThis as typeof globalThis & {
       __mythicCamera?: { getPose(): CameraPose };
     };
-    if (!scope.__mythicCamera) throw new Error('3D camera diagnostics are not mounted');
-    return scope.__mythicCamera.getPose();
+    return scope.__mythicCamera?.getPose() ?? null;
   });
+}
+
+function samePose(a: CameraPose, b: CameraPose): boolean {
+  return (
+    a.targetX === b.targetX &&
+    a.targetY === b.targetY &&
+    a.targetZ === b.targetZ &&
+    a.azimuth === b.azimuth &&
+    a.polar === b.polar &&
+    a.distance === b.distance
+  );
+}
+
+/**
+ * M2-05: entering 3D tweens the orbit camera from the 2D framing. Project only against a settled
+ * pose, or a projection taken mid-tween points at where the camera will no longer be.
+ */
+async function settledCameraPose(page: Page): Promise<CameraPose> {
+  await expect.poll(() => cameraPose(page)).not.toBeNull();
+  let previous = await cameraPose(page);
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    await page.waitForTimeout(50);
+    const next = await cameraPose(page);
+    if (next !== null && previous !== null && samePose(next, previous)) return next;
+    previous = next;
+  }
+  throw new Error('the 3D camera did not settle after the view switch');
 }
 
 /** Projects a world point through the live 3D pose (M2-12 default vertical FOV is 60 degrees). */
@@ -199,7 +226,7 @@ test('the selected token reads the range to a hovered token in 2D and 3D', async
   const canvas = dm.locator('canvas');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('no canvas box');
-  const pose = await cameraPose(dm);
+  const pose = await settledCameraPose(dm);
   // Size-1 tokens stand 1.2 cells tall above a 0.06 base; aim at the middle of that quad.
   const ogreStandee = projectToCanvas(pose, box, { x: 21.5, y: 0.66, z: 12.5 });
   const ariaStandee = projectToCanvas(pose, box, { x: 15.5, y: 0.66, z: 12.5 });
