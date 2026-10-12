@@ -52,11 +52,12 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
         action:
           'Sizes the ruler or area shape under the pointer as you drag, with the distance shown as you go.',
       },
-      // UI-MEAS-05 / Q31: a 2D ruler takes waypoints; AoE and the 3D ruler clear instead.
+      // UI-MEAS-05 / Q31: a measuring 2D ruler takes the waypoint, an AoE draft its own quick
+      // delete, and anything else clears (rulerRightClick in tools/ruler.ts).
       {
         input: 'Measure tool: right click',
         action:
-          'Adds a waypoint to a 2D ruler and measures on from it. On an area shape or the 3D ruler it clears the measurement.',
+          'While a 2D ruler is in progress it adds a waypoint and measures on from it. Otherwise it clears the ruler, and on one of your own area shapes it deletes it.',
       },
       // UI-TOOL-03: Esc cancels the measurement, then puts the tool away.
       {
