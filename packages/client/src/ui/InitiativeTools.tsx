@@ -1,6 +1,7 @@
 import { canPerform, Initiative, type Campaign, type Scene } from '@mythic/shared';
 import { useRef, useState } from 'react';
 import { useClientStore } from '../store/react.js';
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { useSubmit } from './submit.js';
 
 function InitiativePanel({ campaign, scene }: { campaign: Campaign; scene: Scene }) {
@@ -186,7 +187,7 @@ function InitiativePanel({ campaign, scene }: { campaign: Campaign; scene: Scene
 }
 
 export function InitiativeTools() {
-  const campaign = useClientStore((state) => state.campaign);
+  const campaign = useViewedCampaign();
   const [open, setOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
   const scene = campaign?.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;
