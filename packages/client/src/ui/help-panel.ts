@@ -5,15 +5,15 @@
  * (`UIUX.md` §1.2, UI-SHELL-01) — and it is the onboarding *instead of* first-time tooltips:
  * nothing here (or in `HelpPanel`) records a sign-in or a "seen" flag (UI-HELP-01).
  *
- * The camera and token rows are the input mapping UX-16 implements (`UIUX.md` §5.3,
- * UI-INPUT-01..04). It lives here once so the panel and the board cannot drift apart.
+ * Only behaviour that is on the board today is listed; requirement IDs live in the comments above
+ * each row and never in the copy.
  */
 export type HelpTopic = 'moving' | 'camera' | 'token';
 
 export interface HelpEntry {
   /** The input, worded the way the interface names it. */
   input: string;
-  /** What the input does, with the UI item it comes from for review traceability. */
+  /** What the input does, in plain user-facing words. No requirement IDs here. */
   action: string;
 }
 
@@ -35,33 +35,44 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
     id: 'moving',
     title: 'Moving and measuring',
     entries: [
+      // UI-TOOL-01 / TOK-02 / Q23: the press claims the pointer and starts the move.
       {
         input: 'Left press on a token',
         action:
-          'Starts a move without selecting it first; the token becomes the selection too (UI-TOOL-01, Q23).',
+          'Picks it up straight away — there is no need to select it first. The token becomes the selection too.',
       },
+      // UI-INPUT-01 / TOK-02: one move is sent on release.
       {
-        input: 'Left drag',
-        action:
-          'Moves the token you picked up. A left drag never moves the camera unless the Pan tool is active (UI-INPUT-01).',
+        input: 'Left drag on a token',
+        action: 'Carries it to wherever you release the button.',
       },
+      // UI-TOOL-03 / UI-MEAS-04 / Q28: every shape is sized by dragging, with a live readout.
       {
-        input: 'Measure tool — drag on the board',
+        input: 'Measure tool: drag on the board',
         action:
-          'Sizes the ruler or area of effect under the cursor with a live readout, so every shape is sized by dragging (UI-MEAS-02, UI-MEAS-04).',
+          'Sizes the ruler or area shape under the pointer as you drag, with the distance shown as you go.',
       },
+      // UI-MEAS-05 / Q31: a 2D ruler takes waypoints; AoE and the 3D ruler clear instead.
+      {
+        input: 'Measure tool: right click',
+        action:
+          'Adds a waypoint to a 2D ruler and measures on from it. On an area shape or the 3D ruler it clears the measurement.',
+      },
+      // UI-TOOL-03: Esc cancels the measurement, then puts the tool away.
+      {
+        input: 'Measure tool: Esc',
+        action: 'Clears the measurement, and puts the tool away once nothing is being measured.',
+      },
+      // UI-MEAS-03 / GRID-02: feet only for the alpha, from the scene's own grid.
       {
         input: 'Any measurement',
-        action: "Reads in the scene's units; the alpha shows feet only (UI-MEAS-03, GRID-02).",
+        action: "Reads in the scene's units — feet in this alpha.",
       },
+      // UI-MEAS-02 / UI-TOKEN-06: the Ruler panel's checkbox draws the drag's distance.
       {
-        input: 'Right click with the Measure tool',
-        action: 'Adds a waypoint to a 2D ruler; quick-deletes an AoE or the 3D ruler (UI-MEAS-05).',
-      },
-      {
-        input: 'Left click while dragging a token',
+        input: 'Always measure token movement',
         action:
-          'With "Always measure token movement" on, drops a checkpoint and keeps measuring from it (UI-TOKEN-06, §10 C4).',
+          'Switched on in the Ruler panel, it draws the distance while a token is being dragged.',
       },
     ],
   },
@@ -69,22 +80,26 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
     id: 'camera',
     title: 'Camera controls',
     entries: [
-      { input: 'Wheel', action: 'Zooms in and out (UI-INPUT-02, CAM-01).' },
-      { input: 'Middle drag', action: 'Pans the view in both 2D and 3D (UI-INPUT-03, CAM-01).' },
+      // UI-INPUT-02 / CAM-01: a notched wheel zooms; touchpad scroll pans and a pinch zooms.
+      {
+        input: 'Wheel',
+        action:
+          'Zooms in and out. On a trackpad a two-finger scroll pans instead and a pinch zooms.',
+      },
+      // UI-INPUT-03 / CAM-01.
+      { input: 'Middle drag', action: 'Pans the view, in both 2D and 3D.' },
+      // UI-INPUT-01 / CAM-01: a press no token or handle claimed belongs to the camera.
+      { input: 'Left drag on the empty board', action: 'Pans the view, in both 2D and 3D.' },
+      // UI-INPUT-04 / CAM-02: right-drag orbits in 3D; in 2D the button stays free for the tool.
       {
         input: 'Right drag in 3D',
         action:
-          'Orbits around the focus point. In 2D the right button is kept for menus and waypoints, so a right drag does not move the camera (UI-INPUT-04, CAM-02).',
+          'Orbits around the focus point. In 2D the right button belongs to the current tool, so it never moves the camera.',
       },
-      {
-        input: 'Pan tool',
-        action:
-          'While it is active, a left drag pans the view instead of selecting, in 2D and 3D (UI-TOOL-02, UI-INPUT-01).',
-      },
+      // UI-TOP-05 / CAM-01: the button lives in the top bar and frames the scene again.
       {
         input: 'Reset view',
-        action:
-          'Returns the camera to its default framing; the button is shown in 3D (UI-TOP-05, CAM-01).',
+        action: 'In the top bar: frames the scene again, in both 2D and 3D.',
       },
     ],
   },
@@ -92,25 +107,27 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
     id: 'token',
     title: 'Token interaction',
     entries: [
+      // UI-INPUT-01 / TOK-01: a plain click replaces the selection, a modifier toggles membership.
+      {
+        input: 'Left click on a token',
+        action: 'Selects it. Shift, Ctrl or Cmd click adds it to the selection or takes it out.',
+      },
+      // UI-INPUT-03 / TOK-03 / Q26: the drag threshold separates the click from the pan.
       {
         input: 'Middle click on the selected token',
         action:
-          'Toggles its flying lock. A middle drag pans instead: the drag threshold separates the click from the drag (UI-INPUT-03, Q26).',
+          'Toggles its flying lock, so it keeps its height. A middle drag pans instead: the drag threshold tells the two apart.',
       },
+      // M1-20 (2D handles) / M1-47 (3D handle); a 3D token is raised and lowered.
       {
-        input: 'Single click',
+        input: 'Selected token',
         action:
-          'Opens a small preview card beside the token: its name and the quick fields (HP, AC, Speed). A value you may not see reads "not shared" (UI-TOKEN-01, PERM-03).',
+          'In 2D its handles move, resize and rotate it; in 3D a handle raises and lowers it.',
       },
+      // MEAS-05: the same ruler geometry, so the two readouts always agree.
       {
-        input: 'Double click, or the gear on the preview',
-        action:
-          'Opens the full token menu: name, image, height with the flying lock, layer and delete (UI-TOKEN-02).',
-      },
-      {
-        input: 'Right click on a token',
-        action:
-          'Opens a short menu to its right: See Sheet, Add Condition, Change Layer and Token Options (UI-TOKEN-03).',
+        input: 'Hover another token with one token selected',
+        action: 'Shows the range between them: horizontal, vertical and total.',
       },
     ],
   },

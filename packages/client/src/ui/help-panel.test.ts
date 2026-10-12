@@ -8,6 +8,12 @@ import { HELP_SECTIONS, HELP_TOPICS, helpSections, type HelpTopic } from './help
 const textOf = (topic: HelpTopic) =>
   HELP_SECTIONS[topic].entries.map((entry) => `${entry.input} ${entry.action}`).join('\n');
 
+/**
+ * Requirement and task IDs (`UI-INPUT-01`, `UX-29`, `M4-15`, `Q26`, `D35`) and `§` references are
+ * for reviewers, not for players: the panel must read as English. Comments may carry them.
+ */
+const ID_LIKE = [/\b[A-Z][A-Z0-9]+-\d+\b/, /\b[QD]\d+\b/, /§/];
+
 describe('UI-HELP-01 help content', () => {
   it('covers the three topics the issue names, in order', () => {
     expect(HELP_TOPICS).toEqual(['moving', 'camera', 'token']);
@@ -29,7 +35,7 @@ describe('UI-HELP-01 help content', () => {
     expect(Object.keys(HELP_SECTIONS).sort()).toEqual([...HELP_TOPICS].sort());
   });
 
-  it('has a non-empty, traceable row per input and no duplicate input in a section', () => {
+  it('has a non-empty row per input and no duplicate input in a section', () => {
     for (const section of helpSections()) {
       expect(section.entries.length).toBeGreaterThan(0);
       const inputs = section.entries.map((entry) => entry.input);
@@ -40,19 +46,33 @@ describe('UI-HELP-01 help content', () => {
         expect(entry.action.trim()).toBe(entry.action);
         expect(entry.input.length).toBeGreaterThan(0);
         expect(entry.action.length).toBeGreaterThan(0);
-        // Every row names the UI item it comes from, so the panel stays reviewable.
-        expect(entry.action).toMatch(/UI-[A-Z]+-\d+/);
       }
     }
   });
 
-  it('documents the UX-16 input mapping (UIUX §5.3)', () => {
+  it('keeps requirement and task IDs out of the copy the player reads', () => {
+    for (const section of helpSections()) {
+      expect(ID_LIKE.some((pattern) => pattern.test(section.title))).toBe(false);
+      for (const entry of section.entries) {
+        for (const line of [entry.input, entry.action]) {
+          // The whole rendered string must be plain: no ID, no section reference.
+          expect(ID_LIKE.map((pattern) => line.match(pattern)?.[0] ?? null)).toEqual([
+            null,
+            null,
+            null,
+          ]);
+        }
+      }
+    }
+  });
+
+  it('documents the input mapping (UIUX §5.3) that the board implements', () => {
     const moving = textOf('moving').toLowerCase();
     const camera = textOf('camera').toLowerCase();
     const token = textOf('token').toLowerCase();
-    // Left button selects and moves and never moves the camera unless Pan is active.
-    expect(moving).toContain('without selecting it first');
-    expect(moving).toContain('never moves the camera unless the pan tool is active');
+    // Left press moves a token without selecting it first; left-drag on empty board pans.
+    expect(moving).toContain('no need to select it first');
+    expect(camera).toContain('left drag on the empty board');
     // Wheel zooms; middle drag pans; right drag orbits in 3D.
     expect(camera).toContain('wheel');
     expect(camera).toContain('zoom');
@@ -60,14 +80,11 @@ describe('UI-HELP-01 help content', () => {
     expect(camera).toContain('pans');
     expect(camera).toContain('right drag in 3d');
     expect(camera).toContain('orbits');
-    // Middle click on a selected token toggles the flying lock (separated from the drag).
+    // Middle click on the selected token toggles the flying lock (separated from the drag).
     expect(token).toContain('middle click');
     expect(token).toContain('flying lock');
-    // Right click opens the menu / the tool's right-click action.
-    expect(token).toContain('right click');
-    expect(token).toContain('see sheet');
-    // The three token levels survive in the copy (UI-TOKEN-01..03).
-    expect(token).toContain('not shared');
+    // The ruler keeps right-click waypoints (MEAS-05).
+    expect(moving).toContain('waypoint');
   });
 
   it('states 2D and 3D behaviour separately (AGENTS rule 5)', () => {
