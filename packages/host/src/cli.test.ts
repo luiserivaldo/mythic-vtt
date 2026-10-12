@@ -55,3 +55,46 @@ describe('config precedence (HOST-01)', () => {
     await expect(resolveConfig(['--config', '/nope.json'], {}, none)).rejects.toThrow();
   });
 });
+
+describe('campaign selection flags (HOST-03)', () => {
+  const pick = async (argv: string[], env: Record<string, string>, f: unknown = {}) => {
+    const { config } = await resolveConfig(argv, env, file(f));
+    return [config.campaignId, config.campaign, config.newCampaign];
+  };
+
+  it('parses --campaign, --new-campaign and --list-campaigns', () => {
+    expect(parseArgs(['--campaign', 'Sunken Chapel', '--list-campaigns'])).toEqual({
+      campaign: 'Sunken Chapel',
+      listCampaigns: true,
+    });
+    expect(parseArgs(['--new-campaign=Lost Mine']).newCampaign).toBe('Lost Mine');
+  });
+
+  it('keeps MYTHIC_CAMPAIGN_ID and the config file key working', async () => {
+    expect(await pick([], { MYTHIC_CAMPAIGN_ID: 'ENVID' })).toEqual([
+      'ENVID',
+      undefined,
+      undefined,
+    ]);
+    expect(await pick([], {}, { campaignId: 'FILEID' })).toEqual(['FILEID', undefined, undefined]);
+    expect(await pick([], {}, { campaign: 'Chapel' })).toEqual([undefined, 'Chapel', undefined]);
+  });
+
+  it('lets the highest layer replace the whole choice instead of conflicting', async () => {
+    expect(await pick([], { MYTHIC_CAMPAIGN: 'env' }, { campaignId: 'FILEID' })).toEqual([
+      undefined,
+      'env',
+      undefined,
+    ]);
+    expect(await pick(['--campaign', 'flag'], { MYTHIC_CAMPAIGN_ID: 'ENVID' })).toEqual([
+      undefined,
+      'flag',
+      undefined,
+    ]);
+    expect(await pick(['--new-campaign', 'Fresh'], { MYTHIC_CAMPAIGN: 'env' })).toEqual([
+      undefined,
+      undefined,
+      'Fresh',
+    ]);
+  });
+});
