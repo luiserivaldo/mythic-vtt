@@ -721,6 +721,10 @@ main [tabindex]:focus-visible {
   display: flex;
   gap: 0.4rem;
 }
+/* UI-CHAT-02: the game-log toggle sits just above the composer, small and greyed (`main button:disabled`). */
+.ui-chat-log-toggle {
+  align-self: flex-start;
+}
 .ui-chat-composer input {
   flex: 1 1 auto;
   min-width: 0;

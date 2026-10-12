@@ -31,6 +31,10 @@ export const NEUTRAL_ROLL_COLOR = '#7d8b99';
 export const CHAT_EMPTY_STATE = 'No messages yet.';
 export const CHAT_COMING_SOON = 'Chat is coming soon. Messages and dice rolls will appear here.';
 
+/** UI-CHAT-02: the game-log toggle waits on the variable API, so it ships greyed and inert. */
+export const CHAT_LOG_ICON = '📜';
+export const CHAT_LOG_TEXT = 'WIP';
+
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 function hex(value: string | undefined): string | null {
