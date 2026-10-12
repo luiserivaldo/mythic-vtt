@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Response } from '@playwright/test';
 import { RawClient, openClient, startTable, testUlid, type Table } from './harness.js';
 import { HistoryPage } from '../packages/shared/src/index.js';
 
@@ -91,12 +91,21 @@ test('history filters, survives restart and excludes private REST content', asyn
   await expect(history).toContainText('/transform/position');
   const spectator = await openClient(browser, table, 'spectator');
   const responses: string[] = [];
-  spectator.page.on('response', (response) => {
+  const reading: Promise<void>[] = [];
+  // A body can vanish if the host or page goes away mid-read. An unreadable body cannot have
+  // leaked, so that case is ignored, but a floating rejection would fail the test at random.
+  const collect = (response: Response) => {
     if (response.url().includes('/api/history'))
-      void response.text().then((body) => {
-        responses.push(body);
-      });
-  });
+      reading.push(
+        response
+          .text()
+          .then((body) => {
+            responses.push(body);
+          })
+          .catch(() => undefined),
+      );
+  };
+  spectator.page.on('response', collect);
   await spectator.page.getByRole('button', { name: 'History', exact: true }).click();
   const spectatorHistory = spectator.page.getByRole('region', { name: 'Action history' });
   await expect(spectatorHistory.locator('summary').first()).toBeVisible();
@@ -142,6 +151,9 @@ test('history filters, survives restart and excludes private REST content', asyn
   expect(JSON.stringify(await deletedPrivate.json())).not.toMatch(
     new RegExp(`History hero|${entityId}`),
   );
+  // Stop observing before the restart: the open spectator panel refetches while the host is down.
+  spectator.page.off('response', collect);
+  await Promise.all(reading);
   await player.close();
   await host.close();
   await table.restart();
