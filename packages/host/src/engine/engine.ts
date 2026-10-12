@@ -64,6 +64,12 @@ export interface Engine extends GatewayHandler {
   state(): Campaign;
   seq(): number;
   ephemeralStats(): EphemeralRelayStats;
+  /**
+   * SES-04: seats an authenticated identity through the normal `session.join` pipeline (seat free
+   * or already theirs, one seat per identity, active scene). The caller has already verified an
+   * invite credential; every shared permission rule still applies.
+   */
+  claimSeat(identityId: string, seatId: string): Promise<boolean>;
   /** Ends this Session, releasing only per-session seat bindings through durable actions. */
   endSession(): Promise<void>;
   /** Resolves once every queued connect/intent/join has been processed. */
@@ -312,6 +318,19 @@ export function createEngine(options: EngineOptions): Engine {
     state: () => state,
     seq: () => seq,
     ephemeralStats: () => ephemeralRelay.stats(),
+    claimSeat(identityId, seatId) {
+      let claimed = false;
+      return serialize(async () => {
+        const outcome = await apply(
+          undefined,
+          'session.join',
+          { seatId, identityId },
+          { actor: { kind: 'seat', identityId } },
+        );
+        claimed = outcome.ok;
+      }).then(() => claimed);
+    },
+
     endSession() {
       return serialize(async () => {
         const seatIds = Object.values(state.seats)
