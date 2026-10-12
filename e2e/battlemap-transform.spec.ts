@@ -112,7 +112,7 @@ test('DM selects, moves and resizes a rectangular battlemap using its real bound
     await expect.poll(() => position()?.position.x).toBe(21);
     await page.getByRole('button', { name: '3D view' }).click();
     await expect(canvas).toBeVisible();
-    await page.getByRole('button', { name: '2D view' }).click();
+    await page.getByRole('button', { name: '3D view' }).click();
     await expect(panel).toBeVisible();
     expect(errors).toEqual([]);
   } finally {

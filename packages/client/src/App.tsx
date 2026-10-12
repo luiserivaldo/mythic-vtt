@@ -5,7 +5,7 @@ import { RightDock } from './ui/RightDock.js';
 import { JoinScreen } from './ui/JoinScreen.js';
 import './ui/shell.css';
 import { BoardCanvas } from './render/BoardCanvas.js';
-import { TopBar } from './ui/TopBar.js';
+import { IdentityStatus } from './ui/IdentityStatus.js';
 
 const THEME_KEY = 'mythic.theme';
 type Theme = 'dark' | 'light';
@@ -29,6 +29,7 @@ export function App() {
   const panelRef = useCallback((node: HTMLDivElement | null) => {
     setPanelContainer(node);
   }, []);
+  const scene = campaign?.activeSceneId ? campaign.scenes[campaign.activeSceneId] : null;
 
   const changeTheme = (next: Theme) => {
     setTheme(next);
@@ -51,7 +52,10 @@ export function App() {
         </p>
       )}
       <UndoHotkey />
-      <TopBar />
+      <header className="ui-top-bar">
+        <span className="ui-scene-heading">{scene?.name ?? campaign?.name ?? 'Table'}</span>
+        <IdentityStatus />
+      </header>
       <div className="ui-app-body">
         <BoardCanvas panelContainer={panelContainer} />
         <RightDock theme={theme} onThemeChange={changeTheme} contextPanelRef={panelRef} />

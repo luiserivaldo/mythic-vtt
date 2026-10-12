@@ -1,13 +1,12 @@
-import { lazy, Suspense, useId, type Ref } from 'react';
+import { lazy, Suspense, useId, useState, type Ref } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { ChatPanel } from './ChatPanel.js';
 import { seatColorsOf } from './chat-panel.js';
-import { DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
+import { DEFAULT_DOCK_TAB, DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
 import { HistoryTools } from './HistoryTools.js';
 import { IdentityTransfer } from './IdentityTransfer.js';
 import { joinUrlsFromNotices } from './share-panel.js';
-import { useDockState } from './dock-store.js';
 import { viewerRole } from './viewer.js';
 
 const ScenePanel = lazy(async () => ({ default: (await import('./ScenePanel.js')).ScenePanel }));
@@ -49,7 +48,8 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
   const seatId = useClientStore((s) => s.seatId);
   const presence = useClientStore((s) => s.presence);
   const notices = useClientStore((s) => s.notices);
-  const { collapsed, requested, open, toggleCollapsed } = useDockState();
+  const [collapsed, setCollapsed] = useState(false);
+  const [requested, setRequested] = useState(DEFAULT_DOCK_TAB);
   const idBase = useId();
 
   const role = viewerRole({ isHost, seatId, campaign });
@@ -135,7 +135,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
           aria-label={collapsed ? 'Expand dock' : 'Collapse dock'}
           aria-expanded={!collapsed}
           onClick={() => {
-            toggleCollapsed();
+            setCollapsed((value) => !value);
           }}
         >
           {collapsed ? '›' : '‹'}
@@ -159,7 +159,8 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             aria-selected={active === tab.id}
             aria-controls={panelId}
             onClick={() => {
-              open(tab.id);
+              setRequested(tab.id);
+              setCollapsed(false);
             }}
           >
             <span aria-hidden="true">{DOCK_ICONS[tab.icon]}</span>

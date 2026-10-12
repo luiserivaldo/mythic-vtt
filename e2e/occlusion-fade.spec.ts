@@ -4,7 +4,14 @@ import {
   withinRenderBudget,
 } from '../packages/client/src/render/performance-budget.js';
 import { orbitPosition, type Orbit3D } from '../packages/client/src/render/camera-3d.js';
-import { RawClient, openClient, startTable, testUlid, type Table } from './harness.js';
+import {
+  RawClient,
+  openClient,
+  settledCameraPose,
+  startTable,
+  testUlid,
+  type Table,
+} from './harness.js';
 
 interface Diagnostics {
   __mythicCamera?: { getPose(): Readonly<Orbit3D> };
@@ -105,10 +112,7 @@ test('selected tokens fade blocking primitives locally in 3D and restore materia
       page.evaluate(() => (globalThis as unknown as Diagnostics).__mythicCamera?.getPose()),
     )
     .not.toBeUndefined();
-  const pose = await page.evaluate(() =>
-    (globalThis as unknown as Diagnostics).__mythicCamera?.getPose(),
-  );
-  if (!pose) throw new Error('camera diagnostics unavailable');
+  const pose = await settledCameraPose(page);
   const camera = orbitPosition(pose);
   const point = { x: (camera.x + 20) / 2, y: (camera.y + 0.6) / 2 - 2, z: (camera.z + 15) / 2 };
   expect(
@@ -192,8 +196,8 @@ test('selected tokens fade blocking primitives locally in 3D and restore materia
   await expect.poll(opacity).toBe(1);
   await page.getByRole('button', { name: 'Focus token', exact: true }).click();
   await expect.poll(opacity).toBe(0.18);
-  await page.getByRole('button', { name: '2D view' }).click();
-  await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
+  await page.getByRole('button', { name: '3D view' }).click();
+  await expect(page.getByRole('button', { name: 'Reset view' })).toHaveCount(0);
   await expect
     .poll(() =>
       page.evaluate(() => (globalThis as unknown as Diagnostics).__mythicOcclusion === undefined),
