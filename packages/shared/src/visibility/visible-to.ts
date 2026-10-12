@@ -135,8 +135,10 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
       let hidden = false;
       for (const [id, prefab] of Object.entries(state.prefabs)) {
         const allowed = viewPrefab(audience, prefab, seat);
-        if (allowed) prefabs[id] = allowed;
-        else hidden = true;
+        if (allowed) {
+          prefabs[id] = allowed;
+          if (allowed !== prefab) hidden = true;
+        } else hidden = true;
       }
       if (hidden) return { ...view, prefabs };
     }
