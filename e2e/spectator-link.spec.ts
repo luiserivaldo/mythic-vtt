@@ -49,7 +49,7 @@ test('spectator links skip identity/seat selection and remain read-only through 
       ],
     ] as const)
       expect(await setup.intent(type, payload)).toMatchObject({ t: 'ack' });
-    await page.getByRole('button', { name: 'Invite', exact: true }).click();
+    await page.getByRole('tab', { name: 'Invite', exact: true }).click();
     const panel = page.getByRole('region', { name: 'Invite players' });
     await panel.getByRole('button', { name: 'Generate new spectator link' }).click();
     await expect(panel.getByRole('status')).toHaveText(
@@ -65,6 +65,7 @@ test('spectator links skip identity/seat selection and remain read-only through 
     await expect(guestPage.getByRole('status')).toHaveText('Connected to New campaign');
     await expect(guestPage.getByRole('complementary', { name: 'DM tools' })).toHaveCount(0);
     await expect(guestPage.getByRole('dialog')).toHaveCount(0);
+    await guestPage.getByRole('tab', { name: 'Settings', exact: true }).click();
     await expect(guestPage.getByText('Identity backup and transfer', { exact: true })).toHaveCount(
       0,
     );

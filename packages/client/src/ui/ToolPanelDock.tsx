@@ -12,14 +12,10 @@ import { useGizmoTarget3D } from '../tools/use-gizmo-target-3d.js';
 import { AoEAffectedPanel } from './AoEAffectedPanel.js';
 import { AoEToolPanel } from './AoEToolPanel.js';
 import { toolPanelLayoutStore, type ToolPanelId } from './tool-panel-layout.js';
-import { isReadOnlyViewer, viewerRole } from './viewer.js';
+import { isReadOnlyViewer } from './viewer.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { RulerPanel } from './RulerPanel.js';
 
-const EntityPanel = lazy(async () => {
-  const module = await import('./EntityPanel.js');
-  return { default: module.EntityPanel };
-});
 const TransformPanel3D = lazy(async () => {
   const module = await import('./TransformPanel3D.js');
   return { default: module.TransformPanel3D };
@@ -87,7 +83,6 @@ export function ToolPanelDock({
 }) {
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
-  const entities = useStore(toolPanelLayoutStore, (state) => state.entities);
   const collapsed = useStore(toolPanelLayoutStore, (state) => state.collapsed);
   const aoeActive = useStore(aoeToolStore, (state) => state.active);
   const rulerActive = useStore(rulerStore, (state) => state.tool);
@@ -95,9 +90,6 @@ export function ToolPanelDock({
   const target2d = useGizmoTarget();
   const target3d = useGizmoTarget3D();
   const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
-  const role = campaign ? viewerRole({ isHost, seatId, campaign }) : 'observer';
-  const canAdmin = role === 'host' || role === 'codm';
-  const showEntities = canAdmin && campaign !== null && entities !== 'hidden';
   const showTransform = !aoeActive && (mode3d ? target3d !== null : target2d !== null);
   const selectedEntity =
     scene && selected.length === 1 ? scene.entities[selected[0] ?? ''] : undefined;
@@ -106,21 +98,10 @@ export function ToolPanelDock({
   const showRuler = scene !== null && (rulerActive || aoeActive);
 
   const showToken = campaign !== null && scene !== null && selectedEntity?.token !== undefined;
-  if (
-    !container ||
-    readOnly ||
-    (!showEntities && !showTransform && !showAoE && !showToken && !showRuler)
-  )
+  if (!container || readOnly || (!showTransform && !showAoE && !showToken && !showRuler))
     return null;
   return createPortal(
     <aside className="ui-tool-dock" aria-label="Tool panels">
-      {showEntities && (
-        <PanelFrame id="entities" label="Entities" collapsed={entities === 'collapsed'}>
-          <Suspense fallback={<p role="status">Loading panel…</p>}>
-            <EntityPanel campaign={campaign} />
-          </Suspense>
-        </PanelFrame>
-      )}
       {showTransform && (
         <PanelFrame id="transform" label="Transform" collapsed={collapsed.transform}>
           <Suspense fallback={<span role="status">Loading transform tools…</span>}>

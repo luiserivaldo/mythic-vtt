@@ -20,7 +20,7 @@ test('the DM adds role templates and the spectator preset receives a read-only p
   dm.on('pageerror', (error) => errors.push(error.message));
   await dm.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
-  await dm.getByRole('button', { name: 'Participants' }).click();
+  await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
 
   for (const label of ['DM / Admin', 'Co-DM', 'Player', 'Spectator']) {
     await dm.getByRole('button', { name: `Add ${label}` }).click();
