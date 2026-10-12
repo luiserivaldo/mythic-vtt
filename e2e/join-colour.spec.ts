@@ -58,7 +58,7 @@ test('join colour persists and colours the avatar and shared ruler in 2D and 3D'
     await setup.waitFor('host presence colour', () =>
       setup.frames.some((f) => f.includes('"color":"#c04e32"')),
     );
-    await player.getByRole('button', { name: 'Ruler', exact: true }).click();
+    await player.getByRole('button', { name: 'Measure', exact: true }).click();
     await player.getByLabel('Ruler fade').selectOption('linger');
     const box = await player.locator('canvas').boundingBox();
     if (!box) throw new Error('canvas missing');
