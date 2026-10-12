@@ -1,5 +1,6 @@
 import { tokenSetQuickField } from './token.setQuickField.js';
 import { historyUndo } from './history.undo.js';
+import { historyRollback } from './history.rollback.js';
 import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import { tokenSetRings } from './token.setRings.js';
 import { sceneDelete } from './scene.delete.js';
@@ -68,6 +69,7 @@ export const allActions: readonly AnyAction[] = [
   sceneSetPlayerToggles,
   historyUndo,
   tokenSetQuickField,
+  historyRollback,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

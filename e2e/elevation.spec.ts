@@ -59,6 +59,8 @@ test('host sets elevation through the panel and sees the badge in scene units', 
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(table.clientUrl);
+  await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
+  await expect(page.getByTestId('token-label').filter({ hasText: 'Archer' })).toBeVisible();
 
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();

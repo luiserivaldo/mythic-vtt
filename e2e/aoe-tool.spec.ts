@@ -59,19 +59,21 @@ test('the DM replaces and quick-deletes their persistent AoE without page errors
       Object.values((host.state as Snapshot).scenes[sceneId]?.entities ?? {}).filter(
         (entity) => entity.aoe !== undefined,
       ).length;
+    // The tool ignores pointer input while a placement or removal awaits the host's ack, and the
+    // raw observer can see the patch before the page does. `aria-busy` is the page's own signal.
+    const idle = () => expect(tool).toHaveAttribute('aria-busy', 'false');
     await page.mouse.click(first.x, first.y);
     await expect.poll(() => ownAoE()?.aoe?.kind).toBe('cone');
+    await idle();
     expect(aoeCount()).toBe(1);
     const firstPosition = JSON.stringify(ownAoE()?.transform.position);
-    await expect(async () => {
-      await page.mouse.click(second.x, second.y);
-      await expect
-        .poll(() => JSON.stringify(ownAoE()?.transform.position), { timeout: 1_000 })
-        .not.toBe(firstPosition);
-    }).toPass();
+    await page.mouse.click(second.x, second.y);
+    await expect.poll(() => JSON.stringify(ownAoE()?.transform.position)).not.toBe(firstPosition);
+    await idle();
     expect(aoeCount()).toBe(1);
     await page.mouse.click(second.x, second.y, { button: 'right' });
     await expect.poll(() => ownAoE()).toBeUndefined();
+    await idle();
     expect(aoeCount()).toBe(0);
     await expect(page.getByRole('status')).toContainText('Connected to');
     expect(errors).toEqual([]);
