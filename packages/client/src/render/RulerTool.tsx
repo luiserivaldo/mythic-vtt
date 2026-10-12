@@ -6,6 +6,7 @@ import { Raycaster, Vector2, type Object3D } from 'three';
 import { useStore } from 'zustand';
 import type { Scene, Vec3 } from '@mythic/shared';
 import { rulerStore } from '../tools/ruler-store.js';
+import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { measurementScene } from '../tools/measurement-tool.js';
 import { intersectPlaneY } from '../tools/token-drag.js';
 import {
@@ -15,6 +16,7 @@ import {
   rulerExpired,
   rulerDragStarted,
   rulerOwnerName,
+  rulerRightClick,
   shouldSendRuler,
   withCursor,
   type RulerPhase,
@@ -34,8 +36,9 @@ const NO_REMOTE: readonly never[] = [];
  * While the tool is armed a press claims its pointer (pointer-claims) so the camera does not
  * pan and TokenDrag does not start. A drag measures until release, optionally retaining the result;
  * a short press retains click-to-add waypoints. A short token click while idle exits the tool so the
- * normal selection handler can run. Right-click or Esc clears. The path is render-local plus an
- * ephemeral relay; nothing is an action.
+ * normal selection handler can run. In 2D a right click adds a waypoint and measuring continues from
+ * it (MEAS-08/Q31); everywhere else the ruler keeps clearing on right click. Esc clears. The path is
+ * render-local plus an ephemeral relay; nothing is an action.
  */
 function entityIdForObject(object: Object3D, scene: Scene): string | undefined {
   let current: Object3D | null = object;
@@ -315,10 +318,26 @@ export function RulerTool({
       finish();
     };
     const onContextMenu = (e: MouseEvent) => {
-      if (!rulerStore.getState().tool || e.target !== el) return;
+      if (e.target !== el) return;
+      const s = rulerStore.getState();
+      const action = rulerRightClick({
+        tool: s.tool,
+        aoeActive: aoeToolStore.getState().active,
+        mode: s.mode,
+        measuring: s.phase === 'active',
+      });
+      if (action === 'ignore') return;
+      // The right click is ours: keep the browser menu and the board's own menu out of it.
       e.preventDefault();
       e.stopPropagation();
-      cancel();
+      if (action === 'clear') {
+        cancel();
+        return;
+      }
+      const point = pointAt(e);
+      if (!point) return;
+      s.addWaypoint(point);
+      publish('active', true);
     };
 
     const onKey = (e: KeyboardEvent) => {

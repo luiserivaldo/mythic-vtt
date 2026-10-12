@@ -1,6 +1,6 @@
 import type { Vec3 } from '@mythic/shared';
 import { createStore } from 'zustand/vanilla';
-import type { RemoteRuler } from './ruler.js';
+import { appendWaypoint, finiteRulerPoint, type RemoteRuler } from './ruler.js';
 
 /** Render-local ruler state (MEAS-01). Never game state; only relayed through ephemerals. */
 interface RulerState {
@@ -25,6 +25,8 @@ interface RulerState {
   setPersistent(persistent: boolean): void;
   begin(sceneId: string, first: Vec3): void;
   setPoints(points: readonly Vec3[]): void;
+  /** M1-45: a 2D right click commits a waypoint and the path keeps growing from it. */
+  addWaypoint(point: Vec3): void;
   setCursor(cursor: Vec3 | null): void;
   finish(): void;
   clear(): void;
@@ -62,6 +64,12 @@ export const rulerStore = createStore<RulerState>()((set) => ({
   },
   setPoints: (points) => {
     set({ points });
+  },
+  addWaypoint: (point) => {
+    set((state) => {
+      if (state.phase !== 'active' || !finiteRulerPoint(point)) return state;
+      return { points: appendWaypoint(state.points, point), cursor: point };
+    });
   },
   setCursor: (cursor) => {
     set({ cursor });
