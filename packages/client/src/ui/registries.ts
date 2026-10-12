@@ -94,6 +94,8 @@ export const railTools = createRegistry<RailTool>([
 ]);
 
 export const dockTabs = createRegistry<DockTab>([
+  { id: 'chat', label: 'Chat', icon: 'chat', group: 'play', allowed: everyone, panel: 'chat' },
+  { id: 'sheet', label: 'Sheet', icon: 'sheet', group: 'play', allowed: everyone, panel: 'sheet' },
   {
     id: 'scenes',
     label: 'Scenes',
@@ -136,6 +138,15 @@ export const dockTabs = createRegistry<DockTab>([
     panel: 'seats',
   },
   { id: 'share', label: 'Invite', icon: 'share', group: 'table', allowed: host, panel: 'share' },
+  { id: 'help', label: 'Help', icon: 'help', group: 'info', allowed: everyone, panel: 'help' },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: 'settings',
+    group: 'info',
+    allowed: everyone,
+    panel: 'settings',
+  },
 ]);
 
 export const tokenQuickFields = createRegistry<TokenQuickField>([

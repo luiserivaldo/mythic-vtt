@@ -128,6 +128,7 @@ test('Ctrl+Z, History multi-select undo, and no leak of an undone DM-layer actio
   }
 
   // 3. The DM selects both of the player's moves in History and undoes them from the menu.
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'History', exact: true }).click();
   const history = page.getByRole('region', { name: 'Action history' });
   await expect(history.getByText(`#${String(secondMove)} token.move`)).toBeVisible();

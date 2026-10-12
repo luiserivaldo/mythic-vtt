@@ -59,7 +59,7 @@ test('the marker picker syncs, persists and never sends private markers', async 
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(table.clientUrl);
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Hero', exact: true }).click();
   await page.getByRole('button', { name: 'Restore Token panel' }).click();
   const panel = page.getByRole('region', { name: 'Token status markers' });
@@ -184,7 +184,7 @@ test('the marker picker syncs, persists and never sends private markers', async 
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await expect(panel.getByRole('listitem')).toHaveCount(2);
   await page.reload();
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Hero', exact: true }).click();
   await page.getByRole('button', { name: 'Restore Token panel' }).click();
   await expect(panel.getByRole('listitem')).toHaveCount(2);

@@ -4,30 +4,31 @@ import { TOOL_PANEL_ORDER, toolPanelLayoutStore } from './tool-panel-layout.js';
 describe('tool panel layout', () => {
   beforeEach(() => {
     toolPanelLayoutStore.setState({
-      entities: 'hidden',
       collapsed: { transform: false, aoe: false, token: true, ruler: false },
     });
   });
 
   it('keeps a stable stacking order', () => {
-    expect(TOOL_PANEL_ORDER).toEqual(['entities', 'transform', 'aoe', 'token', 'ruler']);
+    expect(TOOL_PANEL_ORDER).toEqual(['transform', 'aoe', 'token', 'ruler']);
   });
 
   it('collapses active panels without hiding their restore control', () => {
-    toolPanelLayoutStore.getState().toggleEntities();
-    toolPanelLayoutStore.getState().collapse('entities');
+    toolPanelLayoutStore.getState().collapse('transform');
     toolPanelLayoutStore.getState().collapse('aoe');
-
-    expect(toolPanelLayoutStore.getState()).toMatchObject({
-      entities: 'collapsed',
-      collapsed: { transform: false, aoe: true },
+    expect(toolPanelLayoutStore.getState().collapsed).toEqual({
+      transform: true,
+      aoe: true,
+      token: true,
+      ruler: false,
     });
 
-    toolPanelLayoutStore.getState().restore('entities');
+    toolPanelLayoutStore.getState().restore('transform');
     toolPanelLayoutStore.getState().restore('aoe');
-    expect(toolPanelLayoutStore.getState()).toMatchObject({
-      entities: 'open',
-      collapsed: { transform: false, aoe: false, token: true, ruler: false },
+    expect(toolPanelLayoutStore.getState().collapsed).toEqual({
+      transform: false,
+      aoe: false,
+      token: true,
+      ruler: false,
     });
   });
 });
