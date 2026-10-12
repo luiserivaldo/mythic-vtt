@@ -31,3 +31,5 @@ export { prefabPlace } from './prefab.place.js';
 export { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 export { canReadEntityLabel, canUseEntity, isAdmin, isLayerLocked } from './entity-access.js';
 export { historyUndo, UndoRequest, HistoryUndoPayload } from './history.undo.js';
+export { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
+export { canUseSceneToggle, TOGGLE_FOR_CHANNEL } from './scene-toggles.js';
