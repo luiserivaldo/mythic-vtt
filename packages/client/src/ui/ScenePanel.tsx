@@ -99,6 +99,7 @@ export function ScenePanel({ campaign }: { campaign: Campaign }) {
                 key={`${row.id}:${JSON.stringify(backgroundDraft(campaign, row.id))}`}
                 sceneId={row.id}
                 initial={backgroundDraft(campaign, row.id)}
+                skybox={campaign.scenes[row.id]?.environment.skybox}
                 send={send}
               />
             )}

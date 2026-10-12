@@ -72,6 +72,8 @@ export interface RenderScene {
   background: string;
   /** ENV-07: optional gradient top colour (3D only). */
   zenith?: string;
+  /** ENV-07: optional uploaded image used as the 3D skybox; the colour/gradient is the fallback. */
+  skybox?: AssetRef;
   entities: RenderEntity[];
 }
 
@@ -143,6 +145,7 @@ export function mapScene(scene: Scene): RenderScene {
     id: scene.id,
     background: scene.environment.background,
     ...(scene.environment.zenith ? { zenith: scene.environment.zenith } : {}),
+    ...(scene.environment.skybox ? { skybox: scene.environment.skybox } : {}),
     entities: orderedEntities(
       Object.values(scene.entities).map((entity) => ({
         id: entity.id,
