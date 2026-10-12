@@ -1,13 +1,43 @@
 import { historyGroups } from './history-groups.js';
 import { HistoryPage, type HistoryEntry } from '@mythic/shared';
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { loadOrCreateIdentity } from '../net/identity.js';
 import { useClientStore } from '../store/react.js';
+import { isUndoableType, prune, select, type Selection } from './history-selection.js';
+import { SubmitContext } from './submit.js';
 import { viewerRole } from './viewer.js';
 
-function HistoryPanel() {
+function HistoryPanel({ canUndo }: { canUndo: boolean }) {
   const campaign = useClientStore((state) => state.campaign);
+  const submit = useContext(SubmitContext);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [selection, setSelection] = useState<Selection>({ selected: new Set() });
+  const [menu, setMenu] = useState<{ x: number; y: number }>();
+  const selectable = entries.filter((entry) => isUndoableType(entry.type)).map((e) => e.seq);
+  const selectableKey = selectable.join(',');
+  useEffect(() => {
+    setSelection((current) => prune(current, selectable));
+  }, [selectableKey]);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => {
+      setMenu(undefined);
+    };
+    window.addEventListener('pointerdown', close);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+    };
+  }, [menu]);
+  async function undoSelected() {
+    setMenu(undefined);
+    if (!submit || selection.selected.size === 0) return;
+    const result = await submit('history.undo', {
+      targetSeqs: [...selection.selected].sort((a, b) => a - b),
+    });
+    if (!result.ok) return; // the shell has already shown why
+    setSelection({ selected: new Set() });
+    await load();
+  }
   const [before, setBefore] = useState<number>();
   const [seatId, setSeatId] = useState('');
   const [entityId, setEntityId] = useState('');
@@ -112,6 +142,17 @@ function HistoryPanel() {
       >
         Refresh history
       </button>
+      {canUndo && (
+        <button
+          type="button"
+          disabled={busy || selection.selected.size === 0}
+          onClick={() => {
+            void undoSelected();
+          }}
+        >
+          Undo selected ({selection.selected.size})
+        </button>
+      )}
       {error && <p role="alert">{error}</p>}
       {!busy && entries.length === 0 && <p>No visible actions.</p>}
       <ol>
@@ -124,7 +165,35 @@ function HistoryPanel() {
             </h3>
             <ol>
               {group.entries.map((entry) => (
-                <li key={`${entry.sessionId}:${String(entry.seq)}`}>
+                <li
+                  key={`${entry.sessionId}:${String(entry.seq)}`}
+                  data-selected={selection.selected.has(entry.seq) || undefined}
+                  onContextMenu={(event) => {
+                    if (!canUndo || !selectable.includes(entry.seq)) return;
+                    event.preventDefault();
+                    if (!selection.selected.has(entry.seq))
+                      setSelection((current) => select(current, selectable, entry.seq, 'only'));
+                    setMenu({ x: event.clientX, y: event.clientY });
+                  }}
+                >
+                  {canUndo && selectable.includes(entry.seq) && (
+                    <input
+                      type="checkbox"
+                      aria-label={`Select action #${String(entry.seq)}`}
+                      checked={selection.selected.has(entry.seq)}
+                      onChange={() => undefined}
+                      onClick={(event) => {
+                        setSelection((current) =>
+                          select(
+                            current,
+                            selectable,
+                            entry.seq,
+                            event.shiftKey ? 'range' : 'toggle',
+                          ),
+                        );
+                      }}
+                    />
+                  )}
                   <details>
                     <summary>
                       #{entry.seq} {entry.type} —{' '}
@@ -149,6 +218,35 @@ function HistoryPanel() {
           </li>
         ))}
       </ol>
+      {menu && (
+        <div
+          role="menu"
+          aria-label="History actions"
+          className="ui-history-menu"
+          style={{ left: menu.x, top: menu.y }}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.stopPropagation(); // closes the menu, not the whole History panel
+              setMenu(undefined);
+            }
+          }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            autoFocus
+            onClick={() => {
+              void undoSelected();
+            }}
+          >
+            Undo{' '}
+            {selection.selected.size > 1 ? `${String(selection.selected.size)} actions` : 'action'}
+          </button>
+        </div>
+      )}
       {before !== undefined && (
         <button
           type="button"
@@ -202,7 +300,7 @@ export function HistoryTools() {
           <button type="button" aria-label="Close History panel" onClick={close}>
             Close
           </button>
-          <HistoryPanel key={`${campaign.id}:${seatId ?? ''}:${role}`} />
+          <HistoryPanel key={`${campaign.id}:${seatId ?? ''}:${role}`} canUndo={isHost} />
         </div>
       )}
     </aside>

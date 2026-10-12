@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { HistoryTools } from './ui/HistoryTools.js';
+import { UndoHotkey } from './ui/UndoHotkey.js';
 import { useClientStore } from './store/react.js';
 import { DmPanels } from './ui/DmPanels.js';
 import { JoinScreen } from './ui/JoinScreen.js';
@@ -53,6 +54,7 @@ export function App() {
           {fatalError}
         </p>
       )}
+      <UndoHotkey />
       <header className="ui-top-bar">
         <span className="ui-scene-heading">{scene?.name ?? campaign?.name ?? 'Table'}</span>
         <IdentityStatus />

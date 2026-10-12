@@ -1,3 +1,4 @@
+import { historyUndo } from './history.undo.js';
 import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import { tokenSetRings } from './token.setRings.js';
 import { sceneDelete } from './scene.delete.js';
@@ -64,6 +65,7 @@ export const allActions: readonly AnyAction[] = [
   sceneDelete,
   tokenSetFlying,
   sceneSetPlayerToggles,
+  historyUndo,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));
