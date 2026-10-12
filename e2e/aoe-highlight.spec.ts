@@ -153,7 +153,8 @@ test('D35: a player sees a placeholder for an unreadable label and nothing for a
   const readableId = testUlid('TOKEN', 511);
   const ownerOnlyId = testUlid('TOKEN', 512);
   const dmLayerId = testUlid('TOKEN', 513);
-  const aoeId = testUlid('AOE', 514);
+  // M3-14: an AoE belongs to the identity that placed it, so its id is that identity.
+  const aoeId = dmIdentity.identityId;
   const transform = (x: number, y: number, z: number) => ({
     position: { x, y, z },
     rotation: { x: 0, y: 0, z: 0, w: 1 },
