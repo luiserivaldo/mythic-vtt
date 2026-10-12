@@ -3,7 +3,7 @@ import { SceneOverlay } from './SceneOverlay.js';
 import { Canvas, useThree } from '@react-three/fiber';
 import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
 import { OrthographicCamera } from '@react-three/drei';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo } from 'react';
 import { useStore } from 'zustand';
 import { tokenDragStore } from '../tools/token-drag-store.js';
 import { withLocalDrag } from '../tools/token-drag.js';
@@ -23,9 +23,8 @@ import { TransformGizmo } from './TransformGizmo.js';
 import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
 import { outsideColor } from './canvas-style.js';
 import type { GroundBounds } from './camera-3d.js';
-import { useViewMode, type ViewMode } from './view-mode-store.js';
+import { useViewMode, viewModeStore, type ViewMode } from './view-mode-store.js';
 import { useViewDirector } from './use-view-director.js';
-import { ViewToggle } from './ViewToggle.js';
 import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
@@ -111,7 +110,11 @@ function BoardScene({
         </Suspense>
       ) : (
         <>
-          <PanZoomControls bounds={canvasSize} frameKey={frameKey} />
+          <PanZoomControls
+            bounds={canvasSize}
+            frameKey={`${frameKey}:${String(resetToken)}`}
+            initialView={director.restored2d ? director.view2d : undefined}
+          />
           <OrthographicCamera
             makeDefault
             position={[director.view2d.centerX, 20, director.view2d.centerZ]}
@@ -157,7 +160,7 @@ function BoardScene({
 export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | null }) {
   const viewMode = useViewMode();
   const mode3d = viewMode === '3d';
-  const [resetToken, setResetToken] = useState(0);
+  const resetToken = useStore(viewModeStore, (state) => state.resetToken);
   const campaign = useViewedCampaign();
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
@@ -180,7 +183,7 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
       tabIndex={0}
       onKeyDown={(event) => {
         handleBoardEscape(event);
-        if (mode3d && event.key === 'Home') setResetToken((n) => n + 1);
+        if (mode3d && event.key === 'Home') viewModeStore.getState().reset();
       }}
       className="ui-board"
     >
@@ -190,18 +193,8 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
         {/* UI-TOOL-01..07: the rail lists every tool; one a seat may not use is disabled, not hidden. */}
         <ToolRail />
-        <hr className="ui-rail-divider" />
-        <ViewToggle />
         {mode3d && (
           <>
-            <button
-              type="button"
-              onClick={() => {
-                setResetToken((n) => n + 1);
-              }}
-            >
-              Reset view
-            </button>
             <span className="ui-camera-hint">
               3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom ·
               middle-click a selected token to lock its height

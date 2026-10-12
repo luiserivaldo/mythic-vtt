@@ -192,8 +192,8 @@ test('selected tokens fade blocking primitives locally in 3D and restore materia
   await expect.poll(opacity).toBe(1);
   await page.getByRole('button', { name: 'Focus token', exact: true }).click();
   await expect.poll(opacity).toBe(0.18);
-  await page.getByRole('button', { name: '3D view' }).click();
-  await expect(page.getByRole('button', { name: 'Reset view' })).toHaveCount(0);
+  await page.getByRole('button', { name: '2D view' }).click();
+  await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() => (globalThis as unknown as Diagnostics).__mythicOcclusion === undefined),
