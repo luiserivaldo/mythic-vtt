@@ -17,7 +17,7 @@ async function expectChatPanel(page: Page): Promise<void> {
   await expect(panel).toBeVisible();
   await expect(panel.getByRole('log', { name: 'Chat messages' })).toBeVisible();
   await expect(panel.getByText('No messages yet.')).toBeVisible();
-  await expect(panel.getByLabel('Message')).toBeDisabled();
+  await expect(panel.getByLabel('Message', { exact: true })).toBeDisabled();
   await expect(panel.getByRole('button', { name: 'Send' })).toBeDisabled();
   await expect(panel.getByText(/Chat is coming soon/)).toBeVisible();
   // No dice hotkey chips: the composer holds nothing but the send button.
