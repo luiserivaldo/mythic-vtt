@@ -60,6 +60,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
   const tabId = (id: string) => `${idBase}-tab-${id}`;
   const panelId = `${idBase}-panel`;
   const board = viewed ?? campaign;
+  const joinUrls = joinUrlsFromNotices(notices);
 
   const content = () => {
     switch (active) {
@@ -118,10 +119,11 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             campaign={campaign}
             presence={presence?.seats ?? null}
             unseated={presence?.unseated}
+            joinUrls={joinUrls}
           />
         );
       case 'share':
-        return <SharePanel joinUrls={joinUrlsFromNotices(notices)} />;
+        return <SharePanel joinUrls={joinUrls} />;
       default:
         return null;
     }
