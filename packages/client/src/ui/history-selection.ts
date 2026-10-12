@@ -5,6 +5,14 @@ export function isUndoableType(type: string): boolean {
   return !NOT_UNDOABLE.test(type);
 }
 
+/**
+ * HIST-07: rolling back to "just after #N" only makes sense for a point before the newest action.
+ * The host decides whether the point still exists; this only hides the button where it is moot.
+ */
+export function canRollbackTo(seq: number, currentSeq: number | null): boolean {
+  return currentSeq !== null && seq >= 1 && seq < currentSeq;
+}
+
 export interface Selection {
   selected: ReadonlySet<number>;
   /** The entry the last click landed on; a Shift-click extends from it. */
