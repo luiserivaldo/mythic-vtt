@@ -97,7 +97,7 @@ test('selected tokens fade blocking primitives locally in 3D and restore materia
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(table.clientUrl);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Focus token', exact: true }).click();
   await page.getByRole('button', { name: '3D view' }).click();
   await expect

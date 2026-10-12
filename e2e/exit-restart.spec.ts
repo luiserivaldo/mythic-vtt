@@ -67,10 +67,10 @@ test('M0 exit: browser sync survives clean and SIGKILL host restarts', async ({ 
     await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
     await expect(player.getByRole('status')).toHaveText('Connected to New campaign');
 
-    await dm.getByRole('button', { name: 'Scenes', exact: true }).click();
+    await dm.getByRole('tab', { name: 'Scenes', exact: true }).click();
     await dm.getByLabel('New scene name').fill('M0 persistent scene');
     await dm.getByRole('button', { name: 'Create scene' }).click();
-    await dm.getByRole('button', { name: 'Entities', exact: true }).click();
+    await dm.getByRole('tab', { name: 'Entities', exact: true }).click();
     await dm.getByLabel('Token name').fill('Persistent knight');
     await dm.getByRole('button', { name: 'Create token' }).click();
     // The host patch may arrive before the form clears its draft on ack. Wait for both
@@ -81,7 +81,7 @@ test('M0 exit: browser sync survives clean and SIGKILL host restarts', async ({ 
     await expect(dm.getByLabel('Token name')).toHaveValue('');
     await dm.getByLabel('Token name').fill('Persistent mage');
     await dm.getByRole('button', { name: 'Create token' }).click();
-    await dm.getByRole('button', { name: 'Close Entities panel' }).click();
+    await dm.getByRole('tab', { name: 'Chat', exact: true }).click();
 
     // Browser A performs a real token drag; browser B must render the resulting durable action.
     const beforeFirstMove = highestSeq(playerFrames);

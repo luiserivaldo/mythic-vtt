@@ -33,7 +33,7 @@ it('allows bounded hex colours and rejects invalid profile/preview colours at th
   expect(RulerPreview.safeParse(preview).success).toBe(false);
 });
 
-it('round-trips the v5 join-profile golden frames and requires a matching peer version', () => {
+it('still decodes the v5 join-profile golden frames, though v5 is no longer a supported version', () => {
   const fixture = JSON.parse(
     readFileSync(
       new URL('../../../fixtures/protocol/v5/join-profile.json', import.meta.url),
@@ -45,7 +45,7 @@ it('round-trips the v5 join-profile golden frames and requires a matching peer v
     expect(decoded.ok).toBe(true);
     if (!decoded.ok) throw new Error('invalid v5 client fixture');
     expect(JSON.parse(encodeClientMessage(decoded.message))).toEqual(frame);
-    if (decoded.message.t === 'hello') expect(isSupportedVersion(decoded.message.v)).toBe(true);
+    if (decoded.message.t === 'hello') expect(isSupportedVersion(decoded.message.v)).toBe(false);
   }
   for (const frame of fixture.server) {
     const decoded = decodeServerMessage(JSON.stringify(frame));
@@ -54,4 +54,5 @@ it('round-trips the v5 join-profile golden frames and requires a matching peer v
     expect(JSON.parse(encodeServerMessage(decoded.message))).toEqual(frame);
   }
   expect(isSupportedVersion(4)).toBe(false);
+  expect(isSupportedVersion(5)).toBe(false);
 });

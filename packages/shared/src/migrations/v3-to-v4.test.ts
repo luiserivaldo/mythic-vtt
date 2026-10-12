@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { storeMigrate } from './registry.js';
+import { createStoreMigrate, storeMigrate } from './registry.js';
+import { v3ToV4 } from './v3-to-v4.js';
 import { makeCampaign, IDS } from '../actions/testing.js';
 import { Campaign } from '../schema/index.js';
 
@@ -10,7 +11,12 @@ describe('v3 to v4 interaction migration', () => {
     const next = Campaign.parse(storeMigrate('campaign', 3, state));
     expect(next.seats[IDS.owner]?.interactionEnabled).toBe(true);
     expect(state).toEqual(old);
-    const snapshot = storeMigrate('snapshot', 3, { schemaVersion: 3, state, seq: 42 });
+    // Run this step alone so the assertion keeps describing v4, not whatever the chain ends at.
+    const snapshot = createStoreMigrate([v3ToV4], 4)('snapshot', 3, {
+      schemaVersion: 3,
+      state,
+      seq: 42,
+    });
     expect(snapshot).toMatchObject({
       schemaVersion: 4,
       seq: 42,
