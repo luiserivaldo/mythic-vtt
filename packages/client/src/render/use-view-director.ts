@@ -98,6 +98,7 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
       // Remember the 3D pose so a quick toggle back lands where the user was.
       const from = orbitRef.current;
       if (tween.current?.direction !== 'in') resting3d.current = from;
+      setRestored2d(true);
       const view = orbitToView2d(from, height);
       setView2d(view);
       tween.current = { from, to: view2dToOrbit(view, height), startedAt: null, direction: 'out' };

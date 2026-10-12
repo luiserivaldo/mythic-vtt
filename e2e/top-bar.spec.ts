@@ -56,7 +56,7 @@ test('segmented view controls retain selection, tool and camera focus; reset wor
     await page.getByRole('button', { name: '3D view' }).click();
     const pose = () =>
       page.evaluate(() => {
-        const scope = window as unknown as {
+        const scope = globalThis as unknown as {
           __mythicCamera?: { getPose(): { targetX: number; targetZ: number } };
         };
         return scope.__mythicCamera?.getPose();
