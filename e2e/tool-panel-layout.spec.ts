@@ -43,7 +43,7 @@ test('tool panels share an ordered dock and active tools collapse to restore but
   await expect(page.getByRole('button', { name: 'Restore Transform panel' })).toBeVisible();
   await page.getByRole('button', { name: 'Restore Transform panel' }).click();
 
-  await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+  await page.getByRole('button', { name: 'Measure', exact: true }).click();
   await page.getByText('Measurement shapes', { exact: true }).click();
   await page.getByLabel('Measurement shape').selectOption('cone');
   await dock.getByRole('button', { name: 'Close Ruler panel' }).click();

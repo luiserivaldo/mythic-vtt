@@ -107,8 +107,8 @@ test('DM, player and spectator keep shared state and privacy across independent 
     await expect(
       page.getByTestId('token-label').filter({ hasText: 'Elevated sentinel' }),
     ).toHaveCount(1);
-    await page.getByRole('button', { name: '3D view' }).click();
-    await expect(page.getByRole('button', { name: 'Reset view' })).toHaveCount(0);
+    await page.getByRole('button', { name: '2D view' }).click();
+    await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
     await expect(page.getByTestId('elevation-badge').filter({ hasText: '20 ft' })).toHaveCount(1);
   }
   await player.page.reload();

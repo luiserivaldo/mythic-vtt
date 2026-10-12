@@ -1,12 +1,13 @@
-import { lazy, Suspense, useId, useState, type Ref } from 'react';
+import { lazy, Suspense, useId, type Ref } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { ChatPanel } from './ChatPanel.js';
 import { seatColorsOf } from './chat-panel.js';
-import { DEFAULT_DOCK_TAB, DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
+import { DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
 import { HistoryTools } from './HistoryTools.js';
 import { IdentityTransfer } from './IdentityTransfer.js';
 import { joinUrlsFromNotices } from './share-panel.js';
+import { useDockState } from './dock-store.js';
 import { viewerRole } from './viewer.js';
 
 const ScenePanel = lazy(async () => ({ default: (await import('./ScenePanel.js')).ScenePanel }));
@@ -48,8 +49,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
   const seatId = useClientStore((s) => s.seatId);
   const presence = useClientStore((s) => s.presence);
   const notices = useClientStore((s) => s.notices);
-  const [collapsed, setCollapsed] = useState(false);
-  const [requested, setRequested] = useState(DEFAULT_DOCK_TAB);
+  const { collapsed, requested, open, toggleCollapsed } = useDockState();
   const idBase = useId();
 
   const role = viewerRole({ isHost, seatId, campaign });
@@ -106,7 +106,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'scenes':
         return <ScenePanel campaign={campaign} />;
       case 'layers':
-        return <LayerPanel campaign={board} />;
+        return <LayerPanel campaign={board} role={role} />;
       case 'map':
         return <MapPanel campaign={board} />;
       case 'entities':
@@ -137,7 +137,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
           aria-label={collapsed ? 'Expand dock' : 'Collapse dock'}
           aria-expanded={!collapsed}
           onClick={() => {
-            setCollapsed((value) => !value);
+            toggleCollapsed();
           }}
         >
           {collapsed ? '›' : '‹'}
@@ -161,8 +161,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             aria-selected={active === tab.id}
             aria-controls={panelId}
             onClick={() => {
-              setRequested(tab.id);
-              setCollapsed(false);
+              open(tab.id);
             }}
           >
             <span aria-hidden="true">{DOCK_ICONS[tab.icon]}</span>

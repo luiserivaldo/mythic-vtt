@@ -820,3 +820,55 @@ main [tabindex]:focus-visible {
   background: var(--ui-panel-bg, Canvas);
   box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
 }
+/* UX-15: the tool rail inside the board's control column. */
+.ui-rail-divider {
+  align-self: stretch;
+  margin: 0.2rem 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+}
+.ui-board-controls .ui-rail-tool {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: left;
+}
+.ui-rail-glyph {
+  width: 1.1rem;
+  text-align: center;
+}
+.ui-board-controls button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-rail-tool[data-wip] {
+  border-style: dashed;
+  font-style: italic;
+}
+.ui-rail-wip {
+  margin-left: auto;
+  padding: 0 0.3rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-style: normal;
+}
+
+.ui-view-mode {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+.ui-view-mode button {
+  border-radius: 0;
+}
+.ui-view-mode button:first-child {
+  border-radius: 0.3rem 0 0 0.3rem;
+}
+.ui-view-mode button:last-child {
+  border-radius: 0 0.3rem 0.3rem 0;
+}
+.ui-scene-heading {
+  min-width: 0;
+  max-width: 35%;
+}
