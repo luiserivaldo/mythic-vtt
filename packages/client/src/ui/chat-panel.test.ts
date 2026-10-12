@@ -85,7 +85,9 @@ it('colours a roll row with the roller seat colour, giving it props', () => {
   expect(html).not.toContain(CHAT_EMPTY_STATE);
   expect(html).toContain('1d20 + 3 = 17');
   expect(html).toContain('background:#c04e32');
-  expect(html).toContain(`color:${rollTextColor('#c04e32')}`);
+  // The roller's colour is light, so the row text flips to the light label colour to stay readable.
+  expect(contrastRatio(LABEL_TEXT_COLOR, '#c04e32') ?? 0).toBeGreaterThanOrEqual(4.5);
+  expect(html).toContain(`color:${LABEL_TEXT_COLOR}`);
   expect(render([roll({ seatId: 'archived-seat' })], { [SEAT]: '#c04e32' })).toContain(
     `background:${NEUTRAL_ROLL_COLOR}`,
   );
