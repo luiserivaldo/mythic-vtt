@@ -105,7 +105,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'scenes':
         return <ScenePanel campaign={campaign} />;
       case 'layers':
-        return <LayerPanel campaign={board} />;
+        return <LayerPanel campaign={board} role={role} />;
       case 'map':
         return <MapPanel campaign={board} />;
       case 'entities':
