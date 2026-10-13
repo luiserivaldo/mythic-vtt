@@ -17,6 +17,10 @@
   --ui-accent: #f0ae55;
   --ui-on-accent: #14110b;
   --ui-danger: #ff9b8f;
+  /* UI-TOP-06: the seat status dot's tones; the thresholds that pick them live in seat-avatars.ts. */
+  --ui-seat-good: #4ade80;
+  --ui-seat-poor: #f0ae55;
+  --ui-seat-bad: #ff9b8f;
   --ui-bar-pad: 0.4rem;
   --ui-drawer-width: min(28rem, 100vw);
 }
@@ -587,6 +591,9 @@ main [tabindex]:focus-visible {
   --ui-accent: #9b5717;
   --ui-on-accent: #ffffff;
   --ui-danger: #a12626;
+  --ui-seat-good: #1f7a3d;
+  --ui-seat-poor: #8a4a10;
+  --ui-seat-bad: #a12626;
 }
 .ui-top-bar {
   display: flex;
@@ -608,6 +615,87 @@ main [tabindex]:focus-visible {
 .ui-top-bar .ui-identity-status {
   margin-left: auto;
   padding: 0;
+}
+/* UI-TOP-06: one badge per occupied seat, right-aligned beside the identity; the strip is absent
+   for players and spectators, who receive no presence feed, so the identity keeps the auto margin. */
+.ui-top-bar .ui-seat-avatars {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.ui-top-bar .ui-seat-avatars + .ui-identity-status {
+  margin-left: 0;
+}
+.ui-seat-avatar {
+  position: relative;
+  border-radius: 50%;
+}
+.ui-seat-avatar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+/* The dot's shape, not only its colour, says the state: filled good/poor/bad, a ring offline,
+   a dashed ring before the host has a first reading. */
+.ui-seat-avatar-dot {
+  position: absolute;
+  right: -0.1rem;
+  bottom: -0.1rem;
+  width: 0.65rem;
+  height: 0.65rem;
+  box-sizing: border-box;
+  border: 2px solid var(--ui-bg);
+  border-radius: 50%;
+}
+.ui-seat-avatar-dot[data-tone='green'] {
+  background: var(--ui-seat-good);
+}
+.ui-seat-avatar-dot[data-tone='orange'] {
+  background: var(--ui-seat-poor);
+}
+.ui-seat-avatar-dot[data-tone='red'] {
+  background: var(--ui-seat-bad);
+}
+.ui-seat-avatar-dot[data-tone='grey'] {
+  background: transparent;
+  border-color: var(--ui-muted);
+}
+/* Offline is a ring; "not measured yet" is the same ring, dashed, so the two differ by shape too. */
+.ui-seat-avatar-dot[data-quality='unknown'] {
+  border-style: dashed;
+}
+/* Hover or keyboard focus opens the seat's name and latency; the same text is the element's title. */
+.ui-seat-avatar-popup {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 30;
+  display: none;
+  width: max-content;
+  max-width: 16rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--ui-bg-raised);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+  font-size: 0.78rem;
+}
+.ui-seat-avatar:hover .ui-seat-avatar-popup,
+.ui-seat-avatar:focus .ui-seat-avatar-popup {
+  display: block;
 }
 .ui-app-body {
   display: flex;
