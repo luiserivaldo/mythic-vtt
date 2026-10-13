@@ -31,6 +31,7 @@ import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
 import { OcclusionFade } from './OcclusionFade.js';
 import { FocusCamera } from './FocusCamera.js';
+import { CameraLink } from './CameraLink.js';
 import { RenderDiagnostics } from './RenderDiagnostics.js';
 import { ToolPanelDock } from '../ui/ToolPanelDock.js';
 import { isReadOnlyViewer } from '../ui/viewer.js';
@@ -136,6 +137,16 @@ function BoardScene({
       {/* CAM-06: double-clicking a token tweens the camera onto it, in 2D and in 3D. */}
       <FocusCamera
         mode={viewMode}
+        bounds={bounds}
+        canvasSize={canvasSize}
+        orbitRef={director.orbitRef}
+        applyRef={director.applyRef}
+      />
+      {/* CAM-06/M4-11: the DM publishes its camera pose; a player pulls to it and a spectator can follow it. */}
+      <CameraLink
+        mode={viewMode}
+        rendered={director.rendered}
+        transitioning={director.transitioning}
         bounds={bounds}
         canvasSize={canvasSize}
         orbitRef={director.orbitRef}

@@ -71,6 +71,92 @@ describe('ephemeral relay', () => {
     expect(watcher.received).toHaveLength(3);
   });
 
+  it('relays a camera pose from the DM and a co-DM only (M4-11, CAM-06)', () => {
+    const state = fixtureCampaign();
+    const coDmSeat = state.seats[T.coDm];
+    if (!coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const relay = createEphemeralRelay(() => 1_000);
+    const pose = {
+      t: 'ephemeral' as const,
+      channel: 'camera.pose',
+      data: { mode: '2d' as const, centerX: 4, centerZ: 6, zoom: 48, sceneId: T.scene, pull: true },
+    };
+    const send = (from: FakeConnection) => {
+      relay.relay(from, pose, state, recipients(state, [watcher]));
+    };
+
+    // A player may not move anyone else's camera: the frame is dropped, not an error.
+    send(alice);
+    expect(watcher.received).toEqual([]);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+
+    send(host);
+    send(coDm);
+    expect(watcher.received).toHaveLength(2);
+    expect(watcher.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: 'camera.pose',
+      from: T.carol,
+      data: pose.data,
+    });
+    expect(relay.stats().dropped.forbidden).toBe(1);
+  });
+
+  it('never hands a camera pose to a target that cannot see its scene (M4-11 leak check)', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    if (!scene || !coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    state.scenes[T.newScene] = { ...scene, id: T.newScene, name: 'DM notes', dmOnly: true };
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [host, coDm, alice, spectator]);
+    const relay = createEphemeralRelay(() => 1_000);
+    const pose = (sceneId: string) => ({
+      t: 'ephemeral' as const,
+      channel: 'camera.pose',
+      data: { mode: '2d' as const, centerX: 1, centerZ: 2, zoom: 48, sceneId, pull: true },
+    });
+
+    // The DM's camera in a DM-only scene is the host's and a co-DM's business only.
+    relay.relay(host, pose(T.newScene), state, targets);
+    expect(host.received).toHaveLength(1);
+    expect(coDm.received).toHaveLength(1);
+    expect(alice.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({ relayed: 2, dropped: { 'hidden-scene': 2 } });
+
+    // The active scene belongs to everyone, so the same pull reaches the player and the spectator.
+    relay.relay(host, pose(T.scene), state, targets);
+    expect(alice.received).toHaveLength(1);
+    expect(spectator.received).toHaveLength(1);
+
+    // Once the DM moves to the hidden scene, the old scene is out of the player's view as well.
+    state.activeSceneId = T.newScene;
+    relay.relay(host, pose(T.scene), state, targets);
+    expect(alice.received).toHaveLength(1);
+    expect(spectator.received).toHaveLength(1);
+    expect(relay.stats().dropped['hidden-scene']).toBe(4);
+
+    // A pose that names no scene at all is malformed, and moves nobody.
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: 'camera.pose', data: { mode: '2d', centerX: 1, centerZ: 2 } },
+      state,
+      targets,
+    );
+    expect(relay.stats().dropped['invalid-scene-reference']).toBe(1);
+    expect(alice.received).toHaveLength(1);
+  });
+
   it('filters entity previews by current audience, including D32 co-DM visibility', () => {
     const state = fixtureCampaign();
     const coDmSeat = state.seats[T.coDm];

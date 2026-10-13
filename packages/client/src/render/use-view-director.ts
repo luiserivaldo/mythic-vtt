@@ -24,6 +24,8 @@ interface Tween {
 export interface ViewDirector {
   /** Which camera/representation is mounted right now (lags the target during the 'out' tween). */
   rendered: ViewMode;
+  /** A 2D↔3D tween is running; M4-11's camera link waits for it instead of fighting it. */
+  transitioning: boolean;
   /** 3D orbit state shared with OrbitControls3D. */
   orbitRef: RefObject<Orbit3D>;
   /** Set by OrbitControls3D: poses the camera and updates orbitRef. */
@@ -50,6 +52,7 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
   const getState = useThree((s) => s.get);
   const [restored2d, setRestored2d] = useState(false);
   const [rendered, setRendered] = useState<ViewMode>(target);
+  const [transitioning, setTransitioning] = useState(false);
   const [view2d, setView2d] = useState<View2D>(DEFAULT_VIEW);
   const initialSize = getState().size;
   const orbitRef = useRef<Orbit3D>(
@@ -103,6 +106,8 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
       setView2d(view);
       tween.current = { from, to: view2dToOrbit(view, height), startedAt: null, direction: 'out' };
     }
+    // M4-11: a pose that arrives mid-switch waits for this tween instead of fighting the camera.
+    setTransitioning(true);
     invalidate();
   }, [target, rendered, bounds, getState, invalidate]);
 
@@ -123,6 +128,7 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
       return;
     }
     tween.current = null;
+    setTransitioning(false);
     if (t.direction === 'out') {
       setKeep(false);
       setRendered('2d');
@@ -132,5 +138,5 @@ export function useViewDirector(target: ViewMode, bounds: GroundBounds | null): 
     invalidate();
   });
 
-  return { rendered, orbitRef, applyRef, keepInitialOrbit, view2d, restored2d };
+  return { rendered, transitioning, orbitRef, applyRef, keepInitialOrbit, view2d, restored2d };
 }

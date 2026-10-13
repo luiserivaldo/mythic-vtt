@@ -1,6 +1,9 @@
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import {
+  canSendCameraPose,
   canUseSceneToggle,
+  canViewScene,
+  CAMERA_POSE_CHANNEL,
   checkIntent,
   seatOf,
   TOGGLE_FOR_CHANNEL,
@@ -36,8 +39,10 @@ export type EphemeralDropReason =
   | 'spectator-rate-limited'
   | 'payload-too-large'
   | 'invalid-entity-reference'
+  | 'invalid-scene-reference'
   | 'forbidden'
-  | 'hidden-entity';
+  | 'hidden-entity'
+  | 'hidden-scene';
 
 export interface EphemeralRelayStats {
   readonly relayed: number;
@@ -163,8 +168,10 @@ export function createEphemeralRelay(
     'spectator-rate-limited': 0,
     'payload-too-large': 0,
     'invalid-entity-reference': 0,
+    'invalid-scene-reference': 0,
     forbidden: 0,
     'hidden-entity': 0,
+    'hidden-scene': 0,
   };
 
   const drop = (reason: EphemeralDropReason, count = 1) => {
@@ -186,6 +193,20 @@ export function createEphemeralRelay(
         const sceneId = sceneIdOf(message.data);
         if (sceneId === undefined || !canUseSceneToggle(state, senderActor, sceneId, toggle)) {
           drop('forbidden');
+          return;
+        }
+      }
+      // CAM-06: only the DM (or an enabled co-DM) may move everyone else's camera, and the pose
+      // has to name the scene it was taken in so it can be filtered per audience below.
+      const poseSceneId =
+        message.channel === CAMERA_POSE_CHANNEL ? sceneIdOf(message.data) : undefined;
+      if (message.channel === CAMERA_POSE_CHANNEL) {
+        if (!canSendCameraPose(state, senderActor)) {
+          drop('forbidden');
+          return;
+        }
+        if (poseSceneId === undefined) {
+          drop('invalid-scene-reference');
           return;
         }
       }
@@ -261,7 +282,19 @@ export function createEphemeralRelay(
       }
 
       const targets = Array.from(recipients);
-      const visibleTargets = targets.filter((target) => {
+      // CAM-06: a pose names the scene it was taken in, so a target that cannot see that scene
+      // makes no sense of it and never receives it (PERM-03, the snapshot's own rule).
+      const sceneVisible =
+        poseSceneId === undefined
+          ? targets
+          : targets.filter((target) => {
+              const seat =
+                target.audience.kind === 'seat' ? state.seats[target.audience.seatId] : undefined;
+              return canViewScene(state, target.audience, seat, poseSceneId);
+            });
+      drop('hidden-scene', targets.length - sceneVisible.length);
+
+      const visibleTargets = sceneVisible.filter((target) => {
         for (const ref of refs) {
           const entity = state.scenes[ref.sceneId]?.entities[ref.entityId];
           if (entity === undefined) return false;
@@ -271,7 +304,7 @@ export function createEphemeralRelay(
         }
         return true;
       });
-      drop('hidden-entity', targets.length - visibleTargets.length);
+      drop('hidden-entity', sceneVisible.length - visibleTargets.length);
 
       // M4-02: a spectator watching through a seat has a seat audience but is still a spectator.
       const spectatorTargets = visibleTargets.filter(isSpectatorTarget);
