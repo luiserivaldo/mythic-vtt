@@ -38,4 +38,9 @@ export {
   ROLLBACK_MAX_PATCHES,
 } from './history.rollback.js';
 export { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
-export { canUseSceneToggle, TOGGLE_FOR_CHANNEL } from './scene-toggles.js';
+export {
+  canUseSceneToggle,
+  PING_CHANNEL,
+  PING_TOGGLE,
+  TOGGLE_FOR_CHANNEL,
+} from './scene-toggles.js';

@@ -2,6 +2,7 @@ import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@my
 import {
   canUseSceneToggle,
   checkIntent,
+  PING_CHANNEL,
   seatOf,
   TOGGLE_FOR_CHANNEL,
   viewEntity,
@@ -237,8 +238,12 @@ export function createEphemeralRelay(
         }
       }
 
-      // UI-JOIN-01: shared tool colours come from the validated connection profile, not a spoofed preview.
-      const coloredTool = message.channel === 'ruler.preview' || message.channel === 'cursor';
+      // UI-JOIN-01: shared tool colours come from the validated connection profile, not a spoofed
+      // preview. Pings carry the sender's colour too, so the marker is identifiable on every board.
+      const coloredTool =
+        message.channel === 'ruler.preview' ||
+        message.channel === 'cursor' ||
+        message.channel === PING_CHANNEL;
       const data =
         coloredTool &&
         sender.color !== undefined &&

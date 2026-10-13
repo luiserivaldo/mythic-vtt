@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PING_CHANNEL, PING_TOGGLE } from '@mythic/shared';
 import { audienceFor } from './audience.js';
 import { createEphemeralRelay, type EphemeralRecipient } from './ephemeral-relay.js';
 import { T, fakeConnection, fixtureCampaign, type FakeConnection } from './testing.js';
@@ -69,6 +70,85 @@ describe('ephemeral relay', () => {
     seat.interactionEnabled = false; // both gates must allow
     send(alice);
     expect(watcher.received).toHaveLength(3);
+  });
+
+  it('gates pings on the scene pins toggle: players dropped, host and co-DM unaffected', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    if (!scene || !coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const watcher = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000);
+    const ping = {
+      t: 'ephemeral' as const,
+      channel: PING_CHANNEL,
+      data: { sceneId: T.scene, x: 2, y: 0, z: 3 },
+    };
+    const send = (from: FakeConnection) => {
+      relay.relay(from, ping, state, recipients(state, [watcher]));
+    };
+
+    // `pins` is opt-in by default, so a player's ping never leaves the host.
+    expect(PING_TOGGLE).toBe('pins');
+    send(alice);
+    expect(watcher.received).toHaveLength(0);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+
+    scene.playerToggles = { pins: true };
+    send(alice);
+    send(host);
+    send(coDm);
+    expect(watcher.received).toHaveLength(3);
+    expect(watcher.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: PING_CHANNEL,
+      from: T.carol,
+      data: { sceneId: T.scene, x: 2, y: 0, z: 3 },
+    });
+
+    // A ping naming a scene the host does not have (or one the sender cannot see) is denied too.
+    relay.relay(
+      alice,
+      { ...ping, data: { ...ping.data, sceneId: T.newScene } },
+      state,
+      recipients(state, [watcher]),
+    );
+    expect(watcher.received).toHaveLength(3);
+    expect(relay.stats().dropped.forbidden).toBe(2);
+
+    // The seat-level Enable Interaction switch still applies on top of an open toggle.
+    const seat = state.seats[T.seatA];
+    if (!seat) throw new Error('missing seat');
+    seat.interactionEnabled = false;
+    send(alice);
+    expect(watcher.received).toHaveLength(3);
+    seat.interactionEnabled = true;
+    send(alice);
+    expect(watcher.received).toHaveLength(4);
+  });
+
+  it('rate-limits a ping flood per connection before relaying it', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { pins: true };
+    const alice = fakeConnection(T.alice);
+    const watcher = fakeConnection(T.bob);
+    // A frozen clock: the bucket never refills, so exactly `burst` pings get through.
+    const relay = createEphemeralRelay(() => 1_000, { activeRate: { ratePerSecond: 1, burst: 2 } });
+    const ping = {
+      t: 'ephemeral' as const,
+      channel: PING_CHANNEL,
+      data: { sceneId: T.scene, x: 1, y: 0, z: 1 },
+    };
+    for (let index = 0; index < 5; index += 1) {
+      relay.relay(alice, ping, state, recipients(state, [watcher]));
+    }
+    expect(relay.stats()).toMatchObject({ relayed: 2, dropped: { 'rate-limited': 3 } });
   });
 
   it('filters entity previews by current audience, including D32 co-DM visibility', () => {
@@ -171,8 +251,8 @@ describe('ephemeral relay', () => {
       state,
       targets,
     );
-    relay.relay(spectator, { t: 'ephemeral', channel: 'ping', data: { x: 1 } }, state, targets);
-    relay.relay(spectator, { t: 'ephemeral', channel: 'ping', data: { x: 2 } }, state, targets);
+    relay.relay(spectator, { t: 'ephemeral', channel: 'cursor', data: { x: 1 } }, state, targets);
+    relay.relay(spectator, { t: 'ephemeral', channel: 'cursor', data: { x: 2 } }, state, targets);
 
     expect(alice.received.filter((m) => m.t === 'error')).toEqual([]);
     expect(spectator.received.filter((m) => m.t === 'error')).toEqual([]);
@@ -190,12 +270,16 @@ describe('ephemeral relay', () => {
   });
 });
 
-it('shares the validated profile colour for rulers and cursors instead of a spoofed preview colour', () => {
+it('shares the validated profile colour for rulers, cursors and pings instead of a spoofed preview colour', () => {
   const state = fixtureCampaign();
+  const scene = state.scenes[T.scene];
+  if (!scene) throw new Error('fixture incomplete');
+  // LAY-05: a player may ping only where the DM opened the scene's pins toggle.
+  scene.playerToggles = { pins: true };
   const alice = { ...fakeConnection(T.alice), color: '#ab1234' };
   const host = fakeConnection(T.host, { isHost: true });
   const relay = createEphemeralRelay(() => 1000);
-  for (const channel of ['ruler.preview', 'cursor']) {
+  for (const channel of ['ruler.preview', 'cursor', PING_CHANNEL]) {
     const data =
       channel === 'ruler.preview'
         ? {
@@ -207,7 +291,9 @@ it('shares the validated profile colour for rulers and cursors instead of a spoo
             phase: 'active',
             color: '#ffffff',
           }
-        : { x: 1, color: '#ffffff' };
+        : channel === PING_CHANNEL
+          ? { sceneId: T.scene, x: 1, y: 0, z: 2, color: '#ffffff' }
+          : { x: 1, color: '#ffffff' };
     relay.relay(alice, { t: 'ephemeral', channel, data }, state, recipients(state, [host]));
     expect(host.received.at(-1)).toMatchObject({
       t: 'ephemeral',
