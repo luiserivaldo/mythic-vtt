@@ -15,7 +15,7 @@ import {
 } from '@mythic/shared';
 import type { GatewayConnection, GatewayHandler } from '../gateway/engine-seam.js';
 import type { CampaignStore } from '../storage/types.js';
-import { actorFor, audienceFor, audienceViewKey } from './audience.js';
+import { actorFor, audienceFor, audienceViewKey, spectatorSourceSeat } from './audience.js';
 import {
   createEphemeralRelay,
   type EphemeralRelayOptions,
@@ -62,6 +62,8 @@ export interface EngineOptions {
   ephemeral?: EphemeralRelayOptions;
   /** M1-38: fragment-free player links reported to authenticated host connections only. */
   hostJoinUrls?: () => readonly { kind: 'lan' | 'public'; url: string }[];
+  /** M4-02: the persisted DM-chosen spectator source seat; absent means the player view. */
+  initialSpectatorSeatId?: string | null;
 }
 
 /** One room per campaign (§4.2): owns the authoritative state, `seq` and the connections. */
@@ -77,6 +79,13 @@ export interface Engine extends GatewayHandler {
    * invite credential; every shared permission rule still applies.
    */
   claimSeat(identityId: string, seatId: string): Promise<boolean>;
+  /** M4-02 / SES-11: the seat spectators currently watch through, or null for the player view. */
+  spectatorView(): string | null;
+  /**
+   * M4-02: switches what spectators see, live: each spectator gets a fresh filtered snapshot.
+   * Resolves false (nothing changed) for an unknown or co-DM seat; null selects the player view.
+   */
+  setSpectatorView(seatId: string | null): Promise<boolean>;
   /** Ends this Session, releasing only per-session seat bindings through durable actions. */
   endSession(): Promise<void>;
   /** Resolves once every queued connect/intent/join has been processed. */
@@ -110,6 +119,7 @@ export function createEngine(options: EngineOptions): Engine {
   const { sessionId, store } = options;
 
   let state = options.campaign;
+  let spectatorSeatId: string | null = options.initialSpectatorSeatId ?? null;
   let seq = options.initialSeq ?? 0;
   /** Ring of recently applied actions, oldest first, contiguous in `seq`. */
   const history: Applied[] = [];
@@ -130,16 +140,17 @@ export function createEngine(options: EngineOptions): Engine {
   const placeOf = (conn: GatewayConnection) => ({
     identityId: conn.identityId,
     isHost: conn.isHost,
-    ...(conn.isSpectator ? { isSpectator: true } : {}),
+    ...(conn.isSpectator ? { isSpectator: true, spectatorSeatId } : {}),
   });
 
-  function snapshotFor(audience: Audience): ServerMessage {
-    // PERM-03: the state is filtered for the audience before it is serialized.
+  function snapshotFor(audience: Audience, spectator = false): ServerMessage {
+    // PERM-03: the state is filtered for the audience before it is serialized. A spectator who
+    // watches through a seat gets that seat's view but is never told it holds the seat (M4-02).
     return {
       t: 'snapshot',
       seq,
       state: visibleTo(audience, state),
-      seatId: audience.kind === 'seat' ? audience.seatId : null,
+      seatId: audience.kind === 'seat' && !spectator ? audience.seatId : null,
     };
   }
 
@@ -171,7 +182,7 @@ export function createEngine(options: EngineOptions): Engine {
     const { lastSeq } = member.conn;
     const missed = lastSeq === undefined ? undefined : replayFrom(member, lastSeq);
     if (missed) for (const entry of missed) member.conn.send(patchMessage(member.audience, entry));
-    else member.conn.send(snapshotFor(member.audience));
+    else member.conn.send(snapshotFor(member.audience, member.conn.isSpectator === true));
     if (member.conn.isHost) {
       for (const entry of options.hostJoinUrls?.() ?? []) {
         member.conn.send({
@@ -195,7 +206,7 @@ export function createEngine(options: EngineOptions): Engine {
         // assumes the old audience's state.
         member.audience = next;
         member.key = nextKey;
-        member.conn.send(snapshotFor(next));
+        member.conn.send(snapshotFor(next, member.conn.isSpectator === true));
         continue;
       }
       const group = groups.get(nextKey);
@@ -362,6 +373,24 @@ export function createEngine(options: EngineOptions): Engine {
     state: () => state,
     seq: () => seq,
     ephemeralStats: () => ephemeralRelay.stats(),
+    spectatorView: () => spectatorSeatId,
+    setSpectatorView(seatId) {
+      let changed = false;
+      return serialize(() => {
+        if (seatId !== null && spectatorSourceSeat(state, seatId) === undefined) return;
+        changed = true;
+        spectatorSeatId = seatId;
+        for (const member of members.values()) {
+          if (!member.conn.isSpectator) continue;
+          const key = audienceViewKey(state, placeOf(member.conn));
+          if (key === member.key) continue;
+          // A different view is a different audience: fresh snapshot, never a patch (D31).
+          member.audience = audienceFor(state, placeOf(member.conn));
+          member.key = key;
+          member.conn.send(snapshotFor(member.audience, true));
+        }
+      }).then(() => changed);
+    },
     claimSeat(identityId, seatId) {
       let claimed = false;
       return serialize(async () => {

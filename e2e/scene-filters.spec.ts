@@ -84,7 +84,7 @@ test('scene washes sync, preserve input and labels in both views, and reload', a
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await expect(page.getByRole('region', { name: /Transform/ })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  await expect(page.getByText('Clear label', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('token-label')).toHaveText('Clear label');
   await page.getByRole('button', { name: '3D view', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await expect
@@ -94,7 +94,7 @@ test('scene washes sync, preserve input and labels in both views, and reload', a
       ),
     )
     .toBe(1);
-  await expect(page.getByText('Clear label', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('token-label')).toHaveText('Clear label');
   await page.reload();
   await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   await expect(page.getByLabel('Darkness', { exact: true })).toHaveValue('0.5');

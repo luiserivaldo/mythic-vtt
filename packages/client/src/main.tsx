@@ -1,3 +1,4 @@
+import { ViewerPreferencesProvider } from './ui/ViewerPreferencesProvider.js';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
@@ -114,7 +115,9 @@ createRoot(rootEl).render(
                 initialProfile,
               }}
             >
-              <App />
+              <ViewerPreferencesProvider>
+                <App />
+              </ViewerPreferencesProvider>
             </JoinContext.Provider>
           </EphemeralContext.Provider>
         </SubmitProvider>

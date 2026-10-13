@@ -76,7 +76,7 @@ export function ScenePanel({ campaign }: { campaign: Campaign }) {
             />
             {row.id === viewedId && (
               <SceneBoundsForm
-                key={`${row.id}:${JSON.stringify(boundsDraft(campaign, row.id))}`}
+                key={`bounds:${row.id}:${JSON.stringify(boundsDraft(campaign, row.id))}`}
                 name={row.name}
                 initial={boundsDraft(campaign, row.id)}
                 onSubmit={(b) => send(sceneBoundsIntent(row.id, b))}
@@ -84,19 +84,21 @@ export function ScenePanel({ campaign }: { campaign: Campaign }) {
             )}
             {row.id === viewedId && campaign.scenes[row.id] && (
               <SceneOverlayForm
-                key={`${row.id}:${JSON.stringify(campaign.scenes[row.id]?.overlay)}`}
+                key={`filters:${row.id}:${JSON.stringify(campaign.scenes[row.id]?.overlay ?? null)}`}
                 scene={campaign.scenes[row.id] ?? null}
               />
             )}
             {row.id === viewedId && (
               <SceneTogglesForm
-                key={`${row.id}:${JSON.stringify(campaign.scenes[row.id]?.playerToggles)}`}
+                key={`permissions:${row.id}:${JSON.stringify(
+                  campaign.scenes[row.id]?.playerToggles ?? null,
+                )}`}
                 scene={campaign.scenes[row.id] ?? null}
               />
             )}
             {row.id === viewedId && (
               <BackgroundForm
-                key={`${row.id}:${JSON.stringify(backgroundDraft(campaign, row.id))}`}
+                key={`background:${row.id}:${JSON.stringify(backgroundDraft(campaign, row.id))}`}
                 sceneId={row.id}
                 initial={backgroundDraft(campaign, row.id)}
                 send={send}

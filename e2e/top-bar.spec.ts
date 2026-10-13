@@ -42,8 +42,9 @@ test('segmented view controls retain selection, tool and camera focus; reset wor
     const selected = page.getByRole('button', { name: 'Focus token', exact: true });
     await selected.click();
     await expect(selected).toHaveAttribute('aria-pressed', 'true');
-    await page.getByRole('button', { name: 'Ruler', exact: true }).click();
-    const ruler = page.getByRole('button', { name: 'Ruler', exact: true });
+    const rail = page.getByRole('toolbar', { name: 'Board controls' });
+    await rail.getByRole('button', { name: 'Measure', exact: true }).click();
+    const ruler = rail.getByRole('button', { name: 'Measure', exact: true });
     await expect(ruler).toHaveAttribute('aria-pressed', 'true');
     await expect(selected).toHaveAttribute('aria-pressed', 'true');
     const canvas = page.locator('canvas');

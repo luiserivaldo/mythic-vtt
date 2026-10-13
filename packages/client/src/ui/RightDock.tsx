@@ -4,6 +4,7 @@ import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { ChatPanel } from './ChatPanel.js';
 import { seatColorsOf } from './chat-panel.js';
 import { DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
+import { SettingsPanel } from './SettingsPanel.js';
 import { HistoryTools } from './HistoryTools.js';
 import { IdentityTransfer } from './IdentityTransfer.js';
 import { joinUrlsFromNotices } from './share-panel.js';
@@ -60,6 +61,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
   const tabId = (id: string) => `${idBase}-tab-${id}`;
   const panelId = `${idBase}-panel`;
   const board = viewed ?? campaign;
+  const joinUrls = joinUrlsFromNotices(notices);
 
   const content = () => {
     switch (active) {
@@ -77,22 +79,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'settings':
         return (
           <>
-            <fieldset className="ui-dock-settings">
-              <legend>Appearance</legend>
-              {(['dark', 'light'] as const).map((value) => (
-                <label key={value}>
-                  <input
-                    type="radio"
-                    name="theme"
-                    checked={theme === value}
-                    onChange={() => {
-                      onThemeChange(value);
-                    }}
-                  />
-                  {value === 'dark' ? 'Dark' : 'Light'}
-                </label>
-              ))}
-            </fieldset>
+            <SettingsPanel theme={theme} onThemeChange={onThemeChange} />
             {ready && <IdentityTransfer />}
             <HistoryTools />
           </>
@@ -105,7 +92,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'scenes':
         return <ScenePanel campaign={campaign} />;
       case 'layers':
-        return <LayerPanel campaign={board} />;
+        return <LayerPanel campaign={board} role={role} />;
       case 'map':
         return <MapPanel campaign={board} />;
       case 'entities':
@@ -118,10 +105,11 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             campaign={campaign}
             presence={presence?.seats ?? null}
             unseated={presence?.unseated}
+            joinUrls={joinUrls}
           />
         );
       case 'share':
-        return <SharePanel joinUrls={joinUrlsFromNotices(notices)} />;
+        return <SharePanel joinUrls={joinUrls} />;
       default:
         return null;
     }
