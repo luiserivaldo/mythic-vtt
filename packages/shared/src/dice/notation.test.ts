@@ -6,6 +6,7 @@ import {
   MAX_DICE_PER_TERM,
   MAX_EXPRESSION_LENGTH,
   MAX_MODIFIER,
+  MAX_MODIFIER_DIGITS,
   MAX_SIDES,
   MAX_TERMS,
   MAX_TOTAL_ROLLS,
@@ -14,16 +15,26 @@ import {
   parseDice,
   RollResultSchema,
   rollDice,
-  type ParsedRoll,
   type Rng,
 } from './notation.js';
 
-/** Deterministic rng: a fixed cycle over `min..min+period-1`. */
-function cyclingRng(period: number): Rng {
+/** Deterministic rng cycling through every face of the drawn range, max included. */
+function cyclingRng(): Rng {
   let n = 0;
-  return (min) => {
+  return (min, max) => {
+    const face = min + (n % (max - min + 1));
     n += 1;
-    return min + ((n - 1) % period);
+    return face;
+  };
+}
+
+/** cyclingRng that never draws the maximum, so no die explodes. */
+function cappedRng(): Rng {
+  let n = 0;
+  return (min, max) => {
+    const face = min + (n % Math.max(1, max - min));
+    n += 1;
+    return face;
   };
 }
 
@@ -59,7 +70,7 @@ describe('parseDice', () => {
   });
 
   it('treats a trailing signed integer as the whole-expression modifier', () => {
-    expect(parseDice('2d6+1 4')).toEqual(
+    expect(parseDice('2d6+14')).toEqual(
       expect.objectContaining({ terms: [{ sign: 1, count: 2, sides: 6 }], modifier: 14 }),
     );
     expect(parseDice('2d6-3').modifier).toBe(-3);
@@ -75,13 +86,23 @@ describe('parseDice', () => {
     expect(parseDice('d20').terms).toEqual([{ sign: 1, count: 1, sides: 20 }]);
   });
 
-  it('is case-insensitive and strips whitespace', () => {
-    const parsed = parseDice('  2D20KH1  ');
-    expect(parsed.terms).toEqual([
-      { sign: 1, count: 2, sides: 20, keep: { mode: 'highest', count: 1 } },
+  it('is case-insensitive', () => {
+    const expected = [{ sign: 1, count: 2, sides: 20, keep: { mode: 'highest', count: 1 } }];
+    expect(parseDice('2D20KH1').terms).toEqual(expected);
+    expect(parseDice('2d20kh1').terms).toEqual(expected);
+    expect(parseDice('2d20Kl1').terms).toEqual([
+      { sign: 1, count: 2, sides: 20, keep: { mode: 'lowest', count: 1 } },
     ]);
+  });
+
+  it('strips whitespace between tokens but never inside a number', () => {
     expect(parseDice('2d6 + 3d4').expression).toBe('2d6+3d4');
     expect(parseDice(' 2d6+3d4 ').expression).toBe('2d6+3d4');
+    expect(parseDice('2d6\t+\t3d4').expression).toBe('2d6+3d4');
+    // Stripping these would join the digits into a different number.
+    for (const source of ['2 0d6', '2d6+1 4', '1 0d6+2', '2d6 + 1 4', '2d6\t1 4']) {
+      expect(() => parseDice(source), `should reject ${JSON.stringify(source)}`).toThrow(DiceError);
+    }
   });
 
   it('rejects malformed input with DiceError', () => {
@@ -122,16 +143,56 @@ describe('parseDice', () => {
     }
   });
 
+  it('rejects one-sided dice, which could only explode forever', () => {
+    // A die explodes while it shows its maximum, so sides < MIN_SIDES can never
+    // evaluate. `d1!` (the review's example) is rejected here, at parse time.
+    expect(MIN_SIDES).toBeGreaterThan(1);
+    for (const source of ['d1', '1d1', '3d1', '2d1kh1', 'd1!', '1d1!']) {
+      expect(() => parseDice(source), `should reject ${source}`).toThrow(DiceError);
+    }
+    expect(parseDice('2d2').terms).toEqual([{ sign: 1, count: 2, sides: 2 }]);
+  });
+
+  it('rejects the unsupported exploding and drop syntax outright', () => {
+    // The grammar has no `!` marker and no drop, so these are errors rather than
+    // half-supported: `2d6dl2` cannot drop every die because it drops nothing.
+    for (const source of ['2d6!', '!2d6', '2d6kh1!', '2d6dl2', '2d6dl1', '2d6dl0', '2d6dh1']) {
+      expect(() => parseDice(source), `should reject ${source}`).toThrow(DiceError);
+    }
+  });
+
   it('rejects absurd sizes', () => {
     expect(() => parseDice('1001d20')).toThrow(DiceError);
-    expect(() => parseDice('2d1')).toThrow(DiceError);
     expect(() => parseDice('2d1001')).toThrow(DiceError);
-    expect(() => parseDice(`2d20+${String(MAX_MODIFIER + 1)}`)).toThrow(DiceError);
+    expect(() => parseDice('2d999999999999999999999999')).toThrow(DiceError);
+    expect(() => parseDice('999999999999999999999999d6')).toThrow(DiceError);
     expect(() => parseDice(`${'9d6 + '.repeat(MAX_TERMS)}1d6`)).toThrow(DiceError);
     expect(() => parseDice(`${'101d6+'.repeat(MAX_TERMS - 1)}101d6`)).toThrow(DiceError);
     expect(() => parseDice(`2d6+${'2d6+'.repeat(MAX_EXPRESSION_LENGTH / 4 + 1)}`)).toThrow(
       DiceError,
     );
+  });
+
+  it('caps flat modifiers, so a total can never be Infinity', () => {
+    expect(parseDice(`2d6+${String(MAX_MODIFIER)}`).modifier).toBe(MAX_MODIFIER);
+    expect(parseDice(`2d6-${String(MAX_MODIFIER)}`).modifier).toBe(-MAX_MODIFIER);
+    expect(parseDice(`+${String(MAX_MODIFIER)}`).modifier).toBe(MAX_MODIFIER);
+    // One past the cap, on both signs and with no dice at all.
+    expect(() => parseDice(`2d6+${String(MAX_MODIFIER + 1)}`)).toThrow(DiceError);
+    expect(() => parseDice(`2d6-${String(MAX_MODIFIER + 1)}`)).toThrow(DiceError);
+    expect(() => parseDice(`+${String(MAX_MODIFIER + 1)}`)).toThrow(DiceError);
+    // Within the digit cap but past the value cap.
+    expect(() => parseDice(`2d6+${'9'.repeat(MAX_MODIFIER_DIGITS)}`)).toThrow(DiceError);
+
+    // `parseInt` of this is Infinity, and Infinity serialises to null in JSON.
+    const overflow = '9'.repeat(400);
+    expect(MAX_MODIFIER_DIGITS).toBeLessThan(overflow.length);
+    for (const source of [`d6+${overflow}`, `2d6+${overflow}`, `+${overflow}`, `-${overflow}`]) {
+      expect(() => parseDice(source)).toThrow(DiceError);
+      expect(() => parseDice(source)).toThrow(/flat modifier exceeds/);
+    }
+    const result = rollDice(`2d6+${String(MAX_MODIFIER)}`, facesRng([1, 1]));
+    expect(Number.isFinite(result.total)).toBe(true);
   });
 
   it('accepts the exact maxima', () => {
@@ -145,7 +206,7 @@ describe('parseDice', () => {
 describe('evaluateDice', () => {
   it('is a pure function of the rng stream: same stream, same result', () => {
     const parsed = parseDice('2d20kh1+5');
-    expect(evaluateDice(parsed, cyclingRng(20))).toEqual(evaluateDice(parsed, cyclingRng(20)));
+    expect(evaluateDice(parsed, cyclingRng())).toEqual(evaluateDice(parsed, cyclingRng()));
   });
 
   it('keeps the highest die and adds the modifier', () => {
@@ -160,13 +221,21 @@ describe('evaluateDice', () => {
     expect(result).toEqual({ values: [19, 3], total: 3 });
   });
 
+  it('sums equal dice the same whichever rank is kept', () => {
+    // Ties are value-equal, so kh and kl agree on the total.
+    expect(rollDice('2d6kh1', facesRng([3, 3]))).toEqual({ values: [3, 3], total: 3 });
+    expect(rollDice('2d6kl1', facesRng([3, 3]))).toEqual({ values: [3, 3], total: 3 });
+    expect(rollDice('4d6kh2', facesRng([5, 5, 5, 5]))).toEqual({ values: [5, 5, 5, 5], total: 10 });
+  });
+
   it('exploding dice reroll on the maximum; the die is the chain sum', () => {
     // 1d4: 4 (explode), 4 (explode), 2 -> die = 4+4+2 = 10.
     const result = rollDice('1d4', facesRng([4, 4, 2]));
     expect(result).toEqual({ values: [4, 4, 2], total: 10 });
   });
 
-  it('a single max face is not an explosion chain by itself', () => {
+  it('a die that lands on the maximum adds the reroll to its own value', () => {
+    // 1d6: 6 (explode), 1 -> one die worth 7; the 1 could not explode again.
     const result = rollDice('1d6', facesRng([6, 1]));
     expect(result).toEqual({ values: [6, 1], total: 7 });
   });
@@ -192,6 +261,26 @@ describe('evaluateDice', () => {
     expect(rollDice('-3', rng)).toEqual({ values: [], total: -3 });
   });
 
+  it('rejects an rng draw outside the requested range', () => {
+    // The injected stream is a trust boundary: NaN or ±Infinity in a total
+    // serialises to null, so a bad draw is a typed error, not a silent total.
+    const parsed = parseDice('2d6');
+    for (const bad of [
+      0,
+      -1,
+      7,
+      1.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+    ]) {
+      expect(() => evaluateDice(parsed, () => bad), `should reject ${String(bad)}`).toThrow(
+        DiceError,
+      );
+    }
+    expect(evaluateDice(parsed, facesRng([1, 2]))).toEqual({ values: [1, 2], total: 3 });
+  });
+
   it('bounds a degenerate always-max rng at MAX_TOTAL_ROLLS draws', () => {
     const result = rollDice('2d4', (_min, max) => max);
     expect(result.values.length).toBe(MAX_TOTAL_ROLLS);
@@ -202,99 +291,168 @@ describe('evaluateDice', () => {
 describe('property tests', () => {
   const countArb = fc.integer({ min: 1, max: 50 });
   const sidesArb = fc.integer({ min: MIN_SIDES, max: 100 });
-  const modArb = fc.integer({ min: -999, max: 999 });
-  const periodArb = fc.integer({ min: 1, max: 50 });
+  const modArb = fc.integer({ min: -MAX_MODIFIER, max: MAX_MODIFIER });
 
-  it('parses well-formed expressions with the expected fields', () => {
+  /** `[count, sides, keepCount in 1..count, keepsHighest]` for one term. */
+  const termArb = countArb.chain((count) =>
+    fc.tuple(fc.constant(count), sidesArb, fc.integer({ min: 1, max: count }), fc.boolean()),
+  );
+
+  // Builds `3d6kh2` / `-3d6kl1` style sources; the keep count always fits `count`.
+  const sourceFor = (
+    count: number,
+    sides: number,
+    k: number,
+    highest: boolean,
+    negative: boolean,
+    mod: number,
+  ): string =>
+    `${negative ? '-' : ''}${String(count)}d${String(sides)}${highest ? 'kh' : 'kl'}${String(k)}` +
+    (mod === 0 ? '' : `${mod > 0 ? '+' : ''}${String(mod)}`);
+
+  const rollArb = countArb.chain((count) =>
+    fc.tuple(
+      fc.constant(count),
+      sidesArb,
+      fc.integer({ min: 1, max: count }),
+      fc.boolean(),
+      fc.boolean(),
+      modArb,
+    ),
+  );
+
+  it('parses every well-formed expression it generates', () => {
     fc.assert(
-      fc.property(countArb, sidesArb, modArb, (count, sides, mod) => {
-        const source = `${String(count)}d${String(sides)}${mod === 0 ? '' : mod > 0 ? `+${String(mod)}` : String(mod)}`;
+      fc.property(rollArb, ([count, sides, k, highest, negative, mod]) => {
+        // Upper case throughout: parsing must be case-insensitive.
+        const source =
+          `${negative ? '-' : ''}${String(count)}D${String(sides)}${highest ? 'KH' : 'KL'}${String(k)}` +
+          (mod === 0 ? '' : `${mod > 0 ? '+' : ''}${String(mod)}`);
+        // parseDice throws on malformed input, so reaching the assertions at all
+        // proves parsing succeeded — no silent early return.
         const parsed = parseDice(source);
-        expect(parsed.terms).toHaveLength(1);
-        expect(parsed.terms[0]).toEqual({ sign: 1, count, sides });
+        expect(parsed.terms).toEqual([
+          {
+            sign: negative ? -1 : 1,
+            count,
+            sides,
+            keep: { mode: highest ? 'highest' : 'lowest', count: k },
+          },
+        ]);
         expect(parsed.modifier).toBe(mod);
         expect(parsed.baseRolls).toBe(count);
       }),
     );
   });
 
-  it('keeps the total within combinatorial bounds (no explosions)', () => {
+  it('keeps exactly the k best dice, matching a sort-based reference', () => {
+    const arb = countArb.chain((count) =>
+      fc.tuple(
+        fc.constant(count),
+        sidesArb,
+        fc.integer({ min: 1, max: count }),
+        fc.boolean(),
+        fc.integer({ min: 0, max: 10_000 }),
+      ),
+    );
     fc.assert(
-      fc.property(countArb, sidesArb, periodArb, (count, sides, period) => {
-        const parsed = parseDice(`${String(count)}d${String(sides)}`);
-        // period < sides: faces never reach the maximum, so no die explodes.
-        const result = evaluateDice(parsed, cyclingRng(Math.min(period, sides - 1)));
-        const { min, max } = boundsFor(parsed);
+      fc.property(arb, ([count, sides, k, highest, seed]) => {
+        // Faces cycle 1..sides-1, so they differ per die and none is the maximum.
+        const faces = Array.from({ length: count }, (_, i) => 1 + ((seed + i) % (sides - 1)));
+        const parsed = parseDice(sourceFor(count, sides, k, highest, false, 0));
+        const result = evaluateDice(parsed, facesRng(faces));
+        expect(result.values).toEqual(faces);
+        const sorted = [...faces].sort((a, b) => a - b);
+        const expected = (highest ? sorted.slice(count - k) : sorted.slice(0, k)).reduce(
+          (sum, value) => sum + value,
+          0,
+        );
+        expect(result.total).toBe(expected);
+      }),
+    );
+  });
+
+  it('bounds a non-exploding roll within its kept-face bounds', () => {
+    fc.assert(
+      fc.property(rollArb, ([count, sides, k, highest, negative, mod]) => {
+        const parsed = parseDice(sourceFor(count, sides, k, highest, negative, mod));
+        // cappedRng draws 1..sides-1, so no die ever explodes.
+        const result = evaluateDice(parsed, cappedRng());
+        const [min, max] = negative
+          ? [mod - k * (sides - 1), mod - k]
+          : [mod + k, mod + k * (sides - 1)];
         expect(result.total).toBeGreaterThanOrEqual(min);
         expect(result.total).toBeLessThanOrEqual(max);
+        expect(result.values).toHaveLength(count);
         expect(Number.isInteger(result.total)).toBe(true);
       }),
     );
   });
 
-  it('keeps total and every recorded value an integer', () => {
+  it('bounds an exploding roll whose rng reaches the maximum', () => {
     fc.assert(
-      fc.property(
-        fc.array(fc.tuple(countArb, sidesArb, fc.boolean()), { minLength: 1, maxLength: 4 }),
-        modArb,
-        (terms, mod) => {
-          const source =
-            terms
-              .map(([count, sides, negative], idx) =>
-                [negative ? '-' : idx === 0 ? '' : '+', `${String(count)}d${String(sides)}`].join(
-                  '',
-                ),
-              )
-              .join('') + (mod === 0 ? '' : mod > 0 ? `+${String(mod)}` : String(mod));
-          const result = rollDice(source, cyclingRng(97));
-          expect(Number.isInteger(result.total)).toBe(true);
-          for (const value of result.values) expect(Number.isInteger(value)).toBe(true);
-        },
-      ),
-    );
-  });
-
-  it('keeps kept totals within kept-face bounds (no explosions)', () => {
-    fc.assert(
-      fc.property(countArb, sidesArb, (count, sides) => {
-        for (const keep of [1, Math.min(2, count), count]) {
-          const parsed = parseDice(`${String(count)}d${String(sides)}kh${String(keep)}`);
-          const result = evaluateDice(parsed, cyclingRng(sides - 1));
-          expect(result.total).toBeGreaterThanOrEqual(keep);
-          expect(result.total).toBeLessThanOrEqual(keep * (sides - 1));
+      fc.property(rollArb, ([count, sides, k, highest, negative, mod]) => {
+        const parsed = parseDice(sourceFor(count, sides, k, highest, negative, mod));
+        // cyclingRng draws every face of 1..sides, the maximum included, and the
+        // cycle restarts at 1 straight after the maximum: a die explodes at most
+        // once, so its value is at most sides + 1.
+        const result = evaluateDice(parsed, cyclingRng());
+        const [min, max] = negative
+          ? [mod - k * (sides + 1), mod - k]
+          : [mod + k, mod + k * (sides + 1)];
+        expect(result.total).toBeGreaterThanOrEqual(min);
+        expect(result.total).toBeLessThanOrEqual(max);
+        expect(result.values.length).toBeGreaterThanOrEqual(count);
+        expect(result.values.length).toBeLessThanOrEqual(MAX_TOTAL_ROLLS);
+        for (const value of result.values) {
+          expect(value).toBeGreaterThanOrEqual(1);
+          expect(value).toBeLessThanOrEqual(sides);
         }
       }),
     );
   });
 
-  it('is deterministic for a given rng stream', () => {
+  it('keeps every total and recorded value an integer for signed rolls', () => {
+    const arb = fc
+      .array(termArb, { minLength: 1, maxLength: 4 })
+      .chain((terms) => fc.tuple(fc.constant(terms), modArb));
     fc.assert(
-      fc.property(countArb, sidesArb, periodArb, (count, sides, period) => {
-        const parsed = parseDice(`${String(count)}d${String(sides)}`);
-        expect(evaluateDice(parsed, cyclingRng(period))).toEqual(
-          evaluateDice(parsed, cyclingRng(period)),
-        );
+      fc.property(arb, ([terms, mod]) => {
+        const source =
+          terms
+            .map(([count, sides, k, highest], index) => {
+              const sign = index === 0 ? '' : index % 2 === 0 ? '+' : '-';
+              return `${sign}${String(count)}d${String(sides)}${highest ? 'kh' : 'kl'}${String(k)}`;
+            })
+            .join('') + (mod === 0 ? '' : `${mod > 0 ? '+' : ''}${String(mod)}`);
+        const result = rollDice(source, cyclingRng());
+        expect(Number.isInteger(result.total)).toBe(true);
+        for (const value of result.values) expect(Number.isInteger(value)).toBe(true);
+        expect(result.values.length).toBeLessThanOrEqual(MAX_TOTAL_ROLLS);
       }),
     );
   });
-});
 
-/** Inclusive bounds of a roll's total, assuming no die explodes. */
-function boundsFor(parsed: ParsedRoll): { min: number; max: number } {
-  let min = parsed.modifier;
-  let max = parsed.modifier;
-  for (const term of parsed.terms) {
-    const kept = term.keep ? term.keep.count : term.count;
-    if (term.sign > 0) {
-      min += kept;
-      max += kept * term.sides;
-    } else {
-      min -= kept * term.sides;
-      max -= kept;
-    }
-  }
-  return { min, max };
-}
+  it('is deterministic for the same rng stream', () => {
+    fc.assert(
+      fc.property(rollArb, ([count, sides, k, highest, negative, mod]) => {
+        const parsed = parseDice(sourceFor(count, sides, k, highest, negative, mod));
+        expect(evaluateDice(parsed, cyclingRng())).toEqual(evaluateDice(parsed, cyclingRng()));
+      }),
+    );
+  });
+
+  it('stops a never-ending exploding roll at MAX_TOTAL_ROLLS draws', () => {
+    fc.assert(
+      fc.property(countArb, sidesArb, (count, sides) => {
+        const result = rollDice(`${String(count)}d${String(sides)}`, (_min, max) => max);
+        expect(result.values).toHaveLength(MAX_TOTAL_ROLLS);
+        expect(result.total).toBe(sides * MAX_TOTAL_ROLLS);
+      }),
+      { numRuns: 10 },
+    );
+  });
+});
 
 describe('zod schemas', () => {
   it('validate parsed and roll results', () => {
@@ -306,6 +464,23 @@ describe('zod schemas', () => {
     expect(ParsedRollSchema.parse(parsed).expression).toBe('2d20kh1+5');
     expect(() =>
       ParsedRollSchema.parse({ ...parsed, terms: [{ sign: 2, count: 1, sides: 6 }] }),
+    ).toThrow();
+  });
+
+  it('rejects the shapes the parser can never produce', () => {
+    const parsed = parseDice('2d20kh1+5');
+    expect(() =>
+      ParsedRollSchema.parse({ ...parsed, terms: [{ sign: 1, count: 1, sides: 1 }] }),
+    ).toThrow();
+    expect(() =>
+      ParsedRollSchema.parse({ ...parsed, terms: [{ sign: 1, count: 1, sides: MAX_SIDES + 1 }] }),
+    ).toThrow();
+    expect(() => ParsedRollSchema.parse({ ...parsed, modifier: MAX_MODIFIER + 1 })).toThrow();
+    expect(() =>
+      ParsedRollSchema.parse({
+        ...parsed,
+        terms: [{ sign: 1, count: 1, sides: 6, keep: { mode: 'sideways', count: 1 } }],
+      }),
     ).toThrow();
   });
 });
