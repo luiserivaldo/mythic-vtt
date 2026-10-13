@@ -5,6 +5,8 @@ import { DoubleSide, type Group } from 'three';
 import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
 import { TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { TokenStatusMarkers } from './TokenStatusMarkers.js';
+import { markerAnchor3d } from './status-markers.js';
 import {
   billboardYaw,
   facingMarkerPosition,
@@ -14,6 +16,7 @@ import {
 import { SELECTION_COLOR } from './canvas-style.js';
 
 const SELECTED = SELECTION_COLOR;
+const FLYING_COLOR = '#7dd3fc';
 
 /**
  * M2-06 / TOK-03: a 3D token. Base disc at `position` (feet, y = elevation) plus an
@@ -28,6 +31,7 @@ export function TokenStandee({
   actor,
   renderOrder,
   onClick,
+  onDoubleClick,
 }: {
   entity: RenderEntity;
   color: string;
@@ -35,6 +39,8 @@ export function TokenStandee({
   actor: SelectionActor;
   renderOrder: number;
   onClick: (event: ThreeEvent<MouseEvent>) => void;
+  /** CAM-06: the second click of a double-click focuses the camera on this token. */
+  onDoubleClick: () => void;
 }) {
   const pivot = useRef<Group>(null);
   const [x, y, z] = entity.position;
@@ -57,6 +63,7 @@ export function TokenStandee({
           position={[0, dims.baseThickness / 2, 0]}
           renderOrder={renderOrder}
           onClick={onClick}
+          onDoubleClick={onDoubleClick}
         >
           <cylinderGeometry args={[dims.baseRadius, dims.baseRadius, dims.baseThickness, 32]} />
           <meshStandardMaterial color={selected ? SELECTED : '#2b3643'} />
@@ -74,18 +81,27 @@ export function TokenStandee({
           <meshBasicMaterial color={SELECTED} side={DoubleSide} />
         </mesh>
       )}
+      {entity.token?.flying && (
+        // TOK-03: flying indicator. Not pickable, like the selection ring.
+        <mesh raycast={() => null} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+          <ringGeometry args={[dims.baseRadius * 1.2, dims.baseRadius * 1.32, 48]} />
+          <meshBasicMaterial color={FLYING_COLOR} side={DoubleSide} />
+        </mesh>
+      )}
       <group ref={pivot} position={[0, dims.baseThickness, 0]}>
         <mesh
           name={entity.id}
           position={[0, dims.height / 2, 0]}
           renderOrder={renderOrder}
           onClick={onClick}
+          onDoubleClick={onDoubleClick}
         >
           <planeGeometry args={[dims.width, dims.height]} />
           <TokenMaterial entity={entity} color={color} depth />
         </mesh>
       </group>
       <TokenLabel entity={entity} actor={actor} anchor={labelAnchor3d(entity.sizeCells)} />
+      <TokenStatusMarkers entity={entity} actor={actor} anchor={markerAnchor3d(entity.sizeCells)} />
     </group>
   );
 }

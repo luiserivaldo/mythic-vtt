@@ -26,12 +26,12 @@ test('the DM link makes the browser host: panels appear, the token leaves the UR
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
   for (const panel of ['Scenes', 'Layers', 'Map', 'Participants']) {
-    await expect(page.getByText(panel, { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('tab', { name: panel, exact: true })).toBeVisible();
   }
   expect(page.url()).not.toContain('host=');
   expect(await page.evaluate(() => localStorage.getItem('mythic.host'))).toBe('1');
 
-  await page.getByRole('button', { name: 'Invite' }).click();
+  await page.getByRole('tab', { name: 'Invite', exact: true }).click();
   const invitePanel = page.getByRole('region', { name: 'Invite players' });
   await expect(invitePanel).toContainText('https://table.example/play');
   await expect(invitePanel.getByRole('button', { name: 'Copy' })).toBeVisible();

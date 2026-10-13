@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { isWithinBounds } from '../geometry/bounds.js';
 import { Entity, Id, resolveSceneBounds } from '../schema/index.js';
-import { defineAction } from './define.js';
+import { viewEntity } from '../visibility/visible-to.js';
+import { defineAction, seatOf } from './define.js';
 import { canUseEntity, canReadEntityLabel, isLayerLocked } from './entity-access.js';
 
 const EntityChanges = Entity.omit({ id: true, layer: true, owners: true, perms: true })
@@ -39,6 +40,22 @@ export const entityUpdate = defineAction({
     )
       return false;
 
+    // UX-07: general token editors may echo visible fields but must use the dedicated action
+    // to change them. Omitted private fields are preserved when replacing the token component.
+    for (const [id, field] of Object.entries(p.changes.token?.quickFields ?? {})) {
+      const audience =
+        actor.kind === 'host'
+          ? { kind: 'host' as const }
+          : { kind: 'seat' as const, seatId: actor.seatId ?? '' };
+      const existing = viewEntity(audience, entity, seatOf(state, actor))?.token?.quickFields?.[id];
+      if (
+        !existing ||
+        field.value !== existing.value ||
+        field.visibility !== existing.visibility ||
+        field.color !== existing.color
+      )
+        return false;
+    }
     const keys = Object.keys(p.changes);
     const needsMove = keys.includes('transform');
     const needsEdit = keys.some((key) => key !== 'transform');
@@ -50,8 +67,10 @@ export const entityUpdate = defineAction({
   reduce: (draft, a) => {
     const entity = draft.scenes[a.payload.sceneId]?.entities[a.payload.entityId];
     if (!entity) return;
+    const fields = entity.token?.quickFields;
     const previousMarkers = entity.token?.statusMarkers;
     Object.assign(entity, a.payload.changes);
+    if (entity.token && fields) entity.token.quickFields = fields;
     // A resize uses the client's filtered token; omission cannot erase hidden markers.
     if (
       a.payload.changes.token &&

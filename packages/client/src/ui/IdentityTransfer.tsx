@@ -13,7 +13,7 @@ export function IdentityTransfer() {
   const [pending, setPending] = useState<Identity | null>(null);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
-  if (!env) return null;
+  if (!env || env.readOnlyVisitor) return null;
 
   const download = () => {
     try {

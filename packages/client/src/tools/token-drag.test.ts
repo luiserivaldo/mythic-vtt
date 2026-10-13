@@ -1,10 +1,13 @@
-import { Campaign, Scene, type Entity } from '@mythic/shared';
+import { Campaign, Scene, type Entity, type Vec3 } from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
 import type { RenderScene } from '../render/scene-model.js';
 import { makeCampaign, tid } from '../testing.js';
 import {
+  cursorSurface,
   dragStarted,
   dragRulerPaths,
+  appendCheckpoint,
+  dragRulerPoints,
   groundPoint,
   intersectPlaneY,
   movableToken,
@@ -15,6 +18,7 @@ import {
   visibleGhosts,
   withLocalDrag,
 } from './token-drag.js';
+import { MAX_RULER_POINTS, measureRuler } from './ruler.js';
 import { handleLayout } from './transform-gizmo.js';
 import { tokenDragStore } from './token-drag-store.js';
 
@@ -88,13 +92,53 @@ describe('tokenDrop', () => {
     expect(tokenDrop(sc, tiny, { x: -2, y: 0, z: -2 })).toMatchObject({ x: 0.25, z: 0.25 });
     expect(tokenDrop(sc, tiny, { x: 20, y: 0, z: 20 })).toMatchObject({ x: 9.75, z: 7.75 });
   });
-  it('takes the exact surface height over a walkable platform (D25)', () => {
+  it('keeps the elevation: no gravity without a surface under the cursor (TOK-03)', () => {
     const sc = scene(true, { [PLATFORM]: platform() });
     const e = sc.entities[E] as Entity;
-    const onDais = tokenDrop(sc, e, { x: 6, y: 0, z: 4 });
-    const off = tokenDrop(sc, e, { x: 1.5, y: 0, z: 1.5 });
-    expect(off.y).toBe(0);
-    expect(onDais.y).toBeGreaterThanOrEqual(0);
+    expect(tokenDrop(sc, e, { x: 1.5, y: 3, z: 1.5 }).y).toBe(3);
+    // Over the dais but with no pick (cursor not on its top): still keeps its height.
+    expect(tokenDrop(sc, e, { x: 6, y: 3, z: 4 }).y).toBe(3);
+    expect(tokenDrop(sc, e, { x: 6, y: 0, z: 4 }).y).toBe(0);
+  });
+  it('takes the exact height of the surface under the cursor, up or down (D25)', () => {
+    const sc = scene(true, { [PLATFORM]: platform() });
+    const e = sc.entities[E] as Entity;
+    expect(tokenDrop(sc, e, { x: 6, y: 0, z: 4 }, 2).y).toBe(2);
+    expect(tokenDrop(sc, e, { x: 6, y: 5, z: 4 }, 2).y).toBe(2);
+  });
+  it('a flying token keeps its height whatever is under the cursor', () => {
+    const sc = scene(true, { [PLATFORM]: platform() });
+    const flying = entity({
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all', flying: true },
+    });
+    expect(tokenDrop(sc, flying, { x: 6, y: 4.5, z: 4 }, 2).y).toBe(4.5);
+    expect(tokenDrop(sc, flying, { x: 1.5, y: 4.5, z: 1.5 }).y).toBe(4.5);
+  });
+});
+
+describe('cursorSurface', () => {
+  const down = { origin: { x: 6, y: 20, z: 4 }, direction: { x: 0, y: -1, z: 0 } };
+  const sc = () => scene(true, { [PLATFORM]: platform() });
+
+  it('2D: the highest walkable under the cursor, else nothing', () => {
+    expect(cursorSurface(sc(), '2d', down, [])).toBe(2);
+    expect(
+      cursorSurface(sc(), '2d', { ...down, origin: { x: 1, y: 20, z: 1 } }, []),
+    ).toBeUndefined();
+  });
+  it('3D: the first walkable hit decides, and only a top face counts', () => {
+    expect(cursorSurface(sc(), '3d', down, [{ entityId: PLATFORM, y: 2, normalY: 1 }])).toBe(2);
+    expect(
+      cursorSurface(sc(), '3d', down, [{ entityId: PLATFORM, y: 1, normalY: 0 }]),
+    ).toBeUndefined();
+    // Hits that are not walkable (other tokens, the dragged token) are skipped.
+    expect(
+      cursorSurface(sc(), '3d', down, [
+        { entityId: E, y: 1, normalY: 1 },
+        { entityId: PLATFORM, y: 2, normalY: 0.9 },
+      ]),
+    ).toBe(2);
+    expect(cursorSurface(sc(), '3d', down, [])).toBeUndefined();
   });
 });
 
@@ -216,6 +260,82 @@ describe('render helpers', () => {
       .setRemote('a', { sceneId: S, entityId: E, to: { x: 1, y: 0, z: 1 }, at: 0 });
     tokenDragStore.getState().pruneRemote(10_000, 1500);
     expect(tokenDragStore.getState().remote).toEqual({});
+  });
+});
+
+describe('drag checkpoints (UX-21, UI-TOKEN-06)', () => {
+  const base = { x: 2.5, y: 0, z: 3.5 };
+  const east = { x: 8.5, y: 0, z: 3.5 };
+  const south = { x: 8.5, y: 0, z: 6.5 };
+
+  it('draws the base, every checkpoint and then the live position', () => {
+    expect(dragRulerPoints(base, [], east)).toEqual([base, east]);
+    expect(dragRulerPoints(base, [east], south)).toEqual([base, east, south]);
+    // The live position on the last checkpoint (a click that did not move) adds no segment.
+    expect(dragRulerPoints(base, [east], east)).toEqual([base, east]);
+    // A checkpoint equal to the base never enters the path, and neither does a non-finite one.
+    expect(dragRulerPoints(base, [base], east)).toEqual([base, east]);
+    expect(dragRulerPoints(base, [east], { x: Number.NaN, y: 0, z: 0 })).toEqual([base, east]);
+    expect(dragRulerPoints(base, [east], { x: 0, y: Number.POSITIVE_INFINITY, z: 0 })).toEqual([
+      base,
+      east,
+    ]);
+    expect(dragRulerPoints(base, [east], { x: 0, y: 0, z: Number.NEGATIVE_INFINITY })).toEqual([
+      base,
+      east,
+    ]);
+  });
+
+  it('commits a checkpoint cumulatively, ignoring a repeat, a non-finite point and the base', () => {
+    const one = appendCheckpoint(base, [], east);
+    expect(one).toEqual([east]);
+    expect(appendCheckpoint(base, one, south)).toEqual([east, south]);
+    // An ignored click returns the same array, so the drag store is not poked needlessly.
+    expect(appendCheckpoint(base, one, east)).toBe(one);
+    expect(appendCheckpoint(base, one, { x: Number.NaN, y: 0, z: 0 })).toBe(one);
+    expect(appendCheckpoint(base, [], base)).toEqual([]);
+  });
+
+  it('caps the committed path at MAX_RULER_POINTS counting the base, like the ruler', () => {
+    let checkpoints: readonly Vec3[] = [];
+    for (let x = 0; x < MAX_RULER_POINTS + 5; x += 1) {
+      checkpoints = appendCheckpoint(base, checkpoints, { x, y: 0, z: 0 });
+    }
+    // Base plus 63 checkpoints fill the ruler's own point cap; further clicks add nothing.
+    expect(checkpoints).toHaveLength(MAX_RULER_POINTS - 1);
+    expect(appendCheckpoint(base, checkpoints, { x: 1234, y: 0, z: 0 })).toBe(checkpoints);
+    const last = checkpoints[checkpoints.length - 1] as Vec3;
+    expect(dragRulerPoints(base, checkpoints, last)).toHaveLength(MAX_RULER_POINTS);
+  });
+
+  it('measures the bent drag path cumulatively in scene units with the diagonal rule', () => {
+    const sc = scene();
+    const measured = measureRuler(dragRulerPoints(base, [east], south), sc.grid);
+    // Six cells east then three south: 45 ft, not the 30 ft straight line from the base.
+    expect(measured.segments.map((segment) => segment.cells)).toEqual([6, 3]);
+    expect(measured.segments.map((segment) => segment.label)).toEqual(['30 ft', '15 ft']);
+    expect(measured.totalLabel).toBe('45 ft');
+    expect(measureRuler([base, south], sc.grid).totalLabel).toBe('30 ft');
+  });
+
+  it('feeds the checkpoints into the local drag ruler, including a return to the base', () => {
+    const sc = scene();
+    const local = {
+      sceneId: S,
+      entityId: E,
+      base,
+      checkpoints: [east],
+      to: south,
+      settling: false,
+    };
+    expect(dragRulerPaths(local, {}, sc, 1100)).toEqual([
+      { key: 'local', from: null, points: [base, east, south] },
+    ]);
+    // Out and back: the travelled path is still measured, unlike a plain no-move drag.
+    expect(dragRulerPaths({ ...local, to: base }, {}, sc, 1100)).toEqual([
+      { key: 'local', from: null, points: [base, east, base] },
+    ]);
+    expect(dragRulerPaths({ ...local, checkpoints: [], to: base }, {}, sc, 1100)).toEqual([]);
   });
 });
 

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { desc } from 'drizzle-orm';
-import { mkdir, open, readFile, readdir, stat, rm } from 'node:fs/promises';
+import { mkdir, open, opendir, readFile, readdir, stat, rm } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -53,6 +53,7 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
   ) {
     mkdirSync(root, { recursive: true });
     this.db = new Database(join(root, 'index.sqlite'));
+    this.db.pragma('busy_timeout = 2000');
     this.index = drizzle(this.db);
     this.db.exec(
       'CREATE TABLE IF NOT EXISTS campaigns (id TEXT PRIMARY KEY, name TEXT NOT NULL, schema_version INTEGER NOT NULL, updated_at INTEGER NOT NULL)',
@@ -62,6 +63,52 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
     return Promise.resolve(
       this.index.select().from(campaigns).orderBy(desc(campaigns.updatedAt)).all(),
     );
+  }
+  /**
+   * HOST-03: the `campaigns` table is a cache of the folders. Adds a row for every readable
+   * `campaigns/<id>/campaign.json` that has none (a single-campaign data dir from before the
+   * index, a restored backup, a deleted `index.sqlite`). Never rewrites campaign files, so
+   * existing data loads unchanged; an unreadable folder is reported, not fatal.
+   */
+  async reindex(): Promise<{ added: string[]; skipped: { id: string; reason: string }[] }> {
+    const known = new Set(
+      this.index
+        .select()
+        .from(campaigns)
+        .all()
+        .map((row) => row.id),
+    );
+    const added: string[] = [];
+    const skipped: { id: string; reason: string }[] = [];
+    let names: string[];
+    try {
+      names = await readdir(join(this.root, 'campaigns'));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { added, skipped };
+      throw error;
+    }
+    for (const id of names.sort()) {
+      if (known.has(id) || !Id.safeParse(id).success) continue;
+      const file = join(this.folder(id), 'campaign.json');
+      try {
+        const campaign = await this.read(file, 'campaign', CampaignFile);
+        if (campaign.id !== id) throw new StorageDataError('Campaign id mismatch', 'corrupt');
+        this.index
+          .insert(campaigns)
+          .values({
+            id,
+            name: campaign.name,
+            schemaVersion: campaign.schemaVersion,
+            updatedAt: Math.trunc((await stat(file)).mtimeMs),
+          })
+          .onConflictDoNothing()
+          .run();
+        added.push(id);
+      } catch (error) {
+        skipped.push({ id, reason: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return { added, skipped };
   }
   /** @internal used by campaign-archive */
   folder(id: string): string {
@@ -239,11 +286,18 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
     );
     await atomicWrite(join(dir, 'meta.json'), JSON.stringify(SessionMeta.parse(meta)));
   }
-  async readSessions(campaignId: Id): Promise<SessionMeta[]> {
+  async readSessions(campaignId: Id, max?: number): Promise<SessionMeta[]> {
     const dir = join(this.folder(campaignId), 'sessions');
     let names: string[];
     try {
-      names = await readdir(dir);
+      if (max !== undefined) {
+        names = [];
+        const directory = await opendir(dir);
+        for await (const entry of directory) {
+          names.push(entry.name);
+          if (names.length > max) throw new Error('history session budget exceeded');
+        }
+      } else names = await readdir(dir);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
       throw error;
@@ -254,6 +308,8 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       const path = join(dir, name, 'meta.json');
       let raw: string;
       try {
+        if (max !== undefined && (await stat(path)).size > 1024)
+          throw new Error('history metadata budget exceeded');
         raw = await readFile(path, 'utf8');
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;

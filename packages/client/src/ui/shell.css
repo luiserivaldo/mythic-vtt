@@ -128,7 +128,8 @@ main > p {
   background: var(--ui-bg);
   border-bottom: 1px solid var(--ui-border);
 }
-.ui-drawer .ui-panel {
+.ui-drawer .ui-panel,
+.ui-dock-tab-body .ui-panel {
   max-height: none;
   overflow: visible;
 }
@@ -141,7 +142,8 @@ main > p {
   border-radius: 6px;
   padding: 0.6rem;
 }
-.ui-drawer .ui-panel {
+.ui-drawer .ui-panel,
+.ui-dock-tab-body .ui-panel {
   border: 0;
   padding: 0;
   background: transparent;
@@ -263,6 +265,20 @@ main > p {
 .ui-aoe-affected ul {
   margin: 0.3rem 0 0;
   padding-left: 1.1rem;
+}
+/* MEAS-04: one row per affected token, with its distance in scene units beside the name. */
+.ui-aoe-affected ul ul {
+  margin-top: 0.15rem;
+  padding-left: 0.9rem;
+}
+.ui-aoe-affected-distance {
+  margin-left: 0.35rem;
+  color: var(--ui-muted);
+}
+/* D35: the viewer sees the token but may not read this name. */
+.ui-aoe-affected-hidden .ui-aoe-affected-name {
+  font-style: italic;
+  opacity: 0.75;
 }
 .ui-field {
   display: block;
@@ -540,4 +556,319 @@ main [tabindex]:focus-visible {
 .ui-dev-overlay li {
   margin-bottom: 0.25rem;
   overflow-wrap: anywhere;
+}
+
+/* UI-SHELL-01: the dock participates in layout, so its width changes the board viewport. */
+.ui-app {
+  --ui-page: #0c1a2c;
+  --ui-bg: #172b45;
+  --ui-bg-raised: #213954;
+  --ui-control: #29425e;
+  --ui-control-hover: #365573;
+  --ui-input: #102238;
+  --ui-border: #58708a;
+  --ui-fg: #f1f5fa;
+  --ui-muted: #bac9d8;
+  color: var(--ui-fg);
+  overflow: hidden;
+  background: var(--ui-page);
+}
+.ui-app[data-theme='light'] {
+  color-scheme: light;
+  --ui-page: #dce8f2;
+  --ui-bg: #f4f8fc;
+  --ui-bg-raised: #e6eef6;
+  --ui-control: #e4ecf4;
+  --ui-control-hover: #cfdfed;
+  --ui-input: #ffffff;
+  --ui-border: #758ca5;
+  --ui-fg: #172b45;
+  --ui-muted: #36506a;
+  --ui-accent: #9b5717;
+  --ui-on-accent: #ffffff;
+  --ui-danger: #a12626;
+}
+.ui-top-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 1rem;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0.25rem 0.75rem;
+  background: var(--ui-bg);
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-scene-heading {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-top-bar .ui-identity-status {
+  margin-left: auto;
+  padding: 0;
+}
+.ui-app-body {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+}
+.ui-app-body > .ui-board {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: auto;
+}
+.ui-right-dock {
+  flex: 0 0 22rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--ui-bg);
+  border-left: 1px solid var(--ui-border);
+  transition: flex-basis 150ms ease;
+}
+.ui-right-dock[data-collapsed='true'] {
+  flex-basis: 3rem;
+}
+.ui-right-dock-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-right-dock-head button {
+  min-width: 2rem;
+  padding-inline: 0;
+}
+.ui-right-dock-content {
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.5rem;
+}
+.ui-right-dock-content[hidden] {
+  display: none;
+}
+/* UI-DOCK-01: the tab strip is a row of icons that becomes a column when the dock collapses. */
+.ui-dock-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-right-dock[data-collapsed='true'] .ui-dock-tabs {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-y: auto;
+  border-bottom: 0;
+}
+.ui-right-dock[data-collapsed='true'] .ui-dock-tabs [role='tab'] {
+  width: 2.25rem;
+}
+.ui-dock-tabs [role='tab'] {
+  min-width: 2rem;
+  padding-inline: 0.3rem;
+}
+.ui-dock-tabs [role='tab'][aria-selected='true'] {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+.ui-dock-placeholder h2 {
+  margin: 0 0 0.4rem;
+}
+/* UI-CHAT-01: the message list scrolls, the composer stays under it, rolls carry their own colour. */
+.ui-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ui-chat-log {
+  min-height: 4rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.ui-chat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-chat-row {
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  background: var(--ui-bg-raised);
+  overflow-wrap: anywhere;
+}
+.ui-chat-roll {
+  font-weight: 600;
+}
+.ui-chat-empty,
+.ui-chat-note {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
+.ui-chat-composer {
+  display: flex;
+  gap: 0.4rem;
+}
+/* UI-CHAT-02: the game-log toggle sits just above the composer, small and greyed (`main button:disabled`). */
+.ui-chat-log-toggle {
+  align-self: flex-start;
+}
+.ui-chat-composer input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.35rem 0.4rem;
+  color: var(--ui-fg);
+  background: var(--ui-input);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+}
+.ui-dock-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-right: 0.8rem;
+}
+.ui-app .ui-tool-dock {
+  position: static;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+}
+.ui-context-panel-slot {
+  margin-top: 0.75rem;
+}
+.ui-shell-error {
+  position: fixed;
+  z-index: 60;
+  top: 3.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 0.8rem;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-danger);
+  border-radius: 5px;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 40%);
+}
+/* Existing board controls provide the first floating rail; UX-15 replaces its entries. */
+.ui-app .ui-board-controls {
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 10rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.ui-app .ui-board-controls .ui-camera-hint {
+  white-space: normal;
+}
+@media (max-width: 40rem) {
+  .ui-right-dock {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    width: min(22rem, 75vw);
+    max-height: 70%;
+    border-top: 1px solid var(--ui-border);
+  }
+  .ui-right-dock[data-collapsed='true'] {
+    width: 3rem;
+  }
+  .ui-app .ui-board-controls {
+    top: 0.5rem;
+    transform: none;
+  }
+}
+/* History lives in the right dock like the other panels: it scrolls with the dock and never overlaps it. */
+.ui-history-tools {
+  margin-top: 0.5rem;
+}
+.ui-history-tools code {
+  overflow-wrap: anywhere;
+}
+.ui-history-tools .ui-panel ol {
+  padding-left: 1.1rem;
+}
+/* HIST-04: DM selection and the right-click menu in the History log. */
+.ui-history-tools li[data-selected] {
+  background: color-mix(in srgb, var(--ui-accent, #7dd3fc) 18%, transparent);
+}
+.ui-history-tools li > input[type='checkbox'] {
+  margin-right: 0.35rem;
+}
+.ui-history-menu {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 9rem;
+  padding: 0.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.4rem;
+  background: var(--ui-panel-bg, Canvas);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
+}
+/* UX-15: the tool rail inside the board's control column. */
+.ui-rail-divider {
+  align-self: stretch;
+  margin: 0.2rem 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+}
+.ui-board-controls .ui-rail-tool {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: left;
+}
+.ui-rail-glyph {
+  width: 1.1rem;
+  text-align: center;
+}
+.ui-board-controls button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-rail-tool[data-wip] {
+  border-style: dashed;
+  font-style: italic;
+}
+.ui-rail-wip {
+  margin-left: auto;
+  padding: 0 0.3rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-style: normal;
+}
+
+.ui-view-mode {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+.ui-view-mode button {
+  border-radius: 0;
+}
+.ui-view-mode button:first-child {
+  border-radius: 0.3rem 0 0 0.3rem;
+}
+.ui-view-mode button:last-child {
+  border-radius: 0 0.3rem 0.3rem 0;
+}
+.ui-scene-heading {
+  min-width: 0;
+  max-width: 35%;
 }

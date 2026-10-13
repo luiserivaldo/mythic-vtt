@@ -2,13 +2,15 @@ import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { TokenDragPreview } from '@mythic/protocol';
 import { useThree } from '@react-three/fiber';
 import { useContext, useEffect, useMemo, useRef } from 'react';
-import { Raycaster, Vector2, type Object3D } from 'three';
+import { Matrix3, Raycaster, Vector2, type Object3D } from 'three';
 import { useStore } from 'zustand';
-import type { Actor, Scene, Vec3 } from '@mythic/shared';
+import type { Actor, Entity, Scene, Vec3 } from '@mythic/shared';
 import { useClientStore } from '../store/react.js';
 import {
+  cursorSurface,
   dragStarted,
   dragRulerPaths,
+  appendCheckpoint,
   groundPoint,
   movableToken,
   pressOnGizmoHandle,
@@ -17,6 +19,8 @@ import {
   shouldSendPreview,
   visibleGhosts,
   GHOST_TTL_MS,
+  type Ray,
+  type SurfaceHit,
 } from '../tools/token-drag.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { tokenDragStore } from '../tools/token-drag-store.js';
@@ -33,14 +37,18 @@ import { rulerStore } from '../tools/ruler-store.js';
 
 const SETTLE_TIMEOUT_MS = 2000;
 
+type Px = { x: number; y: number };
+
 interface Press {
   pointerId: number;
   entityId: string;
   sceneId: string;
-  startPx: { x: number; y: number };
+  startPx: Px;
   grab: { x: number; z: number };
   startY: number;
   base: Vec3;
+  /** UX-21/UI-TOKEN-06: checkpoints dropped with a right click while this press drags. */
+  checkpoints: readonly Vec3[];
   moving: boolean;
   lastSentAt: number | null;
 }
@@ -48,6 +56,14 @@ interface Press {
 function entityIdAt(object: Object3D | null, scene: Scene): string | null {
   for (let o: Object3D | null = object; o; o = o.parent) {
     if (o.name && scene.entities[o.name]?.token) return o.name;
+  }
+  return null;
+}
+
+/** Like `entityIdAt`, but for any scene entity (a platform is not a token). */
+function sceneEntityIdAt(object: Object3D | null, scene: Scene): string | null {
+  for (let o: Object3D | null = object; o; o = o.parent) {
+    if (o.name && scene.entities[o.name]) return o.name;
   }
   return null;
 }
@@ -133,6 +149,7 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
     if (readOnly) return;
     const el = gl.domElement;
     let press: Press | null = null;
+    let middle: { pointerId: number; entityId: string; startPx: Px; moved: boolean } | null = null;
     let swallowClick = false;
     const raycaster = new Raycaster();
 
@@ -148,6 +165,29 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         origin: { x: origin.x, y: origin.y, z: origin.z },
         direction: { x: direction.x, y: direction.y, z: direction.z },
       };
+    };
+
+    /**
+     * TOK-03 / Q26: the walkable surface under the cursor, which a dropped token lands on. A flying
+     * token ignores surfaces, so it skips the raycast. Must follow `ray(e)`, which aims `raycaster`.
+     */
+    const surfaceUnderPointer = (r: Ray, sc: Scene, dragged: Entity): number | undefined => {
+      if (dragged.token?.flying) return undefined;
+      const hits: SurfaceHit[] = [];
+      if (latest.current.mode === '3d') {
+        for (const hit of raycaster.intersectObjects(getState().scene.children, true)) {
+          const entityId = sceneEntityIdAt(hit.object, sc);
+          if (!entityId || entityId === dragged.id) continue;
+          const normalY = hit.face
+            ? hit.face.normal
+                .clone()
+                .applyMatrix3(new Matrix3().getNormalMatrix(hit.object.matrixWorld))
+                .normalize().y
+            : 1;
+          hits.push({ entityId, y: hit.point.y, normalY });
+        }
+      }
+      return cursorSurface(sc, latest.current.mode, r, hits);
     };
 
     const end = (cancel: boolean) => {
@@ -193,24 +233,95 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         });
     };
 
+    /** The topmost token under the pointer; aims `raycaster` as a side effect. */
+    const tokenUnder = (e: PointerEvent, sc: Scene): { id: string; ray: Ray } | null => {
+      const r = ray(e);
+      for (const hit of raycaster.intersectObjects(getState().scene.children, true)) {
+        const id = entityIdAt(hit.object, sc);
+        if (id) return { id, ray: r };
+      }
+      return null;
+    };
+
+    /**
+     * TOK-03 / Q26 (pending playtest): a middle CLICK on an already-selected token toggles its
+     * flying lock. It claims nothing, so a held or dragged middle press still pans; the drag
+     * threshold decides which it was.
+     */
+    const onMiddleDown = (e: PointerEvent) => {
+      const { campaign: c, actor: a, scene: sc } = latest.current;
+      if (!sc || press || middle) return;
+      const hit = tokenUnder(e, sc);
+      if (!hit || !selectionStore.getState().ids.includes(hit.id)) return;
+      if (!movableToken(c, a, sc, hit.id)) return;
+      middle = {
+        pointerId: e.pointerId,
+        entityId: hit.id,
+        startPx: { x: e.clientX, y: e.clientY },
+        moved: false,
+      };
+    };
+
+    const toggleFlying = (entityId: string) => {
+      const { scene: sc, submit: send } = latest.current;
+      const token = sc?.entities[entityId]?.token;
+      if (!sc || !token || !send) return;
+      void send(
+        'token.setFlying',
+        { sceneId: sc.id, entityId, flying: token.flying !== true },
+        sc.id,
+      ).finally(() => {
+        invalidate();
+      });
+    };
+
+    /**
+     * UX-21/UI-TOKEN-06: a right click while a token is being dragged commits the live position as
+     * a checkpoint and the drag keeps measuring from it (total in scene units, diagonal rule). The
+     * drag owns the pointer, so the press is swallowed rather than handed to the camera (right-drag
+     * orbits in 3D), to a ruler action or to the context menu. A left press never checkpoints.
+     */
+    const addCheckpoint = () => {
+      const drag = tokenDragStore.getState().local;
+      if (!press || !drag || drag.settling || !rulerStore.getState().measureMovement) return;
+      const checkpoints = appendCheckpoint(drag.base, press.checkpoints, drag.to);
+      if (checkpoints === press.checkpoints) return;
+      press.checkpoints = checkpoints;
+      tokenDragStore.getState().setLocal({ ...drag, checkpoints });
+      invalidate();
+    };
+
+    /**
+     * UX-21/UI-TOKEN-06: the right button pressed during a drag. The pointer is already active, so
+     * the browser fires no second `pointerdown`; the press arrives as the compat `mousedown`, and
+     * swallowing it keeps the camera, the ruler and the context menu out of the gesture.
+     */
+    const onMouseDown = (e: MouseEvent) => {
+      if (!press || e.target !== el || e.button !== 2) return;
+      e.preventDefault();
+      e.stopPropagation();
+      addCheckpoint();
+    };
+
     const onDown = (e: PointerEvent) => {
       if (e.target !== el) return;
-      swallowClick = false;
+      // The drag owns the pointer: nothing may start from it until the left button is released.
+      // A second button press never reaches us here (the pointer is already active, so the browser
+      // fires no further pointerdown); the right one is handled by onMouseDown.
+      if (press) return;
+      if (e.pointerType === 'mouse' && e.button === 1) {
+        onMiddleDown(e);
+        return;
+      }
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (press || pointerClaims.isClaimed(e.pointerId)) return;
+      swallowClick = false;
+      if (pointerClaims.isClaimed(e.pointerId)) return;
       const { campaign: c, actor: a, scene: sc, mode: m } = latest.current;
       if (!sc || tokenDragStore.getState().local) return;
-      const r = ray(e);
-      const hits = raycaster.intersectObjects(getState().scene.children, true);
-      let hitId: string | null = null;
-      for (const hit of hits) {
-        const id = entityIdAt(hit.object, sc);
-        if (id) {
-          hitId = id;
-          break;
-        }
-      }
-      if (!hitId) return;
+      const under = tokenUnder(e, sc);
+      if (!under) return;
+      const hitId = under.id;
+      const r = under.ray;
       const entity = movableToken(c, a, sc, hitId);
       if (!entity) return;
       const pos = entity.transform.position;
@@ -234,12 +345,20 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         grab: { x: ground.x - pos.x, z: ground.z - pos.z },
         startY: pos.y,
         base: pos,
+        checkpoints: [],
         moving: false,
         lastSentAt: null,
       };
     };
 
     const onMove = (e: PointerEvent) => {
+      if (
+        middle &&
+        e.pointerId === middle.pointerId &&
+        dragStarted(middle.startPx, { x: e.clientX, y: e.clientY })
+      ) {
+        middle.moved = true;
+      }
       if (!press || e.pointerId !== press.pointerId) return;
       const { scene: sc, ephemeral: eph } = latest.current;
       const entity = sc?.entities[press.entityId];
@@ -252,13 +371,16 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         press.moving = true;
         swallowClick = true;
       }
-      const ground = groundPoint(ray(e), press.startY, sc, entity);
+      const r = ray(e);
+      const surface = surfaceUnderPointer(r, sc, entity);
+      const ground = groundPoint(r, press.startY, sc, entity, surface);
       if (!ground) return;
-      const to = previewPosition(sc, entity, ground, press.grab);
+      const to = previewPosition(sc, entity, ground, press.grab, surface);
       tokenDragStore.getState().setLocal({
         sceneId: press.sceneId,
         entityId: press.entityId,
         base: press.base,
+        checkpoints: press.checkpoints,
         to,
         settling: false,
       });
@@ -271,9 +393,17 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
     };
 
     const onUp = (e: PointerEvent) => {
+      if (middle && e.pointerId === middle.pointerId) {
+        const done = middle;
+        middle = null;
+        if (!done.moved) toggleFlying(done.entityId);
+      }
+      // UX-21: a mouse `pointerup` fires only once every button is up, so the right release during
+      // a drag never reaches here; the left release still ends the move as usual.
       if (press && e.pointerId === press.pointerId) end(false);
     };
     const onCancel = (e: PointerEvent) => {
+      if (middle && e.pointerId === middle.pointerId) middle = null;
       if (press && e.pointerId === press.pointerId) end(true);
     };
     const onKey = (e: KeyboardEvent) => {
@@ -285,21 +415,32 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         swallowClick = false;
       }
     };
+    // UX-21: while the drag lasts the right button is the checkpoint gesture, so the context menu
+    // (and the ruler's right-click waypoint) must not open on top of the drag.
+    const onContextMenu = (e: MouseEvent) => {
+      if (!press) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
 
     // Window capture runs before every handler on the canvas (pan, gizmo), whatever their mount order.
     window.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('mousedown', onMouseDown, true);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onCancel);
     el.addEventListener('click', onClickCapture, true);
+    window.addEventListener('contextmenu', onContextMenu, true);
     window.addEventListener('keydown', onKey);
     return () => {
       if (press) pointerClaims.release(press.pointerId);
       window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('mousedown', onMouseDown, true);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', onCancel);
       el.removeEventListener('click', onClickCapture, true);
+      window.removeEventListener('contextmenu', onContextMenu, true);
       window.removeEventListener('keydown', onKey);
     };
   }, [gl, invalidate, getState, readOnly]);

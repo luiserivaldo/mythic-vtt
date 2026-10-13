@@ -1,24 +1,11 @@
-import { expect, test, type Page } from '@playwright/test';
-import { openClient, startTable, type Table } from './harness.js';
-
-interface CameraPose {
-  targetX: number;
-  targetY: number;
-  targetZ: number;
-  azimuth: number;
-  polar: number;
-  distance: number;
-}
-
-async function cameraPose(page: Page): Promise<CameraPose> {
-  return page.evaluate(() => {
-    const scope = globalThis as typeof globalThis & {
-      __mythicCamera?: { getPose(): CameraPose };
-    };
-    if (!scope.__mythicCamera) throw new Error('3D camera diagnostics are not mounted');
-    return scope.__mythicCamera.getPose();
-  });
-}
+import { expect, test } from '@playwright/test';
+import {
+  openClient,
+  settledCameraPose,
+  startTable,
+  type CameraPose,
+  type Table,
+} from './harness.js';
 
 function projectToCanvas(
   pose: CameraPose,
@@ -66,12 +53,12 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
 
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-  await page.getByRole('button', { name: 'Scenes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   await page.getByLabel('New scene name').fill('Vertical test');
   await page.getByRole('button', { name: 'Create scene' }).click();
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   const prop = page.getByRole('form', { name: 'Create prop' });
   await prop.getByLabel('Prop name').fill('High platform');
   await prop.getByLabel('Width (cells)').fill('6');
@@ -92,10 +79,10 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   const canvas = page.locator('canvas');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('no canvas box');
-  const pose = await cameraPose(page);
+  const pose = await settledCameraPose(page);
   const ground = projectToCanvas(pose, box, { x: 20, y: 0, z: 25 });
   const platformTop = projectToCanvas(pose, box, { x: 20, y: 10, z: 15 });
-  await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+  await page.getByRole('button', { name: 'Measure', exact: true }).click();
   await page.getByLabel('Measurement mode').selectOption('3d');
   await page.getByLabel('Ruler fade').selectOption('linger');
   // The platform spawns at scene centre. Project known world points through the live pose so this

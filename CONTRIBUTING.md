@@ -82,6 +82,10 @@ Workspace packages expose their types from `dist/`, so the type-aware lint needs
 - Paths that define contracts or touch security (`.github/`, `packages/protocol/`, the schema, actions, visibility and migrations folders, the host gateway, and `fixtures/saves/`) list the maintainer as code owner, who will be asked to review.
 - CI runs on pull requests from forks with a read-only token and no secrets. The first run from a new contributor needs a maintainer to approve it.
 
+The `e2e` CI job builds the host and client, then runs the complete standard Playwright suite in Chromium with one worker and no retries. The separate `@load` suite remains opt-in (`pnpm test:load`). Browser downloads are cached by OS, architecture and lockfile; system dependencies are installed on every runner. Each run uploads a 14-day HTML report and retained failure traces as `playwright-results`. To reproduce the CI run locally, use `CI=true pnpm check && CI=true pnpm test:e2e`. Open a downloaded report with `pnpm --filter @mythic/e2e exec playwright show-report <report-directory>`.
+
+After confirming green cold-cache and warm-cache hosted runs, maintainers add the `e2e` status to the required checks on `develop` and `main`, preserving their existing checks and review rules.
+
 ### Automated and AI-assisted contributions
 
 Agents and bots are welcome, and follow the same rules as people:

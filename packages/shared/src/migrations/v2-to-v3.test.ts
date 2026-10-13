@@ -17,7 +17,11 @@ it('migrates zero-scene snapshots to one deterministic blank active scene withou
     name: 'Blank scene',
     dmOnly: false,
   });
-  expect(campaign.seats).toEqual(state.seats);
+  expect(campaign.seats).toEqual(
+    Object.fromEntries(
+      Object.entries(state.seats).map(([id, seat]) => [id, { ...seat, interactionEnabled: true }]),
+    ),
+  );
 });
 it('preserves existing scenes and adds the public default without mutating old saves', () => {
   const before = { ...makeCampaign(), schemaVersion: 2 };

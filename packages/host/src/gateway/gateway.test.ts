@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from '@mythic/protocol';
@@ -188,6 +189,25 @@ describe('gateway', () => {
     await c.closed;
   });
 
+  it('closes even when a client never reads an HTTP response (M0-16)', async () => {
+    gw = createGateway({ heartbeatMs: 0 });
+    // An endless body: the request stays in flight until the connection is cut.
+    gw.app.get('/endless', (_req, reply) => {
+      const body = new Readable({
+        read() {
+          setImmediate(() => this.push(Buffer.alloc(64 * 1024)));
+        },
+      });
+      return reply.type('application/octet-stream').send(body);
+    });
+    port = await gw.listen();
+    const res = await fetch(`http://127.0.0.1:${String(port)}/endless`);
+    expect(res.status).toBe(200); // headers only: the body is deliberately left unread
+    const started = Date.now();
+    await gw.close();
+    expect(Date.now() - started).toBeLessThan(5000);
+    await res.body?.cancel().catch(() => undefined);
+  });
   it('requires hello before anything else', async () => {
     const r = recorder();
     await start(r.handler);
@@ -442,10 +462,10 @@ describe('transport RTT (UX-06)', () => {
     expect(samples[0]).toBeLessThanOrEqual(30_000);
     expect(c.received).toEqual([]);
   });
-  it('rejects version 1 after the presence contract upgrade', async () => {
+  it.each([1, 4, 5])('rejects version %i after the quick-field contract upgrade', async (v) => {
     await start();
     const c = await connect();
-    c.send(hello({ v: 1 }));
+    c.send(hello({ v }));
     expect(await c.next()).toMatchObject({
       t: 'error',
       code: 'protocol-mismatch',
