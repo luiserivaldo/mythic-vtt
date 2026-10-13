@@ -177,15 +177,6 @@ export function clampViewToBounds(
   };
 }
 
-/**
- * M4-10 (CAM-06): the view that centres `x`/`z` on screen, keeping the current zoom so the
- * focus is animated by a centre tween only. `zoom` is always a finite value in practice
- * (clamped by `clampZoom`), so no zoom guard is needed here.
- */
-export function focusView2D(x: number, z: number, zoom: number): View2D {
-  return { centerX: x, centerZ: z, zoom };
-}
-
 /** D37: the view that shows the whole canvas, with a little padding, centred. */
 export function frameBounds(viewport: Viewport, bounds: CanvasSize, paddingCells = 1): View2D {
   const zoom = Math.min(
