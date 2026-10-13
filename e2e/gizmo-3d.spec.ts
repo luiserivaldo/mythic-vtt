@@ -15,6 +15,7 @@ test.afterAll(async () => {
 });
 
 interface Snapshot {
+  activeSceneId: string;
   scenes: Record<string, { entities: Record<string, { transform: { position: { y: number } } }> }>;
 }
 
@@ -28,13 +29,13 @@ test('selecting a prop in 3D mounts the gizmo without errors and a typed value c
 
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-  await page.getByRole('button', { name: 'Scenes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   await page.getByLabel('New scene name').fill('Tower');
   await page.getByRole('button', { name: 'Create scene' }).click();
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByLabel('Prop name').fill('Crate');
-  await page.getByRole('button', { name: 'Create prop' }).click();
+  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
   const list = page.getByRole('list', { name: 'Entities in this scene' });
   await list.getByRole('button', { name: 'Crate', exact: true }).click();
 
@@ -52,7 +53,7 @@ test('selecting a prop in 3D mounts the gizmo without errors and a typed value c
   await reader.waitFor('snapshot', () => reader.state !== undefined);
   const elevation = () => {
     const s = reader.state as Snapshot;
-    return Object.values(Object.values(s.scenes)[0]?.entities ?? {})[0]?.transform.position.y;
+    return Object.values(s.scenes[s.activeSceneId]?.entities ?? {})[0]?.transform.position.y;
   };
 
   const y = panel.getByLabel(/^Y /);

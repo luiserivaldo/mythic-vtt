@@ -33,10 +33,10 @@ describe(`${T} schema`, () => {
 });
 
 describe(`${T} permissions`, () => {
-  it('allows host and co-DM only', () => {
+  it('allows only the host', () => {
     expect(permissionMatrix(makeCampaign(), T, payload)).toEqual({
       host: true,
-      coDm: true,
+      coDm: false,
       owner: false,
       otherSeat: false,
       spectator: false,

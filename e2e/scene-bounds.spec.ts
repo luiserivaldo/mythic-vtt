@@ -25,7 +25,7 @@ test('the DM creates a bounded scene from the panel and resizes it, with no page
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
 
-  await page.getByRole('button', { name: 'Scenes' }).click();
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
 
   // Defaults are shown in the create form; out-of-range values disable it.
   const width = page.getByLabel('New scene width');
@@ -39,7 +39,7 @@ test('the DM creates a bounded scene from the panel and resizes it, with no page
   await height.fill('12');
   await page.getByRole('button', { name: 'Create scene' }).click();
 
-  await expect(page.getByText('Bounded', { exact: true })).toBeVisible();
+  await expect(page.getByRole('listitem').getByText('Bounded', { exact: true })).toBeVisible();
   const canvasWidth = page.getByLabel('Canvas of Bounded width');
   await expect(canvasWidth).toHaveValue('20');
   await expect(page.getByLabel('Canvas of Bounded height')).toHaveValue('12');

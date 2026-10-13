@@ -60,7 +60,7 @@ test('ring controls synchronize in scene units and survive 2D/3D and reload', as
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(table.clientUrl);
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Hero', exact: true }).click();
   await page.getByRole('button', { name: 'Restore Token panel' }).click();
   const panel = page.getByRole('region', { name: 'Token rings' });
@@ -83,9 +83,9 @@ test('ring controls synchronize in scene units and survive 2D/3D and reload', as
   await expect.poll(() => ringCount(page)).toBe(1);
   await expect.poll(() => ringCount(spectator.page)).toBe(1);
   await expect(panel.getByRole('list')).toContainText('10 ft');
-  await page.getByRole('button', { name: '3D view' }).click();
+  await page.getByRole('button', { name: '2D view' }).click();
   await page.reload();
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Hero', exact: true }).click();
   await page.getByRole('button', { name: 'Restore Token panel' }).click();
   await expect(panel.getByRole('list')).toContainText('10 ft');

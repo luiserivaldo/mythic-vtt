@@ -5,6 +5,23 @@ export interface Participant {
   readonly identityId: string;
   /** D24: the bound host identity (admin privileges). */
   readonly isHost: boolean;
+  readonly isSpectator?: boolean;
+  /** M4-02: the seat the DM chose as the spectators' source, if any (host-side, not campaign state). */
+  readonly spectatorSeatId?: string | null;
+}
+
+/**
+ * M4-02 / SES-11: the seat whose view spectators get, or undefined for the player view. Never a
+ * co-DM seat (its audience adds DM-layer data); a missing seat falls back to the player view too.
+ * Every future ineligible seat kind (e.g. archived seats) belongs in this one guard.
+ */
+export function spectatorSourceSeat(
+  state: Campaign,
+  seatId: string | null | undefined,
+): string | undefined {
+  if (!seatId) return undefined;
+  const seat = state.seats[seatId];
+  return seat && seat.role !== 'codm' ? seat.id : undefined;
 }
 
 /** The seat this identity currently occupies (SES-03: at most one), if any. */
@@ -20,6 +37,10 @@ export function seatIdOf(state: Campaign, identityId: string): string | undefine
  * `audienceViewKey` below carries the role to force a fresh snapshot when it changes.
  */
 export function audienceFor(state: Campaign, p: Participant): Audience {
+  if (p.isSpectator) {
+    const source = spectatorSourceSeat(state, p.spectatorSeatId);
+    return source === undefined ? { kind: 'spectators' } : { kind: 'seat', seatId: source };
+  }
   if (p.isHost) return { kind: 'host' };
   const seatId = seatIdOf(state, p.identityId);
   return seatId === undefined ? { kind: 'spectators' } : { kind: 'seat', seatId };
@@ -31,6 +52,7 @@ export function audienceFor(state: Campaign, p: Participant): Audience {
  * claiming a free seat for its own identity via `session.join`.
  */
 export function actorFor(state: Campaign, p: Participant): Actor {
+  if (p.isSpectator) return { kind: 'seat' };
   if (p.isHost) return { kind: 'host', identityId: p.identityId };
   const seatId = seatIdOf(state, p.identityId);
   return seatId === undefined
@@ -45,6 +67,10 @@ export function actorFor(state: Campaign, p: Participant): Actor {
  */
 export function audienceViewKey(state: Campaign, p: Participant): string {
   const audience = audienceFor(state, p);
+  // M4-02: a spectator watching through a seat never shares a key with that seat's own members.
+  if (p.isSpectator) {
+    return audience.kind === 'seat' ? `spectators:${audience.seatId}:player` : 'spectators';
+  }
   if (audience.kind !== 'seat') return audienceKey(audience);
   return `${audienceKey(audience)}:${state.seats[audience.seatId]?.role ?? 'player'}`;
 }

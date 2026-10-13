@@ -4,6 +4,7 @@ import { useClientStore } from '../store/react.js';
 import {
   AVATAR_PIXELS,
   DISPLAY_NAME_MAX,
+  DEFAULT_PLAYER_COLOR,
   avatarHue,
   cleanDisplayName,
   defaultSeat,
@@ -23,7 +24,7 @@ import './join-screen.css';
 /** SES-01: name, optional avatar and seat choice, shown to every visitor except the host. */
 export function JoinScreen() {
   const env = useJoinEnv();
-  return env ? <JoinFlow env={env} /> : null;
+  return env && !env.readOnlyVisitor ? <JoinFlow env={env} /> : null;
 }
 
 function JoinFlow({ env }: { env: JoinEnv }) {
@@ -31,6 +32,8 @@ function JoinFlow({ env }: { env: JoinEnv }) {
   const started = useSyncExternalStore(session.subscribe, session.started);
   const ready = useClientStore((s) => s.ready);
   const seatId = useClientStore((s) => s.seatId);
+  const campaign = useClientStore((s) => s.campaign);
+  const notices = useClientStore((s) => s.notices);
   const [profile, setProfile] = useState<Profile | null>(env.initialProfile);
   const [editingName, setEditingName] = useState(false);
 
@@ -78,6 +81,19 @@ function JoinFlow({ env }: { env: JoinEnv }) {
       </Card>
     );
   }
+  if (
+    !env.hostVisitor &&
+    ready &&
+    campaign?.activeSceneId === null &&
+    (!seatId || campaign.seats[seatId]?.role !== 'codm') &&
+    (step === 'seat' || notices.some((n) => n.message.startsWith('No active scene.')))
+  ) {
+    return (
+      <Card title="Waiting for a scene">
+        <p role="alert">No active scene. Ask the DM to activate a scene before joining.</p>
+      </Card>
+    );
+  }
   if (step === 'seat' && profile) {
     return (
       <SeatStep
@@ -117,6 +133,9 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   return (
     <div className="join-backdrop">
       <section className="join-card" role="dialog" aria-modal="true" aria-labelledby="join-h">
+        <h1 className="join-brand">
+          Mythic VTT <small>by MythicTomes</small>
+        </h1>
         <h2 id="join-h">{title}</h2>
         {children}
       </section>
@@ -124,13 +143,21 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export function AvatarBadge({ name, avatar }: { name: string; avatar?: string | undefined }) {
+export function AvatarBadge({
+  name,
+  avatar,
+  color,
+}: {
+  name: string;
+  avatar?: string | undefined;
+  color?: string | undefined;
+}) {
   if (avatar) return <img className="join-avatar" src={avatar} alt="" />;
   return (
     <span
       className="join-avatar"
       aria-hidden="true"
-      style={{ background: `hsl(${String(avatarHue(name))} 55% 38%)` }}
+      style={{ background: color ?? `hsl(${String(avatarHue(name))} 55% 38%)` }}
     >
       {initialsOf(name)}
     </span>
@@ -167,6 +194,7 @@ function NameStep({
   onSubmit: (p: Profile) => void;
 }) {
   const [name, setName] = useState(initial?.displayName ?? '');
+  const [color, setColor] = useState(initial?.color ?? DEFAULT_PLAYER_COLOR);
   const [avatar, setAvatar] = useState<string | undefined>(initial?.avatar);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const clean = cleanDisplayName(name);
@@ -174,7 +202,7 @@ function NameStep({
   const submit = (e: SyntheticEvent) => {
     e.preventDefault();
     if (clean === null) return;
-    onSubmit({ displayName: clean, ...(avatar !== undefined ? { avatar } : {}) });
+    onSubmit({ displayName: clean, color, ...(avatar !== undefined ? { avatar } : {}) });
   };
 
   return (
@@ -193,8 +221,18 @@ function NameStep({
             }}
           />
         </label>
+        <label>
+          Your colour
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => {
+              setColor(e.target.value);
+            }}
+          />
+        </label>
         <div className="join-avatar-row">
-          <AvatarBadge name={clean ?? name} avatar={avatar} />
+          <AvatarBadge name={clean ?? name} avatar={avatar} color={color} />
           <label>
             Avatar (optional)
             <input
@@ -259,7 +297,7 @@ function SeatStep({
   return (
     <Card title={`Welcome, ${profile.displayName}`}>
       <div className="join-who">
-        <AvatarBadge name={profile.displayName} avatar={profile.avatar} />
+        <AvatarBadge name={profile.displayName} avatar={profile.avatar} color={profile.color} />
         <button type="button" className="join-link" onClick={onChangeName}>
           Change name or avatar
         </button>

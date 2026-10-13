@@ -1,0 +1,52 @@
+{
+  "client": [
+    {
+      "t": "hello",
+      "v": 6,
+      "identityId": "00000000000000000000000001",
+      "identitySecret": "synthetic-fixture-secret",
+      "displayName": "Fixture guest"
+    },
+    {
+      "t": "intent",
+      "type": "token.setQuickField",
+      "payload": {
+        "sceneId": "00000000000000000000000002",
+        "entityId": "00000000000000000000000003",
+        "fieldId": "hp",
+        "field": { "value": 18, "visibility": "all", "color": "#c0392b" }
+      },
+      "clientRef": "fixture-1",
+      "sceneId": "00000000000000000000000002"
+    }
+  ],
+  "server": [
+    {
+      "t": "patch",
+      "seq": 7,
+      "patches": [
+        {
+          "op": "add",
+          "path": [
+            "scenes",
+            "00000000000000000000000002",
+            "entities",
+            "00000000000000000000000003",
+            "token",
+            "quickFields",
+            "hp"
+          ],
+          "value": { "value": 18, "visibility": "all", "color": "#c0392b" }
+        }
+      ],
+      "clientRef": "fixture-1"
+    },
+    {
+      "t": "error",
+      "code": "protocol-mismatch",
+      "message": "Unsupported protocol version",
+      "supportedVersion": 6,
+      "fatal": true
+    }
+  ]
+}

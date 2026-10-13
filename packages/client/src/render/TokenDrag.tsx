@@ -1,11 +1,13 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { TokenDragPreview } from '@mythic/protocol';
 import { useThree } from '@react-three/fiber';
 import { useContext, useEffect, useMemo, useRef } from 'react';
-import { Raycaster, Vector2, type Object3D } from 'three';
+import { Matrix3, Raycaster, Vector2, type Object3D } from 'three';
 import { useStore } from 'zustand';
-import type { Actor, Scene, Vec3 } from '@mythic/shared';
+import type { Actor, Entity, Scene, Vec3 } from '@mythic/shared';
 import { useClientStore } from '../store/react.js';
 import {
+  cursorSurface,
   dragStarted,
   dragRulerPaths,
   groundPoint,
@@ -16,6 +18,8 @@ import {
   shouldSendPreview,
   visibleGhosts,
   GHOST_TTL_MS,
+  type Ray,
+  type SurfaceHit,
 } from '../tools/token-drag.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { tokenDragStore } from '../tools/token-drag-store.js';
@@ -32,11 +36,13 @@ import { rulerStore } from '../tools/ruler-store.js';
 
 const SETTLE_TIMEOUT_MS = 2000;
 
+type Px = { x: number; y: number };
+
 interface Press {
   pointerId: number;
   entityId: string;
   sceneId: string;
-  startPx: { x: number; y: number };
+  startPx: Px;
   grab: { x: number; z: number };
   startY: number;
   base: Vec3;
@@ -47,6 +53,14 @@ interface Press {
 function entityIdAt(object: Object3D | null, scene: Scene): string | null {
   for (let o: Object3D | null = object; o; o = o.parent) {
     if (o.name && scene.entities[o.name]?.token) return o.name;
+  }
+  return null;
+}
+
+/** Like `entityIdAt`, but for any scene entity (a platform is not a token). */
+function sceneEntityIdAt(object: Object3D | null, scene: Scene): string | null {
+  for (let o: Object3D | null = object; o; o = o.parent) {
+    if (o.name && scene.entities[o.name]) return o.name;
   }
   return null;
 }
@@ -63,7 +77,7 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
   const getState = useThree((s) => s.get);
   const submit = useContext(SubmitContext);
   const ephemeral = useContext(EphemeralContext);
-  const campaign = useClientStore((s) => s.campaign);
+  const campaign = useViewedCampaign();
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const mode = useViewMode();
@@ -132,6 +146,7 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
     if (readOnly) return;
     const el = gl.domElement;
     let press: Press | null = null;
+    let middle: { pointerId: number; entityId: string; startPx: Px; moved: boolean } | null = null;
     let swallowClick = false;
     const raycaster = new Raycaster();
 
@@ -147,6 +162,29 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         origin: { x: origin.x, y: origin.y, z: origin.z },
         direction: { x: direction.x, y: direction.y, z: direction.z },
       };
+    };
+
+    /**
+     * TOK-03 / Q26: the walkable surface under the cursor, which a dropped token lands on. A flying
+     * token ignores surfaces, so it skips the raycast. Must follow `ray(e)`, which aims `raycaster`.
+     */
+    const surfaceUnderPointer = (r: Ray, sc: Scene, dragged: Entity): number | undefined => {
+      if (dragged.token?.flying) return undefined;
+      const hits: SurfaceHit[] = [];
+      if (latest.current.mode === '3d') {
+        for (const hit of raycaster.intersectObjects(getState().scene.children, true)) {
+          const entityId = sceneEntityIdAt(hit.object, sc);
+          if (!entityId || entityId === dragged.id) continue;
+          const normalY = hit.face
+            ? hit.face.normal
+                .clone()
+                .applyMatrix3(new Matrix3().getNormalMatrix(hit.object.matrixWorld))
+                .normalize().y
+            : 1;
+          hits.push({ entityId, y: hit.point.y, normalY });
+        }
+      }
+      return cursorSurface(sc, latest.current.mode, r, hits);
     };
 
     const end = (cancel: boolean) => {
@@ -192,24 +230,63 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         });
     };
 
+    /** The topmost token under the pointer; aims `raycaster` as a side effect. */
+    const tokenUnder = (e: PointerEvent, sc: Scene): { id: string; ray: Ray } | null => {
+      const r = ray(e);
+      for (const hit of raycaster.intersectObjects(getState().scene.children, true)) {
+        const id = entityIdAt(hit.object, sc);
+        if (id) return { id, ray: r };
+      }
+      return null;
+    };
+
+    /**
+     * TOK-03 / Q26 (pending playtest): a middle CLICK on an already-selected token toggles its
+     * flying lock. It claims nothing, so a held or dragged middle press still pans; the drag
+     * threshold decides which it was.
+     */
+    const onMiddleDown = (e: PointerEvent) => {
+      const { campaign: c, actor: a, scene: sc } = latest.current;
+      if (!sc || press || middle) return;
+      const hit = tokenUnder(e, sc);
+      if (!hit || !selectionStore.getState().ids.includes(hit.id)) return;
+      if (!movableToken(c, a, sc, hit.id)) return;
+      middle = {
+        pointerId: e.pointerId,
+        entityId: hit.id,
+        startPx: { x: e.clientX, y: e.clientY },
+        moved: false,
+      };
+    };
+
+    const toggleFlying = (entityId: string) => {
+      const { scene: sc, submit: send } = latest.current;
+      const token = sc?.entities[entityId]?.token;
+      if (!sc || !token || !send) return;
+      void send(
+        'token.setFlying',
+        { sceneId: sc.id, entityId, flying: token.flying !== true },
+        sc.id,
+      ).finally(() => {
+        invalidate();
+      });
+    };
+
     const onDown = (e: PointerEvent) => {
       if (e.target !== el) return;
       swallowClick = false;
+      if (e.pointerType === 'mouse' && e.button === 1) {
+        onMiddleDown(e);
+        return;
+      }
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (press || pointerClaims.isClaimed(e.pointerId)) return;
       const { campaign: c, actor: a, scene: sc, mode: m } = latest.current;
       if (!sc || tokenDragStore.getState().local) return;
-      const r = ray(e);
-      const hits = raycaster.intersectObjects(getState().scene.children, true);
-      let hitId: string | null = null;
-      for (const hit of hits) {
-        const id = entityIdAt(hit.object, sc);
-        if (id) {
-          hitId = id;
-          break;
-        }
-      }
-      if (!hitId) return;
+      const under = tokenUnder(e, sc);
+      if (!under) return;
+      const hitId = under.id;
+      const r = under.ray;
       const entity = movableToken(c, a, sc, hitId);
       if (!entity) return;
       const pos = entity.transform.position;
@@ -239,6 +316,13 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
     };
 
     const onMove = (e: PointerEvent) => {
+      if (
+        middle &&
+        e.pointerId === middle.pointerId &&
+        dragStarted(middle.startPx, { x: e.clientX, y: e.clientY })
+      ) {
+        middle.moved = true;
+      }
       if (!press || e.pointerId !== press.pointerId) return;
       const { scene: sc, ephemeral: eph } = latest.current;
       const entity = sc?.entities[press.entityId];
@@ -251,9 +335,11 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         press.moving = true;
         swallowClick = true;
       }
-      const ground = groundPoint(ray(e), press.startY, sc, entity);
+      const r = ray(e);
+      const surface = surfaceUnderPointer(r, sc, entity);
+      const ground = groundPoint(r, press.startY, sc, entity, surface);
       if (!ground) return;
-      const to = previewPosition(sc, entity, ground, press.grab);
+      const to = previewPosition(sc, entity, ground, press.grab, surface);
       tokenDragStore.getState().setLocal({
         sceneId: press.sceneId,
         entityId: press.entityId,
@@ -270,9 +356,15 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
     };
 
     const onUp = (e: PointerEvent) => {
+      if (middle && e.pointerId === middle.pointerId) {
+        const done = middle;
+        middle = null;
+        if (!done.moved) toggleFlying(done.entityId);
+      }
       if (press && e.pointerId === press.pointerId) end(false);
     };
     const onCancel = (e: PointerEvent) => {
+      if (middle && e.pointerId === middle.pointerId) middle = null;
       if (press && e.pointerId === press.pointerId) end(true);
     };
     const onKey = (e: KeyboardEvent) => {

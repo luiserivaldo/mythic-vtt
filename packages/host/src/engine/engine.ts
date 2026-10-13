@@ -6,19 +6,24 @@ import {
   reduceAction,
   visibleTo,
   type ActionEnvelope,
+  UndoRequest,
+  RollbackRequest,
   type Actor,
   type Audience,
   type Campaign,
+  type HistoryUndoPayload,
 } from '@mythic/shared';
 import type { GatewayConnection, GatewayHandler } from '../gateway/engine-seam.js';
 import type { CampaignStore } from '../storage/types.js';
-import { actorFor, audienceFor, audienceViewKey } from './audience.js';
+import { actorFor, audienceFor, audienceViewKey, spectatorSourceSeat } from './audience.js';
 import {
   createEphemeralRelay,
   type EphemeralRelayOptions,
   type EphemeralRelayStats,
 } from './ephemeral-relay.js';
 import { buildHostPresence } from './presence.js';
+import { planRollback, type LogReader } from './rollback.js';
+import { JOURNAL_LIMIT, planUndo, type JournalEntry } from './undo.js';
 import {
   cryptoRandom,
   randomFloats,
@@ -39,6 +44,8 @@ export interface EngineOptions {
   sessionId: string;
   /** Only the log append is used here; scene/campaign autosave is M0-11. */
   store: Pick<CampaignStore, 'appendLog'>;
+  /** HIST-07: the on-disk action log, newest first. Without it a rollback is refused. */
+  readLog?: LogReader;
   clock?: Clock;
   random?: RandomSource;
   /** Last `seq` already used by this campaign (M0-11 passes the recovered value). Default 0. */
@@ -55,6 +62,8 @@ export interface EngineOptions {
   ephemeral?: EphemeralRelayOptions;
   /** M1-38: fragment-free player links reported to authenticated host connections only. */
   hostJoinUrls?: () => readonly { kind: 'lan' | 'public'; url: string }[];
+  /** M4-02: the persisted DM-chosen spectator source seat; absent means the player view. */
+  initialSpectatorSeatId?: string | null;
 }
 
 /** One room per campaign (§4.2): owns the authoritative state, `seq` and the connections. */
@@ -64,6 +73,19 @@ export interface Engine extends GatewayHandler {
   state(): Campaign;
   seq(): number;
   ephemeralStats(): EphemeralRelayStats;
+  /**
+   * SES-04: seats an authenticated identity through the normal `session.join` pipeline (seat free
+   * or already theirs, one seat per identity, active scene). The caller has already verified an
+   * invite credential; every shared permission rule still applies.
+   */
+  claimSeat(identityId: string, seatId: string): Promise<boolean>;
+  /** M4-02 / SES-11: the seat spectators currently watch through, or null for the player view. */
+  spectatorView(): string | null;
+  /**
+   * M4-02: switches what spectators see, live: each spectator gets a fresh filtered snapshot.
+   * Resolves false (nothing changed) for an unknown or co-DM seat; null selects the player view.
+   */
+  setSpectatorView(seatId: string | null): Promise<boolean>;
   /** Ends this Session, releasing only per-session seat bindings through durable actions. */
   endSession(): Promise<void>;
   /** Resolves once every queued connect/intent/join has been processed. */
@@ -97,9 +119,12 @@ export function createEngine(options: EngineOptions): Engine {
   const { sessionId, store } = options;
 
   let state = options.campaign;
+  let spectatorSeatId: string | null = options.initialSpectatorSeatId ?? null;
   let seq = options.initialSeq ?? 0;
   /** Ring of recently applied actions, oldest first, contiguous in `seq`. */
   const history: Applied[] = [];
+  /** What `history.undo` may revert: this run's applied actions with their inverse patches. */
+  const journal: JournalEntry[] = [];
   const members = new Map<string, Member>();
   const ephemeralRelay = createEphemeralRelay(clock, options.ephemeral);
 
@@ -115,15 +140,17 @@ export function createEngine(options: EngineOptions): Engine {
   const placeOf = (conn: GatewayConnection) => ({
     identityId: conn.identityId,
     isHost: conn.isHost,
+    ...(conn.isSpectator ? { isSpectator: true, spectatorSeatId } : {}),
   });
 
-  function snapshotFor(audience: Audience): ServerMessage {
-    // PERM-03: the state is filtered for the audience before it is serialized.
+  function snapshotFor(audience: Audience, spectator = false): ServerMessage {
+    // PERM-03: the state is filtered for the audience before it is serialized. A spectator who
+    // watches through a seat gets that seat's view but is never told it holds the seat (M4-02).
     return {
       t: 'snapshot',
       seq,
       state: visibleTo(audience, state),
-      seatId: audience.kind === 'seat' ? audience.seatId : null,
+      seatId: audience.kind === 'seat' && !spectator ? audience.seatId : null,
     };
   }
 
@@ -155,7 +182,7 @@ export function createEngine(options: EngineOptions): Engine {
     const { lastSeq } = member.conn;
     const missed = lastSeq === undefined ? undefined : replayFrom(member, lastSeq);
     if (missed) for (const entry of missed) member.conn.send(patchMessage(member.audience, entry));
-    else member.conn.send(snapshotFor(member.audience));
+    else member.conn.send(snapshotFor(member.audience, member.conn.isSpectator === true));
     if (member.conn.isHost) {
       for (const entry of options.hostJoinUrls?.() ?? []) {
         member.conn.send({
@@ -179,7 +206,7 @@ export function createEngine(options: EngineOptions): Engine {
         // assumes the old audience's state.
         member.audience = next;
         member.key = nextKey;
-        member.conn.send(snapshotFor(next));
+        member.conn.send(snapshotFor(next, member.conn.isSpectator === true));
         continue;
       }
       const group = groups.get(nextKey);
@@ -231,6 +258,42 @@ export function createEngine(options: EngineOptions): Engine {
   ): Promise<Outcome> {
     const actor = extra.actor ?? (conn === undefined ? undefined : actorFor(state, placeOf(conn)));
     if (actor === undefined) return { ok: false, reason: 'forbidden' };
+    if (type === 'history.undo') {
+      // HIST-04: the logged payload is built here from the journal. Whatever else the client sent
+      // (patches included) is discarded, so an undo can only ever replay what this host applied.
+      const request = UndoRequest.safeParse(payload);
+      if (!request.success) return { ok: false, reason: 'invalid-payload' };
+      const plan = planUndo({ journal, state, actor, request: request.data });
+      if (!plan.ok) {
+        return {
+          ok: false,
+          reason: plan.reason,
+          ...(plan.detail !== undefined ? { detail: plan.detail } : {}),
+        };
+      }
+      payload = plan.payload;
+    }
+    if (type === 'history.rollback') {
+      // HIST-07: as with undo, the logged payload is built here; whatever the client sent beyond
+      // the target point is discarded, so a rollback can only ever replay what this host logged.
+      const request = RollbackRequest.safeParse(payload);
+      if (!request.success) return { ok: false, reason: 'invalid-payload' };
+      const plan = await planRollback({
+        state,
+        seq,
+        actor,
+        request: request.data,
+        readLog: options.readLog,
+      });
+      if (!plan.ok) {
+        return {
+          ok: false,
+          reason: plan.reason,
+          ...(plan.detail !== undefined ? { detail: plan.detail } : {}),
+        };
+      }
+      payload = plan.payload;
+    }
     const check = checkIntent(state, actor, type, payload);
     if (!check.ok) {
       // zod messages echo client input; keep the detail generic.
@@ -274,6 +337,19 @@ export function createEngine(options: EngineOptions): Engine {
       seq = entry.seq;
       history.push(entry);
       if (history.length > replayLimit) history.shift();
+      // The journal's inverse patches describe states a rollback has just replaced.
+      if (type === 'history.rollback') journal.length = 0;
+      journal.push({
+        seq: entry.seq,
+        actor,
+        type,
+        inverse: result.inversePatches,
+        paths: result.patches.map((patch) => patch.path),
+        ...(type === 'history.undo'
+          ? { undoes: (check.payload as HistoryUndoPayload).targetSeqs }
+          : {}),
+      });
+      if (journal.length > JOURNAL_LIMIT) journal.shift();
       broadcast(entry, conn, extra.clientRef);
       if (options.onApplied) {
         try {
@@ -297,6 +373,37 @@ export function createEngine(options: EngineOptions): Engine {
     state: () => state,
     seq: () => seq,
     ephemeralStats: () => ephemeralRelay.stats(),
+    spectatorView: () => spectatorSeatId,
+    setSpectatorView(seatId) {
+      let changed = false;
+      return serialize(() => {
+        if (seatId !== null && spectatorSourceSeat(state, seatId) === undefined) return;
+        changed = true;
+        spectatorSeatId = seatId;
+        for (const member of members.values()) {
+          if (!member.conn.isSpectator) continue;
+          const key = audienceViewKey(state, placeOf(member.conn));
+          if (key === member.key) continue;
+          // A different view is a different audience: fresh snapshot, never a patch (D31).
+          member.audience = audienceFor(state, placeOf(member.conn));
+          member.key = key;
+          member.conn.send(snapshotFor(member.audience, true));
+        }
+      }).then(() => changed);
+    },
+    claimSeat(identityId, seatId) {
+      let claimed = false;
+      return serialize(async () => {
+        const outcome = await apply(
+          undefined,
+          'session.join',
+          { seatId, identityId },
+          { actor: { kind: 'seat', identityId } },
+        );
+        claimed = outcome.ok;
+      }).then(() => claimed);
+    },
+
     endSession() {
       return serialize(async () => {
         const seatIds = Object.values(state.seats)
@@ -321,6 +428,17 @@ export function createEngine(options: EngineOptions): Engine {
         const member: Member = { conn, audience, key: audienceViewKey(state, placeOf(conn)) };
         members.set(conn.connectionId, member);
         greet(member);
+        if (
+          !conn.isHost &&
+          state.activeSceneId === null &&
+          (audience.kind !== 'seat' || state.seats[audience.seatId]?.role !== 'codm')
+        )
+          conn.send({
+            t: 'notice',
+            level: 'warning',
+            code: 'no-active-scene',
+            message: 'No active scene. Ask the DM to activate a scene before joining.',
+          });
         publishPresence();
       });
     },
@@ -328,6 +446,10 @@ export function createEngine(options: EngineOptions): Engine {
     onIntent(conn, msg: Of<'intent'>) {
       return serialize(async () => {
         if (!members.has(conn.connectionId)) return; // disconnected while queued
+        if (conn.isSpectator) {
+          conn.send({ t: 'reject', clientRef: msg.clientRef, reason: 'forbidden' });
+          return;
+        }
         const outcome = await apply(conn, msg.type, msg.payload, {
           clientRef: msg.clientRef,
           ...(msg.sceneId !== undefined ? { sceneId: msg.sceneId } : {}),
@@ -349,7 +471,21 @@ export function createEngine(options: EngineOptions): Engine {
      */
     onJoin(conn, msg: Of<'join'>) {
       return serialize(async () => {
-        if (!members.has(conn.connectionId) || msg.seatId === undefined) return;
+        if (!members.has(conn.connectionId)) return;
+        if (
+          state.activeSceneId === null &&
+          !conn.isHost &&
+          (!msg.seatId || state.seats[msg.seatId]?.role !== 'codm')
+        ) {
+          conn.send({
+            t: 'error',
+            code: 'seat-unavailable',
+            message: 'No active scene. Ask the DM to activate a scene before joining.',
+            fatal: false,
+          });
+          return;
+        }
+        if (conn.isSpectator || msg.seatId === undefined) return;
         const outcome = await apply(
           conn,
           'session.join',
@@ -373,7 +509,7 @@ export function createEngine(options: EngineOptions): Engine {
     onEphemeral(conn, msg) {
       return serialize(() => {
         if (!members.has(conn.connectionId)) return;
-        ephemeralRelay.relay(conn, msg, state, members.values());
+        if (!conn.isSpectator) ephemeralRelay.relay(conn, msg, state, members.values());
       });
     },
 

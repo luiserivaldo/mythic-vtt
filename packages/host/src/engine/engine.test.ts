@@ -74,6 +74,23 @@ function expectNoSecrets(...conns: FakeConnection[]) {
 }
 
 describe('connect', () => {
+  it('pins a watch connection to the spectator audience even when its identity owns a seat', async () => {
+    const { engine, log } = setup();
+    const watcher = { ...fakeConnection(T.alice), isSpectator: true };
+    await engine.onConnect(watcher);
+    expect(ofType(watcher, 'snapshot')[0]?.seatId).toBeNull();
+    expectNoSecrets(watcher);
+    await engine.onIntent(watcher, rename('Attack', 'watch-intent'));
+    expect(ofType(watcher, 'reject')).toEqual([
+      { t: 'reject', clientRef: 'watch-intent', reason: 'forbidden' },
+    ]);
+    await engine.onJoin(watcher, { t: 'join', seatId: T.coDm });
+    await engine.onEphemeral(watcher, { t: 'ephemeral', channel: 'ping', data: {} });
+    expect(engine.seq()).toBe(0);
+    expect(log.entries).toHaveLength(0);
+    expect(ofType(watcher, 'ephemeral')).toHaveLength(0);
+  });
+
   it('sends each audience its own filtered snapshot (PERM-03)', async () => {
     const { engine } = setup();
     const host = fakeConnection(T.host, { isHost: true });
@@ -591,5 +608,32 @@ describe('non-leak (PERM-03)', () => {
     expect(lateCarol.received.every((m) => m.t === 'patch')).toBe(true);
     expect(clientView(lateCarol, carolAt2).state).toEqual(visibleTo({ kind: 'spectators' }, final));
     expectView(host, { kind: 'host' });
+  });
+});
+
+describe('claimSeat (SES-04)', () => {
+  it('seats a free seat through session.join and is idempotent for the same identity', async () => {
+    const { engine, log } = setup({});
+    expect(await engine.claimSeat(T.bob, T.seatB)).toBe(true);
+    expect(engine.state().seats[T.seatB]?.identityId).toBe(T.bob);
+    expect(await engine.claimSeat(T.bob, T.seatB)).toBe(true);
+    expect(log.entries.every((entry) => entry.envelope.type === 'session.join')).toBe(true);
+  });
+
+  it('refuses a seat held by someone else, a second seat for one identity and unknown seats', async () => {
+    const { engine } = setup({});
+    expect(await engine.claimSeat(T.bob, T.seatA)).toBe(false); // alice's
+    expect(await engine.claimSeat(T.alice, T.seatB)).toBe(false); // alice already seated
+    expect(await engine.claimSeat(T.bob, tid(30))).toBe(false);
+    expect(engine.state().seats[T.seatA]?.identityId).toBe(T.alice);
+    expect(engine.state().seats[T.seatB]?.identityId).toBeNull();
+  });
+
+  it('is refused while no scene is active, except for a co-DM seat', async () => {
+    const campaign = fixtureCampaign();
+    campaign.activeSceneId = null;
+    const { engine } = setup({ campaign });
+    expect(await engine.claimSeat(T.bob, T.seatB)).toBe(false);
+    expect(await engine.claimSeat(T.bob, T.coDm)).toBe(true);
   });
 });

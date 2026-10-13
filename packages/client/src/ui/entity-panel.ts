@@ -48,6 +48,18 @@ export function entityCreateLayers(isHost: boolean): LayerId[] {
   return isHost ? [...publicLayers, 'dm'] : publicLayers;
 }
 
+/**
+ * UI-LAY-01: creation defaults to the viewer's active layer, still limited by what they may create
+ * on — a co-DM's active DM layer falls back to the form's own default (the host would refuse it).
+ */
+export function layerForCreate(
+  active: LayerId,
+  allowed: readonly LayerId[],
+  fallback: LayerId,
+): LayerId {
+  return allowed.includes(active) ? active : fallback;
+}
+
 export const DEFAULT_TOKEN_COLOR = DEFAULT_BOARD_TOKEN_COLOR;
 export const MAX_PROP_CELLS = 50;
 const UNIT_ROTATION = { x: 0, y: 0, z: 0, w: 1 } as const;

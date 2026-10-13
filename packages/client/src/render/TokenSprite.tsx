@@ -1,3 +1,4 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { Html } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { useEffect, useSyncExternalStore } from 'react';
@@ -5,7 +6,6 @@ import { DoubleSide, SRGBColorSpace, TextureLoader, type Texture } from 'three';
 import { assetUrl } from '../assets/asset-url.js';
 import { createTextureCache } from '../assets/texture-cache.js';
 import { formatElevation } from '../tools/elevation.js';
-import { useClientStore } from '../store/react.js';
 import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
 import { labelVisible } from './token-labels.js';
@@ -153,10 +153,8 @@ export function TokenLabel({
  */
 export function ElevationBadge({ entity, actor }: { entity: RenderEntity; actor: SelectionActor }) {
   const token = entity.token;
-  const grid = useClientStore((s) => {
-    const sceneId = s.campaign?.activeSceneId;
-    return sceneId ? s.campaign?.scenes[sceneId]?.grid : undefined;
-  });
+  const campaign = useViewedCampaign();
+  const grid = campaign?.activeSceneId ? campaign.scenes[campaign.activeSceneId]?.grid : undefined;
   if (!token || !grid) return null;
   const visible = labelVisible(
     {
@@ -168,8 +166,11 @@ export function ElevationBadge({ entity, actor }: { entity: RenderEntity; actor:
     },
     actor,
   );
-  const text = visible ? formatElevation(entity.position[1], grid) : null;
-  if (text === null) return null;
+  const elevation = visible ? formatElevation(entity.position[1], grid) : null;
+  // A flying token is marked even at ground level, where there is no elevation text to show.
+  const flying = visible && token.flying === true;
+  if (elevation === null && !flying) return null;
+  const text = [flying ? '✈ Flying' : null, elevation].filter(Boolean).join(' ');
   return (
     <Html
       center

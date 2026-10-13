@@ -94,6 +94,8 @@ export const railTools = createRegistry<RailTool>([
 ]);
 
 export const dockTabs = createRegistry<DockTab>([
+  { id: 'chat', label: 'Chat', icon: 'chat', group: 'play', allowed: everyone, panel: 'chat' },
+  { id: 'sheet', label: 'Sheet', icon: 'sheet', group: 'play', allowed: everyone, panel: 'sheet' },
   {
     id: 'scenes',
     label: 'Scenes',
@@ -120,6 +122,14 @@ export const dockTabs = createRegistry<DockTab>([
     panel: 'entities',
   },
   {
+    id: 'prefabs',
+    label: 'Prefabs',
+    icon: 'prefabs',
+    group: 'world',
+    allowed: admin,
+    panel: 'prefabs',
+  },
+  {
     id: 'seats',
     label: 'Participants',
     icon: 'seats',
@@ -128,17 +138,40 @@ export const dockTabs = createRegistry<DockTab>([
     panel: 'seats',
   },
   { id: 'share', label: 'Invite', icon: 'share', group: 'table', allowed: host, panel: 'share' },
+  { id: 'help', label: 'Help', icon: 'help', group: 'info', allowed: everyone, panel: 'help' },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: 'settings',
+    group: 'info',
+    allowed: everyone,
+    panel: 'settings',
+  },
 ]);
 
 export const tokenQuickFields = createRegistry<TokenQuickField>([
-  { id: 'hp', label: 'HP', icon: 'heart', group: 'default', allowed: canView, field: 'hp' },
-  { id: 'ac', label: 'AC', icon: 'shield', group: 'default', allowed: canView, field: 'ac' },
+  {
+    id: 'hp',
+    label: 'HP',
+    icon: 'heart',
+    group: 'default',
+    allowed: (role, permissions) => role === 'observer' || canView(role, permissions),
+    field: 'hp',
+  },
+  {
+    id: 'ac',
+    label: 'AC',
+    icon: 'shield',
+    group: 'default',
+    allowed: (role, permissions) => role === 'observer' || canView(role, permissions),
+    field: 'ac',
+  },
   {
     id: 'speed',
     label: 'Speed',
     icon: 'speed',
     group: 'default',
-    allowed: canView,
+    allowed: (role, permissions) => role === 'observer' || canView(role, permissions),
     field: 'speed',
   },
 ]);

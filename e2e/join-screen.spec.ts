@@ -35,7 +35,7 @@ test('a new visitor joins by name and seat; the DM sees them and seats a spectat
   await expect(dm.getByLabel('Current identity')).toContainText('Host');
   // The DM link skips the join screen.
   await expect(dm.getByRole('dialog')).toHaveCount(0);
-  await dm.getByRole('button', { name: 'Participants' }).click();
+  await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
   await addSeat(dm, 'Wizard');
   await addSeat(dm, 'Rogue');
 

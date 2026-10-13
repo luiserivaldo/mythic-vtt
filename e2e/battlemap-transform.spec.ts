@@ -104,12 +104,15 @@ test('DM selects, moves and resizes a rectangular battlemap using its real bound
     await panel.getByLabel('Scale', { exact: true }).fill('3');
     await panel.getByRole('button', { name: 'Apply', exact: true }).click();
     await expect.poll(() => position()?.scale.x).toBe(3);
+    // The raw observer can see a patch before this editor receives its ack and clears its draft.
+    await expect(panel.getByLabel('Scale', { exact: true })).toHaveValue('3');
+    await expect(panel.getByRole('button', { name: 'Apply', exact: true })).toBeEnabled();
     await panel.getByLabel(/^X/).fill('105');
     await panel.getByRole('button', { name: 'Apply', exact: true }).click();
     await expect.poll(() => position()?.position.x).toBe(21);
     await page.getByRole('button', { name: '3D view' }).click();
     await expect(canvas).toBeVisible();
-    await page.getByRole('button', { name: '3D view' }).click();
+    await page.getByRole('button', { name: '2D view' }).click();
     await expect(panel).toBeVisible();
     expect(errors).toEqual([]);
   } finally {

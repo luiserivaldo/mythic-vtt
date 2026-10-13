@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { Scene, Vec3 } from '@mythic/shared';
 import { measureRuler } from '../tools/ruler.js';
 import { LABEL_BACKGROUND_COLOR, LABEL_TEXT_COLOR } from './canvas-style.js';
+import { rulerLabel } from './range-readout.js';
 import type { ViewMode } from './view-mode-store.js';
 
 const LIFT = 0.05;
@@ -20,14 +21,10 @@ function lifted(point: Vec3): [number, number, number] {
   return [point.x, point.y + LIFT, point.z];
 }
 
-function breakdown(horizontal: string, vertical: string, total: string): string {
-  return `H ${horizontal} · V ${vertical} · T ${total}`;
-}
-
 /**
- * Camera-facing ruler labels. M3-11: in 3D the path draws one straight segment between the
- * first and last points, labelled with the total length only; hovering the line or any label
- * restores the MEAS-02 horizontal/vertical breakdown.
+ * Camera-facing ruler labels. M3-11: a 3D ruler is one straight segment between the first and last
+ * points, labelled with its total length only; hovering the line or the label restores the MEAS-02
+ * horizontal/vertical breakdown. 2D keeps the polyline with a label per segment.
  */
 export function RulerPath({
   points,
@@ -50,12 +47,9 @@ export function RulerPath({
   const last = points[points.length - 1];
   if (!first || !last) return null;
   const testId = testIdOverride ?? (owner === null ? 'ruler' : 'remote-ruler');
-  const total =
-    mode === '3d'
-      ? hovered
-        ? breakdown(measured.horizontalLabel, measured.verticalLabel, measured.totalLabel)
-        : measured.totalLabel
-      : measured.totalLabel;
+  const total = rulerLabel(measured, mode, hovered);
+  // The hover reveal is a 3D readout, so only the 3D label needs to catch the pointer.
+  const labelPointerEvents = mode === '3d' ? 'auto' : 'none';
   return (
     <group>
       {mode === '3d' && points.length > 1 && (
@@ -96,28 +90,21 @@ export function RulerPath({
           <meshBasicMaterial color={color} depthTest={false} />
         </mesh>
       ))}
-      {measured.segments.length > 1 &&
+      {mode !== '3d' &&
+        measured.segments.length > 1 &&
         measured.segments.map((segment, index) => (
           <Html
             key={`${String(index)}:${segment.label}`}
             center
             position={lifted(segment.midpoint)}
             zIndexRange={[5, 0]}
-            style={{ pointerEvents: 'auto' }}
+            style={{ pointerEvents: 'none' }}
           >
             <div
               data-testid={`${testId}-segment`}
               style={{ ...pillStyle, fontSize: 11, opacity: 0.85 }}
-              onPointerEnter={() => {
-                setHovered(true);
-              }}
-              onPointerLeave={() => {
-                setHovered(false);
-              }}
             >
-              {mode === '3d' && hovered
-                ? breakdown(segment.horizontalLabel, segment.verticalLabel, segment.label)
-                : segment.label}
+              {segment.label}
             </div>
           </Html>
         ))}
@@ -126,7 +113,7 @@ export function RulerPath({
           center
           position={lifted(last)}
           zIndexRange={[6, 0]}
-          style={{ pointerEvents: 'auto', transform: 'translateY(-18px)' }}
+          style={{ pointerEvents: labelPointerEvents, transform: 'translateY(-18px)' }}
         >
           <div
             data-testid={`${testId}-total`}

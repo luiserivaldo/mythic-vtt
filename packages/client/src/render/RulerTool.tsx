@@ -1,11 +1,12 @@
+import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { RulerPreview } from '@mythic/protocol';
 import { useThree } from '@react-three/fiber';
 import { useContext, useEffect, useMemo, useRef } from 'react';
-import { Raycaster, Vector2, type Object3D } from 'three';
+import { Raycaster, Vector2 } from 'three';
 import { useStore } from 'zustand';
 import type { Scene, Vec3 } from '@mythic/shared';
-import { useClientStore } from '../store/react.js';
 import { rulerStore } from '../tools/ruler-store.js';
+import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { measurementScene } from '../tools/measurement-tool.js';
 import { intersectPlaneY } from '../tools/token-drag.js';
 import {
@@ -15,6 +16,7 @@ import {
   rulerExpired,
   rulerDragStarted,
   rulerOwnerName,
+  rulerRightClick,
   shouldSendRuler,
   withCursor,
   type RulerPhase,
@@ -22,6 +24,7 @@ import {
 import { prepareRulerPoint3d } from '../tools/ruler-3d.js';
 import { EphemeralContext } from '../ui/ephemeral-context.js';
 import { pointerClaims } from './pointer-claims.js';
+import { entityIdForObject } from './pick-entity.js';
 import { RulerPath } from './RulerPath.js';
 import { RULER_LOCAL_COLOR, RULER_REMOTE_COLOR } from './canvas-style.js';
 import type { ViewMode } from './view-mode-store.js';
@@ -34,18 +37,10 @@ const NO_REMOTE: readonly never[] = [];
  * While the tool is armed a press claims its pointer (pointer-claims) so the camera does not
  * pan and TokenDrag does not start. A drag measures until release, optionally retaining the result;
  * a short press retains click-to-add waypoints. A short token click while idle exits the tool so the
- * normal selection handler can run. Right-click or Esc clears. The path is render-local plus an
- * ephemeral relay; nothing is an action.
+ * normal selection handler can run. In 2D a right click adds a waypoint and measuring continues from
+ * it (MEAS-08/Q31); everywhere else the ruler keeps clearing on right click. Esc clears. The path is
+ * render-local plus an ephemeral relay; nothing is an action.
  */
-function entityIdForObject(object: Object3D, scene: Scene): string | undefined {
-  let current: Object3D | null = object;
-  while (current) {
-    if (current.name && scene.entities[current.name]) return current.name;
-    current = current.parent;
-  }
-  return undefined;
-}
-
 export function RulerTool({
   mode = '2d',
   readOnly = false,
@@ -57,7 +52,7 @@ export function RulerTool({
   const invalidate = useThree((s) => s.invalidate);
   const getState = useThree((s) => s.get);
   const ephemeral = useContext(EphemeralContext);
-  const campaign = useClientStore((s) => s.campaign);
+  const campaign = useViewedCampaign();
   const scene: Scene | null = campaign?.activeSceneId
     ? (campaign.scenes[campaign.activeSceneId] ?? null)
     : null;
@@ -90,13 +85,19 @@ export function RulerTool({
       if (m.from === ephemeral.identityId) return;
       const parsed = RulerPreview.shape.data.safeParse(m.data);
       if (!parsed.success) return;
-      const { sceneId: sid, points: pts, phase: ph } = parsed.data;
-      rulerStore
-        .getState()
-        .setRemote(
-          m.from,
-          ph === 'cancelled' ? null : { sceneId: sid, points: pts, phase: ph, at: Date.now() },
-        );
+      const { sceneId: sid, points: pts, phase: ph, color } = parsed.data;
+      rulerStore.getState().setRemote(
+        m.from,
+        ph === 'cancelled'
+          ? null
+          : {
+              sceneId: sid,
+              points: pts,
+              phase: ph,
+              at: Date.now(),
+              ...(color !== undefined ? { color } : {}),
+            },
+      );
     });
     const timer = setInterval(() => {
       rulerStore.getState().pruneRemote((r) => rulerExpired(r, Date.now()));
@@ -309,10 +310,26 @@ export function RulerTool({
       finish();
     };
     const onContextMenu = (e: MouseEvent) => {
-      if (!rulerStore.getState().tool || e.target !== el) return;
+      if (e.target !== el) return;
+      const s = rulerStore.getState();
+      const action = rulerRightClick({
+        tool: s.tool,
+        aoeActive: aoeToolStore.getState().active,
+        mode: s.mode,
+        measuring: s.phase === 'active',
+      });
+      if (action === 'ignore') return;
+      // The right click is ours: keep the browser menu and the board's own menu out of it.
       e.preventDefault();
       e.stopPropagation();
-      cancel();
+      if (action === 'clear') {
+        cancel();
+        return;
+      }
+      const point = pointAt(e);
+      if (!point) return;
+      s.addWaypoint(point);
+      publish('active', true);
     };
 
     const onKey = (e: KeyboardEvent) => {
@@ -385,7 +402,7 @@ export function RulerTool({
       <RulerPath
         points={localPoints}
         scene={scene}
-        color={RULER_LOCAL_COLOR}
+        color={ephemeral?.color?.() ?? RULER_LOCAL_COLOR}
         owner={null}
         mode={measurementMode}
       />
@@ -394,7 +411,7 @@ export function RulerTool({
           key={from}
           points={r.points}
           scene={scene}
-          color={RULER_REMOTE_COLOR}
+          color={r.color ?? RULER_REMOTE_COLOR}
           owner={rulerOwnerName(seats ?? {}, from)}
           mode={mode}
         />

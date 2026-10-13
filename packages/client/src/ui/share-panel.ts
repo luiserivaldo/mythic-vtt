@@ -49,8 +49,11 @@ function legacyCopy(text: string): Promise<void> {
   return copied ? Promise.resolve() : Promise.reject(new Error('copy command was refused'));
 }
 
-export function copyJoinUrl(url: string, clipboard?: ClipboardWriter): Promise<void> {
-  const text = playerVisibleUrl(url);
-  // LAN tables commonly run on non-secure HTTP origins, where the modern Clipboard API is absent.
+/** LAN tables commonly run on non-secure HTTP origins, where the modern Clipboard API is absent. */
+export function copyText(text: string, clipboard?: ClipboardWriter): Promise<void> {
   return clipboard ? clipboard.writeText(text) : legacyCopy(text);
+}
+
+export function copyJoinUrl(url: string, clipboard?: ClipboardWriter): Promise<void> {
+  return copyText(playerVisibleUrl(url), clipboard);
 }

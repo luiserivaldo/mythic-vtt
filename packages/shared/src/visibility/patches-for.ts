@@ -36,10 +36,25 @@ export function patchesFor(
   if (audience.kind === 'host') return raw ? [...raw] : diffPatches(before, after);
   if (!raw) return diffPatchesFor(audience, before, after);
 
+  // Scene activation changes the entire audience projection, not only the active id.
+  if (before.activeSceneId !== after.activeSceneId) return diffPatchesFor(audience, before, after);
   const passthrough: Patch[] = [];
   const touched = new Map<string, [string, string]>();
   for (const p of raw) {
     const [root, sceneId, key, entityId] = p.path;
+    const coDm = audience.kind === 'seat' && after.seats[audience.seatId]?.role === 'codm';
+    // PERM-03: entity/metadata fast paths are valid only within scenes this viewer may see.
+    if (
+      root === 'scenes' &&
+      typeof sceneId === 'string' &&
+      !coDm &&
+      (before.scenes[sceneId]?.dmOnly ||
+        after.scenes[sceneId]?.dmOnly ||
+        sceneId !== before.activeSceneId ||
+        sceneId !== after.activeSceneId)
+    ) {
+      return diffPatchesFor(audience, before, after);
+    }
     if (typeof root === 'string' && SAFE_ROOT_KEYS.has(root)) {
       passthrough.push(p);
     } else if (

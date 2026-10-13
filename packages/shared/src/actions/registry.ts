@@ -1,6 +1,13 @@
+import { tokenSetQuickField } from './token.setQuickField.js';
+import { historyUndo } from './history.undo.js';
+import { historyRollback } from './history.rollback.js';
 import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import { tokenSetRings } from './token.setRings.js';
+import { sceneDelete } from './scene.delete.js';
 import { sceneSetOverlay } from './scene.setOverlay.js';
+import { prefabSave } from './prefab.save.js';
+import { prefabRemove } from './prefab.remove.js';
+import { prefabPlace } from './prefab.place.js';
 import type { AnyAction } from './define.js';
 import { aoePlace } from './aoe.place.js';
 import { aoeRemove } from './aoe.remove.js';
@@ -24,6 +31,8 @@ import { seatUpdate } from './seat.update.js';
 import { sessionJoin } from './session.join.js';
 import { tokenMove } from './token.move.js';
 import { tokenSetElevation } from './token.setElevation.js';
+import { tokenSetFlying } from './token.setFlying.js';
+import { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
 
 /** Append-only: add new actions at the end to keep merges painless. */
 export const allActions: readonly AnyAction[] = [
@@ -52,6 +61,15 @@ export const allActions: readonly AnyAction[] = [
   sceneSetOverlay,
   tokenSetRings,
   tokenSetStatusMarkers,
+  prefabSave,
+  prefabRemove,
+  prefabPlace,
+  sceneDelete,
+  tokenSetFlying,
+  sceneSetPlayerToggles,
+  historyUndo,
+  tokenSetQuickField,
+  historyRollback,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));
