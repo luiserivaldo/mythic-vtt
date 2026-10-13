@@ -4,7 +4,7 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
 import { Fragment, lazy, Suspense, useEffect, useMemo } from 'react';
 import { useClientStore } from '../store/react.js';
-import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
+import { pickEntity, selectionActor, validSelection } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { focusStore } from './focus-store.js';
 import { MapImageMesh } from './MapImage.js';
@@ -37,12 +37,6 @@ const ElevatedSurfaceGrid = lazy(async () => {
   return { default: module.ElevatedSurfaceGrid };
 });
 
-function actorFor(seatId: string | null, seats: SceneSelectionSeats): SelectionActor {
-  if (seatId === null) return { kind: 'host' };
-  const seat = seats[seatId];
-  return seat ? { kind: 'seat', seat } : { kind: 'spectator' };
-}
-
 type SceneSelectionSeats = Record<string, Seat>;
 
 // Stable fallback: a fresh `{}` inside a store selector changes identity on every read and
@@ -62,11 +56,12 @@ export function PickableEntities({
   /** GRID-05: scene grid style for walkable tops (3D only). */
   grid?: RenderGrid | null;
 }) {
+  const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const seats = useClientStore((state) => state.campaign?.seats ?? NO_SEATS);
   const selected = useStore(selectionStore, (state) => state.ids);
   const hiddenLayers = useUiStore((state) => state.hiddenLayers);
-  const actor = actorFor(seatId, seats);
+  const actor = selectionActor(isHost, seatId, seats);
   const walkables = useMemo(
     () =>
       Object.values(scene?.entities ?? {}).flatMap((entity) => {
@@ -89,7 +84,7 @@ export function PickableEntities({
   useEffect(() => {
     const state = selectionStore.getState();
     state.reconcile(scene?.id ?? null, validSelection(state.ids, scene, actor));
-  }, [scene, seatId, seats]);
+  }, [scene, isHost, seatId, seats]);
 
   function onClick(event: ThreeEvent<MouseEvent>) {
     if (!scene) return;

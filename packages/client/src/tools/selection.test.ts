@@ -5,6 +5,7 @@ import {
   canSelect,
   nextSelection,
   pickEntity,
+  selectionActor,
   validSelection,
   type SelectionActor,
 } from './selection.js';
@@ -186,5 +187,27 @@ describe('multi-select', () => {
     expect(nextSelection([map.id, token.id], map.id, true)).toEqual([token.id]);
     expect(nextSelection([map.id], null, false)).toEqual([]);
     expect(nextSelection([map.id], null, true)).toEqual([map.id]);
+  });
+});
+
+describe('selectionActor (PERM-03)', () => {
+  const seats = { [owner.id]: owner };
+
+  it('maps only the real host to the host actor', () => {
+    expect(selectionActor(true, null, seats)).toEqual({ kind: 'host' });
+  });
+
+  it('treats a seat-less client as a spectator, never as the host', () => {
+    const actor = selectionActor(false, null, seats);
+    expect(actor).toEqual({ kind: 'spectator' });
+    expect(canSelect(entity(3, 'tokens'), scene, actor)).toBe(false);
+  });
+
+  it('treats a seat that no longer exists as a spectator', () => {
+    expect(selectionActor(false, tid(77), seats)).toEqual({ kind: 'spectator' });
+  });
+
+  it('keeps a real seat as a seat actor', () => {
+    expect(selectionActor(false, owner.id, seats)).toEqual({ kind: 'seat', seat: owner });
   });
 });
