@@ -30,15 +30,6 @@ interface Props {
   contextPanelRef: Ref<HTMLDivElement>;
 }
 
-function Placeholder({ title, children }: { title: string; children: string }) {
-  return (
-    <section className="ui-panel ui-dock-placeholder" aria-label={title}>
-      <h2>{title}</h2>
-      <p>{children}</p>
-    </section>
-  );
-}
-
 /**
  * UI-DOCK-01: an icon tab strip with a collapse button. Collapsed, the strip becomes an icon
  * column and the board widens. Only the active tab's content is mounted, and a tab the viewer

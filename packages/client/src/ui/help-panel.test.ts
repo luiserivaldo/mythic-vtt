@@ -92,6 +92,18 @@ describe('UI-HELP-01 help content', () => {
     expect(textOf('token').toLowerCase()).toContain('card beside it');
   });
 
+  it('documents the two move/measure gestures the board has today', () => {
+    const moving = textOf('moving').toLowerCase();
+    // TOK-02 / GRID-03: tokenDrop snaps the footprint to the grid while the scene has snapping on,
+    // so a drop lands on a cell instead of exactly under the pointer.
+    expect(moving).toContain('lands on the grid');
+    expect(moving).toContain('snapping');
+    // UI-TOKEN-06 (UX-21): with "Always measure token movement" on, a right click during the drag
+    // commits a checkpoint and the total keeps measuring from it.
+    expect(moving).toContain('checkpoint');
+    expect(moving).toContain('right click during the drag');
+  });
+
   it('never promises that a press selects the token (M1-28: a drag moves without selecting)', () => {
     // e2e/token-drag.spec.ts: press-dragging an unselected token commits the move and leaves the
     // Transform panel closed, so the token is not selected by the drag. Only a click selects.

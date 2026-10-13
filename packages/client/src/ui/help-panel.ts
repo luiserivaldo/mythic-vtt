@@ -42,10 +42,12 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
         input: 'Left press on a token',
         action: 'Picks it up straight away — there is no need to select it first.',
       },
-      // UI-INPUT-01 / TOK-02: one move is sent on release.
+      // UI-INPUT-01 / TOK-02 / GRID-03: one move is sent on release. tokenDrop snaps the footprint
+      // to the grid while the scene has snapping on (the default), so the drop can land on a cell
+      // rather than exactly under the pointer.
       {
         input: 'Left drag on a token',
-        action: 'Carries it to wherever you release the button.',
+        action: 'Carries it along, and on release it lands on the grid when snapping is on.',
       },
       // UI-TOOL-03 / UI-MEAS-04 / Q28: every shape is sized by dragging, with a live readout.
       {
@@ -71,11 +73,12 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
         action: "Reads in the scene's units — feet in this alpha.",
       },
       // UI-MEAS-02: the Ruler panel's checkbox draws the drag's distance (TokenDrag renders
-      // dragRulerPaths for the local drag and for every remote preview).
+      // dragRulerPaths for the local drag and for every remote preview). UI-TOKEN-06 / UX-21: with
+      // it on, a right click during the drag commits a checkpoint and the total measures on from it.
       {
         input: 'Always measure token movement',
         action:
-          'Switched on in the Ruler panel, it draws the distance while a token is being dragged.',
+          'Switched on in the Ruler panel, it draws the distance while a token is dragged, and a right click during the drag drops a checkpoint to measure on from.',
       },
     ],
   },
