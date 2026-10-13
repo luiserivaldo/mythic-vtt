@@ -153,6 +153,16 @@ describe('primitive shapes (ENV-02)', () => {
     expect(map(shaped('plane', { x: 5, y: 9, z: 5 }))?.shape?.height).toBeLessThan(0.1);
     expect(map(entity(30, 'props'))?.shape).toBeUndefined();
   });
+
+  it('carries an uploaded texture, and omits the key when there is none (ENV-05)', () => {
+    const texture = { source: 'local' as const, hash: 'a'.repeat(64), kind: 'image' as const };
+    const textured = Entity.parse({
+      ...shaped('box', { x: 2, y: 1, z: 2 }),
+      shape: { kind: 'box', color: '#aa5522', walkable: true, texture },
+    });
+    expect(map(textured)?.shape).toMatchObject({ texture });
+    expect(map(shaped('box', { x: 2, y: 1, z: 2 }))?.shape).not.toHaveProperty('texture');
+  });
 });
 
 describe('image skybox (ENV-07)', () => {

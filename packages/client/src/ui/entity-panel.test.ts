@@ -6,11 +6,13 @@ import {
   entityCreateLayers,
   entityRenameIntent,
   entityShowGridOnTopIntent,
+  entityTextureIntent,
   entityRows,
   isValidEntityName,
   isValidColour,
   isValidPropSize,
   layerForCreate,
+  localImageAsset,
   ownerOptions,
   placementPosition,
   SPAWN_STEPS,
@@ -142,6 +144,28 @@ describe('entity panel intents', () => {
         entity: { shape: { kind, walkable: true }, transform: { position: { y: 0 } } },
       });
     }
+  });
+
+  it('carries an uploaded texture, and omits the key when there is none (ENV-05)', () => {
+    const texture = localImageAsset('a'.repeat(64), 'Crate');
+    const farmDraft = {
+      sceneId: S,
+      entityId: tid(35),
+      name: 'Crate',
+      kind: 'box' as const,
+      color: '#aa5500',
+      size: { x: 2, y: 1, z: 3 },
+      walkable: true,
+      layer: 'props' as const,
+    };
+    const textured = propCreateIntent(scene, { ...farmDraft, texture });
+    expect(canPerform(state, host, textured.type, textured.payload)).toBe(true);
+    expect(textured.payload).toMatchObject({ entity: { shape: { texture } } });
+
+    const bare = propCreateIntent(scene, farmDraft);
+    expect((bare.payload as { entity: { shape: object } }).entity.shape).not.toHaveProperty(
+      'texture',
+    );
   });
 
   it('rename and delete intents are accepted once the entity exists', () => {
@@ -294,5 +318,53 @@ describe('entityShowGridOnTopIntent (GRID-05)', () => {
       },
       sceneId: 'S',
     });
+  });
+});
+
+describe('entityTextureIntent (ENV-05)', () => {
+  const shape = { kind: 'box' as const, color: '#aa5522', walkable: true };
+  const texture = localImageAsset('b'.repeat(64), 'Crate');
+  const state = world();
+
+  it('sets the texture and keeps the rest of the shape', () => {
+    const spec = entityTextureIntent('S', 'E', shape, texture);
+    expect(spec).toEqual({
+      type: 'entity.update',
+      payload: { sceneId: 'S', entityId: 'E', changes: { shape: { ...shape, texture } } },
+      sceneId: 'S',
+    });
+  });
+
+  it('clears a texture by dropping the key, not by sending undefined', () => {
+    const cleared = entityTextureIntent('S', 'E', { ...shape, texture }, null).payload as {
+      changes: { shape: object };
+    };
+    expect(cleared.changes.shape).toEqual(shape);
+    expect(cleared.changes.shape).not.toHaveProperty('texture');
+  });
+
+  it('is accepted by the host for an existing prop (ENV-05)', () => {
+    const scene = sceneOf(state);
+    const created = propCreateIntent(scene, {
+      sceneId: S,
+      entityId: tid(36),
+      name: 'Crate',
+      kind: 'box',
+      color: '#aa5500',
+      size: { x: 1, y: 1, z: 1 },
+      walkable: true,
+      layer: 'props',
+    });
+    const withEntity: Campaign = {
+      ...state,
+      scenes: {
+        [S]: {
+          ...scene,
+          entities: { [tid(36)]: (created.payload as { entity: never }).entity },
+        },
+      },
+    };
+    const spec = entityTextureIntent(S, tid(36), shape, texture);
+    expect(canPerform(withEntity, host, spec.type, spec.payload)).toBe(true);
   });
 });
