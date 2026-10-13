@@ -5,6 +5,7 @@ import {
   canSelect,
   nextSelection,
   pickEntity,
+  selectionActor,
   validSelection,
   type SelectionActor,
 } from './selection.js';
@@ -176,6 +177,23 @@ describe('raycast picking', () => {
     ).toBe(false);
     expect(validSelection([token.id, hidden.id, 'gone'], withHidden, player)).toEqual([token.id]);
     expect(validSelection([token.id], null, player)).toEqual([]);
+  });
+});
+
+describe('selection actor', () => {
+  it('resolves the host by its flag, and everything seat-less and seat-less-and-unknown as a spectator', () => {
+    expect(selectionActor(true, null, {})).toEqual({ kind: 'host' });
+    // The host flag wins even when the identity happens to own a seat.
+    expect(selectionActor(true, owner.id, { [owner.id]: owner })).toEqual({ kind: 'host' });
+    expect(selectionActor(false, owner.id, { [owner.id]: owner })).toEqual({
+      kind: 'seat',
+      seat: owner,
+    });
+    // PERM-01: no seat and no host claim is a spectator, who may not select anything.
+    expect(selectionActor(false, null, {})).toEqual({ kind: 'spectator' });
+    // A stale seat id (another table, or the seat deleted) is a spectator too, never a host.
+    expect(selectionActor(false, tid(20), { [owner.id]: owner })).toEqual({ kind: 'spectator' });
+    expect(canSelect(token, scene, selectionActor(false, null, {}))).toBe(false);
   });
 });
 

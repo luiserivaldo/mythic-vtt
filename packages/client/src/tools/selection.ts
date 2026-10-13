@@ -9,6 +9,22 @@ export interface PickHit {
 export type SelectionActor =
   { kind: 'host' } | { kind: 'seat'; seat: Seat } | { kind: 'spectator' };
 
+/**
+ * The picking actor for one client. The host flag decides it, not the seat id on its own: a client
+ * with no seat that never claimed host is a spectator (PERM-01/02, it may not select anything), and
+ * a seat id that no longer resolves — another table, or a deleted seat — is a spectator too. A
+ * seat-less client only picks as the host when it actually remembers the host claim.
+ */
+export function selectionActor(
+  isHost: boolean,
+  seatId: string | null,
+  seats: Readonly<Record<string, Seat>>,
+): SelectionActor {
+  if (isHost) return { kind: 'host' };
+  const seat = seatId === null ? undefined : seats[seatId];
+  return seat ? { kind: 'seat', seat } : { kind: 'spectator' };
+}
+
 /** PERM-01/02: local selection grants no authority to change game state. */
 export function canSelect(entity: Entity, scene: Scene, actor: SelectionActor): boolean {
   if (scene.layers[entity.layer]?.locked) return false;
