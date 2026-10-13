@@ -12,7 +12,7 @@ test.afterAll(async () => {
 });
 
 const PLAYER_TABS = ['Chat', 'Sheet', 'Help', 'Settings'];
-const DM_ONLY_TABS = ['Scenes', 'Layers', 'Map', 'Entities', 'Prefabs', 'Participants', 'Invite'];
+const DM_ONLY_TABS = ['Scenes', 'Layers', 'Entities', 'Prefabs', 'Participants', 'Invite'];
 
 test('players get four tabs, never render DM tabs, and the DM sees them all', async ({
   browser,

@@ -259,3 +259,44 @@ describe('aoe.persist', () => {
     expect(JSON.stringify(patches)).not.toContain(IDS.otherIdentity);
   });
 });
+
+// Both projections must survive integration: hiding provenance must not restore token secrets.
+it('combines lasting provenance, label, marker and quick-field visibility', () => {
+  const state = stateWithSource();
+  const scene = state.scenes[IDS.scene];
+  const owner = state.seats[IDS.owner];
+  if (!scene || !owner) throw new Error('missing fixture');
+  owner.identityId = IDS.identity;
+  scene.entities[IDS.entity] = makeEntity(IDS.entity, {
+    owners: [IDS.owner],
+    name: 'Private label',
+    lastingAoE: { creatorIdentityId: IDS.identity },
+    token: {
+      sizeCells: 1,
+      heightCells: 1,
+      labelVisibility: 'owner',
+      statusMarkers: [{ kind: 'text', text: 'Private marker' }],
+      quickFields: {
+        hp: { value: 8, visibility: 'owner' },
+        ac: { value: 12, visibility: 'all' },
+      },
+    },
+  });
+  const view = (audience: Parameters<typeof visibleTo>[0]) =>
+    visibleTo(audience, state).scenes[IDS.scene]?.entities[IDS.entity];
+  for (const audience of [{ kind: 'spectators' }, { kind: 'seat', seatId: IDS.other }] as const) {
+    expect(view(audience)).toMatchObject({
+      name: '',
+      lastingAoE: {},
+      token: { quickFields: { ac: { value: 12 } } },
+    });
+    expect(view(audience)?.token?.quickFields).not.toHaveProperty('hp');
+    expect(view(audience)?.token).not.toHaveProperty('statusMarkers');
+    expect(view(audience)?.lastingAoE).not.toHaveProperty('creatorIdentityId');
+  }
+  expect(view({ kind: 'seat', seatId: IDS.owner })?.lastingAoE).toEqual({
+    creatorIdentityId: IDS.identity,
+  });
+  expect(view({ kind: 'seat', seatId: IDS.coDm })?.token?.quickFields).toHaveProperty('hp');
+  expect(view({ kind: 'seat', seatId: IDS.coDm })?.lastingAoE).toEqual({});
+});

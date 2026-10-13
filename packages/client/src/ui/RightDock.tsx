@@ -2,6 +2,7 @@ import { lazy, Suspense, useId, type Ref } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { ChatPanel } from './ChatPanel.js';
+import { SheetPanel } from './SheetPanel.js';
 import { seatColorsOf } from './chat-panel.js';
 import { DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
 import { SettingsPanel } from './SettingsPanel.js';
@@ -68,7 +69,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'chat':
         return <ChatPanel entries={[]} seatColors={seatColorsOf(presence?.seats)} />;
       case 'sheet':
-        return <Placeholder title="Sheet">Character sheets are coming soon.</Placeholder>;
+        return <SheetPanel />;
       case 'help':
         return (
           <Placeholder title="Help">
@@ -89,12 +90,17 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
     }
     if (!campaign || !board) return null;
     switch (active) {
+      // UI-SCN-01: the Scenes tab holds the scene list, create, and the battlemap upload with
+      // 2-point calibration (moved out of its own Map tab).
       case 'scenes':
-        return <ScenePanel campaign={campaign} />;
+        return (
+          <>
+            <ScenePanel campaign={campaign} />
+            <MapPanel campaign={board} />
+          </>
+        );
       case 'layers':
         return <LayerPanel campaign={board} role={role} />;
-      case 'map':
-        return <MapPanel campaign={board} />;
       case 'entities':
         return <EntityPanel campaign={board} />;
       case 'prefabs':

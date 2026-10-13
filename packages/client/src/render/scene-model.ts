@@ -60,6 +60,8 @@ export interface RenderEntity {
 export interface RenderShape {
   kind: PrimitiveKind;
   color: string;
+  /** ENV-05: uploaded image tiled once per cell across the faces; the colour is the fallback. */
+  texture?: AssetRef;
   walkable: boolean;
   /** GRID-05: show the scene grid on the walkable top in 3D. */
   showGridOnTop: boolean;
@@ -77,6 +79,8 @@ export interface RenderScene {
   background: string;
   /** ENV-07: optional gradient top colour (3D only). */
   zenith?: string;
+  /** ENV-07: optional uploaded image used as the 3D skybox; the colour/gradient is the fallback. */
+  skybox?: AssetRef;
   entities: RenderEntity[];
 }
 
@@ -122,6 +126,7 @@ function renderShape(entity: Entity, shape: NonNullable<Entity['shape']>): Rende
   return {
     kind: shape.kind,
     color: shape.color,
+    ...(shape.texture ? { texture: shape.texture } : {}),
     walkable: shape.walkable,
     showGridOnTop: shape.showGridOnTop === true,
     width,
@@ -153,6 +158,7 @@ export function mapScene(scene: Scene): RenderScene {
     id: scene.id,
     background: scene.environment.background,
     ...(scene.environment.zenith ? { zenith: scene.environment.zenith } : {}),
+    ...(scene.environment.skybox ? { skybox: scene.environment.skybox } : {}),
     entities: orderedEntities(
       Object.values(scene.entities).map((entity) => ({
         id: entity.id,

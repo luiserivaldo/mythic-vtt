@@ -17,6 +17,7 @@ import {
 } from '@mythic/shared';
 import { DRAG_THRESHOLD_PX } from '../render/camera-2d.js';
 import type { RenderScene } from '../render/scene-model.js';
+import { appendWaypoint, withCursor } from './ruler.js';
 import type { LocalDrag, RemotePreview } from './token-drag-store.js';
 
 export function dragStarted(
@@ -203,7 +204,35 @@ export interface Ghost {
 export interface DragRulerPath {
   key: string;
   from: string | null;
-  points: readonly [Vec3, Vec3];
+  points: readonly Vec3[];
+}
+
+/**
+ * UX-21/UI-TOKEN-06: the ruler shown while dragging is the base, every committed checkpoint, then
+ * the live position. Checkpoints use the ruler's own rules: finite, no repeats, capped length.
+ */
+export function dragRulerPoints(
+  base: Vec3,
+  checkpoints: readonly Vec3[],
+  to: Vec3,
+): readonly Vec3[] {
+  let points: readonly Vec3[] = [base];
+  for (const checkpoint of checkpoints) points = appendWaypoint(points, checkpoint);
+  return withCursor(points, to);
+}
+
+/**
+ * UX-21/UI-TOKEN-06: commit the live drag position as a checkpoint and keep measuring from it. A
+ * non-finite or repeated position adds nothing, and the path is capped like a ruler's (so the
+ * cumulative total can never be poisoned or grow without bound).
+ */
+export function appendCheckpoint(
+  base: Vec3,
+  checkpoints: readonly Vec3[],
+  point: Vec3,
+): readonly Vec3[] {
+  const path = appendWaypoint([base, ...checkpoints], point);
+  return path.length > checkpoints.length + 1 ? path.slice(1) : checkpoints;
 }
 
 /** Remote previews worth drawing: this scene, entity still present, not already where it landed. */
@@ -242,10 +271,10 @@ export function dragRulerPaths(
     local &&
     !local.settling &&
     local.sceneId === scene.id &&
-    scene.entities[local.entityId]?.token &&
-    !samePosition(local.base, local.to)
+    scene.entities[local.entityId]?.token
   ) {
-    paths.push({ key: 'local', from: null, points: [local.base, local.to] });
+    const points = dragRulerPoints(local.base, local.checkpoints ?? [], local.to);
+    if (points.length > 1) paths.push({ key: 'local', from: null, points });
   }
   for (const ghost of visibleGhosts(remote, scene, now)) {
     const base = scene.entities[ghost.entityId]?.transform.position;

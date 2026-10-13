@@ -100,6 +100,21 @@ test('host sets elevation through the panel and sees the badge in scene units', 
   await expect.poll(y, { timeout: 10_000 }).toBe(0);
   await expect(badge).toHaveCount(0);
 
+  // UI-TOKEN-05: the per-viewer "Show height labels" setting hides the badge text only.
+  await panel.getByRole('button', { name: 'Raise elevation' }).click();
+  await expect.poll(y, { timeout: 10_000 }).toBe(1);
+  await expect(badge).toHaveText('+5 ft');
+
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click();
+  const heightLabels = page.getByLabel('Show height labels', { exact: true });
+  await expect(heightLabels).toBeChecked();
+  await heightLabels.uncheck();
+  await expect(badge).toHaveCount(0);
+  await expect(page.getByTestId('token-label').filter({ hasText: 'Archer' })).toBeVisible();
+
+  await heightLabels.check();
+  await expect(badge).toHaveText('+5 ft');
+
   expect(errors).toEqual([]);
   await setup.close();
   await context.close();
