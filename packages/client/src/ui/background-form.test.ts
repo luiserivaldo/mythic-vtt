@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { backgroundDraft, isValidBackgroundDraft } from './background-form.js';
-import { sceneBackgroundIntent } from './intent-specs.js';
+import { sceneBackgroundIntent, sceneSkyboxIntent } from './intent-specs.js';
 import type { Campaign } from '@mythic/shared';
 
 const campaign = {
@@ -24,5 +24,10 @@ describe('background form', () => {
       background: '#000000',
       zenith: null,
     });
+  });
+  it('builds the image skybox intent to set and clear it', () => {
+    const asset = { source: 'local', hash: 'a'.repeat(64), kind: 'image' } as const;
+    expect(sceneSkyboxIntent('s', asset).payload).toEqual({ sceneId: 's', skybox: asset });
+    expect(sceneSkyboxIntent('s', null).payload).toEqual({ sceneId: 's', skybox: null });
   });
 });

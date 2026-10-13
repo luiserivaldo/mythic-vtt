@@ -26,6 +26,17 @@ describe(`${T} schema`, () => {
   it('accepts a valid payload', () => {
     expect(sceneUpdate.schema.safeParse(payload).success).toBe(true);
   });
+  it('accepts the skybox alone, null to clear, and rejects a malformed asset', () => {
+    const asset = { source: 'local', hash: 'a'.repeat(64), kind: 'image' };
+    expect(sceneUpdate.schema.safeParse({ sceneId: IDS.scene, skybox: asset }).success).toBe(true);
+    expect(sceneUpdate.schema.safeParse({ sceneId: IDS.scene, skybox: null }).success).toBe(true);
+    expect(
+      sceneUpdate.schema.safeParse({
+        sceneId: IDS.scene,
+        skybox: { source: 'local', hash: 'not-a-hash', kind: 'image' },
+      }).success,
+    ).toBe(false);
+  });
   it.each([
     ['no fields', { sceneId: IDS.scene }],
     ['empty name', { sceneId: IDS.scene, name: '  ' }],
@@ -86,6 +97,26 @@ describe(`${T} reducer`, () => {
     });
     const cleared = reduceAction(set.state, envelope({ sceneId: IDS.scene, zenith: null }));
     expect(cleared.state.scenes[IDS.scene]?.environment).toEqual({ background: '#000000' });
+  });
+
+  it('sets and clears the optional image skybox, leaving the colours alone (ENV-07)', () => {
+    const asset = { source: 'local', hash: 'a'.repeat(64), kind: 'image', name: 'sky.png' };
+    const set = reduceAction(makeCampaign(), envelope({ sceneId: IDS.scene, skybox: asset }));
+    expect(set.state.scenes[IDS.scene]?.environment).toEqual({
+      background: '#000000',
+      skybox: asset,
+    });
+    // A colour-only update must not drop the image.
+    const recoloured = reduceAction(
+      set.state,
+      envelope({ sceneId: IDS.scene, background: '#112233' }),
+    );
+    expect(recoloured.state.scenes[IDS.scene]?.environment).toEqual({
+      background: '#112233',
+      skybox: asset,
+    });
+    const cleared = reduceAction(recoloured.state, envelope({ sceneId: IDS.scene, skybox: null }));
+    expect(cleared.state.scenes[IDS.scene]?.environment).toEqual({ background: '#112233' });
   });
 
   it('is deterministic: same state + envelope gives identical results', () => {

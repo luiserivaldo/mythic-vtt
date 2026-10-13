@@ -165,6 +165,35 @@ describe('primitive shapes (ENV-02)', () => {
   });
 });
 
+describe('image skybox (ENV-07)', () => {
+  const asset = { source: 'local', hash: 'a'.repeat(64), kind: 'image' } as const;
+  const withSkybox = Scene.parse({
+    ...scene,
+    environment: { ...scene.environment, skybox: asset },
+  });
+
+  it('carries the scene skybox into the render scene', () => {
+    expect(mapScene(freshScene()).skybox).toBeUndefined();
+    expect(mapScene(withSkybox).skybox).toEqual(asset);
+  });
+
+  it('keeps the colour and gradient alongside the image for the fallback', () => {
+    const gradient = Scene.parse({
+      ...scene,
+      environment: { background: '#102030', zenith: '#6688aa', skybox: asset },
+    });
+    expect(mapScene(gradient)).toMatchObject({
+      background: '#102030',
+      zenith: '#6688aa',
+      skybox: asset,
+    });
+  });
+
+  function freshScene() {
+    return Scene.parse({ ...scene, environment: { background: '#102030' } });
+  }
+});
+
 describe('token yaw (M1-34)', () => {
   const tokenEntity = (id: number, rotation: { x: number; y: number; z: number; w: number }) =>
     Entity.parse({
