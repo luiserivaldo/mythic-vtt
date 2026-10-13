@@ -217,3 +217,35 @@ describe('token yaw (M1-34)', () => {
     expect(yawOf(entity(43, 'props'))).toBeUndefined();
   });
 });
+
+describe('status markers (TOK-06)', () => {
+  const markers = [
+    { kind: 'icon', icon: 'blinded' },
+    { kind: 'text', text: 'Moon marked' },
+  ] as const;
+  const tokenWith = (id: number, statusMarkers?: typeof markers) =>
+    Entity.parse({
+      id: tid(id),
+      layer: 'tokens',
+      name: 'Token',
+      owners: [],
+      transform: {
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0, w: 1 },
+        scale: { x: 1, y: 1, z: 1 },
+      },
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all', statusMarkers },
+    });
+  const renderToken = (subject: Entity) =>
+    mapScene({ ...scene, entities: { [subject.id]: subject } }).entities[0]?.token;
+
+  it('carries a token marker list through to the renderer', () => {
+    expect(renderToken(tokenWith(50, markers))?.statusMarkers).toEqual(markers);
+  });
+
+  it('omits the field entirely when the host stripped the markers', () => {
+    // The host removes the list when this viewer may not read the label (PERM-03); the renderer
+    // must not see an empty list it could mistake for "no markers".
+    expect(renderToken(tokenWith(51))?.statusMarkers).toBeUndefined();
+  });
+});

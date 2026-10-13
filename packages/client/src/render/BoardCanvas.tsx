@@ -11,6 +11,7 @@ import { useClientStore } from '../store/react.js';
 import { activeRenderScene, type RenderScene } from './scene-model.js';
 import { PickableEntities } from './PickableEntities.js';
 import { RangeReadout } from './RangeReadout.js';
+import { TokenPreviewCard } from './TokenPreviewCard.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
@@ -29,6 +30,7 @@ import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
 import { OcclusionFade } from './OcclusionFade.js';
+import { FocusCamera } from './FocusCamera.js';
 import { RenderDiagnostics } from './RenderDiagnostics.js';
 import { ToolPanelDock } from '../ui/ToolPanelDock.js';
 import { isReadOnlyViewer } from '../ui/viewer.js';
@@ -130,6 +132,14 @@ function BoardScene({
       {grid && (
         <GridLines grid={grid} fill={scene?.background ?? DEFAULT_BACKGROUND} renderOrder={-1} />
       )}
+      {/* CAM-06: double-clicking a token tweens the camera onto it, in 2D and in 3D. */}
+      <FocusCamera
+        mode={viewMode}
+        bounds={bounds}
+        canvasSize={canvasSize}
+        orbitRef={director.orbitRef}
+        applyRef={director.applyRef}
+      />
       {/* M1-28: TokenDrag claims a press on any movable token without selecting it first, while
           empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
@@ -138,6 +148,8 @@ function BoardScene({
       <PickableEntities rendered={shown} scene={source} mode={mode3d ? '3d' : '2d'} grid={grid} />
       {/* MEAS-05: hovering a token with one token selected shows the token-to-token range. */}
       <RangeReadout scene={source} />
+      {/* UI-TOKEN-01: a single selected token shows its quick preview card near it, 2D and 3D. */}
+      <TokenPreviewCard scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       {mode3d && <OcclusionFade rendered={shown} />}
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       <SceneOverlay overlay={source?.overlay} />

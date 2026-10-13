@@ -12,6 +12,16 @@ declare global {
     __mythicOcclusion?: {
       getMaterials(): { id: string; opacity: number; depthWrite: boolean }[];
     };
+    /** Development-only 2D camera state for the CAM-06 focus e2e. */
+    __mythicFocus?: {
+      getView2d(): {
+        centerX: number;
+        centerZ: number;
+        zoom: number;
+        animating: boolean;
+        poses: number;
+      };
+    };
     /** Development/test-only render counters for performance assertions. */
     __mythicRender?: {
       getFrameCount(): number;

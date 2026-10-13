@@ -1,4 +1,5 @@
 import type { Campaign, Entity, LayerId, Scene } from '@mythic/shared';
+import { useViewerPreferences } from './ViewerPreferencesProvider.js';
 import { useId, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { useStore } from 'zustand';
 import { UploadError, uploadFailureMessage, type ImageUploader } from '../assets/image-upload.js';
@@ -447,6 +448,7 @@ function EntityRowView({
     (s) => s.sceneId === scene.id && s.ids.includes(entityId),
   );
   const [confirming, setConfirming] = useState(false);
+  const { preferences } = useViewerPreferences();
   const [textureBusy, setTextureBusy] = useState(false);
   const textureInputId = useId();
   const entity = scene.entities[entityId];
@@ -605,7 +607,11 @@ function EntityRowView({
             <button
               type="button"
               onClick={() => {
-                setConfirming(true);
+                if (preferences.confirmBeforeDeleting) setConfirming(true);
+                else
+                  void send(entityDeleteIntent(scene.id, entityId)).then((ok) => {
+                    if (ok) selectionStore.getState().clear();
+                  });
               }}
             >
               Delete {entity.name}
