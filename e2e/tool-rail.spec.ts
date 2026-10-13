@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid } from './harness.js';
 
-// UX-15 (UI-TOOL-01..07): the left tool rail lists Select, Pan, Measure, Create Prop and the
+// UX-15 (UI-TOOL-01..07): the left tool rail lists Select, Pan, Measure, Draw, Create Prop and the
 // Initiative placeholder. A tool a seat may not use stays on the rail, disabled with a reason;
 // switching a seat's Enable Interaction off disables every tool.
+// LAY-05 (M4-13) adds Draw, the slot UI-TOOL-06 reserved for a later milestone: the rail takes it
+// as one registry entry, and the never-hide rule holds for it exactly as for the alpha tools.
 
-const TOOLS = ['Select', 'Pan', 'Measure', 'Create Prop', 'Initiative'];
+const TOOLS = ['Select', 'Pan', 'Measure', 'Draw', 'Create Prop', 'Initiative'];
 
 test('the rail disables, never hides, tools a seat cannot use', async ({ browser }) => {
   test.setTimeout(120_000);
@@ -46,8 +48,8 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     expect(await dm.locator('.ui-board-controls .ui-rail-divider').count()).toBeGreaterThanOrEqual(
       3,
     );
-    for (const absent of ['Draw', 'Pin', 'Lighting', 'Fog'])
-      await expect(rail(dm, absent)).toHaveCount(0);
+    // Pin, Lighting and Fog are still unimplemented (UI-TOOL-06), so they are not on the rail at all.
+    for (const absent of ['Pin', 'Lighting', 'Fog']) await expect(rail(dm, absent)).toHaveCount(0);
 
     // Initiative is a labelled placeholder that opens a mock panel.
     await expect(rail(dm, 'Initiative')).toContainText('WIP');
@@ -93,6 +95,26 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     await rail(player, 'Create Prop').click({ force: true });
     await expect(player.getByRole('form', { name: 'Create prop' })).toHaveCount(0);
 
+    // LAY-05 (M4-13): Draw stays on the rail too, and opens no panel the seat may not use.
+    await expect(rail(player, 'Draw')).toHaveAttribute('aria-disabled', 'true');
+    await expect(rail(player, 'Draw')).toHaveAttribute(
+      'title',
+      'Drawing is disabled in this scene',
+    );
+    await rail(player, 'Draw').click({ force: true });
+    await expect(player.getByRole('region', { name: 'Draw tool' })).toHaveCount(0);
+
+    // PERM-05: the DM opens the scene's Draw toggle, and the player's tool becomes usable.
+    expect(
+      (await setup.intent('scene.setPlayerToggles', { sceneId, toggles: { draw: true } })).t,
+    ).toBe('ack');
+    await expect(rail(player, 'Draw')).not.toHaveAttribute('aria-disabled', 'true');
+    await rail(player, 'Draw').click();
+    await expect(rail(player, 'Draw')).toHaveAttribute('aria-pressed', 'true');
+    await expect(player.getByRole('region', { name: 'Draw tool' })).toBeVisible();
+    await rail(player, 'Select').click();
+    await expect(player.getByRole('region', { name: 'Draw tool' })).toHaveCount(0);
+
     // Enable Interaction off: every tool is disabled with the same reason, none hidden.
     expect((await setup.intent('seat.update', { seatId, interactionEnabled: false })).t).toBe(
       'ack',
@@ -106,6 +128,8 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     }
     expect((await setup.intent('seat.update', { seatId, interactionEnabled: true })).t).toBe('ack');
     await expect(rail(player, 'Select')).not.toHaveAttribute('aria-disabled', 'true');
+    // The scene toggle is still on, so Draw comes back with the rest.
+    await expect(rail(player, 'Draw')).not.toHaveAttribute('aria-disabled', 'true');
 
     expect(errors).toEqual([]);
     await setup.close();

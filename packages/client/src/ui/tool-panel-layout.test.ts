@@ -9,6 +9,7 @@ describe('tool panel layout', () => {
         aoe: false,
         token: true,
         ruler: false,
+        draw: false,
         'create-prop': false,
         initiative: false,
       },
@@ -21,6 +22,7 @@ describe('tool panel layout', () => {
       'aoe',
       'token',
       'ruler',
+      'draw',
       'create-prop',
       'initiative',
     ]);
@@ -34,6 +36,7 @@ describe('tool panel layout', () => {
       aoe: true,
       token: true,
       ruler: false,
+      draw: false,
       'create-prop': false,
       initiative: false,
     });
@@ -45,6 +48,7 @@ describe('tool panel layout', () => {
       aoe: false,
       token: true,
       ruler: false,
+      draw: false,
       'create-prop': false,
       initiative: false,
     });

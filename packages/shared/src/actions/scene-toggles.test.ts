@@ -8,8 +8,9 @@ import {
   type ActionEnvelope,
 } from '../index.js';
 import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix } from './testing.js';
-import { canUseSceneToggle } from './scene-toggles.js';
+import { canUseSceneToggle, TOGGLE_FOR_CHANNEL } from './scene-toggles.js';
 import { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
+import { DRAW_CLEAR_CHANNEL, DRAW_ERASE_CHANNEL, DRAW_STROKE_CHANNEL } from '../drawing.js';
 
 const payload = { sceneId: IDS.scene, toggles: { draw: true, measure: false } };
 const envelope: ActionEnvelope = {
@@ -32,6 +33,14 @@ function withToggles(toggles: Record<string, boolean>) {
 }
 
 describe('scene player toggles (PERM-05)', () => {
+  it('gates live drawing on the scene draw toggle; erase and clear are host-enforced', () => {
+    expect(TOGGLE_FOR_CHANNEL[DRAW_STROKE_CHANNEL]).toBe('draw');
+    expect(TOGGLE_FOR_CHANNEL['ruler.preview']).toBe('measure');
+    // Erasing is ownership and clearing is role: neither is a scene-wide player permission.
+    expect(TOGGLE_FOR_CHANNEL[DRAW_ERASE_CHANNEL]).toBeUndefined();
+    expect(TOGGLE_FOR_CHANNEL[DRAW_CLEAR_CHANNEL]).toBeUndefined();
+  });
+
   it('defaults keep measuring open and drawing/pins closed for scenes without toggles', () => {
     const state = makeCampaign();
     expect(state.scenes[IDS.scene]?.playerToggles).toBeUndefined();

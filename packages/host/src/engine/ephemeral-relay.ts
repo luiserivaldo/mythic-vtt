@@ -1,12 +1,21 @@
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import {
+  canClearDrawings,
+  canEraseDrawing,
   canUseSceneToggle,
   checkIntent,
+  drawChannelOf,
+  DrawClearData,
+  DrawEraseData,
+  DrawStrokeData,
   seatOf,
   TOGGLE_FOR_CHANNEL,
   viewEntity,
+  visibleTo,
+  type Actor,
   type Audience,
   type Campaign,
+  type DrawChannel,
 } from '@mythic/shared';
 import type { GatewayConnection } from '../gateway/engine-seam.js';
 import { actorFor, audienceFor } from './audience.js';
@@ -36,8 +45,10 @@ export type EphemeralDropReason =
   | 'spectator-rate-limited'
   | 'payload-too-large'
   | 'invalid-entity-reference'
+  | 'invalid-drawing'
   | 'forbidden'
-  | 'hidden-entity';
+  | 'hidden-entity'
+  | 'hidden-scene';
 
 export interface EphemeralRelayStats {
   readonly relayed: number;
@@ -66,6 +77,14 @@ export interface EphemeralRelay {
 const DEFAULT_ACTIVE_RATE: TokenBucketConfig = { ratePerSecond: 30, burst: 60 };
 const DEFAULT_SPECTATOR_RATE: TokenBucketConfig = { ratePerSecond: 5, burst: 10 };
 const DEFAULT_SPECTATOR_DELIVERY_RATE: TokenBucketConfig = { ratePerSecond: 10, burst: 10 };
+
+/**
+ * LAY-05: how many drawings the relay remembers per scene, and how many scenes it tracks at all.
+ * A session drawing more than this is throttled out of memory oldest-first; the drawings stay on
+ * the board for everyone who already has them.
+ */
+const MAX_DRAWINGS_PER_SCENE = 512;
+const MAX_DRAWING_SCENES = 64;
 
 class TokenBucket {
   private tokens: number;
@@ -163,13 +182,120 @@ export function createEphemeralRelay(
     'spectator-rate-limited': 0,
     'payload-too-large': 0,
     'invalid-entity-reference': 0,
+    'invalid-drawing': 0,
     forbidden: 0,
     'hidden-entity': 0,
+    'hidden-scene': 0,
   };
 
   const drop = (reason: EphemeralDropReason, count = 1) => {
     dropped[reason] += count;
   };
+
+  /**
+   * LAY-05: drawings are relayed live and are never campaign state, so the host remembers only
+   * who drew each stroke — the minimum it needs to authorise erasing. It is bounded and in
+   * memory only: a restart, an eviction or a `draw.clear` forgets the stroke, and an evicted
+   * stroke is nobody's to erase. Nothing here is persisted or logged.
+   */
+  const drawings = new Map<string, Map<string, string>>();
+
+  function recordStroke(sceneId: string, strokeId: string, owner: string): void {
+    let strokes = drawings.get(sceneId);
+    if (!strokes) {
+      if (drawings.size >= MAX_DRAWING_SCENES) {
+        const oldest = drawings.keys().next().value;
+        if (oldest !== undefined) drawings.delete(oldest);
+      }
+      strokes = new Map();
+      drawings.set(sceneId, strokes);
+    }
+    strokes.delete(strokeId);
+    strokes.set(strokeId, owner);
+    while (strokes.size > MAX_DRAWINGS_PER_SCENE) {
+      const oldest = strokes.keys().next().value;
+      if (oldest === undefined) break;
+      strokes.delete(oldest);
+    }
+  }
+
+  /**
+   * PERM-03: a scene a viewer may not see does not exist for them, so drawings are relayed only to
+   * targets that can see the scene they were drawn on, and a sender can only draw on a scene they
+   * see themselves. `visibleTo` keeps the host and co-DMs on every scene and a player or spectator
+   * on the active, non-DM-only one: no second copy of the rule to drift.
+   */
+  function seesScene(state: Campaign, audience: Audience, sceneId: string): boolean {
+    return visibleTo(audience, state).scenes[sceneId] !== undefined;
+  }
+
+  /** Runs one drawing message: `null` means it was dropped (and counted) and must not relay. */
+  function applyDrawing(
+    sender: GatewayConnection,
+    senderAudience: Audience,
+    message: EphemeralMessage,
+    state: Campaign,
+    actor: Actor,
+    kind: DrawChannel,
+  ): string | null {
+    switch (kind) {
+      case 'stroke': {
+        // The scene toggle gate above already proved the scene exists, for every sender.
+        const parsed = DrawStrokeData.safeParse(message.data);
+        if (!parsed.success) {
+          drop('invalid-drawing');
+          return null;
+        }
+        const { sceneId, strokeId } = parsed.data;
+        if (!seesScene(state, senderAudience, sceneId)) {
+          drop('forbidden');
+          return null;
+        }
+        const owner = drawings.get(sceneId)?.get(strokeId);
+        // A client may update its own stroke while the pointer is down, but never take over a
+        // stroke that is already someone else's: that would hand it the author's erase right.
+        if (owner !== undefined && owner !== sender.identityId) {
+          drop('forbidden');
+          return null;
+        }
+        recordStroke(sceneId, strokeId, sender.identityId);
+        return sceneId;
+      }
+      case 'erase': {
+        const parsed = DrawEraseData.safeParse(message.data);
+        if (!parsed.success) {
+          drop('invalid-drawing');
+          return null;
+        }
+        const strokes = drawings.get(parsed.data.sceneId);
+        const owner = strokes?.get(parsed.data.strokeId);
+        if (owner === undefined) {
+          drop('invalid-drawing');
+          return null;
+        }
+        if (!canEraseDrawing(state, actor, owner)) {
+          drop('forbidden');
+          return null;
+        }
+        strokes?.delete(parsed.data.strokeId);
+        return parsed.data.sceneId;
+      }
+      case 'clear': {
+        const parsed = DrawClearData.safeParse(message.data);
+        if (!parsed.success) {
+          drop('invalid-drawing');
+          return null;
+        }
+        // Role before scene, so a refusal never tells a player which scenes exist.
+        if (!canClearDrawings(state, actor)) {
+          drop('forbidden');
+          return null;
+        }
+        drawings.delete(parsed.data.sceneId);
+        return parsed.data.sceneId;
+      }
+    }
+  }
 
   return {
     relay(sender, message, state, recipients) {
@@ -204,6 +330,16 @@ export function createEphemeralRelay(
         return;
       }
 
+      // LAY-05: drawings are relayed like other tool ephemerals, but erasing and clearing are
+      // authorised here — the author for one stroke, the DM or a co-DM for all of them.
+      const drawing = drawChannelOf(message.channel);
+      const senderAudience = audienceFor(state, sender);
+      const drawingSceneId =
+        drawing === null
+          ? null
+          : applyDrawing(sender, senderAudience, message, state, senderActor, drawing);
+      if (drawing !== null && drawingSceneId === null) return;
+
       const refs = entityReferences(message.data);
       if (refs === undefined) {
         drop('invalid-entity-reference');
@@ -216,7 +352,6 @@ export function createEphemeralRelay(
         }
       }
 
-      const senderAudience = audienceFor(state, sender);
       const senderSeat =
         senderAudience.kind === 'seat' ? state.seats[senderAudience.seatId] : undefined;
       if (
@@ -261,7 +396,14 @@ export function createEphemeralRelay(
       }
 
       const targets = Array.from(recipients);
-      const visibleTargets = targets.filter((target) => {
+      // LAY-05: a drawing carries no entity to filter on, so the scene itself decides who sees it.
+      const sceneTargets =
+        drawingSceneId === null
+          ? targets
+          : targets.filter((target) => seesScene(state, target.audience, drawingSceneId));
+      drop('hidden-scene', targets.length - sceneTargets.length);
+
+      const visibleTargets = sceneTargets.filter((target) => {
         for (const ref of refs) {
           const entity = state.scenes[ref.sceneId]?.entities[ref.entityId];
           if (entity === undefined) return false;
@@ -271,7 +413,9 @@ export function createEphemeralRelay(
         }
         return true;
       });
-      drop('hidden-entity', targets.length - visibleTargets.length);
+      // Counted against the scene-filtered targets: a drawing has no entity to hide, and a target
+      // already dropped as hidden-scene must not be counted twice under a second reason.
+      drop('hidden-entity', sceneTargets.length - visibleTargets.length);
 
       // M4-02: a spectator watching through a seat has a seat audience but is still a spectator.
       const spectatorTargets = visibleTargets.filter(isSpectatorTarget);

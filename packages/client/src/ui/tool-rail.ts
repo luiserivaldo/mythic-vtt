@@ -36,6 +36,7 @@ export interface RailInput {
 const DENIED: Readonly<Record<string, string>> = {
   select: 'Your seat cannot move tokens',
   measure: 'Your seat cannot measure',
+  draw: 'Your seat cannot draw',
   'create-prop': 'Your seat cannot create props',
 };
 
@@ -44,7 +45,7 @@ export const SPECTATOR_REASON = 'Spectators can only look around';
 export const READ_ONLY_REASON = 'Your seat is view-only';
 
 /** Tools that act on the board; a read-only viewer keeps only Pan (and the placeholder). */
-const ACTS_ON_BOARD: ReadonlySet<string> = new Set(['select', 'measure', 'create-prop']);
+const ACTS_ON_BOARD: ReadonlySet<string> = new Set(['select', 'measure', 'draw', 'create-prop']);
 
 /** The whole rail, in registry order, each tool enabled or disabled with a reason. */
 export function railToolStates(input: RailInput): RailToolState[] {
