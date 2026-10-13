@@ -5,6 +5,7 @@ import { lazy, Suspense, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
 import { useClientStore } from '../store/react.js';
+import { activeToolStore } from '../tools/active-tool-store.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { useGizmoTarget } from '../tools/use-gizmo-target.js';
@@ -16,6 +17,7 @@ import { isReadOnlyViewer } from './viewer.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { RulerPanel } from './RulerPanel.js';
 import { seeSheet } from './sheet-panel.js';
+import { CreatePropPanel, InitiativePanel } from './RailPanels.js';
 
 const TransformPanel3D = lazy(async () => {
   const module = await import('./TransformPanel3D.js');
@@ -87,6 +89,7 @@ export function ToolPanelDock({
   const collapsed = useStore(toolPanelLayoutStore, (state) => state.collapsed);
   const aoeActive = useStore(aoeToolStore, (state) => state.active);
   const rulerActive = useStore(rulerStore, (state) => state.tool);
+  const activeTool = useStore(activeToolStore, (state) => state.tool);
   const selected = useStore(selectionStore, (state) => state.ids);
   const target2d = useGizmoTarget();
   const target3d = useGizmoTarget3D();
@@ -99,10 +102,39 @@ export function ToolPanelDock({
   const showRuler = scene !== null && (rulerActive || aoeActive);
 
   const showToken = campaign !== null && scene !== null && selectedEntity?.token !== undefined;
-  if (!container || readOnly || (!showTransform && !showAoE && !showToken && !showRuler))
+  // UI-TOOL-04/05: the rail's own panels. Measuring (the ruler or an AoE) takes the rail over.
+  const measuring = rulerActive || aoeActive;
+  const showCreateProp = scene !== null && !measuring && activeTool === 'create-prop';
+  const showInitiative = !measuring && activeTool === 'initiative';
+  // Read-only viewers get no editing panels, only the Initiative placeholder.
+  if (!container) return null;
+  if (
+    (readOnly || (!showTransform && !showAoE && !showToken && !showRuler && !showCreateProp)) &&
+    !showInitiative
+  )
     return null;
+  if (readOnly) {
+    return createPortal(
+      <aside className="ui-tool-dock" aria-label="Tool panels">
+        <PanelFrame id="initiative" label="Initiative" collapsed={collapsed.initiative}>
+          <InitiativePanel />
+        </PanelFrame>
+      </aside>,
+      container,
+    );
+  }
   return createPortal(
     <aside className="ui-tool-dock" aria-label="Tool panels">
+      {showCreateProp && (
+        <PanelFrame id="create-prop" label="Create Prop" collapsed={collapsed['create-prop']}>
+          <CreatePropPanel scene={scene} isHost={isHost} />
+        </PanelFrame>
+      )}
+      {showInitiative && (
+        <PanelFrame id="initiative" label="Initiative" collapsed={collapsed.initiative}>
+          <InitiativePanel />
+        </PanelFrame>
+      )}
       {showTransform && (
         <PanelFrame id="transform" label="Transform" collapsed={collapsed.transform}>
           <Suspense fallback={<span role="status">Loading transform tools…</span>}>

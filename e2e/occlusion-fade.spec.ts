@@ -1,10 +1,17 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   PERFORMANCE_SCENE,
   withinRenderBudget,
 } from '../packages/client/src/render/performance-budget.js';
 import { orbitPosition, type Orbit3D } from '../packages/client/src/render/camera-3d.js';
-import { RawClient, openClient, startTable, testUlid, type Table } from './harness.js';
+import {
+  RawClient,
+  openClient,
+  settledCameraPose,
+  startTable,
+  testUlid,
+  type Table,
+} from './harness.js';
 
 interface Diagnostics {
   __mythicCamera?: { getPose(): Readonly<Orbit3D> };
@@ -22,41 +29,6 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await table?.stop();
 });
-
-/** The live 3D pose, or null while the orbit camera is not mounted yet. */
-function cameraPose(page: Page): Promise<Readonly<Orbit3D> | null> {
-  return page.evaluate(
-    () => (globalThis as unknown as Diagnostics).__mythicCamera?.getPose() ?? null,
-  );
-}
-
-function sameOrbit(a: Readonly<Orbit3D>, b: Readonly<Orbit3D>): boolean {
-  return (
-    a.targetX === b.targetX &&
-    a.targetY === b.targetY &&
-    a.targetZ === b.targetZ &&
-    a.azimuth === b.azimuth &&
-    a.polar === b.polar &&
-    a.distance === b.distance
-  );
-}
-
-/**
- * M2-05: entering 3D tweens the orbit camera from the 2D framing. The wall goes on the sightline
- * between the camera and the token, so read the pose only once it has settled — mid-tween the wall
- * lands on a sightline the settled camera no longer has.
- */
-async function settledCameraPose(page: Page): Promise<Readonly<Orbit3D>> {
-  await expect.poll(() => cameraPose(page)).not.toBeNull();
-  let previous = await cameraPose(page);
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    await page.waitForTimeout(50);
-    const next = await cameraPose(page);
-    if (next !== null && previous !== null && sameOrbit(next, previous)) return next;
-    previous = next;
-  }
-  throw new Error('the 3D camera did not settle after the view switch');
-}
 
 test('selected tokens fade blocking primitives locally in 3D and restore materials in 2D', async ({
   browser,
@@ -135,6 +107,11 @@ test('selected tokens fade blocking primitives locally in 3D and restore materia
   await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Focus token', exact: true }).click();
   await page.getByRole('button', { name: '3D view' }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => (globalThis as unknown as Diagnostics).__mythicCamera?.getPose()),
+    )
+    .not.toBeUndefined();
   const pose = await settledCameraPose(page);
   const camera = orbitPosition(pose);
   const point = { x: (camera.x + 20) / 2, y: (camera.y + 0.6) / 2 - 2, z: (camera.z + 15) / 2 };

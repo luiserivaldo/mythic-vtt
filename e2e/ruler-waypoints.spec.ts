@@ -50,7 +50,7 @@ test('a right click commits a 2D waypoint and the total stays cumulative', async
   const c = at(11.5, 8.5);
   const d = at(14.5, 8.5);
 
-  await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+  await page.getByRole('button', { name: 'Measure', exact: true }).click();
   await page.mouse.click(a.x, a.y);
   await page.mouse.move(b.x, b.y, { steps: 5 });
   await expect(page.getByTestId('ruler-total')).toHaveText('30 ft');
@@ -82,7 +82,7 @@ test('a right click commits a 2D waypoint and the total stays cumulative', async
   await page.mouse.click(d.x, d.y, { button: 'right' });
   await expect(page.getByTestId('ruler-total')).toHaveCount(0);
   await expect(viewer.page.getByTestId('remote-ruler-total')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Ruler', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Measure', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );

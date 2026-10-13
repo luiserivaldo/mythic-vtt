@@ -4,8 +4,10 @@ import {
   openClient,
   recordPageFrames,
   seedProfile,
+  settledCameraPose,
   startTable,
   testUlid,
+  type CameraPose,
   type Table,
 } from './harness.js';
 
@@ -39,52 +41,6 @@ async function cellToPixel(page: Page) {
     x: box.x + box.width / 2 + (x - 20) * zoom,
     y: box.y + box.height / 2 + (z - 15) * zoom,
   });
-}
-
-interface CameraPose {
-  targetX: number;
-  targetY: number;
-  targetZ: number;
-  azimuth: number;
-  polar: number;
-  distance: number;
-}
-
-/** The live 3D pose, or null while the orbit camera is not mounted yet. */
-async function cameraPose(page: Page): Promise<CameraPose | null> {
-  return page.evaluate(() => {
-    const scope = globalThis as typeof globalThis & {
-      __mythicCamera?: { getPose(): CameraPose };
-    };
-    return scope.__mythicCamera?.getPose() ?? null;
-  });
-}
-
-function samePose(a: CameraPose, b: CameraPose): boolean {
-  return (
-    a.targetX === b.targetX &&
-    a.targetY === b.targetY &&
-    a.targetZ === b.targetZ &&
-    a.azimuth === b.azimuth &&
-    a.polar === b.polar &&
-    a.distance === b.distance
-  );
-}
-
-/**
- * M2-05: entering 3D tweens the orbit camera from the 2D framing. Project only against a settled
- * pose, or a projection taken mid-tween points at where the camera will no longer be.
- */
-async function settledCameraPose(page: Page): Promise<CameraPose> {
-  await expect.poll(() => cameraPose(page)).not.toBeNull();
-  let previous = await cameraPose(page);
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    await page.waitForTimeout(50);
-    const next = await cameraPose(page);
-    if (next !== null && previous !== null && samePose(next, previous)) return next;
-    previous = next;
-  }
-  throw new Error('the 3D camera did not settle after the view switch');
 }
 
 /** Projects a world point through the live 3D pose (M2-12 default vertical FOV is 60 degrees). */

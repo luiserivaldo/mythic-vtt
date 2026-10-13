@@ -18,6 +18,7 @@ import {
   isValidPropSize,
   LABEL_VISIBILITIES,
   LAYER_LABELS,
+  layerForCreate,
   ownerOptions,
   PRIMITIVE_KINDS,
   propCreateIntent,
@@ -33,6 +34,7 @@ import { entityMoveLayerIntent } from './intent-specs.js';
 import { moveTargets } from './layer-panel.js';
 import { NameForm } from './NameForm.js';
 import { useSubmit, type SendIntent } from './submit.js';
+import { useUiStore } from './ui-store.js';
 
 function LayerSelect({
   value,
@@ -67,6 +69,7 @@ function TokenForm({
   campaign,
   scene,
   isHost,
+  activeLayer,
   uploader,
   send,
   onError,
@@ -74,13 +77,16 @@ function TokenForm({
   campaign: Campaign;
   scene: Scene;
   isHost: boolean;
+  activeLayer: LayerId;
   send: SendIntent;
   uploader: ImageUploader;
   onError: (message: string | null) => void;
 }) {
   const [name, setName] = useState<string>(TOKEN_FORM_DEFAULTS.name);
   const [size, setSize] = useState<TokenSizeName>(TOKEN_FORM_DEFAULTS.size);
-  const [layer, setLayer] = useState<LayerId>(TOKEN_FORM_DEFAULTS.layer);
+  const [layer, setLayer] = useState<LayerId>(() =>
+    layerForCreate(activeLayer, entityCreateLayers(isHost), TOKEN_FORM_DEFAULTS.layer),
+  );
   const [labels, setLabels] = useState<LabelVisibility>(TOKEN_FORM_DEFAULTS.labelVisibility);
   const [owner, setOwner] = useState<string>(TOKEN_FORM_DEFAULTS.ownerId);
   const [file, setFile] = useState<File | null>(null);
@@ -241,14 +247,16 @@ function TokenForm({
   );
 }
 
-function PropForm({
+export function PropForm({
   scene,
   isHost,
+  activeLayer,
   send,
   onError,
 }: {
   scene: Scene;
   isHost: boolean;
+  activeLayer: LayerId;
   send: SendIntent;
   onError: (message: string | null) => void;
 }) {
@@ -259,7 +267,9 @@ function PropForm({
   const [sy, setSy] = useState('1');
   const [sz, setSz] = useState('1');
   const [walkable, setWalkable] = useState(false);
-  const [layer, setLayer] = useState<LayerId>('props');
+  const [layer, setLayer] = useState<LayerId>(() =>
+    layerForCreate(activeLayer, entityCreateLayers(isHost), 'props'),
+  );
   const [busy, setBusy] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const size = { x: Number(sx), y: Number(sy), z: Number(sz) };
@@ -507,6 +517,7 @@ export function EntityPanel({
   uploader?: ImageUploader;
 }) {
   const isHost = useClientStore((s) => s.isHost);
+  const activeLayer = useUiStore((s) => s.activeLayer);
   const [error, setError] = useState<string | null>(null);
   const { send, error: submitError } = useSubmit();
   const scene = campaign.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;
@@ -527,11 +538,18 @@ export function EntityPanel({
         campaign={campaign}
         scene={scene}
         isHost={isHost}
+        activeLayer={activeLayer}
         uploader={uploader}
         send={send}
         onError={setError}
       />
-      <PropForm scene={scene} isHost={isHost} send={send} onError={setError} />
+      <PropForm
+        scene={scene}
+        isHost={isHost}
+        activeLayer={activeLayer}
+        send={send}
+        onError={setError}
+      />
       <h3>In {scene.name}</h3>
       {rows.length === 0 && <p>Nothing here yet.</p>}
       <ul className="ui-list" aria-label="Entities in this scene">

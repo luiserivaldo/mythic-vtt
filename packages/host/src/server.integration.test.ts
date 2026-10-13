@@ -6,7 +6,14 @@ import { WebSocket } from 'ws';
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import { storeMigrate, type Campaign } from '@mythic/shared';
 import { loadConfig, type HostConfig } from './config.js';
-import { SECRETS, T, fixtureCampaign, tid } from './engine/testing.js';
+import {
+  OWNER_LABELS,
+  SECRETS,
+  T,
+  fixtureCampaign,
+  fixtureWithOwnerLabels,
+  tid,
+} from './engine/testing.js';
 import { startHost, type RunningHost } from './server.js';
 import { CampaignFile, LocalCampaignStore } from './storage/index.js';
 
@@ -56,10 +63,12 @@ async function seed(campaign: Campaign = fixtureCampaign()): Promise<void> {
 
 async function connect(
   identityId: string,
-  opts: { hostToken?: string; lastSeq?: number; displayName?: string } = {},
+  opts: { hostToken?: string; lastSeq?: number; displayName?: string; watchToken?: string } = {},
 ): Promise<WireClient> {
   if (!host) throw new Error('host not started');
-  const ws = new WebSocket(`ws://127.0.0.1:${String(host.port)}/ws`);
+  const ws = new WebSocket(
+    `ws://127.0.0.1:${String(host.port)}/ws${opts.watchToken === undefined ? '' : `?watch=${encodeURIComponent(opts.watchToken)}`}`,
+  );
   const frames: string[] = [];
   const messages: ServerMessage[] = [];
   const listeners = new Set<() => void>();
@@ -387,6 +396,88 @@ describe('startHost with the engine', () => {
     for (const c of [player, spectator, replayed]) {
       for (const secret of SECRETS) expect(c.frames.join('\n')).not.toContain(secret);
     }
+  });
+
+  it('spectators never receive DM-layer data or another seat’s owner-only labels, in either view mode (M4-02)', async () => {
+    await seed(fixtureWithOwnerLabels());
+    await start();
+    const dm = await connect(HOST_ID, { hostToken: 'test-host-token' });
+    const player = await connect(PLAYER_ID);
+    await dm.waitFor('snapshot');
+    await player.waitFor('snapshot');
+    const api = async (id: string, method: string, path: string, body?: unknown) => {
+      const response = await fetch(`http://127.0.0.1:${String(host?.port)}${path}`, {
+        method,
+        headers: {
+          Authorization: `Mythic ${id}.secret-${id}`,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+    };
+    const link = await api(HOST_ID, 'POST', '/api/spectator-link');
+    const spectator = await connect(GUEST_ID, { watchToken: String(link.body['token']) });
+    await spectator.waitFor('snapshot');
+    const snapshots = () => spectator.messages.filter((m) => m.t === 'snapshot');
+    const frameText = () => spectator.frames.join('\n');
+
+    // Default: the player view.
+    expect(frameText()).not.toContain(OWNER_LABELS.seatA);
+    expect(frameText()).not.toContain(OWNER_LABELS.seatB);
+
+    // Only the bound host may choose; co-DM, players and bad seats change nothing.
+    expect(await api(PLAYER_ID, 'PUT', '/api/spectator-view', { seatId: T.seatA })).toMatchObject({
+      status: 403,
+    });
+    expect((await api(HOST_ID, 'GET', '/api/spectator-view')).body).toEqual({ seatId: null });
+    expect(await api(HOST_ID, 'PUT', '/api/spectator-view', { seatId: T.coDm })).toMatchObject({
+      status: 400,
+    });
+    expect(await api(HOST_ID, 'PUT', '/api/spectator-view', { seatId: tid(30) })).toMatchObject({
+      status: 400,
+    });
+    expect(await api(HOST_ID, 'PUT', '/api/spectator-view', { seat: T.seatA })).toMatchObject({
+      status: 400,
+    });
+    expect(snapshots()).toHaveLength(1);
+
+    // Seat A's view: its own label appears, seat B's never does.
+    expect(await api(HOST_ID, 'PUT', '/api/spectator-view', { seatId: T.seatA })).toMatchObject({
+      status: 200,
+    });
+    await spectator.waitFor('snapshot', (m) => JSON.stringify(m).includes(OWNER_LABELS.seatA));
+    expect(frameText()).not.toContain(OWNER_LABELS.seatB);
+    dm.send(rename('Renamed', 'a'));
+    await spectator.waitFor('patch', (m) => m.seq === 1);
+
+    // Seat B's view.
+    await api(HOST_ID, 'PUT', '/api/spectator-view', { seatId: T.seatB });
+    await spectator.waitFor('snapshot', (m) => JSON.stringify(m).includes(OWNER_LABELS.seatB));
+    const asB = JSON.stringify(snapshots().at(-1));
+    expect(asB).not.toContain(OWNER_LABELS.seatA);
+
+    // A mid-session promotion of the watched seat drops the spectator back to the player view.
+    await api(HOST_ID, 'PUT', '/api/spectator-view', { seatId: T.seatA });
+    dm.send({
+      t: 'intent',
+      type: 'seat.update',
+      payload: { seatId: T.seatA, role: 'codm' },
+      clientRef: 'promote',
+    });
+    await dm.waitFor('ack', (m) => m.clientRef === 'promote');
+    await player.waitFor('snapshot', (m) => JSON.stringify(m).includes('SECRET-DM'));
+    await spectator.waitFor('snapshot', (m) => m.seq === 2);
+    const afterPromote = JSON.stringify(snapshots().find((m) => m.seq === 2));
+    expect(afterPromote).not.toContain('SECRET-DM');
+    expect(afterPromote).not.toContain(OWNER_LABELS.seatA);
+
+    await api(HOST_ID, 'PUT', '/api/spectator-view', { seatId: null });
+    expect((await api(HOST_ID, 'GET', '/api/spectator-view')).body).toEqual({ seatId: null });
+
+    // Across every mode, no frame carried DM-layer data or the other seat's label.
+    for (const secret of SECRETS) expect(frameText()).not.toContain(secret);
+    expect(dm.frames.join('\n')).toContain('SECRET-DM');
   });
 
   it('relays ephemerals over ws and never leaks DM-layer previews (M1-07, D32)', async () => {

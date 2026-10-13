@@ -456,6 +456,58 @@ describe('label visibility (D35, TOK-04 + PERM-03)', () => {
   });
 });
 
+describe('switching the audience of one state (M4-02 cache safety)', () => {
+  // A spectator watching through seat X is served `{kind:'seat', seatId: X}`; flipping between
+  // that and `{kind:'spectators'}` on the very same state object must never reuse the other view.
+  const ownerLabel = 'OWNER-ONLY-LABEL';
+  const labelled = () =>
+    produce(withEntities(), (d) => {
+      const s = d.scenes[IDS.scene];
+      if (!s) return;
+      s.entities[testId(13)] = makeEntity(testId(13), {
+        name: ownerLabel,
+        owners: [IDS.owner],
+        token: { sizeCells: 1, heightCells: 1, labelVisibility: 'owner' },
+      });
+    });
+
+  it('serves each audience its own view in any order, never a stale one', () => {
+    const state = labelled();
+    const seen = (a: Audience) => JSON.stringify(visibleTo(a, state));
+    const modes: Audience[] = [
+      { kind: 'spectators' },
+      { kind: 'seat', seatId: IDS.owner },
+      { kind: 'spectators' },
+      { kind: 'seat', seatId: IDS.other },
+      { kind: 'seat', seatId: IDS.owner },
+      { kind: 'spectators' },
+    ];
+    for (const mode of modes) {
+      const json = seen(mode);
+      expect(json).not.toContain(SECRET);
+      const owner = mode.kind === 'seat' && mode.seatId === IDS.owner;
+      expect(json.includes(ownerLabel)).toBe(owner);
+    }
+  });
+
+  it('patches for a seat-view spectator equal that seat’s patches and never carry DM data', () => {
+    const before = labelled();
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) e.name = `${SECRET}-2`;
+      const o = d.scenes[IDS.scene]?.entities[testId(13)];
+      if (o) o.name = `${ownerLabel}-2`;
+    });
+    const seatView: Audience = { kind: 'seat', seatId: IDS.owner };
+    const asSeat = patchesFor(seatView, before, after, raw);
+    const asPlayers = patchesFor({ kind: 'spectators' }, before, after, raw);
+    expect(JSON.stringify(asSeat)).not.toContain(SECRET);
+    expect(JSON.stringify(asSeat)).toContain(`${ownerLabel}-2`);
+    expect(JSON.stringify(asPlayers)).not.toContain(ownerLabel);
+    expect(applyPatches(visibleTo(seatView, before), asSeat)).toEqual(visibleTo(seatView, after));
+  });
+});
+
 describe('UI-TOP-01 scene privacy', () => {
   it('projects only the active scene and filters inactive edits and activation patches', () => {
     const inactiveId = testId(24);
