@@ -35,11 +35,12 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
     id: 'moving',
     title: 'Moving and measuring',
     entries: [
-      // UI-TOOL-01 / TOK-02 / Q23: the press claims the pointer and starts the move.
+      // UI-TOOL-01 / TOK-02 / Q23: the press claims the pointer and starts the move. M1-28 lets it
+      // start on an unselected token; the click that a release without movement produces is what
+      // selects, so the copy must not promise that the press selects.
       {
         input: 'Left press on a token',
-        action:
-          'Picks it up straight away — there is no need to select it first. The token becomes the selection too.',
+        action: 'Picks it up straight away — there is no need to select it first.',
       },
       // UI-INPUT-01 / TOK-02: one move is sent on release.
       {
@@ -69,7 +70,8 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
         input: 'Any measurement',
         action: "Reads in the scene's units — feet in this alpha.",
       },
-      // UI-MEAS-02 / UI-TOKEN-06: the Ruler panel's checkbox draws the drag's distance.
+      // UI-MEAS-02: the Ruler panel's checkbox draws the drag's distance (TokenDrag renders
+      // dragRulerPaths for the local drag and for every remote preview).
       {
         input: 'Always measure token movement',
         action:
@@ -108,10 +110,13 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
     id: 'token',
     title: 'Token interaction',
     entries: [
-      // UI-INPUT-01 / TOK-01: a plain click replaces the selection, a modifier toggles membership.
+      // UI-INPUT-01 / TOK-01 / UI-TOKEN-01: a plain click replaces the selection, a modifier toggles
+      // membership. A single selection also shows its quick preview card beside the token, with the
+      // name and the per-viewer quick values.
       {
         input: 'Left click on a token',
-        action: 'Selects it. Shift, Ctrl or Cmd click adds it to the selection or takes it out.',
+        action:
+          "Selects it, and shows a small card beside it with the token's name and quick values. Shift, Ctrl or Cmd click adds it to the selection or takes it out.",
       },
       // UI-INPUT-03 / TOK-03 / Q26: the drag threshold separates the click from the pan.
       {

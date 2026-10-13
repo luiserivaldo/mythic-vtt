@@ -87,6 +87,17 @@ describe('UI-HELP-01 help content', () => {
     expect(moving).toContain('waypoint');
   });
 
+  it('documents the preview card a single click shows (on the board today)', () => {
+    // UX-19 (render/TokenPreviewCard.tsx): a single selection shows the card beside the token.
+    expect(textOf('token').toLowerCase()).toContain('card beside it');
+  });
+
+  it('never promises that a press selects the token (M1-28: a drag moves without selecting)', () => {
+    // e2e/token-drag.spec.ts: press-dragging an unselected token commits the move and leaves the
+    // Transform panel closed, so the token is not selected by the drag. Only a click selects.
+    expect(textOf('moving')).not.toContain('becomes the selection');
+  });
+
   it('states 2D and 3D behaviour separately (AGENTS rule 5)', () => {
     const camera = textOf('camera').toLowerCase();
     expect(camera).toContain('2d');
