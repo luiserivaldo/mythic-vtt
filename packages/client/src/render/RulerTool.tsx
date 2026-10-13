@@ -7,6 +7,7 @@ import { useStore } from 'zustand';
 import type { Scene, Vec3 } from '@mythic/shared';
 import { rulerStore } from '../tools/ruler-store.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
+import { tokenDragStore } from '../tools/token-drag-store.js';
 import { measurementScene } from '../tools/measurement-tool.js';
 import { intersectPlaneY } from '../tools/token-drag.js';
 import {
@@ -31,6 +32,15 @@ import type { ViewMode } from './view-mode-store.js';
 import { isTypingTarget } from './typing-target.js';
 
 const NO_REMOTE: readonly never[] = [];
+
+/**
+ * UX-21: a token drag owns the right press while it lasts; the settling drag that follows a drop
+ * has already given the pointer back, so it does not keep the event.
+ */
+function tokenDragInProgress(): boolean {
+  const drag = tokenDragStore.getState().local;
+  return drag !== null && !drag.settling;
+}
 
 /**
  * MEAS-01/02: the multi-waypoint ruler uses the ground plane in 2D and ray-hit surfaces in 3D.
@@ -315,6 +325,7 @@ export function RulerTool({
       const action = rulerRightClick({
         tool: s.tool,
         aoeActive: aoeToolStore.getState().active,
+        tokenDrag: tokenDragInProgress(),
         mode: s.mode,
         measuring: s.phase === 'active',
       });
