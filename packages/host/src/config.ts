@@ -11,6 +11,10 @@ export interface HostConfig {
   maxImageUploadBytes: number;
   /** Campaign to open (`MYTHIC_CAMPAIGN_ID`); default: most recently updated, else a new one. */
   campaignId?: string;
+  /** HOST-03: id, unique name or unique id prefix of the campaign to open (`MYTHIC_CAMPAIGN`). */
+  campaign?: string;
+  /** HOST-03: create a campaign with this name and open it (`MYTHIC_NEW_CAMPAIGN`). */
+  newCampaign?: string;
   /** Atomic checkpoint interval before initiative exists (T5). */
   autosaveEvery: number;
   /** Exposes /__test/connections for the e2e harness; never enable on a real table. */
@@ -56,5 +60,7 @@ export function loadConfig(env: Record<string, string | undefined>): HostConfig 
     testEndpoints: env['MYTHIC_TEST_ENDPOINTS'] === '1',
     ...(env['MYTHIC_CLIENT_DIR'] ? { clientDir: resolve(env['MYTHIC_CLIENT_DIR']) } : {}),
     ...(env['MYTHIC_CAMPAIGN_ID'] ? { campaignId: env['MYTHIC_CAMPAIGN_ID'] } : {}),
+    ...(env['MYTHIC_CAMPAIGN'] ? { campaign: env['MYTHIC_CAMPAIGN'] } : {}),
+    ...(env['MYTHIC_NEW_CAMPAIGN'] ? { newCampaign: env['MYTHIC_NEW_CAMPAIGN'] } : {}),
   };
 }

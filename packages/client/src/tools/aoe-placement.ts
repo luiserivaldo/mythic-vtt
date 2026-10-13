@@ -1,4 +1,5 @@
 import {
+  snapToGrid,
   surfaceHeightAt,
   walkableFromEntity,
   yawFromQuaternion,
@@ -57,14 +58,19 @@ export function primarySize(shape: AoEShape): number {
   }
 }
 
-/** MEAS-03 / D25: grid snapping affects the origin and yaw, never the exact platform height. */
+/**
+ * MEAS-03 / D25 / M3-10: grid snapping affects the origin and the yaw, never the exact platform
+ * height. The origin goes through the shared `snapToGrid` helper, so an AoE lands on the same
+ * cell centre a token or prop does; non-square grids have no snap (as for tokens).
+ */
 export function placeDraft(
   draft: AoEDraft,
   scene: Scene,
 ): { shape: AoEShape; transform: Transform } {
   const snap = scene.grid.snap && scene.grid.type === 'square';
-  const x = snap ? Math.round(draft.x) : draft.x;
-  const z = snap ? Math.round(draft.z) : draft.z;
+  const snapped = snap ? snapToGrid({ x: draft.x, y: 0, z: draft.z }, scene.grid) : draft;
+  const x = snapped.x;
+  const z = snapped.z;
   const degrees = snap ? Math.round(draft.degrees / 15) * 15 : draft.degrees;
   const walkables = Object.values(scene.entities).flatMap((entity) => {
     const surface = walkableFromEntity(entity);
@@ -132,4 +138,23 @@ export function validAoEDraft(draft: AoEDraft, grid: Grid): boolean {
     (draft.elevation === null || Number.isFinite(draft.elevation)) &&
     grid.unitsPerCell > 0
   );
+}
+
+/**
+ * MEAS-03 / M3-10 (PT2-21): the panel is a readout in scene units and a placement draft holds raw
+ * world coordinates (the pointer point, or a free position typed while snap is off), for example
+ * 32.744568807685766 cells. Rounding to whole scene units here covers both that case and float
+ * noise from unsnapped sizes and angles; the stored values stay exact. Non-finite input passes
+ * through unchanged: `validAoEDraft` is what rejects it, so a NaN field stays visibly invalid
+ * instead of turning into 0.
+ */
+export function sceneUnitReadout(cells: number, grid: Pick<Grid, 'unitsPerCell'>): number {
+  const units = Math.round(cells * grid.unitsPerCell);
+  return Object.is(units, -0) ? 0 : units;
+}
+
+/** The yaw field is degrees, not scene units: one decimal is enough to aim any shape. */
+export function degreesReadout(degrees: number): number {
+  const rounded = Number.isFinite(degrees) ? Number(degrees.toFixed(1)) : degrees;
+  return Object.is(rounded, -0) ? 0 : rounded;
 }

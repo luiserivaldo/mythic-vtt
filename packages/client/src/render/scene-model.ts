@@ -5,6 +5,7 @@ import {
   type AssetRef,
   type Campaign,
   type Entity,
+  type LayerId,
   type PrimitiveKind,
   type Scene,
 } from '@mythic/shared';
@@ -46,6 +47,8 @@ export interface RenderEntity {
     labelVisibility: 'all' | 'owner' | 'dm';
     /** M1-34: token image Y-rotation in radians, from transform.rotation. */
     yaw: number;
+    /** TOK-03: height is locked; drawn with a flying indicator. */
+    flying?: boolean;
   };
 }
 
@@ -82,11 +85,9 @@ export function gridToWorld(
   return [x, elevation, y];
 }
 
-export function renderLayer(entity: Entity): RenderLayer {
-  // TOK-02: component determines the visual surface. A token authored on map/props still needs
-  // to be visible and pickable above primitive footprints in the 2D table.
-  if (entity.token) return 'tokens';
-  switch (entity.layer) {
+/** The draw band a layer's plain entities use (§6.4); DM primitives draw with props. */
+export function layerRenderBand(layer: LayerId): RenderLayer {
+  switch (layer) {
     case 'map':
       return 'map';
     case 'props':
@@ -98,6 +99,13 @@ export function renderLayer(entity: Entity): RenderLayer {
     case 'effects':
       return 'effects';
   }
+}
+
+export function renderLayer(entity: Entity): RenderLayer {
+  // TOK-02: component determines the visual surface. A token authored on map/props still needs
+  // to be visible and pickable above primitive footprints in the 2D table.
+  if (entity.token) return 'tokens';
+  return layerRenderBand(entity.layer);
 }
 
 export function orderedEntities(entities: readonly RenderEntity[]): RenderEntity[] {
@@ -181,6 +189,7 @@ export function mapScene(scene: Scene): RenderScene {
                 perms: entity.perms,
                 labelVisibility: entity.token.labelVisibility,
                 yaw: yawFromQuaternion(entity.transform.rotation),
+                ...(entity.token.flying ? { flying: true } : {}),
               },
             }
           : {}),

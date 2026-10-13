@@ -1,5 +1,13 @@
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
-import { checkIntent, viewEntity, type Audience, type Campaign } from '@mythic/shared';
+import {
+  canUseSceneToggle,
+  checkIntent,
+  seatOf,
+  TOGGLE_FOR_CHANNEL,
+  viewEntity,
+  type Audience,
+  type Campaign,
+} from '@mythic/shared';
 import type { GatewayConnection } from '../gateway/engine-seam.js';
 import { actorFor, audienceFor } from './audience.js';
 import type { Clock } from './sources.js';
@@ -40,6 +48,9 @@ export interface EphemeralRecipient {
   readonly conn: GatewayConnection;
   readonly audience: Audience;
 }
+
+const isSpectatorTarget = (target: EphemeralRecipient): boolean =>
+  target.audience.kind === 'spectators' || target.conn.isSpectator === true;
 
 export interface EphemeralRelay {
   relay(
@@ -103,6 +114,12 @@ function entityReferences(data: unknown): EntityReference[] | undefined {
   return visit(data) ? found : undefined;
 }
 
+function sceneIdOf(data: unknown): string | undefined {
+  if (data === null || typeof data !== 'object') return undefined;
+  const sceneId = (data as { sceneId?: unknown }).sceneId;
+  return typeof sceneId === 'string' ? sceneId : undefined;
+}
+
 function rate(
   defaults: TokenBucketConfig,
   override?: Partial<TokenBucketConfig>,
@@ -158,6 +175,20 @@ export function createEphemeralRelay(
     relay(sender, message, state, recipients) {
       const now = clock();
       const senderActor = actorFor(state, sender);
+      // UI-SEAT-05: tool previews, rulers and pings cannot bypass the durable gate.
+      if (seatOf(state, senderActor)?.interactionEnabled === false) {
+        drop('forbidden');
+        return;
+      }
+      // PERM-05: scene toggles gate the channel (host and co-DM exempt, see canUseSceneToggle).
+      const toggle = TOGGLE_FOR_CHANNEL[message.channel];
+      if (toggle !== undefined) {
+        const sceneId = sceneIdOf(message.data);
+        if (sceneId === undefined || !canUseSceneToggle(state, senderActor, sceneId, toggle)) {
+          drop('forbidden');
+          return;
+        }
+      }
       const kind =
         senderActor.seatId === undefined && senderActor.kind !== 'host' ? 'spectator' : 'active';
       let senderLimit = senders.get(sender.connectionId);
@@ -206,7 +237,17 @@ export function createEphemeralRelay(
         }
       }
 
-      const relayedMessage: RelayedEphemeral = { ...message, from: sender.identityId };
+      // UI-JOIN-01: shared tool colours come from the validated connection profile, not a spoofed preview.
+      const coloredTool = message.channel === 'ruler.preview' || message.channel === 'cursor';
+      const data =
+        coloredTool &&
+        sender.color !== undefined &&
+        typeof message.data === 'object' &&
+        message.data !== null &&
+        !Array.isArray(message.data)
+          ? { ...message.data, color: sender.color }
+          : message.data;
+      const relayedMessage: RelayedEphemeral = { ...message, data, from: sender.identityId };
       let frame: string;
       try {
         frame = encodeServerMessage(relayedMessage);
@@ -232,9 +273,8 @@ export function createEphemeralRelay(
       });
       drop('hidden-entity', targets.length - visibleTargets.length);
 
-      const spectatorTargets = visibleTargets.filter(
-        (target) => target.audience.kind === 'spectators',
-      );
+      // M4-02: a spectator watching through a seat has a seat audience but is still a spectator.
+      const spectatorTargets = visibleTargets.filter(isSpectatorTarget);
       let sendToSpectators = true;
       if (spectatorTargets.length > 0) {
         spectatorDelivery ??= new TokenBucket(spectatorDeliveryRate, now);
@@ -243,7 +283,7 @@ export function createEphemeralRelay(
       }
 
       for (const target of visibleTargets) {
-        if (target.audience.kind === 'spectators' && !sendToSpectators) continue;
+        if (isSpectatorTarget(target) && !sendToSpectators) continue;
         target.conn.sendRaw(frame);
         relayed += 1;
       }

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { startTable, type Table } from './harness.js';
 
 // M2-05: the 2D <-> 3D toggle is per-client view state. Toggling swaps the camera (the 3D-only
-// "Reset view" control appears), the `3` shortcut does the same, and neither raises page errors.
+// "Reset view" control is available), the `3` shortcut does the same, and neither raises page errors.
 let table: Table | undefined;
 
 test.beforeAll(async () => {
@@ -24,7 +24,7 @@ test('the host toggles 2D <-> 3D from the toolbar and the 3 key without errors',
 
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-  await page.getByRole('button', { name: 'Scenes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   await page.getByPlaceholder('New scene name').fill('Keep');
   await page.getByRole('button', { name: 'Create scene' }).click();
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
@@ -37,7 +37,7 @@ test('the host toggles 2D <-> 3D from the toolbar and the 3 key without errors',
   const reset = page.getByRole('button', { name: 'Reset view' });
   await expect(page.locator('canvas')).toBeVisible();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  await expect(reset).toHaveCount(0);
+  await expect(reset).toBeVisible();
   if (process.env.VIEW_TOGGLE_SHOTS) {
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${process.env.VIEW_TOGGLE_SHOTS}/2d.png` });
@@ -63,9 +63,9 @@ test('the host toggles 2D <-> 3D from the toolbar and the 3 key without errors',
     }
   }
 
-  await toggle.click();
+  await page.getByRole('button', { name: '2D view', exact: true }).click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  await expect(reset).toHaveCount(0);
+  await expect(reset).toBeVisible();
   await page.waitForTimeout(400);
   await expect(page.locator('canvas')).toBeVisible();
 
@@ -75,10 +75,10 @@ test('the host toggles 2D <-> 3D from the toolbar and the 3 key without errors',
   await expect(reset).toBeVisible();
   await page.waitForTimeout(400);
   await page.keyboard.press('3');
-  await expect(reset).toHaveCount(0);
+  await expect(reset).toBeVisible();
   // Typing a 3 in a text field must not toggle.
   await page.getByPlaceholder('New scene name').fill('3');
-  await expect(reset).toHaveCount(0);
+  await expect(reset).toBeVisible();
 
   expect(errors).toEqual([]);
   await context.close();

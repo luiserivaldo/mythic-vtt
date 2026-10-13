@@ -64,6 +64,7 @@ describe(`${T} reducer`, () => {
       binding: 'session',
       identityId: null,
       role: 'player',
+      interactionEnabled: true,
       permissions: { view: true, move: true, edit: false, delete: false },
     });
     expect(before.seats[seatId]).toBeUndefined();

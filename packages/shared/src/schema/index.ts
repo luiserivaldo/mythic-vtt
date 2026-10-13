@@ -1,6 +1,7 @@
 export * from './asset.js';
 export * from './campaign.js';
 export * from './entity.js';
+export * from './quick-fields.js';
 export * from './ids.js';
 export * from './math.js';
 export * from './permissions.js';

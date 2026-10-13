@@ -5,7 +5,13 @@ import {
   type Campaign,
   type Entity,
 } from '@mythic/shared';
-import { entityScale, type GizmoDraft, type GizmoTarget } from './transform-gizmo.js';
+import {
+  entityScale,
+  entityExtents,
+  snapFootprint,
+  type GizmoDraft,
+  type GizmoTarget,
+} from './transform-gizmo.js';
 
 export interface Vec3Like {
   x: number;
@@ -214,4 +220,9 @@ export function hitScreenHandle(
 
 export function handlesFor(kind: 'prop' | 'token'): readonly Gizmo3DHandle[] {
   return kind === 'token' ? ['move-y'] : ['move-xz', 'move-y', 'rotate-x', 'rotate-y', 'rotate-z'];
+}
+
+/** M1-47: footprint for the 3D gizmo's XZ move, using the same aspect as the 2D gizmo. */
+export function gizmo3dMoveFootprint(entity: Entity, imageAspect = 1): number {
+  return snapFootprint(entityExtents(entity, imageAspect));
 }
