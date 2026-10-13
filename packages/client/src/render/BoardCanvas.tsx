@@ -94,9 +94,10 @@ function BoardScene({
     <>
       {/* D37: outside the canvas is a darker neutral; GridLines fills the inside. */}
       <color attach="background" args={[outsideColor(scene?.background)]} />
-      {mode3d && backdrop.zenith && (
+      {mode3d && (backdrop.zenith || scene?.skybox) && (
         <Suspense fallback={null}>
-          <Skybox spec={backdrop} />
+          {/* ENV-07: an image skybox draws over the colour/gradient, which stays as its fallback. */}
+          <Skybox spec={backdrop} {...(scene?.skybox ? { skybox: scene.skybox } : {})} />
         </Suspense>
       )}
       {mode3d ? (
