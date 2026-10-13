@@ -30,6 +30,7 @@ import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
 import { OcclusionFade } from './OcclusionFade.js';
+import { FocusCamera } from './FocusCamera.js';
 import { RenderDiagnostics } from './RenderDiagnostics.js';
 import { ToolPanelDock } from '../ui/ToolPanelDock.js';
 import { isReadOnlyViewer } from '../ui/viewer.js';
@@ -131,6 +132,14 @@ function BoardScene({
       {grid && (
         <GridLines grid={grid} fill={scene?.background ?? DEFAULT_BACKGROUND} renderOrder={-1} />
       )}
+      {/* CAM-06: double-clicking a token tweens the camera onto it, in 2D and in 3D. */}
+      <FocusCamera
+        mode={viewMode}
+        bounds={bounds}
+        canvasSize={canvasSize}
+        orbitRef={director.orbitRef}
+        applyRef={director.applyRef}
+      />
       {/* M1-28: TokenDrag claims a press on any movable token without selecting it first, while
           empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
