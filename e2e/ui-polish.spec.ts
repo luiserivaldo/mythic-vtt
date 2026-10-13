@@ -46,7 +46,7 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
   await page.getByLabel('Colour (no image)').fill('#cc3322');
   await page.getByRole('button', { name: 'Create token' }).click();
   await page.getByLabel('Prop name').fill('Crate');
-  await page.getByRole('button', { name: 'Create prop' }).click();
+  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
 
   const list = page.getByRole('list', { name: 'Entities in this scene' });
   const x = page.getByLabel('X (ft)');

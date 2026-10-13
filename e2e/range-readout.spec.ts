@@ -4,8 +4,10 @@ import {
   openClient,
   recordPageFrames,
   seedProfile,
+  settledCameraPose,
   startTable,
   testUlid,
+  type CameraPose,
   type Table,
 } from './harness.js';
 
@@ -38,25 +40,6 @@ async function cellToPixel(page: Page) {
   return (x: number, z: number) => ({
     x: box.x + box.width / 2 + (x - 20) * zoom,
     y: box.y + box.height / 2 + (z - 15) * zoom,
-  });
-}
-
-interface CameraPose {
-  targetX: number;
-  targetY: number;
-  targetZ: number;
-  azimuth: number;
-  polar: number;
-  distance: number;
-}
-
-async function cameraPose(page: Page): Promise<CameraPose> {
-  return page.evaluate(() => {
-    const scope = globalThis as typeof globalThis & {
-      __mythicCamera?: { getPose(): CameraPose };
-    };
-    if (!scope.__mythicCamera) throw new Error('3D camera diagnostics are not mounted');
-    return scope.__mythicCamera.getPose();
   });
 }
 
@@ -199,7 +182,7 @@ test('the selected token reads the range to a hovered token in 2D and 3D', async
   const canvas = dm.locator('canvas');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('no canvas box');
-  const pose = await cameraPose(dm);
+  const pose = await settledCameraPose(dm);
   // Size-1 tokens stand 1.2 cells tall above a 0.06 base; aim at the middle of that quad.
   const ogreStandee = projectToCanvas(pose, box, { x: 21.5, y: 0.66, z: 12.5 });
   const ariaStandee = projectToCanvas(pose, box, { x: 15.5, y: 0.66, z: 12.5 });

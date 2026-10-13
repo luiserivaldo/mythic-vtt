@@ -9,27 +9,9 @@ import {
   type Scene,
 } from '@mythic/shared';
 import { useState } from 'react';
+import { STATUS_ICON_GLYPHS, statusIconLabel } from '../render/status-markers.js';
 import { useClientStore } from '../store/react.js';
 import { useSubmit } from './submit.js';
-
-const icons: Record<StatusIcon, string> = {
-  blinded: '◉',
-  charmed: '♥',
-  deafened: '♬',
-  frightened: '⚠',
-  grappled: '⚓',
-  incapacitated: '⊘',
-  invisible: '◌',
-  paralyzed: '⚡',
-  petrified: '◆',
-  poisoned: '☠',
-  prone: '↘',
-  restrained: '⛓',
-  stunned: '✦',
-  unconscious: '☾',
-  exhaustion: '⌛',
-};
-const label = (icon: StatusIcon) => icon.slice(0, 1).toUpperCase() + icon.slice(1);
 
 export function TokenStatusPanel({
   campaign,
@@ -71,7 +53,9 @@ export function TokenStatusPanel({
       <ul>
         {markers.map((marker, index) => (
           <li key={index}>
-            {marker.kind === 'icon' ? `${icons[marker.icon]} ${label(marker.icon)}` : marker.text}
+            {marker.kind === 'icon'
+              ? `${STATUS_ICON_GLYPHS[marker.icon]} ${statusIconLabel(marker.icon)}`
+              : marker.text}
             <button
               type="button"
               disabled={!allowed}
@@ -97,7 +81,7 @@ export function TokenStatusPanel({
         >
           {StatusIcon.options.map((value) => (
             <option key={value} value={value}>
-              {icons[value]} {label(value)}
+              {STATUS_ICON_GLYPHS[value]} {statusIconLabel(value)}
             </option>
           ))}
         </select>
