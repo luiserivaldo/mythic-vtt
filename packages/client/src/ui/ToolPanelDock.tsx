@@ -16,6 +16,7 @@ import { toolPanelLayoutStore, type ToolPanelId } from './tool-panel-layout.js';
 import { isReadOnlyViewer } from './viewer.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { RulerPanel } from './RulerPanel.js';
+import { seeSheet } from './sheet-panel.js';
 import { CreatePropPanel, InitiativePanel } from './RailPanels.js';
 
 const TransformPanel3D = lazy(async () => {
@@ -149,6 +150,11 @@ export function ToolPanelDock({
       )}
       {showToken && (
         <PanelFrame id="token" label="Token" collapsed={collapsed.token}>
+          {/* UI-SHEET-01: the token's right-click menu has not landed yet, so See Sheet lives on
+              the selected token's panel and jumps the dock to the Sheet tab. */}
+          <button type="button" onClick={seeSheet}>
+            See Sheet
+          </button>
           <TokenStatusPanel
             key={`status-${selectedEntity.id}`}
             campaign={campaign}

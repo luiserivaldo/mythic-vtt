@@ -25,7 +25,7 @@ test('the DM link makes the browser host: panels appear, the token leaves the UR
 
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-  for (const panel of ['Scenes', 'Layers', 'Map', 'Participants']) {
+  for (const panel of ['Scenes', 'Layers', 'Participants']) {
     await expect(page.getByRole('tab', { name: panel, exact: true })).toBeVisible();
   }
   expect(page.url()).not.toContain('host=');

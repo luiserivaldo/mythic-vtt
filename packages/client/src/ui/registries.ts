@@ -112,7 +112,6 @@ export const dockTabs = createRegistry<DockTab>([
     allowed: admin,
     panel: 'layers',
   },
-  { id: 'map', label: 'Map', icon: 'map', group: 'world', allowed: admin, panel: 'map' },
   {
     id: 'entities',
     label: 'Entities',

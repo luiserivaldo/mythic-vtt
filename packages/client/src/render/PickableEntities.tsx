@@ -84,7 +84,7 @@ export function PickableEntities({
   useEffect(() => {
     const state = selectionStore.getState();
     state.reconcile(scene?.id ?? null, validSelection(state.ids, scene, actor));
-  }, [scene, seatId, seats]);
+  }, [scene, isHost, seatId, seats]);
 
   function onClick(event: ThreeEvent<MouseEvent>) {
     if (!scene) return;

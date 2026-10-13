@@ -10,11 +10,9 @@ export type SelectionActor =
   { kind: 'host' } | { kind: 'seat'; seat: Seat } | { kind: 'spectator' };
 
 /**
- * PERM-01: the actor a viewer's own client selects as, from that viewer's own store — the same
- * derivation the gizmo hooks and the token preview card use, so the two can never disagree. The
- * host flag comes first: a seat-less client that never claimed the host link is a spectator, and a
- * spectator's click must never select anything. A seat id this viewer's campaign does not know
- * (archived, or a stale local value) is a spectator too.
+ * PERM-03: only the real host is the host actor. A seat-less client (spectator link, unseated
+ * participant) has `seatId === null` too, so null must never be read as "host"; it can move the
+ * camera and nothing else.
  */
 export function selectionActor(
   isHost: boolean,
