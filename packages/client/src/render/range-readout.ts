@@ -1,5 +1,6 @@
 import { distance, type Entity, type Grid, type Scene, type Vec3 } from '@mythic/shared';
-import { formatRulerDistance } from '../tools/ruler.js';
+import { formatRulerDistance, type RulerMeasurement } from '../tools/ruler.js';
+import type { ViewMode } from './view-mode-store.js';
 
 /** MEAS-05: the three components of a token-to-token range, already in the scene's units. */
 export interface RangeMeasurement {
@@ -22,6 +23,21 @@ export function formatRangeBreakdown(
   totalLabel: string,
 ): string {
   return `H ${horizontalLabel} · V ${verticalLabel} · T ${totalLabel}`;
+}
+
+/**
+ * M3-11: a 3D ruler is one straight segment, so it reads its total length only; the MEAS-02
+ * horizontal/vertical breakdown appears while the line or the label is hovered. A 2D ruler always
+ * reads its total — its waypoints carry their own segment labels — so a hover never changes 2D.
+ */
+export function rulerLabel(
+  measured: Pick<RulerMeasurement, 'horizontalLabel' | 'verticalLabel' | 'totalLabel'>,
+  mode: ViewMode,
+  hovered: boolean,
+): string {
+  return mode === '3d' && hovered
+    ? formatRangeBreakdown(measured.horizontalLabel, measured.verticalLabel, measured.totalLabel)
+    : measured.totalLabel;
 }
 
 /**

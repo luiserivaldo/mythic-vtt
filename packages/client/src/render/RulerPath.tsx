@@ -22,9 +22,9 @@ function lifted(point: Vec3): [number, number, number] {
 }
 
 /**
- * Camera-facing ruler labels. M3-11: a 3D ruler is one straight segment between the first and last
- * points, labelled with its total length only; hovering the line or the label restores the MEAS-02
- * horizontal/vertical breakdown. 2D keeps the polyline with a label per segment.
+ * Camera-facing ruler labels. M3-11: a 3D ruler joins its points directly — one straight segment
+ * between an elevated and a grounded pick, with no right-angle guide — and reads its total length
+ * only; hovering the line or the label restores the MEAS-02 horizontal/vertical breakdown.
  */
 export function RulerPath({
   points,
@@ -43,18 +43,18 @@ export function RulerPath({
 }) {
   const measured = useMemo(() => measureRuler(points, scene.grid), [points, scene.grid]);
   const [hovered, setHovered] = useState(false);
-  const first = points[0];
   const last = points[points.length - 1];
-  if (!first || !last) return null;
+  if (!last || points.length === 0) return null;
   const testId = testIdOverride ?? (owner === null ? 'ruler' : 'remote-ruler');
   const total = rulerLabel(measured, mode, hovered);
-  // The hover reveal is a 3D readout, so only the 3D label needs to catch the pointer.
-  const labelPointerEvents = mode === '3d' ? 'auto' : 'none';
+  // Only a 3D ruler reveals its breakdown on hover, so only it catches the pointer; a 2D ruler
+  // line stays unpickable so it never swallows a board click.
+  const hoverable = mode === '3d';
   return (
     <group>
-      {mode === '3d' && points.length > 1 && (
+      {hoverable && points.length > 1 && (
         <Line
-          points={[lifted(first), lifted(last)]}
+          points={points.map(lifted)}
           color={color}
           lineWidth={3}
           depthTest={false}
@@ -68,7 +68,7 @@ export function RulerPath({
           }}
         />
       )}
-      {mode !== '3d' && points.length > 1 && (
+      {!hoverable && points.length > 1 && (
         <Line
           points={points.map(lifted)}
           color={color}
@@ -113,7 +113,7 @@ export function RulerPath({
           center
           position={lifted(last)}
           zIndexRange={[6, 0]}
-          style={{ pointerEvents: labelPointerEvents, transform: 'translateY(-18px)' }}
+          style={{ pointerEvents: hoverable ? 'auto' : 'none', transform: 'translateY(-18px)' }}
         >
           <div
             data-testid={`${testId}-total`}
