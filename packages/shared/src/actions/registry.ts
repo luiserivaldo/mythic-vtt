@@ -1,3 +1,6 @@
+import { tokenSetQuickField } from './token.setQuickField.js';
+import { historyUndo } from './history.undo.js';
+import { historyRollback } from './history.rollback.js';
 import { aoePersist } from './aoe.persist.js';
 import { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
 import { tokenSetRings } from './token.setRings.js';
@@ -65,6 +68,9 @@ export const allActions: readonly AnyAction[] = [
   sceneDelete,
   tokenSetFlying,
   sceneSetPlayerToggles,
+  historyUndo,
+  tokenSetQuickField,
+  historyRollback,
   aoePersist,
 ];
 

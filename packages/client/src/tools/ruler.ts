@@ -102,6 +102,35 @@ export function sameRulerPoint(a: Vec3 | undefined, b: Vec3): boolean {
   return a?.x === b.x && a.y === b.y && a.z === b.z;
 }
 
+/** M1-45: a non-finite waypoint would poison the cumulative total for the rest of the path. */
+export function finiteRulerPoint(point: Vec3): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z);
+}
+
+/** M1-45/Q31: what a right click does while the Ruler tool owns the event. */
+export type RulerRightClick = 'waypoint' | 'clear' | 'ignore';
+
+export interface RulerRightClickContext {
+  /** The Ruler tool is armed. */
+  readonly tool: boolean;
+  /** An AoE draft owns the pointer, so its own quick delete must keep receiving the event. */
+  readonly aoeActive: boolean;
+  readonly mode: '2d' | '3d';
+  /** The 2D ruler is mid-path (`phase === 'active'`). */
+  readonly measuring: boolean;
+}
+
+/**
+ * MEAS-08/Q31: only a measuring 2D ruler takes a right click as a waypoint and keeps measuring from
+ * it. An AoE draft keeps the event, a 3D or idle ruler keeps M1-41's clear, and an unarmed tool
+ * leaves the event to the board's own context menu.
+ */
+export function rulerRightClick(context: RulerRightClickContext): RulerRightClick {
+  if (context.aoeActive || !context.tool) return 'ignore';
+  if (context.mode === '2d' && context.measuring) return 'waypoint';
+  return 'clear';
+}
+
 /** Screen-space threshold keeps a short press available for click-to-add waypoint mode. */
 export function rulerDragStarted(
   start: { x: number; y: number },
@@ -127,18 +156,20 @@ export interface RemoteRuler {
   readonly points: readonly Vec3[];
   readonly phase: RulerPhase;
   readonly at: number;
+  readonly color?: string;
 }
 
-/** Adds a waypoint unless it repeats the previous one (a double-click lands two clicks). */
+/** Adds a finite waypoint that differs from the previous one; a double-click lands two clicks. */
 export function appendWaypoint(points: readonly Vec3[], point: Vec3): readonly Vec3[] {
-  if (sameRulerPoint(points[points.length - 1], point)) return points;
+  if (!finiteRulerPoint(point) || sameRulerPoint(points[points.length - 1], point)) return points;
   if (points.length >= MAX_RULER_POINTS) return points;
   return [...points, point];
 }
 
-/** Waypoints plus the live cursor, collapsing a cursor that sits on the last waypoint. */
+/** Waypoints plus the live cursor, collapsing a non-finite cursor or one on the last waypoint. */
 export function withCursor(points: readonly Vec3[], cursor: Vec3 | null): readonly Vec3[] {
-  if (!cursor || sameRulerPoint(points[points.length - 1], cursor)) return points;
+  if (!cursor || !finiteRulerPoint(cursor) || sameRulerPoint(points[points.length - 1], cursor))
+    return points;
   return [...points, cursor];
 }
 

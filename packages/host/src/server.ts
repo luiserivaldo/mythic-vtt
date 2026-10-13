@@ -1,6 +1,8 @@
 import { createSeatInvites } from './gateway/seat-invites.js';
 import { createSpectatorLinks } from './gateway/spectator-links.js';
 import { registerSpectatorRoutes } from './http/spectator-routes.js';
+import { registerSpectatorViewRoutes } from './http/spectator-view-routes.js';
+import { createSpectatorView } from './gateway/spectator-view.js';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { storeMigrate } from '@mythic/shared';
@@ -33,8 +35,16 @@ import {
   type Gateway,
 } from './gateway/index.js';
 import { recoverCampaign, saveCampaignCheckpoint } from './engine/recovery.js';
+import { readHistoryChunk, type HistoryPosition } from './storage/history-log-reader.js';
 import { playerJoinUrls, type PlayerJoinUrl } from './lan.js';
-import { LocalAssetStore, LocalCampaignStore, type ImportLimits } from './storage/index.js';
+import {
+  LocalAssetStore,
+  LocalCampaignStore,
+  backfillAssetLinks,
+  scopedAssetStore,
+  type CampaignMeta,
+  type ImportLimits,
+} from './storage/index.js';
 
 export interface RunningHost {
   readonly gateway: Gateway;
@@ -54,12 +64,16 @@ export interface StartHostOptions {
   importLimits?: Partial<ImportLimits>;
   hostToken?: string;
   publicUrl?: string;
+  /** HOST-03: asked when several campaigns exist and none was selected; undefined = newest. */
+  chooseCampaign?: (campaigns: readonly CampaignMeta[]) => Promise<string | undefined>;
   clock?: Clock;
   random?: RandomSource;
 }
 
 /**
- * Game host: gateway + engine room for one campaign, persisted in `config.dataDir` (§8.2).
+ * Game host: gateway + engine room for one campaign, persisted in `config.dataDir` (§8.2). The
+ * data dir may hold several campaigns (HOST-03); the one to open is chosen at start and the
+ * others stay untouched and unreachable (their assets included).
  * The host secret is created on first run and is never logged.
  */
 export async function startHost(
@@ -83,10 +97,15 @@ export async function startHost(
   let engine: Engine;
   let reportedJoinUrls: PlayerJoinUrl[] = [];
   try {
+    await store.reindex();
+    await backfillAssetLinks(assetStore, store);
     const savedFiles = await loadOrCreateCampaign(store, {
       clock,
       random,
       ...(config.campaignId !== undefined ? { campaignId: config.campaignId } : {}),
+      ...(config.campaign !== undefined ? { campaign: config.campaign } : {}),
+      ...(config.newCampaign !== undefined ? { newCampaign: config.newCampaign } : {}),
+      ...(options.chooseCampaign ? { choose: options.chooseCampaign } : {}),
     });
     const { campaign, seq } = await recoverCampaign(store, savedFiles);
     const startedAt = clock();
@@ -107,6 +126,19 @@ export async function startHost(
       clock,
       random,
       initialSeq: seq,
+      // HIST-07: rollback walks the on-disk log backwards, newest first, across Sessions.
+      readLog: async function* () {
+        await store.flushLogs();
+        const sessions = (await store.readSessions(campaign.id, 1024))
+          .reverse()
+          .map((session) => session.sessionId);
+        let position: HistoryPosition | undefined = { session: 0 };
+        while (position) {
+          const chunk = await readHistoryChunk(store.folder(campaign.id), sessions, position);
+          yield chunk.entries;
+          position = chunk.next;
+        }
+      },
       hostJoinUrls: () => reportedJoinUrls,
       onApplied: async (state, appliedSeq) => {
         if (appliedSeq % config.autosaveEvery === 0)
@@ -125,6 +157,12 @@ export async function startHost(
     join(config.dataDir, 'index.sqlite'),
     engine.state().id,
   );
+  const spectatorView = createSpectatorView(
+    join(config.dataDir, 'index.sqlite'),
+    engine.state().id,
+  );
+  // Restore the persisted choice; an unknown or co-DM seat quietly keeps the player view.
+  await engine.setSpectatorView(spectatorView.get());
   const seatInvites = createSeatInvites(join(config.dataDir, 'index.sqlite'), engine.state().id);
   const gateway = createGateway({
     spectatorTokenValid: (token) => spectatorLinks.valid(token),
@@ -155,14 +193,20 @@ export async function startHost(
       gateway.disconnectSpectators();
     },
   });
+  registerSpectatorViewRoutes(gateway.app, {
+    auth: httpAuth,
+    view: spectatorView,
+    apply: (seatId) => engine.setSpectatorView(seatId),
+  });
   registerSeatInviteRoutes(gateway.app, {
     auth: httpAuth,
     invites: seatInvites,
     state: () => engine.state(),
     claimSeat: (identityId, seatId) => engine.claimSeat(identityId, seatId),
   });
+  // HOST-03: HTTP only sees this campaign's assets; the raw pool stays with import/export.
   registerAssetRoutes(gateway.app, {
-    assetStore,
+    assetStore: scopedAssetStore(assetStore, engine.state().id),
     uploadAuthorizer:
       options.uploadAuthorizer ?? createSeatUploadAuthorizer(httpAuth, { now: clock }),
     maxUploadBytes: config.maxImageUploadBytes,
@@ -188,6 +232,7 @@ export async function startHost(
   } catch (error) {
     await gateway.close();
     spectatorLinks.close();
+    spectatorView.close();
     seatInvites.close();
     await closeStores();
     throw error;
@@ -221,6 +266,7 @@ export async function startHost(
           );
         } finally {
           spectatorLinks.close();
+          spectatorView.close();
           seatInvites.close();
           await closeStores();
         }

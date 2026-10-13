@@ -1,39 +1,13 @@
 import type { MigrationStep } from './runner.js';
 
-const record = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-const withLimit = (scene: Record<string, unknown>) => ({
-  ...scene,
-  maxLastingAoEsPerPlayer: scene['maxLastingAoEsPerPlayer'] ?? 1,
-});
-
-/** MEAS-03: old templates stay measuring AoEs; no IDs, ownership or components are inferred. */
+/** UX-07: old tokens have no quick fields; never invent character statistics. */
 export const v4ToV5: MigrationStep = {
   from: 4,
-  migrate(payload, kind) {
-    if (!record(payload)) return payload;
-    if (kind === 'scene') return withLimit(payload);
-    if (kind === 'snapshot' && record(payload['state'])) {
-      const state = payload['state'];
-      const scenes = state['scenes'];
-      return {
-        ...payload,
-        state: {
-          ...state,
-          schemaVersion: 5,
-          ...(record(scenes)
-            ? {
-                scenes: Object.fromEntries(
-                  Object.entries(scenes).map(([id, scene]) => [
-                    id,
-                    record(scene) ? withLimit(scene) : scene,
-                  ]),
-                ),
-              }
-            : {}),
-        },
-      };
-    }
-    return payload;
+  migrate: (payload, kind) => {
+    if (kind !== 'snapshot' || typeof payload !== 'object' || payload === null) return payload;
+    const record = payload as Record<string, unknown>;
+    const state = record['state'];
+    if (typeof state !== 'object' || state === null) return payload;
+    return { ...record, state: { ...state, schemaVersion: 5 } };
   },
 };

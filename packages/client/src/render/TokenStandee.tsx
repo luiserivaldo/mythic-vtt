@@ -5,6 +5,8 @@ import { DoubleSide, type Group } from 'three';
 import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
 import { TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { TokenStatusMarkers } from './TokenStatusMarkers.js';
+import { markerAnchor3d } from './status-markers.js';
 import {
   billboardYaw,
   facingMarkerPosition,
@@ -29,6 +31,7 @@ export function TokenStandee({
   actor,
   renderOrder,
   onClick,
+  onDoubleClick,
 }: {
   entity: RenderEntity;
   color: string;
@@ -36,6 +39,8 @@ export function TokenStandee({
   actor: SelectionActor;
   renderOrder: number;
   onClick: (event: ThreeEvent<MouseEvent>) => void;
+  /** CAM-06: the second click of a double-click focuses the camera on this token. */
+  onDoubleClick: () => void;
 }) {
   const pivot = useRef<Group>(null);
   const [x, y, z] = entity.position;
@@ -58,6 +63,7 @@ export function TokenStandee({
           position={[0, dims.baseThickness / 2, 0]}
           renderOrder={renderOrder}
           onClick={onClick}
+          onDoubleClick={onDoubleClick}
         >
           <cylinderGeometry args={[dims.baseRadius, dims.baseRadius, dims.baseThickness, 32]} />
           <meshStandardMaterial color={selected ? SELECTED : '#2b3643'} />
@@ -88,12 +94,14 @@ export function TokenStandee({
           position={[0, dims.height / 2, 0]}
           renderOrder={renderOrder}
           onClick={onClick}
+          onDoubleClick={onDoubleClick}
         >
           <planeGeometry args={[dims.width, dims.height]} />
           <TokenMaterial entity={entity} color={color} depth />
         </mesh>
       </group>
       <TokenLabel entity={entity} actor={actor} anchor={labelAnchor3d(entity.sizeCells)} />
+      <TokenStatusMarkers entity={entity} actor={actor} anchor={markerAnchor3d(entity.sizeCells)} />
     </group>
   );
 }

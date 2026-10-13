@@ -94,8 +94,8 @@ test('the ruler measures in scene units and a second client sees it with the sen
   const c = at(11.5, 8.5);
   const tokenAt = at(15.5, 12.5);
 
-  await dm.getByRole('button', { name: 'Ruler', exact: true }).click();
-  await expect(dm.getByRole('button', { name: 'Ruler', exact: true })).toHaveAttribute(
+  await dm.getByRole('button', { name: 'Measure', exact: true }).click();
+  await expect(dm.getByRole('button', { name: 'Measure', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
@@ -189,14 +189,14 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await expect(dm.getByTestId('ruler-total')).toHaveCount(0);
   await expect(dm.getByTestId('remote-ruler-total')).toHaveText('Aria: 30 ft');
   await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
-  await expect(dm.getByRole('button', { name: 'Ruler', exact: true })).toHaveAttribute(
+  await expect(dm.getByRole('button', { name: 'Measure', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
 
   // A short token click while idle exits the tool, then the normal selection click opens Transform.
   await dm.mouse.click(tokenAt.x, tokenAt.y);
-  await expect(dm.getByRole('button', { name: 'Ruler', exact: true })).toHaveAttribute(
+  await expect(dm.getByRole('button', { name: 'Measure', exact: true })).toHaveAttribute(
     'aria-pressed',
     'false',
   );
@@ -204,7 +204,7 @@ test('the ruler measures in scene units and a second client sees it with the sen
 
   // A finished ruler consumes the first Escape and broadcasts its cancel. The selected token
   // remains until a second Escape reaches BoardCanvas. Broadcast was turned off above.
-  await dm.getByRole('button', { name: 'Ruler', exact: true }).click();
+  await dm.getByRole('button', { name: 'Measure', exact: true }).click();
   await dm.getByLabel('Broadcast to others').check();
   await dm.mouse.move(a.x, a.y);
   await dm.mouse.down();

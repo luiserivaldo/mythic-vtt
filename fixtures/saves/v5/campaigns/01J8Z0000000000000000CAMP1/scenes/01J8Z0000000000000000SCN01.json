@@ -49,7 +49,18 @@
         "sizeCells": 1,
         "heightCells": 1,
         "labelVisibility": "all",
-        "facing": 90
+        "facing": 90,
+        "quickFields": {
+          "hp": {
+            "value": 18,
+            "visibility": "all",
+            "color": "#c0392b"
+          },
+          "ac": {
+            "value": 15,
+            "visibility": "owner"
+          }
+        }
       }
     },
     "01J8Z0000000000000000ENT02": {
@@ -109,38 +120,6 @@
         "color": "#8a8f98",
         "walkable": false
       }
-    },
-    "00000000000000000000000002": {
-      "id": "00000000000000000000000002",
-      "layer": "effects",
-      "name": "Lasting Darkness",
-      "owners": ["01J8Z0000000000000000SEAT1"],
-      "transform": {
-        "position": {
-          "x": 10,
-          "y": 0,
-          "z": 10
-        },
-        "rotation": {
-          "x": 0,
-          "y": 0,
-          "z": 0,
-          "w": 1
-        },
-        "scale": {
-          "x": 1,
-          "y": 1,
-          "z": 1
-        }
-      },
-      "aoe": {
-        "kind": "sphere",
-        "radius": 3,
-        "color": "#333333"
-      },
-      "lastingAoE": {
-        "creatorIdentityId": "00000000000000000000000001"
-      }
     }
   },
   "overlay": {
@@ -148,6 +127,5 @@
     "tintOpacity": 0.15,
     "darkness": 0.2
   },
-  "dmOnly": false,
-  "maxLastingAoEsPerPlayer": 1
+  "dmOnly": false
 }

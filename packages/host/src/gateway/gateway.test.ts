@@ -462,7 +462,7 @@ describe('transport RTT (UX-06)', () => {
     expect(samples[0]).toBeLessThanOrEqual(30_000);
     expect(c.received).toEqual([]);
   });
-  it.each([1, 4, 5])('rejects version %i after the lasting-AoE protocol upgrade', async (v) => {
+  it.each([1, 4, 5, 6])('rejects version %i after the lasting-AoE contract upgrade', async (v) => {
     await start();
     const c = await connect();
     c.send(hello({ v }));

@@ -6,7 +6,9 @@ import { useClientStore } from '../store/react.js';
 import {
   aoePlacePayload,
   aoeUpdatePayload,
+  degreesReadout,
   draftFromAoE,
+  sceneUnitReadout,
   validAoEDraft,
   type AoEKind,
 } from '../tools/aoe-placement.js';
@@ -98,8 +100,9 @@ export function AoEToolPanel({
     }
   };
   if (!scene || (!canPlace && !entity)) return null;
-  const unit = scene.grid.unitLabel;
-  const perCell = scene.grid.unitsPerCell;
+  const grid = scene.grid;
+  const unit = grid.unitLabel;
+  const perCell = grid.unitsPerCell;
   const update = (field: 'size' | 'degrees' | 'elevation' | 'x' | 'z', value: string) => {
     if (field === 'elevation' && value === '') {
       aoeToolStore.getState().setDraft({ elevation: null });
@@ -124,7 +127,7 @@ export function AoEToolPanel({
     }
   };
   return (
-    <section className="ui-panel ui-overlay ui-aoe-tool" aria-label="AoE tool">
+    <section className="ui-panel ui-overlay ui-aoe-tool" aria-label="AoE tool" aria-busy={busy}>
       {!unified && (
         <button
           type="button"
@@ -168,7 +171,7 @@ export function AoEToolPanel({
               type="number"
               min="0.01"
               step="any"
-              value={draft.size * perCell}
+              value={sceneUnitReadout(draft.size, grid)}
               onChange={(e) => {
                 update('size', e.target.value);
               }}
@@ -180,7 +183,7 @@ export function AoEToolPanel({
               aria-label="AoE rotation"
               type="number"
               step="1"
-              value={draft.degrees}
+              value={degreesReadout(draft.degrees)}
               onChange={(e) => {
                 update('degrees', e.target.value);
               }}
@@ -193,7 +196,7 @@ export function AoEToolPanel({
               type="number"
               step="any"
               placeholder="Surface"
-              value={draft.elevation === null ? '' : draft.elevation * perCell}
+              value={draft.elevation === null ? '' : sceneUnitReadout(draft.elevation, grid)}
               onChange={(e) => {
                 update('elevation', e.target.value);
               }}
@@ -225,7 +228,7 @@ export function AoEToolPanel({
                   aria-label="Selected AoE X"
                   type="number"
                   step="any"
-                  value={draft.x * perCell}
+                  value={sceneUnitReadout(draft.x, grid)}
                   onChange={(e) => {
                     update('x', e.target.value);
                   }}
@@ -237,7 +240,7 @@ export function AoEToolPanel({
                   aria-label="Selected AoE Z"
                   type="number"
                   step="any"
-                  value={draft.z * perCell}
+                  value={sceneUnitReadout(draft.z, grid)}
                   onChange={(e) => {
                     update('z', e.target.value);
                   }}
@@ -250,7 +253,7 @@ export function AoEToolPanel({
                   type="number"
                   min="0.01"
                   step="any"
-                  value={draft.size * perCell}
+                  value={sceneUnitReadout(draft.size, grid)}
                   onChange={(e) => {
                     update('size', e.target.value);
                   }}
@@ -261,7 +264,7 @@ export function AoEToolPanel({
                 <input
                   aria-label="Selected AoE rotation"
                   type="number"
-                  value={draft.degrees}
+                  value={degreesReadout(draft.degrees)}
                   onChange={(e) => {
                     update('degrees', e.target.value);
                   }}
@@ -272,7 +275,7 @@ export function AoEToolPanel({
                 <input
                   aria-label="Selected AoE elevation"
                   type="number"
-                  value={draft.elevation === null ? '' : draft.elevation * perCell}
+                  value={draft.elevation === null ? '' : sceneUnitReadout(draft.elevation, grid)}
                   onChange={(e) => {
                     update('elevation', e.target.value);
                   }}

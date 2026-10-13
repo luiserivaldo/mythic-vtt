@@ -101,6 +101,27 @@ export function fixtureCampaign(): Campaign {
   };
 }
 
+/** Owner-only token labels for seats A and B (M4-02 leak checks). */
+export const OWNER_LABELS = { seatA: 'ALICE-ONLY-NAME', seatB: 'BOB-ONLY-NAME' } as const;
+
+/** The fixture plus one owner-only label per player seat (PERM-03 / TOK-04). */
+export function fixtureWithOwnerLabels(): Campaign {
+  const c = fixtureCampaign();
+  const scene = c.scenes[T.scene];
+  const base = scene?.entities[T.token];
+  if (!scene || !base) throw new Error('fixture');
+  const owned = (id: string, name: string, owner: string): Entity => ({
+    ...base,
+    id,
+    name,
+    owners: [owner],
+    token: { sizeCells: 1, heightCells: 1, labelVisibility: 'owner' },
+  });
+  scene.entities[tid(14)] = owned(tid(14), OWNER_LABELS.seatA, T.seatA);
+  scene.entities[tid(15)] = owned(tid(15), OWNER_LABELS.seatB, T.seatB);
+  return c;
+}
+
 /** A fake gateway connection that records what it receives (raw frames decoded). */
 export interface FakeConnection extends GatewayConnection {
   readonly received: ServerMessage[];

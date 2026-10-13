@@ -76,7 +76,7 @@ test('a player keeps a lasting AoE across replacement, modes and reload, with ho
     await Promise.all([dm.goto(table.clientUrl), page.goto(table.clientUrl)]);
     await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
     await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
-    await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+    await page.getByRole('button', { name: 'Measure', exact: true }).click();
     await page.getByText('Measurement shapes', { exact: true }).click();
     await page.getByLabel('Measurement shape').selectOption('sphere');
     const tool = page.getByRole('region', { name: 'AoE tool' });
@@ -128,11 +128,11 @@ test('a player keeps a lasting AoE across replacement, modes and reload, with ho
     expect(Campaign.parse(player.state).scenes[sceneId]?.entities[first.id]?.lastingAoE).toEqual({
       creatorIdentityId: playerIdentity.identityId,
     });
-    await dm.getByRole('button', { name: 'Ruler', exact: true }).click();
+    await dm.getByRole('button', { name: 'Measure', exact: true }).click();
     await dm.getByLabel('Lasting AoE limit per player').fill('2');
     await dm.getByRole('button', { name: 'Apply AoE limit' }).click();
     await expect.poll(() => scene()?.maxLastingAoEsPerPlayer).toBe(2);
-    await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+    await page.getByRole('button', { name: 'Measure', exact: true }).click();
     await page.getByText('Measurement shapes', { exact: true }).click();
     await page.getByLabel('Measurement shape').selectOption('sphere');
     await tool.getByRole('button', { name: 'Place AoE', exact: true }).click();

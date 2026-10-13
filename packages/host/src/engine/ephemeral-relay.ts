@@ -49,6 +49,9 @@ export interface EphemeralRecipient {
   readonly audience: Audience;
 }
 
+const isSpectatorTarget = (target: EphemeralRecipient): boolean =>
+  target.audience.kind === 'spectators' || target.conn.isSpectator === true;
+
 export interface EphemeralRelay {
   relay(
     sender: GatewayConnection,
@@ -234,7 +237,17 @@ export function createEphemeralRelay(
         }
       }
 
-      const relayedMessage: RelayedEphemeral = { ...message, from: sender.identityId };
+      // UI-JOIN-01: shared tool colours come from the validated connection profile, not a spoofed preview.
+      const coloredTool = message.channel === 'ruler.preview' || message.channel === 'cursor';
+      const data =
+        coloredTool &&
+        sender.color !== undefined &&
+        typeof message.data === 'object' &&
+        message.data !== null &&
+        !Array.isArray(message.data)
+          ? { ...message.data, color: sender.color }
+          : message.data;
+      const relayedMessage: RelayedEphemeral = { ...message, data, from: sender.identityId };
       let frame: string;
       try {
         frame = encodeServerMessage(relayedMessage);
@@ -260,9 +273,8 @@ export function createEphemeralRelay(
       });
       drop('hidden-entity', targets.length - visibleTargets.length);
 
-      const spectatorTargets = visibleTargets.filter(
-        (target) => target.audience.kind === 'spectators',
-      );
+      // M4-02: a spectator watching through a seat has a seat audience but is still a spectator.
+      const spectatorTargets = visibleTargets.filter(isSpectatorTarget);
       let sendToSpectators = true;
       if (spectatorTargets.length > 0) {
         spectatorDelivery ??= new TokenBucket(spectatorDeliveryRate, now);
@@ -271,7 +283,7 @@ export function createEphemeralRelay(
       }
 
       for (const target of visibleTargets) {
-        if (target.audience.kind === 'spectators' && !sendToSpectators) continue;
+        if (isSpectatorTarget(target) && !sendToSpectators) continue;
         target.conn.sendRaw(frame);
         relayed += 1;
       }

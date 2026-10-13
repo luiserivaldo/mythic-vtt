@@ -128,7 +128,8 @@ main > p {
   background: var(--ui-bg);
   border-bottom: 1px solid var(--ui-border);
 }
-.ui-drawer .ui-panel {
+.ui-drawer .ui-panel,
+.ui-dock-tab-body .ui-panel {
   max-height: none;
   overflow: visible;
 }
@@ -141,7 +142,8 @@ main > p {
   border-radius: 6px;
   padding: 0.6rem;
 }
-.ui-drawer .ui-panel {
+.ui-drawer .ui-panel,
+.ui-dock-tab-body .ui-panel {
   border: 0;
   padding: 0;
   background: transparent;
@@ -263,6 +265,20 @@ main > p {
 .ui-aoe-affected ul {
   margin: 0.3rem 0 0;
   padding-left: 1.1rem;
+}
+/* MEAS-04: one row per affected token, with its distance in scene units beside the name. */
+.ui-aoe-affected ul ul {
+  margin-top: 0.15rem;
+  padding-left: 0.9rem;
+}
+.ui-aoe-affected-distance {
+  margin-left: 0.35rem;
+  color: var(--ui-muted);
+}
+/* D35: the viewer sees the token but may not read this name. */
+.ui-aoe-affected-hidden .ui-aoe-affected-name {
+  font-style: italic;
+  opacity: 0.75;
 }
 .ui-field {
   display: block;
@@ -606,7 +622,7 @@ main [tabindex]:focus-visible {
   width: auto;
 }
 .ui-right-dock {
-  flex: 0 0 19rem;
+  flex: 0 0 22rem;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -637,14 +653,92 @@ main [tabindex]:focus-visible {
 .ui-right-dock-content[hidden] {
   display: none;
 }
-.ui-right-dock .ui-shell {
-  padding: 0;
+/* UI-DOCK-01: the tab strip is a row of icons that becomes a column when the dock collapses. */
+.ui-dock-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--ui-border);
 }
-.ui-right-dock .ui-toolbar {
+.ui-right-dock[data-collapsed='true'] .ui-dock-tabs {
   flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-y: auto;
+  border-bottom: 0;
 }
-.ui-right-dock .ui-toolbar button {
-  text-align: left;
+.ui-right-dock[data-collapsed='true'] .ui-dock-tabs [role='tab'] {
+  width: 2.25rem;
+}
+.ui-dock-tabs [role='tab'] {
+  min-width: 2rem;
+  padding-inline: 0.3rem;
+}
+.ui-dock-tabs [role='tab'][aria-selected='true'] {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+.ui-dock-placeholder h2 {
+  margin: 0 0 0.4rem;
+}
+/* UI-CHAT-01: the message list scrolls, the composer stays under it, rolls carry their own colour. */
+.ui-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ui-chat-log {
+  min-height: 4rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.ui-chat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-chat-row {
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  background: var(--ui-bg-raised);
+  overflow-wrap: anywhere;
+}
+.ui-chat-roll {
+  font-weight: 600;
+}
+.ui-chat-empty,
+.ui-chat-note {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
+.ui-chat-composer {
+  display: flex;
+  gap: 0.4rem;
+}
+/* UI-CHAT-02: the game-log toggle sits just above the composer, small and greyed (`main button:disabled`). */
+.ui-chat-log-toggle {
+  align-self: flex-start;
+}
+.ui-chat-composer input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.35rem 0.4rem;
+  color: var(--ui-fg);
+  background: var(--ui-input);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+}
+.ui-dock-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-right: 0.8rem;
 }
 .ui-app .ui-tool-dock {
   position: static;
@@ -668,21 +762,6 @@ main [tabindex]:focus-visible {
   border-radius: 5px;
   box-shadow: 0 4px 18px rgb(0 0 0 / 40%);
 }
-.ui-settings {
-  margin-top: 0.8rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--ui-border);
-}
-.ui-settings fieldset {
-  margin-top: 0.6rem;
-  border: 1px solid var(--ui-border);
-}
-.ui-settings fieldset label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  margin-right: 0.8rem;
-}
 /* Existing board controls provide the first floating rail; UX-15 replaces its entries. */
 .ui-app .ui-board-controls {
   flex-direction: column;
@@ -700,7 +779,7 @@ main [tabindex]:focus-visible {
     right: 0;
     bottom: 0;
     z-index: 5;
-    width: min(19rem, 75vw);
+    width: min(22rem, 75vw);
     max-height: 70%;
     border-top: 1px solid var(--ui-border);
   }
@@ -721,4 +800,75 @@ main [tabindex]:focus-visible {
 }
 .ui-history-tools .ui-panel ol {
   padding-left: 1.1rem;
+}
+/* HIST-04: DM selection and the right-click menu in the History log. */
+.ui-history-tools li[data-selected] {
+  background: color-mix(in srgb, var(--ui-accent, #7dd3fc) 18%, transparent);
+}
+.ui-history-tools li > input[type='checkbox'] {
+  margin-right: 0.35rem;
+}
+.ui-history-menu {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 9rem;
+  padding: 0.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.4rem;
+  background: var(--ui-panel-bg, Canvas);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
+}
+/* UX-15: the tool rail inside the board's control column. */
+.ui-rail-divider {
+  align-self: stretch;
+  margin: 0.2rem 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+}
+.ui-board-controls .ui-rail-tool {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: left;
+}
+.ui-rail-glyph {
+  width: 1.1rem;
+  text-align: center;
+}
+.ui-board-controls button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-rail-tool[data-wip] {
+  border-style: dashed;
+  font-style: italic;
+}
+.ui-rail-wip {
+  margin-left: auto;
+  padding: 0 0.3rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-style: normal;
+}
+
+.ui-view-mode {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+.ui-view-mode button {
+  border-radius: 0;
+}
+.ui-view-mode button:first-child {
+  border-radius: 0.3rem 0 0 0.3rem;
+}
+.ui-view-mode button:last-child {
+  border-radius: 0 0.3rem 0.3rem 0;
+}
+.ui-scene-heading {
+  min-width: 0;
+  max-width: 35%;
 }

@@ -197,10 +197,10 @@ describe('v2 presence latency', () => {
   });
 });
 
-describe('v6 lasting AoE', () => {
+describe('v7 lasting AoE', () => {
   it('round-trips the synthetic lasting placement intent', () => {
     const raw = readFileSync(
-      new URL('../../../fixtures/protocol/v6/lasting-aoe.json', import.meta.url),
+      new URL('../../../fixtures/protocol/v7/lasting-aoe.json', import.meta.url),
       'utf8',
     );
     const decoded = decodeClientMessage(raw);

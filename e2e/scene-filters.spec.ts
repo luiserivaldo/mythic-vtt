@@ -56,7 +56,7 @@ test('scene washes sync, preserve input and labels in both views, and reload', a
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(table.clientUrl);
-  await page.getByRole('button', { name: 'Scenes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   await page.getByLabel('Tint', { exact: true }).fill('#8040ff');
   await page.getByLabel('Tint strength').fill('0.35');
   await page.getByLabel('Darkness', { exact: true }).fill('0.5');
@@ -67,7 +67,7 @@ test('scene washes sync, preserve input and labels in both views, and reload', a
   expect(await spectator.intent('scene.setOverlay', { sceneId, overlay: null })).toMatchObject({
     t: 'reject',
   });
-  await page.getByRole('button', { name: 'Close Scenes' }).click();
+  await page.getByRole('tab', { name: 'Chat', exact: true }).click();
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -84,7 +84,7 @@ test('scene washes sync, preserve input and labels in both views, and reload', a
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await expect(page.getByRole('region', { name: /Transform/ })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  await expect(page.getByText('Clear label', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('token-label')).toHaveText('Clear label');
   await page.getByRole('button', { name: '3D view', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await expect
@@ -94,9 +94,9 @@ test('scene washes sync, preserve input and labels in both views, and reload', a
       ),
     )
     .toBe(1);
-  await expect(page.getByText('Clear label', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('token-label')).toHaveText('Clear label');
   await page.reload();
-  await page.getByRole('button', { name: 'Scenes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   await expect(page.getByLabel('Darkness', { exact: true })).toHaveValue('0.5');
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await spectator.waitFor('wash cleared', () => overlay() === undefined);

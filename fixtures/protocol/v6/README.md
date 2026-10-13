@@ -1,5 +1,10 @@
-# Candidate protocol v6
+# Protocol v6 token quick fields (UX-07, MV-195)
 
-Synthetic `aoe.persist` intent for MV-180 / M3-17. The codec round-trips this golden frame. The host rejects mismatched hello versions (including v4 and v5).
+Deploy matching host and client versions together. Protocol v5 clients (join-profile colours,
+UX-31) receive the fatal `protocol-mismatch` response with `supportedVersion: 6`. Save schema
+v5 adds optional `token.quickFields`; the `v4-to-v5` migration only advances the version.
 
-This candidate reserves v5 for MV-217 / PR #46 and remains in the contract review queue. Reconcile against the accepted develop contract before marking ready.
+New durable intent `token.setQuickField`; token views carry `quickFields` filtered per viewer
+(`all`, `owner`, `dm`), so values a viewer may not read are never sent. Message codecs
+themselves are unchanged. The v5 join-profile fixture stays as compatibility coverage for its
+frame shapes; its `hello.v` is no longer a supported version.

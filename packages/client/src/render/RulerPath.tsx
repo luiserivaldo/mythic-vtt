@@ -4,6 +4,7 @@ import type { Scene, Vec3 } from '@mythic/shared';
 import { measureRuler } from '../tools/ruler.js';
 import { rulerGuideCorner } from '../tools/ruler-3d.js';
 import { LABEL_BACKGROUND_COLOR, LABEL_TEXT_COLOR } from './canvas-style.js';
+import { formatRangeBreakdown } from './range-readout.js';
 import type { ViewMode } from './view-mode-store.js';
 
 const LIFT = 0.05;
@@ -19,10 +20,6 @@ const pillStyle = {
 
 function lifted(point: Vec3): [number, number, number] {
   return [point.x, point.y + LIFT, point.z];
-}
-
-function breakdown(horizontal: string, vertical: string, total: string): string {
-  return `H ${horizontal} · V ${vertical} · T ${total}`;
 }
 
 /** Camera-facing ruler labels plus the MEAS-02 horizontal/vertical right-angle guide. */
@@ -47,7 +44,7 @@ export function RulerPath({
   const testId = testIdOverride ?? (owner === null ? 'ruler' : 'remote-ruler');
   const total =
     mode === '3d'
-      ? breakdown(measured.horizontalLabel, measured.verticalLabel, measured.totalLabel)
+      ? formatRangeBreakdown(measured.horizontalLabel, measured.verticalLabel, measured.totalLabel)
       : measured.totalLabel;
   return (
     <group>
@@ -103,7 +100,11 @@ export function RulerPath({
               style={{ ...pillStyle, fontSize: 11, opacity: 0.85 }}
             >
               {mode === '3d'
-                ? breakdown(segment.horizontalLabel, segment.verticalLabel, segment.label)
+                ? formatRangeBreakdown(
+                    segment.horizontalLabel,
+                    segment.verticalLabel,
+                    segment.label,
+                  )
                 : segment.label}
             </div>
           </Html>
