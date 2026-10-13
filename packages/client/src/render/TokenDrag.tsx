@@ -47,7 +47,7 @@ interface Press {
   grab: { x: number; z: number };
   startY: number;
   base: Vec3;
-  /** UX-21/UI-TOKEN-06: checkpoints dropped with a left click while this press drags. */
+  /** UX-21/UI-TOKEN-06: checkpoints dropped with a right click while this press drags. */
   checkpoints: readonly Vec3[];
   moving: boolean;
   lastSentAt: number | null;
@@ -276,9 +276,10 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
     };
 
     /**
-     * UX-21/UI-TOKEN-06: a left click while a token is being dragged commits the live position as a
-     * checkpoint and the drag keeps measuring from it (total in scene units, diagonal rule). The
-     * drag owns the pointer, so the press is swallowed rather than handed to picking.
+     * UX-21/UI-TOKEN-06: a right click while a token is being dragged commits the live position as
+     * a checkpoint and the drag keeps measuring from it (total in scene units, diagonal rule). The
+     * drag owns the pointer, so the press is swallowed rather than handed to the camera (right-drag
+     * orbits in 3D), to a ruler action or to the context menu. A left press never checkpoints.
      */
     const addCheckpoint = () => {
       const drag = tokenDragStore.getState().local;
@@ -290,18 +291,29 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
       invalidate();
     };
 
+    /**
+     * UX-21/UI-TOKEN-06: the right button pressed during a drag. The pointer is already active, so
+     * the browser fires no second `pointerdown`; the press arrives as the compat `mousedown`, and
+     * swallowing it keeps the camera, the ruler and the context menu out of the gesture.
+     */
+    const onMouseDown = (e: MouseEvent) => {
+      if (!press || e.target !== el || e.button !== 2) return;
+      e.preventDefault();
+      e.stopPropagation();
+      addCheckpoint();
+    };
+
     const onDown = (e: PointerEvent) => {
       if (e.target !== el) return;
+      // The drag owns the pointer: nothing may start from it until the left button is released.
+      // A second button press never reaches us here (the pointer is already active, so the browser
+      // fires no further pointerdown); the right one is handled by onMouseDown.
+      if (press) return;
       if (e.pointerType === 'mouse' && e.button === 1) {
         onMiddleDown(e);
         return;
       }
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (press) {
-        e.stopPropagation();
-        addCheckpoint();
-        return;
-      }
       swallowClick = false;
       if (pointerClaims.isClaimed(e.pointerId)) return;
       const { campaign: c, actor: a, scene: sc, mode: m } = latest.current;
@@ -386,6 +398,8 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         middle = null;
         if (!done.moved) toggleFlying(done.entityId);
       }
+      // UX-21: a mouse `pointerup` fires only once every button is up, so the right release during
+      // a drag never reaches here; the left release still ends the move as usual.
       if (press && e.pointerId === press.pointerId) end(false);
     };
     const onCancel = (e: PointerEvent) => {
@@ -401,21 +415,32 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         swallowClick = false;
       }
     };
+    // UX-21: while the drag lasts the right button is the checkpoint gesture, so the context menu
+    // (and the ruler's right-click waypoint) must not open on top of the drag.
+    const onContextMenu = (e: MouseEvent) => {
+      if (!press) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
 
     // Window capture runs before every handler on the canvas (pan, gizmo), whatever their mount order.
     window.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('mousedown', onMouseDown, true);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onCancel);
     el.addEventListener('click', onClickCapture, true);
+    window.addEventListener('contextmenu', onContextMenu, true);
     window.addEventListener('keydown', onKey);
     return () => {
       if (press) pointerClaims.release(press.pointerId);
       window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('mousedown', onMouseDown, true);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', onCancel);
       el.removeEventListener('click', onClickCapture, true);
+      window.removeEventListener('contextmenu', onContextMenu, true);
       window.removeEventListener('keydown', onKey);
     };
   }, [gl, invalidate, getState, readOnly]);
