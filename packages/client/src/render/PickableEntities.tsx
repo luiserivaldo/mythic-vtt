@@ -6,6 +6,7 @@ import { Fragment, lazy, Suspense, useEffect, useMemo } from 'react';
 import { useClientStore } from '../store/react.js';
 import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
+import { focusStore } from './focus-store.js';
 import { MapImageMesh } from './MapImage.js';
 import { ElevationBadge, SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { TokenStatusMarkers } from './TokenStatusMarkers.js';
@@ -96,6 +97,17 @@ export function PickableEntities({
     const hits = event.intersections.map(({ object, distance }) => ({ id: object.name, distance }));
     const id = pickEntity(hits, scene, actor);
     selectionStore.getState().pick(scene.id, id, event.shiftKey || event.ctrlKey || event.metaKey);
+  }
+
+  /**
+   * CAM-06: the second click of a double-click focuses the camera on a token. Only tokens are
+   * focus targets; the camera move is per-client view state (never an action, never sent), so a
+   * spectator may focus too. The ruler tool claims a double-click of its own before this runs.
+   */
+  function focusOnDoubleClick(entity: RenderEntity) {
+    if (!entity.token) return;
+    // The token's own base position: world X/Y/Z, so a flying token is framed where it is (TOK-03).
+    focusStore.getState().request(entity.position[0], entity.position[1], entity.position[2]);
   }
 
   return (
@@ -190,6 +202,9 @@ export function PickableEntities({
                     actor={actor}
                     renderOrder={order}
                     onClick={onClick}
+                    onDoubleClick={() => {
+                      focusOnDoubleClick(entity);
+                    }}
                   />
                 </Suspense>
               ) : (
@@ -203,6 +218,9 @@ export function PickableEntities({
                         rotation={[-Math.PI / 2, 0, 0]}
                         renderOrder={order}
                         onClick={onClick}
+                        onDoubleClick={() => {
+                          focusOnDoubleClick(entity);
+                        }}
                       >
                         <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
                         <TokenMaterial
