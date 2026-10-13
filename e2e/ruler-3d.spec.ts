@@ -81,8 +81,11 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   const box = await canvas.boundingBox();
   if (!box) throw new Error('no canvas box');
   const pose = await settledCameraPose(page);
-  const ground = projectToCanvas(pose, box, { x: 20, y: 0, z: 25 });
-  const platformTop = projectToCanvas(pose, box, { x: 20, y: 10, z: 15 });
+  // Aim at cell centres, never cell boundaries: a surface pick snaps X/Z to the nearest cell, so a
+  // world point that sits on an integer flips a whole cell on sub-pixel rounding (this is what made
+  // this spec read 80 ft instead of 75 ft on CI).
+  const ground = projectToCanvas(pose, box, { x: 20.5, y: 0, z: 25.5 });
+  const platformTop = projectToCanvas(pose, box, { x: 20.5, y: 10, z: 15.5 });
   await page.getByRole('button', { name: 'Measure', exact: true }).click();
   await page.getByLabel('Measurement mode').selectOption('3d');
   await page.getByLabel('Ruler fade').selectOption('linger');
