@@ -4,7 +4,18 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', 'fixtures/**'] },
+  {
+    // Generated Playwright output (gitignored): linting the trace viewer's own bundles fails the
+    // project service for files that are not part of any tsconfig.
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
+      'fixtures/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {

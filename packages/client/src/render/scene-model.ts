@@ -8,6 +8,7 @@ import {
   type LayerId,
   type PrimitiveKind,
   type Scene,
+  type TokenStatusMarker,
 } from '@mythic/shared';
 import { footprintCells } from './token-footprint.js';
 import type { Volume } from './aoe-geometry.js';
@@ -49,6 +50,9 @@ export interface RenderEntity {
     yaw: number;
     /** TOK-03: height is locked; drawn with a flying indicator. */
     flying?: boolean;
+    /** TOK-06: conditions and custom markers drawn over the token. Absent when the host stripped
+     * them for this viewer (PERM-03), never an empty list. */
+    statusMarkers?: readonly TokenStatusMarker[];
   };
 }
 
@@ -190,6 +194,10 @@ export function mapScene(scene: Scene): RenderScene {
                 labelVisibility: entity.token.labelVisibility,
                 yaw: yawFromQuaternion(entity.transform.rotation),
                 ...(entity.token.flying ? { flying: true } : {}),
+                // TOK-06: an empty list stays absent, so the strip never mounts for nothing.
+                ...(entity.token.statusMarkers?.length
+                  ? { statusMarkers: entity.token.statusMarkers }
+                  : {}),
               },
             }
           : {}),
