@@ -138,6 +138,7 @@ describe('ruler right-click branching (M1-45, MEAS-08/Q31)', () => {
   const armed: RulerRightClickContext = {
     tool: true,
     aoeActive: false,
+    tokenDrag: false,
     mode: '2d',
     measuring: true,
   };
@@ -157,6 +158,14 @@ describe('ruler right-click branching (M1-45, MEAS-08/Q31)', () => {
     expect(rulerRightClick({ ...armed, tool: false })).toBe('ignore');
     expect(rulerRightClick({ ...armed, tool: false, measuring: false })).toBe('ignore');
     expect(rulerRightClick({ ...armed, tool: false, aoeActive: true })).toBe('ignore');
+  });
+
+  it('leaves the right click alone while a token drag owns the press (UX-21)', () => {
+    // A drag in progress checkpoints instead, whichever mode and phase the ruler is in.
+    expect(rulerRightClick({ ...armed, tokenDrag: true })).toBe('ignore');
+    expect(rulerRightClick({ ...armed, tokenDrag: true, mode: '3d' })).toBe('ignore');
+    expect(rulerRightClick({ ...armed, tokenDrag: true, measuring: false })).toBe('ignore');
+    expect(rulerRightClick({ ...armed, tokenDrag: true, tool: false })).toBe('ignore');
   });
 
   it('sums waypoint legs cumulatively in scene units instead of measuring from the start', () => {

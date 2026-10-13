@@ -30,6 +30,7 @@ import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
 import { OcclusionFade } from './OcclusionFade.js';
+import { FocusCamera } from './FocusCamera.js';
 import { RenderDiagnostics } from './RenderDiagnostics.js';
 import { ToolPanelDock } from '../ui/ToolPanelDock.js';
 import { isReadOnlyViewer } from '../ui/viewer.js';
@@ -93,9 +94,10 @@ function BoardScene({
     <>
       {/* D37: outside the canvas is a darker neutral; GridLines fills the inside. */}
       <color attach="background" args={[outsideColor(scene?.background)]} />
-      {mode3d && backdrop.zenith && (
+      {mode3d && (backdrop.zenith || scene?.skybox) && (
         <Suspense fallback={null}>
-          <Skybox spec={backdrop} />
+          {/* ENV-07: an image skybox draws over the colour/gradient, which stays as its fallback. */}
+          <Skybox spec={backdrop} {...(scene?.skybox ? { skybox: scene.skybox } : {})} />
         </Suspense>
       )}
       {mode3d ? (
@@ -131,6 +133,14 @@ function BoardScene({
       {grid && (
         <GridLines grid={grid} fill={scene?.background ?? DEFAULT_BACKGROUND} renderOrder={-1} />
       )}
+      {/* CAM-06: double-clicking a token tweens the camera onto it, in 2D and in 3D. */}
+      <FocusCamera
+        mode={viewMode}
+        bounds={bounds}
+        canvasSize={canvasSize}
+        orbitRef={director.orbitRef}
+        applyRef={director.applyRef}
+      />
       {/* M1-28: TokenDrag claims a press on any movable token without selecting it first, while
           empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}

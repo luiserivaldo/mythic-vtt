@@ -4,8 +4,9 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
 import { Fragment, lazy, Suspense, useEffect, useMemo } from 'react';
 import { useClientStore } from '../store/react.js';
-import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
+import { pickEntity, selectionActor, validSelection } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
+import { focusStore } from './focus-store.js';
 import { MapImageMesh } from './MapImage.js';
 import { ElevationBadge, SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { TokenStatusMarkers } from './TokenStatusMarkers.js';
@@ -36,12 +37,6 @@ const ElevatedSurfaceGrid = lazy(async () => {
   return { default: module.ElevatedSurfaceGrid };
 });
 
-function actorFor(seatId: string | null, seats: SceneSelectionSeats): SelectionActor {
-  if (seatId === null) return { kind: 'host' };
-  const seat = seats[seatId];
-  return seat ? { kind: 'seat', seat } : { kind: 'spectator' };
-}
-
 type SceneSelectionSeats = Record<string, Seat>;
 
 // Stable fallback: a fresh `{}` inside a store selector changes identity on every read and
@@ -61,11 +56,12 @@ export function PickableEntities({
   /** GRID-05: scene grid style for walkable tops (3D only). */
   grid?: RenderGrid | null;
 }) {
+  const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const seats = useClientStore((state) => state.campaign?.seats ?? NO_SEATS);
   const selected = useStore(selectionStore, (state) => state.ids);
   const hiddenLayers = useUiStore((state) => state.hiddenLayers);
-  const actor = actorFor(seatId, seats);
+  const actor = selectionActor(isHost, seatId, seats);
   const walkables = useMemo(
     () =>
       Object.values(scene?.entities ?? {}).flatMap((entity) => {
@@ -88,7 +84,7 @@ export function PickableEntities({
   useEffect(() => {
     const state = selectionStore.getState();
     state.reconcile(scene?.id ?? null, validSelection(state.ids, scene, actor));
-  }, [scene, seatId, seats]);
+  }, [scene, isHost, seatId, seats]);
 
   function onClick(event: ThreeEvent<MouseEvent>) {
     if (!scene) return;
@@ -96,6 +92,17 @@ export function PickableEntities({
     const hits = event.intersections.map(({ object, distance }) => ({ id: object.name, distance }));
     const id = pickEntity(hits, scene, actor);
     selectionStore.getState().pick(scene.id, id, event.shiftKey || event.ctrlKey || event.metaKey);
+  }
+
+  /**
+   * CAM-06: the second click of a double-click focuses the camera on a token. Only tokens are
+   * focus targets; the camera move is per-client view state (never an action, never sent), so a
+   * spectator may focus too. The ruler tool claims a double-click of its own before this runs.
+   */
+  function focusOnDoubleClick(entity: RenderEntity) {
+    if (!entity.token) return;
+    // The token's own base position: world X/Y/Z, so a flying token is framed where it is (TOK-03).
+    focusStore.getState().request(entity.position[0], entity.position[1], entity.position[2]);
   }
 
   return (
@@ -190,6 +197,9 @@ export function PickableEntities({
                     actor={actor}
                     renderOrder={order}
                     onClick={onClick}
+                    onDoubleClick={() => {
+                      focusOnDoubleClick(entity);
+                    }}
                   />
                 </Suspense>
               ) : (
@@ -203,6 +213,9 @@ export function PickableEntities({
                         rotation={[-Math.PI / 2, 0, 0]}
                         renderOrder={order}
                         onClick={onClick}
+                        onDoubleClick={() => {
+                          focusOnDoubleClick(entity);
+                        }}
                       >
                         <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
                         <TokenMaterial
