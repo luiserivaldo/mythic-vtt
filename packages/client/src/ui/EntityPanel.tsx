@@ -1,3 +1,4 @@
+import { useViewerPreferences } from './ViewerPreferencesProvider.js';
 import type { Campaign, LayerId, Scene } from '@mythic/shared';
 import { useId, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { useStore } from 'zustand';
@@ -403,6 +404,7 @@ function EntityRowView({
     (s) => s.sceneId === scene.id && s.ids.includes(entityId),
   );
   const [confirming, setConfirming] = useState(false);
+  const { preferences } = useViewerPreferences();
   const entity = scene.entities[entityId];
   const row = useMemo(
     () => entityRows(campaign, scene).find((r) => r.id === entityId),
@@ -496,7 +498,11 @@ function EntityRowView({
             <button
               type="button"
               onClick={() => {
-                setConfirming(true);
+                if (preferences.confirmBeforeDeleting) setConfirming(true);
+                else
+                  void send(entityDeleteIntent(scene.id, entityId)).then((ok) => {
+                    if (ok) selectionStore.getState().clear();
+                  });
               }}
             >
               Delete {entity.name}

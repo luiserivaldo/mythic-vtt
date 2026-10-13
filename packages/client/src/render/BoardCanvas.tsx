@@ -11,6 +11,7 @@ import { useClientStore } from '../store/react.js';
 import { activeRenderScene, type RenderScene } from './scene-model.js';
 import { PickableEntities } from './PickableEntities.js';
 import { RangeReadout } from './RangeReadout.js';
+import { TokenPreviewCard } from './TokenPreviewCard.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
@@ -147,6 +148,8 @@ function BoardScene({
       <PickableEntities rendered={shown} scene={source} mode={mode3d ? '3d' : '2d'} grid={grid} />
       {/* MEAS-05: hovering a token with one token selected shows the token-to-token range. */}
       <RangeReadout scene={source} />
+      {/* UI-TOKEN-01: a single selected token shows its quick preview card near it, 2D and 3D. */}
+      <TokenPreviewCard scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       {mode3d && <OcclusionFade rendered={shown} />}
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       <SceneOverlay overlay={source?.overlay} />
