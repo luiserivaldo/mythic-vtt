@@ -115,6 +115,8 @@ export interface RulerRightClickContext {
   readonly tool: boolean;
   /** An AoE draft owns the pointer, so its own quick delete must keep receiving the event. */
   readonly aoeActive: boolean;
+  /** UX-21: a token drag owns the right press, so a checkpoint must not also become a waypoint. */
+  readonly tokenDrag: boolean;
   readonly mode: '2d' | '3d';
   /** The 2D ruler is mid-path (`phase === 'active'`). */
   readonly measuring: boolean;
@@ -122,11 +124,11 @@ export interface RulerRightClickContext {
 
 /**
  * MEAS-08/Q31: only a measuring 2D ruler takes a right click as a waypoint and keeps measuring from
- * it. An AoE draft keeps the event, a 3D or idle ruler keeps M1-41's clear, and an unarmed tool
- * leaves the event to the board's own context menu.
+ * it. An AoE draft or a token drag keeps the event, a 3D or idle ruler keeps M1-41's clear, and an
+ * unarmed tool leaves the event to the board's own context menu.
  */
 export function rulerRightClick(context: RulerRightClickContext): RulerRightClick {
-  if (context.aoeActive || !context.tool) return 'ignore';
+  if (context.aoeActive || context.tokenDrag || !context.tool) return 'ignore';
   if (context.mode === '2d' && context.measuring) return 'waypoint';
   return 'clear';
 }

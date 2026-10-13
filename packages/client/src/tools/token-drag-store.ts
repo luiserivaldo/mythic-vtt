@@ -7,6 +7,12 @@ export interface LocalDrag {
   entityId: string;
   /** Where the token was when the press began; used to detect the host's patch landing. */
   base: Vec3;
+  /**
+   * UX-21/UI-TOKEN-06: checkpoints committed with a left click while dragging, in order. The ruler
+   * drawn during the drag is `base`, these, then the live position. Local only: the drag preview
+   * wire message carries no checkpoints (the protocol is frozen).
+   */
+  checkpoints?: readonly Vec3[];
   to: Vec3;
   settling: boolean;
 }
