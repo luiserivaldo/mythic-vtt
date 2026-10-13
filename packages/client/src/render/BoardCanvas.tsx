@@ -167,7 +167,8 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
   const campaign = useViewedCampaign();
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
-  const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
+  const preview = useClientStore((state) => state.viewAs.kind !== 'host');
+  const readOnly = preview || isReadOnlyViewer({ isHost, seatId, campaign });
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
   const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
   const source = campaign?.activeSceneId ? (campaign.scenes[campaign.activeSceneId] ?? null) : null;
