@@ -98,12 +98,12 @@ test('grey tiles and dark blue surround keep a populated board readable in 2D an
   await expect(page.getByTestId('token-label')).toHaveText('Scout');
   await expect(page.getByTestId('elevation-badge')).toHaveText('+10 ft');
 
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Stone block', exact: true }).click();
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Chat', exact: true }).click();
   const from = await cellToPixel(page, 13.5, 11.5);
   const to = await cellToPixel(page, 19.5, 11.5);
-  await page.getByRole('button', { name: 'Ruler', exact: true }).click();
+  await page.getByRole('button', { name: 'Measure', exact: true }).click();
   await page.getByLabel('Ruler fade').selectOption('linger');
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();

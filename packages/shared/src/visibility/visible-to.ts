@@ -50,14 +50,26 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
     // D35 / TOK-04 + PERM-03: a name the audience may not see on the label is never sent. The
     // schema requires a string, so the neutral placeholder is the empty string.
     const hideName = !canReadTokenLabel(audience, entity, seat);
-    if (!hideName) return entity;
-    // TOK-06 / PERM-03: status markers share the label's audience, even for unnamed tokens.
-    if (entity.token?.statusMarkers !== undefined) {
+    let view = hideName && entity.name !== '' ? { ...entity, name: '' } : entity;
+    // TOK-06: retain the label/marker projection while also filtering independent quick fields.
+    if (hideName && entity.token?.statusMarkers !== undefined) {
       const token = { ...entity.token };
       delete token.statusMarkers;
-      return { ...entity, name: '', token };
+      view = { ...view, token };
     }
-    return entity.name !== '' ? { ...entity, name: '' } : entity;
+    if (view.token?.quickFields) {
+      const coDm = audience.kind === 'seat' && seat?.role === 'codm';
+      const entries = Object.entries(view.token.quickFields);
+      const shared = entries.filter(
+        ([, field]) =>
+          field.visibility === 'all' || coDm || (field.visibility === 'owner' && owner),
+      );
+      // PERM-03: use the already-filtered token, never restore its hidden status markers.
+      if (shared.length !== entries.length) {
+        view = { ...view, token: { ...view.token, quickFields: Object.fromEntries(shared) } };
+      }
+    }
+    return view;
   });
 }
 
@@ -116,7 +128,8 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
     const scenes: Campaign['scenes'] = {};
     let changed = false;
     for (const [id, scene] of Object.entries(state.scenes)) {
-      if (scene.dmOnly && seat?.role !== 'codm') {
+      // UI-TOP-01 / PERM-03: players and spectators know only their active scene.
+      if (seat?.role !== 'codm' && (scene.dmOnly || id !== state.activeSceneId)) {
         changed = true;
         continue;
       }

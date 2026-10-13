@@ -29,6 +29,13 @@ export { prefabSave } from './prefab.save.js';
 export { prefabRemove } from './prefab.remove.js';
 export { prefabPlace } from './prefab.place.js';
 export { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
-export { canReadEntityLabel } from './entity-access.js';
+export { canReadEntityLabel, canUseEntity, isAdmin, isLayerLocked } from './entity-access.js';
+export { historyUndo, UndoRequest, HistoryUndoPayload } from './history.undo.js';
+export {
+  historyRollback,
+  RollbackRequest,
+  HistoryRollbackPayload,
+  ROLLBACK_MAX_PATCHES,
+} from './history.rollback.js';
 export { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
 export { canUseSceneToggle, TOGGLE_FOR_CHANNEL } from './scene-toggles.js';

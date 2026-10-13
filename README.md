@@ -17,7 +17,7 @@ Built by **MythicTomes**. Self-hosting is free and fully featured; optional host
 - **Grid and measuring.** Square grid, custom units and diagonal rules. The Ruler panel combines 2D/3D distance measurement and AoE shapes, with snapping, Instant/Linger fade, movement readouts and optional ruler broadcasting. Placed AoEs remain shared.
 - **Status markers.** Select a token and open its Token panel to add condition icons or custom text. Editing follows token permissions; markers share the token label’s visibility.
 - **Battlemaps.** Upload an image, calibrate it to the grid and place tokens.
-- **Rounds.** Open Rounds in the right dock to configure initiative, advance turns and track rounds. Private combatants stay out of other clients’ rosters and history turn indices; the host log retains the full order.
+- **Rounds.** Open Initiative on the tool rail to show the tracker in the right dock to configure initiative, advance turns and track rounds. Private combatants stay out of other clients’ rosters and history turn indices; the host log retains the full order.
 - **History.** Browse host-filtered action diffs, with seat/entity filters and older pages. Private content stays on the host. History pages scan bounded log windows; filters may return an empty page with older results available. Refresh after campaign changes or expired pages.
 - **Layers and secrets.** Map, token and DM-only layers. Hidden information is never sent to players.
 - **Safe by default.** Every change is recorded: autosave, crash recovery and JSON export.
@@ -54,16 +54,28 @@ See the **[Internet Play Guide](docs/internet-play.md)** for tunnels (recommende
 
 Campaigns are saved automatically in the data directory (set with `--data-dir`). The server checkpoints regularly and on a clean shutdown, and replays its action log after a crash. Log writes are synced to disk every 500 ms, so a sudden power loss can lose up to half a second of recent actions. Stop the server normally when you can, and keep backups of the data directory.
 
+### Several campaigns on one host
+
+One data directory can hold any number of campaigns. Each has its own seats, scenes, session history and uploaded images, and the host opens exactly one of them per run, so players never see another campaign's data.
+
+- `--list-campaigns` prints what is in the data directory and exits.
+- `--campaign <name|id>` opens a campaign by name, id or unique id prefix. `--new-campaign "Name"` creates one and opens it.
+- With neither flag, a terminal gets a numbered picker when there is more than one campaign. Without a terminal (a service, a script), the most recently saved campaign opens, as before.
+
+Existing single-campaign data directories work unchanged: nothing is rewritten, and the campaign is picked up automatically.
+
 ### Configuration
 
-| Setting                     | Flag         | Env var                   | Config file key |
-| --------------------------- | ------------ | ------------------------- | --------------- |
-| Port (default 8787)         | `--port`     | `MYTHIC_PORT`             | `port`          |
-| Bind address                | `--host`     | `MYTHIC_HOST`             | `host`          |
-| Listen on LAN               | `--lan`      | `MYTHIC_LAN=1`            | `lan`           |
-| Data directory              | `--data-dir` | `MYTHIC_DATA_DIR`         | n/a             |
-| Autosave interval (actions) | n/a          | `MYTHIC_AUTOSAVE_ACTIONS` | n/a             |
-| Public URL for the DM link  | n/a          | `MYTHIC_PUBLIC_URL`       | `publicUrl`     |
+| Setting                     | Flag             | Env var                                                     | Config file key              |
+| --------------------------- | ---------------- | ----------------------------------------------------------- | ---------------------------- |
+| Port (default 8787)         | `--port`         | `MYTHIC_PORT`                                               | `port`                       |
+| Bind address                | `--host`         | `MYTHIC_HOST`                                               | `host`                       |
+| Listen on LAN               | `--lan`          | `MYTHIC_LAN=1`                                              | `lan`                        |
+| Data directory              | `--data-dir`     | `MYTHIC_DATA_DIR`                                           | n/a                          |
+| Campaign to open            | `--campaign`     | `MYTHIC_CAMPAIGN` (or `MYTHIC_CAMPAIGN_ID` for an exact id) | `campaign` (or `campaignId`) |
+| Create and open a campaign  | `--new-campaign` | `MYTHIC_NEW_CAMPAIGN`                                       | n/a                          |
+| Autosave interval (actions) | n/a              | `MYTHIC_AUTOSAVE_ACTIONS`                                   | n/a                          |
+| Public URL for the DM link  | n/a              | `MYTHIC_PUBLIC_URL`                                         | `publicUrl`                  |
 
 Precedence is flags, then environment variables, then the config file, then defaults. The config file is `mythic.config.json` in the data directory, or the path given to `--config`.
 
@@ -80,3 +92,7 @@ Prefab library: DM/co-DM tools save entity configurations per campaign and place
 Selected tokens have a Token panel for persistent reach/aura rings. Set each radius in scene units and choose its colour; rings follow the token in 2D and 3D. Editing requires token edit permission. Saves use schema version 3; version 1 and 2 campaigns and sessions migrate without losing data.
 
 New campaigns start with one blank active scene. The DM can browse scenes locally without moving players, and create DM-only scenes that players and spectators never receive. Only the DM activates a public scene for players. The last scene cannot be deleted; deleting the players' active scene leaves their board empty and blocks new joins until another public scene is activated.
+
+The top bar shows your current scene. DMs and co-DMs can click its name to open Scenes in the right dock; players see only their assigned scene name and receive no inactive scene list. Choose 2D or 3D without losing selection, the active tool or camera focus. Reset view frames the scene in either mode.
+
+Settings includes local Show height labels and Confirm before deleting preferences, alongside the dark/light theme. Height badge rendering is separate follow-up work. DMs/co-DMs can adjust measurement permission for the viewed scene; creation is marked "DM and Co-DM only". The host DM can download a campaign ZIP. Game log remains a disabled WIP entry.

@@ -1,40 +1,36 @@
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { SceneOverlay } from './SceneOverlay.js';
 import { Canvas, useThree } from '@react-three/fiber';
-import {
-  canUseSceneToggle,
-  resolveSceneBounds,
-  type Actor,
-  type Scene,
-  type SceneBounds,
-} from '@mythic/shared';
+import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
 import { OrthographicCamera } from '@react-three/drei';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo } from 'react';
 import { useStore } from 'zustand';
 import { tokenDragStore } from '../tools/token-drag-store.js';
 import { withLocalDrag } from '../tools/token-drag.js';
 import { useClientStore } from '../store/react.js';
 import { activeRenderScene, type RenderScene } from './scene-model.js';
 import { PickableEntities } from './PickableEntities.js';
+import { RangeReadout } from './RangeReadout.js';
+import { TokenPreviewCard } from './TokenPreviewCard.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
 import { RulerTool } from './RulerTool.js';
-import { RulerToggle } from './RulerToggle.js';
+import { ToolRail } from '../ui/ToolRail.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
 import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
 import { outsideColor } from './canvas-style.js';
 import type { GroundBounds } from './camera-3d.js';
-import { useViewMode, type ViewMode } from './view-mode-store.js';
+import { useViewMode, viewModeStore, type ViewMode } from './view-mode-store.js';
 import { useViewDirector } from './use-view-director.js';
-import { ViewToggle } from './ViewToggle.js';
 import { AoEPlacementCanvas } from './AoEPlacementCanvas.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { AoEHighlights } from './AoEHighlights.js';
 import { OcclusionFade } from './OcclusionFade.js';
+import { FocusCamera } from './FocusCamera.js';
 import { RenderDiagnostics } from './RenderDiagnostics.js';
 import { ToolPanelDock } from '../ui/ToolPanelDock.js';
 import { isReadOnlyViewer } from '../ui/viewer.js';
@@ -116,7 +112,11 @@ function BoardScene({
         </Suspense>
       ) : (
         <>
-          <PanZoomControls bounds={canvasSize} frameKey={frameKey} />
+          <PanZoomControls
+            bounds={canvasSize}
+            frameKey={`${frameKey}:${String(resetToken)}`}
+            initialView={director.restored2d ? director.view2d : undefined}
+          />
           <OrthographicCamera
             makeDefault
             position={[director.view2d.centerX, 20, director.view2d.centerZ]}
@@ -132,12 +132,24 @@ function BoardScene({
       {grid && (
         <GridLines grid={grid} fill={scene?.background ?? DEFAULT_BACKGROUND} renderOrder={-1} />
       )}
+      {/* CAM-06: double-clicking a token tweens the camera onto it, in 2D and in 3D. */}
+      <FocusCamera
+        mode={viewMode}
+        bounds={bounds}
+        canvasSize={canvasSize}
+        orbitRef={director.orbitRef}
+        applyRef={director.applyRef}
+      />
       {/* M1-28: TokenDrag claims a press on any movable token without selecting it first, while
           empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
       <RulerTool mode={mode3d ? '3d' : '2d'} readOnly={readOnly} />
       {!aoeActive && <TokenDrag readOnly={readOnly} />}
       <PickableEntities rendered={shown} scene={source} mode={mode3d ? '3d' : '2d'} grid={grid} />
+      {/* MEAS-05: hovering a token with one token selected shows the token-to-token range. */}
+      <RangeReadout scene={source} />
+      {/* UI-TOKEN-01: a single selected token shows its quick preview card near it, 2D and 3D. */}
+      <TokenPreviewCard scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       {mode3d && <OcclusionFade rendered={shown} />}
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       <SceneOverlay overlay={source?.overlay} />
@@ -160,20 +172,11 @@ function BoardScene({
 export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | null }) {
   const viewMode = useViewMode();
   const mode3d = viewMode === '3d';
-  const [resetToken, setResetToken] = useState(0);
+  const resetToken = useStore(viewModeStore, (state) => state.resetToken);
   const campaign = useViewedCampaign();
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
-  // PERM-05: a tool a seat may not use is disabled with a reason, never hidden.
-  const measureDisabledReason = useMemo(() => {
-    const sceneId = campaign?.activeSceneId;
-    if (!campaign || !sceneId || isHost) return undefined;
-    const actor: Actor = seatId !== null ? { kind: 'seat', seatId } : { kind: 'seat' };
-    return canUseSceneToggle(campaign, actor, sceneId, 'measure')
-      ? undefined
-      : 'Measuring is disabled in this scene';
-  }, [campaign, isHost, seatId]);
   const scene = useMemo(() => activeRenderScene(campaign), [campaign]);
   const grid = useMemo(() => activeRenderGrid(campaign), [campaign]);
   const source = campaign?.activeSceneId ? (campaign.scenes[campaign.activeSceneId] ?? null) : null;
@@ -192,7 +195,7 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
       tabIndex={0}
       onKeyDown={(event) => {
         handleBoardEscape(event);
-        if (mode3d && event.key === 'Home') setResetToken((n) => n + 1);
+        if (mode3d && event.key === 'Home') viewModeStore.getState().reset();
       }}
       className="ui-board"
     >
@@ -200,18 +203,10 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
         {source?.name ?? ''}
       </span>
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
-        <ViewToggle />
-        {!readOnly && <RulerToggle disabledReason={measureDisabledReason} />}
+        {/* UI-TOOL-01..07: the rail lists every tool; one a seat may not use is disabled, not hidden. */}
+        <ToolRail />
         {mode3d && (
           <>
-            <button
-              type="button"
-              onClick={() => {
-                setResetToken((n) => n + 1);
-              }}
-            >
-              Reset view
-            </button>
             <span className="ui-camera-hint">
               3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom ·
               middle-click a selected token to lock its height

@@ -7,6 +7,7 @@ export interface GatewayConnection {
   readonly connectionId: string;
   readonly identityId: string;
   readonly displayName: string;
+  readonly color?: string | undefined;
   readonly avatar: string | undefined;
   /** D24: true when this identity is the host's bound identity (bound via the one-time host token). */
   readonly isHost: boolean;

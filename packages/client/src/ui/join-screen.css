@@ -115,3 +115,20 @@
 main:has(.join-backdrop) > [role='status'] {
   opacity: 0;
 }
+
+.join-brand {
+  margin: 0 0 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.join-brand small {
+  display: block;
+  font-weight: 400;
+  color: var(--ui-muted);
+  letter-spacing: normal;
+}
+.join-form input[type='color'] {
+  width: 4rem;
+  min-height: 2.25rem;
+  cursor: pointer;
+}

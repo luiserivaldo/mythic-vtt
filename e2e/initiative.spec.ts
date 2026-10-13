@@ -69,7 +69,7 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(table.clientUrl);
-  await page.getByRole('button', { name: 'Rounds', exact: true }).click();
+  await page.getByRole('button', { name: 'Initiative', exact: true }).click();
   const panel = page.getByRole('region', { name: 'Rounds and initiative' });
   const dock = page.getByRole('complementary', { name: 'Right dock' });
   await expect(dock.getByRole('region', { name: 'Rounds and initiative' })).toBeVisible();
@@ -89,7 +89,7 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await player.waitForSeq(host.lastSeq);
   expect(initiative(player)?.activeEntityId).toBeNull();
   const spectator = await openClient(browser, table, 'spectator');
-  await spectator.page.getByRole('button', { name: 'Rounds', exact: true }).click();
+  await spectator.page.getByRole('button', { name: 'Initiative', exact: true }).click();
   const readonly = spectator.page.getByRole('region', { name: 'Rounds and initiative' });
   await expect(readonly.getByRole('listitem')).toHaveCount(1);
   await expect(readonly.getByRole('button', { name: 'Next turn' })).toHaveCount(0);
@@ -144,7 +144,7 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await expect(panel).toContainText('Beast (current)');
   await page.reload();
-  await page.getByRole('button', { name: 'Rounds', exact: true }).click();
+  await page.getByRole('button', { name: 'Initiative', exact: true }).click();
   await expect(panel.getByRole('listitem')).toHaveCount(3);
   await expect(panel).toContainText('Round 2 · Turn 2');
   // The history endpoint must report the viewer's public position, not the host's index.
@@ -194,7 +194,7 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await panel.getByRole('button', { name: 'Apply round' }).focus();
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Rounds', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Initiative', exact: true })).toBeFocused();
   expect(errors).toEqual([]);
   await spectator.context.close();
   await context.close();

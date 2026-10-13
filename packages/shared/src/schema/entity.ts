@@ -1,3 +1,4 @@
+import { QuickFields } from './quick-fields.js';
 import { z } from 'zod';
 import { AssetRef } from './asset.js';
 import { Id, LayerId } from './ids.js';
@@ -58,6 +59,7 @@ const TokenComponent = z.object({
   labelVisibility: z.enum(['all', 'owner', 'dm']),
   facing: z.number().optional(),
   characterInstanceId: Id.optional(),
+  quickFields: QuickFields.optional(),
   statusMarkers: TokenStatusMarkers.optional(),
   rings: z.array(TokenRing).max(8).optional(),
   /** TOK-03: vertical position is locked; moves keep the height and ignore gravity. */

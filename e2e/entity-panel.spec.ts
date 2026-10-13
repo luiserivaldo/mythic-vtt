@@ -24,13 +24,13 @@ test('the host creates a scene, a token and a box from the Entities panel and se
   await page.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
 
-  await page.getByRole('button', { name: 'Scenes', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   await page.getByLabel('New scene name').fill('Cellar');
   await page.getByRole('button', { name: 'Create scene' }).click();
   // scene.create activates the first scene of a campaign by itself.
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   const tokenForm = page.getByRole('form', { name: 'Create token' });
   const tokenFile = tokenForm.locator('input[type="file"]');
   const tokenFileButton = tokenForm.locator('.ui-file-button');
@@ -49,10 +49,10 @@ test('the host creates a scene, a token and a box from the Entities panel and se
   await chooser.setFiles([]);
   expect(chooserCount).toBe(1);
 
-  await page.getByRole('button', { name: 'Map', exact: true }).click();
+  await page.getByRole('tab', { name: 'Map', exact: true }).click();
   const mapFile = page.getByRole('group', { name: 'Upload image' }).locator('input[type="file"]');
   expect(await mapFile.boundingBox()).toMatchObject({ width: 1, height: 1 });
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
 
   const primary = page.getByRole('button', { name: 'Create token' });
   await expect(primary).toHaveCSS('background-color', 'rgb(240, 174, 85)');
@@ -77,7 +77,7 @@ test('the host creates a scene, a token and a box from the Entities panel and se
 
   const propName = page.getByLabel('Prop name');
   await propName.fill('Crate');
-  await page.getByRole('button', { name: 'Create prop' }).click();
+  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
   await expect(propName).toHaveValue('');
   await expect(propName).toBeFocused();
 
@@ -92,11 +92,11 @@ test('the host creates a scene, a token and a box from the Entities panel and se
     'aria-pressed',
     'true',
   );
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Chat', exact: true }).click();
   await page.waitForTimeout(800);
   await page.screenshot({ path: testInfo.outputPath('board.png') });
 
-  await page.getByRole('button', { name: 'Entities', exact: true }).click();
+  await page.getByRole('tab', { name: 'Entities', exact: true }).click();
   await page.getByRole('button', { name: 'Delete Goblin' }).click();
   await page.getByRole('button', { name: 'Confirm delete Goblin' }).click();
   await expect(list.getByRole('button', { name: 'Goblin', exact: true })).toHaveCount(0);

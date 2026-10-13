@@ -49,12 +49,12 @@ test('initiative follows local DM browsing without changing the players scene', 
     const page = await context.newPage();
     await page.goto(table.clientUrl);
     await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-    await page.getByRole('button', { name: 'Rounds', exact: true }).click();
+    await page.getByRole('button', { name: 'Initiative', exact: true }).click();
     const panel = page
       .getByRole('complementary', { name: 'Right dock' })
       .getByRole('region', { name: 'Rounds and initiative' });
     await expect(panel).toContainText('Round 2');
-    await page.getByRole('button', { name: 'Scenes', exact: true }).click();
+    await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
     await page
       .getByRole('listitem')
       .filter({ hasText: 'Private initiative' })

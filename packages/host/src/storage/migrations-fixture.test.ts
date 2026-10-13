@@ -74,6 +74,23 @@ describe('golden save v1 through the shared migrate hook', () => {
       await store.close();
     }
   });
+  it('preserves v2 initiative through migration, save and reload', async () => {
+    const store = new LocalCampaignStore(await copyFixture('v2'), storeMigrate);
+    try {
+      const scene = (await store.load(campaignId)).scenes[0];
+      if (!scene) throw new Error('missing fixture scene');
+      const expected = {
+        round: 2,
+        order: ['01J8Z0000000000000000ENT01', '01J8Z0000000000000000ENT02'],
+        activeEntityId: '01J8Z0000000000000000ENT01',
+      };
+      expect(scene.initiative).toEqual(expected);
+      await store.saveScene(campaignId, scene);
+      expect((await store.load(campaignId)).scenes[0]?.initiative).toEqual(expected);
+    } finally {
+      await store.close();
+    }
+  });
   it('still rejects a newer schemaVersion as unsupported', async () => {
     const root = await copyFixture();
     const path = join(root, 'campaigns', campaignId);

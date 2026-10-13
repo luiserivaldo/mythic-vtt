@@ -1,8 +1,9 @@
 import { canPerform, Initiative, type Campaign, type Scene } from '@mythic/shared';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { useSubmit } from './submit.js';
+import { activeToolStore } from '../tools/active-tool-store.js';
 
 function InitiativePanel({ campaign, scene }: { campaign: Campaign; scene: Scene }) {
   const isHost = useClientStore((state) => state.isHost);
@@ -186,42 +187,21 @@ function InitiativePanel({ campaign, scene }: { campaign: Campaign; scene: Scene
   );
 }
 
+/** HIST-05 / UI-TOOL-05: the rail opens the tracker in the dock's tool-panel slot. */
 export function InitiativeTools() {
   const campaign = useViewedCampaign();
-  const [open, setOpen] = useState(false);
-  const toggle = useRef<HTMLButtonElement>(null);
   const scene = campaign?.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;
   if (!campaign || !scene) return null;
-  const close = () => {
-    setOpen(false);
-    toggle.current?.focus();
-  };
   return (
-    <aside
-      className="ui-initiative-tools"
-      aria-label="Initiative tools"
+    <div
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && open) close();
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        activeToolStore.getState().setTool('select');
+        document.getElementById('rail-tool-initiative')?.focus();
       }}
     >
-      <button
-        type="button"
-        ref={toggle}
-        aria-expanded={open}
-        onClick={() => {
-          setOpen(!open);
-        }}
-      >
-        Rounds
-      </button>
-      {open && (
-        <div className="ui-initiative-body">
-          <button type="button" aria-label="Close Rounds panel" onClick={close}>
-            Close
-          </button>
-          <InitiativePanel key={scene.id} campaign={campaign} scene={scene} />
-        </div>
-      )}
-    </aside>
+      <InitiativePanel key={scene.id} campaign={campaign} scene={scene} />
+    </div>
   );
 }
