@@ -5,6 +5,7 @@ import {
   canSelect,
   nextSelection,
   pickEntity,
+  selectionActor,
   validSelection,
   type SelectionActor,
 } from './selection.js';
@@ -186,5 +187,34 @@ describe('multi-select', () => {
     expect(nextSelection([map.id, token.id], map.id, true)).toEqual([token.id]);
     expect(nextSelection([map.id], null, false)).toEqual([]);
     expect(nextSelection([map.id], null, true)).toEqual([map.id]);
+  });
+});
+
+describe('selectionActor (PERM-01)', () => {
+  const seats = { [owner.id]: owner };
+
+  it('is the host whenever the host link was claimed, seat or not', () => {
+    expect(selectionActor(true, null, {})).toEqual({ kind: 'host' });
+    expect(selectionActor(true, owner.id, seats)).toEqual({ kind: 'host' });
+  });
+
+  it('is the claimed seat', () => {
+    expect(selectionActor(false, owner.id, seats)).toEqual({ kind: 'seat', seat: owner });
+  });
+
+  it('is a spectator for a seat-less client that did not claim the host link', () => {
+    // The bug this guards: both the host and a spectator arrive with no seat, so the seat alone
+    // cannot tell them apart — a spectator's click must never select anything.
+    expect(selectionActor(false, null, seats)).toEqual({ kind: 'spectator' });
+  });
+
+  it("is a spectator when the seat is not in this viewer's campaign", () => {
+    expect(selectionActor(false, tid(99), seats)).toEqual({ kind: 'spectator' });
+    expect(selectionActor(false, owner.id, {})).toEqual({ kind: 'spectator' });
+  });
+
+  it('selects nothing as a spectator and everything as the host', () => {
+    expect(canSelect(token, scene, selectionActor(false, null, seats))).toBe(false);
+    expect(canSelect(token, scene, selectionActor(true, null, seats))).toBe(true);
   });
 });

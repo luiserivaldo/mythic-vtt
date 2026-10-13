@@ -9,6 +9,23 @@ export interface PickHit {
 export type SelectionActor =
   { kind: 'host' } | { kind: 'seat'; seat: Seat } | { kind: 'spectator' };
 
+/**
+ * PERM-01: the actor a viewer's own client selects as, from that viewer's own store — the same
+ * derivation the gizmo hooks and the token preview card use, so the two can never disagree. The
+ * host flag comes first: a seat-less client that never claimed the host link is a spectator, and a
+ * spectator's click must never select anything. A seat id this viewer's campaign does not know
+ * (archived, or a stale local value) is a spectator too.
+ */
+export function selectionActor(
+  isHost: boolean,
+  seatId: string | null,
+  seats: Readonly<Record<string, Seat>>,
+): SelectionActor {
+  if (isHost) return { kind: 'host' };
+  const seat = seatId === null ? undefined : seats[seatId];
+  return seat ? { kind: 'seat', seat } : { kind: 'spectator' };
+}
+
 /** PERM-01/02: local selection grants no authority to change game state. */
 export function canSelect(entity: Entity, scene: Scene, actor: SelectionActor): boolean {
   if (scene.layers[entity.layer]?.locked) return false;
