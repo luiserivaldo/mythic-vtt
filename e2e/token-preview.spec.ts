@@ -43,11 +43,17 @@ async function cellToPixel(page: Page) {
   });
 }
 
-/** Clicks a cell until the card appears; the first click can land before the board is laid out. */
+/**
+ * Clicks a cell until the card appears; the first click can land before the board is laid out.
+ * The canvas only takes its measured size once R3F's resize observer has run, and it reports the
+ * element's 300x150 default until then, so the cell is re-measured on every attempt: a point
+ * computed from the default box lands nowhere near the token and the whole retry budget is spent
+ * clicking empty board.
+ */
 async function selectCell(page: Page, x: number, z: number) {
-  const at = await cellToPixel(page);
-  const point = at(x, z);
   await expect(async () => {
+    const at = await cellToPixel(page);
+    const point = at(x, z);
     await page.mouse.click(point.x, point.y);
     await expect(page.getByTestId('token-preview')).toBeVisible({ timeout: 1000 });
   }).toPass();
