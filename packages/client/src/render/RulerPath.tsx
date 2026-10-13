@@ -24,7 +24,8 @@ function lifted(point: Vec3): [number, number, number] {
 /**
  * Camera-facing ruler labels. M3-11: a 3D ruler joins its points directly — one straight segment
  * between an elevated and a grounded pick, with no right-angle guide — and reads its total length
- * only; hovering the line or the label restores the MEAS-02 horizontal/vertical breakdown.
+ * only; hovering the line or the label restores the MEAS-02 horizontal/vertical breakdown. A ruler
+ * with several legs labels each one in both views, so a mid-drag ruler reads the same in 2D and 3D.
  */
 export function RulerPath({
   points,
@@ -90,8 +91,7 @@ export function RulerPath({
           <meshBasicMaterial color={color} depthTest={false} />
         </mesh>
       ))}
-      {mode !== '3d' &&
-        measured.segments.length > 1 &&
+      {measured.segments.length > 1 &&
         measured.segments.map((segment, index) => (
           <Html
             key={`${String(index)}:${segment.label}`}
