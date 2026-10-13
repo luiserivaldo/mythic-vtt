@@ -4,7 +4,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { tid } from '../testing.js';
-import { CreatePropPanel } from './RailPanels.js';
+import { CreatePropPanel, InitiativePanel } from './RailPanels.js';
 import { createUiStore, UiStoreContext } from './ui-store.js';
 
 const S = tid(2);
@@ -74,5 +74,40 @@ describe('Create Prop panel', () => {
   it('falls back to Props where the viewer may not create on the active layer', () => {
     show('dm', false);
     expect(layerSelect().value).toBe('props');
+  });
+});
+
+/**
+ * UI-TOOL-05: the panel behind the greyed Initiative rail entry is a labelled mock. It is the
+ * placeholder's whole contract: a label, an honest note, and nothing a viewer can operate or that
+ * could reach the host.
+ */
+describe('Initiative mock panel', () => {
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('is labelled WIP and says the tracker is coming, without any control', () => {
+    act(() => {
+      root.render(createElement(InitiativePanel));
+    });
+    const panel = container.querySelector('section[aria-label="Initiative"]');
+    if (!(panel instanceof HTMLElement)) throw new Error('no Initiative panel');
+    expect(panel.textContent).toContain('WIP');
+    expect(panel.textContent).toContain('coming soon');
+    // No behaviour: no field, button or form the viewer could operate.
+    const controls = panel.querySelectorAll(
+      'button, input, select, textarea, form, [role="button"]',
+    );
+    expect(controls).toHaveLength(0);
   });
 });
