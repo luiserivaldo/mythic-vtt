@@ -90,12 +90,17 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
     }
     if (!campaign || !board) return null;
     switch (active) {
+      // UI-SCN-01: the Scenes tab holds the scene list, create, and the battlemap upload with
+      // 2-point calibration (moved out of its own Map tab).
       case 'scenes':
-        return <ScenePanel campaign={campaign} />;
+        return (
+          <>
+            <ScenePanel campaign={campaign} />
+            <MapPanel campaign={board} />
+          </>
+        );
       case 'layers':
         return <LayerPanel campaign={board} role={role} />;
-      case 'map':
-        return <MapPanel campaign={board} />;
       case 'entities':
         return <EntityPanel campaign={board} />;
       case 'prefabs':
