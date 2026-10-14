@@ -6,8 +6,10 @@ import {
   formatRangeBreakdown,
   measureRange,
   rangeTarget,
+  rulerLabel,
   selectedTokenId,
 } from './range-readout.js';
+import { measureRuler } from '../tools/ruler.js';
 
 const ORIGIN = tid(1);
 const TARGET = tid(2);
@@ -270,5 +272,29 @@ describe('rangeTarget (MEAS-05)', () => {
     expect(found?.measurement.horizontalCells).toBe(0);
     expect(found?.measurement.verticalCells).toBe(4);
     expect(found?.measurement.verticalLabel).toBe('20 ft');
+  });
+});
+
+describe('rulerLabel (M3-11)', () => {
+  // The issue's case: a token on a 10-cell platform, 10 cells away from a grounded token.
+  const elevated = measureRuler([at(20, 0, 25), at(20, 10, 15)], grid());
+
+  it('reads the total only on a 3D ruler that is not hovered', () => {
+    expect(rulerLabel(elevated, '3d', false)).toBe('75 ft');
+  });
+
+  it('shows the horizontal/vertical breakdown while a 3D ruler is hovered', () => {
+    expect(rulerLabel(elevated, '3d', true)).toBe('H 50 ft · V 50 ft · T 75 ft');
+  });
+
+  it('keeps a 2D ruler on its total, hovered or not', () => {
+    expect(rulerLabel(elevated, '2d', false)).toBe('75 ft');
+    expect(rulerLabel(elevated, '2d', true)).toBe('75 ft');
+  });
+
+  it('keeps a 3D ruler over a level surface total-only until hovered', () => {
+    const level = measureRuler([at(0, 0, 0), at(6, 0, 0)], grid());
+    expect(rulerLabel(level, '3d', false)).toBe('30 ft');
+    expect(rulerLabel(level, '3d', true)).toBe('H 30 ft · V 0 ft · T 30 ft');
   });
 });

@@ -180,23 +180,6 @@ describe('raycast picking', () => {
   });
 });
 
-describe('selection actor', () => {
-  it('resolves the host by its flag, and everything seat-less and seat-less-and-unknown as a spectator', () => {
-    expect(selectionActor(true, null, {})).toEqual({ kind: 'host' });
-    // The host flag wins even when the identity happens to own a seat.
-    expect(selectionActor(true, owner.id, { [owner.id]: owner })).toEqual({ kind: 'host' });
-    expect(selectionActor(false, owner.id, { [owner.id]: owner })).toEqual({
-      kind: 'seat',
-      seat: owner,
-    });
-    // PERM-01: no seat and no host claim is a spectator, who may not select anything.
-    expect(selectionActor(false, null, {})).toEqual({ kind: 'spectator' });
-    // A stale seat id (another table, or the seat deleted) is a spectator too, never a host.
-    expect(selectionActor(false, tid(20), { [owner.id]: owner })).toEqual({ kind: 'spectator' });
-    expect(canSelect(token, scene, selectionActor(false, null, {}))).toBe(false);
-  });
-});
-
 describe('multi-select', () => {
   it('replaces, toggles, and clears predictably', () => {
     expect(nextSelection([map.id], token.id, false)).toEqual([token.id]);
@@ -204,5 +187,27 @@ describe('multi-select', () => {
     expect(nextSelection([map.id, token.id], map.id, true)).toEqual([token.id]);
     expect(nextSelection([map.id], null, false)).toEqual([]);
     expect(nextSelection([map.id], null, true)).toEqual([map.id]);
+  });
+});
+
+describe('selectionActor (PERM-03)', () => {
+  const seats = { [owner.id]: owner };
+
+  it('maps only the real host to the host actor', () => {
+    expect(selectionActor(true, null, seats)).toEqual({ kind: 'host' });
+  });
+
+  it('treats a seat-less client as a spectator, never as the host', () => {
+    const actor = selectionActor(false, null, seats);
+    expect(actor).toEqual({ kind: 'spectator' });
+    expect(canSelect(entity(3, 'tokens'), scene, actor)).toBe(false);
+  });
+
+  it('treats a seat that no longer exists as a spectator', () => {
+    expect(selectionActor(false, tid(77), seats)).toEqual({ kind: 'spectator' });
+  });
+
+  it('keeps a real seat as a seat actor', () => {
+    expect(selectionActor(false, owner.id, seats)).toEqual({ kind: 'seat', seat: owner });
   });
 });
