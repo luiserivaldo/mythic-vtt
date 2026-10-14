@@ -109,8 +109,8 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     expect((await setup.intent('seat.update', { seatId, interactionEnabled: true })).t).toBe('ack');
     await expect(rail(player, 'Select')).not.toHaveAttribute('aria-disabled', 'true');
 
-    // UI-TOOL-05: a spectator may open the same placeholder, and it opens only when the entry is
-    // used — a read-only viewer still gets no editing panels of their own.
+    // A spectator may open the same tracker, and it opens only when the entry is used — a
+    // read-only viewer still gets no editing panels of their own.
     const spectatorContext = await browser.newContext();
     try {
       const spectator = await spectatorContext.newPage();
@@ -119,12 +119,12 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
       await spectator.getByRole('button', { name: 'Continue', exact: true }).click();
       await spectator.getByRole('button', { name: 'Join as spectator' }).click();
       await expect(spectator.getByRole('dialog')).toHaveCount(0);
-      await expect(spectator.getByRole('region', { name: 'Initiative' })).toHaveCount(0);
+      await expect(spectator.getByRole('region', { name: 'Rounds and initiative' })).toHaveCount(0);
       const watcherRail = rail(spectator, 'Initiative');
       await expect(watcherRail).not.toHaveAttribute('aria-disabled', 'true');
       await watcherRail.click();
-      await expect(spectator.getByRole('region', { name: 'Initiative' })).toContainText(
-        'coming soon',
+      await expect(spectator.getByRole('region', { name: 'Rounds and initiative' })).toContainText(
+        'Round 1',
       );
     } finally {
       await spectatorContext.close();
