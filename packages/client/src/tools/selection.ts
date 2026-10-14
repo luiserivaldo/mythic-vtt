@@ -9,6 +9,21 @@ export interface PickHit {
 export type SelectionActor =
   { kind: 'host' } | { kind: 'seat'; seat: Seat } | { kind: 'spectator' };
 
+/**
+ * PERM-03: only the real host is the host actor. A seat-less client (spectator link, unseated
+ * participant) has `seatId === null` too, so null must never be read as "host"; it can move the
+ * camera and nothing else.
+ */
+export function selectionActor(
+  isHost: boolean,
+  seatId: string | null,
+  seats: Readonly<Record<string, Seat>>,
+): SelectionActor {
+  if (isHost) return { kind: 'host' };
+  const seat = seatId === null ? undefined : seats[seatId];
+  return seat ? { kind: 'seat', seat } : { kind: 'spectator' };
+}
+
 /** PERM-01/02: local selection grants no authority to change game state. */
 export function canSelect(entity: Entity, scene: Scene, actor: SelectionActor): boolean {
   if (scene.layers[entity.layer]?.locked) return false;

@@ -14,7 +14,7 @@ vi.mock('../ui/ToolPanelDock.js', () => ({ ToolPanelDock: () => null }));
 // A host viewer, so the tool rail (which disarms tools its viewer cannot use) leaves the ruler alone.
 vi.mock('../store/react.js', () => ({
   useClientStore: (select: (state: object) => unknown) =>
-    select({ campaign: null, isHost: true, seatId: null }),
+    select({ campaign: null, isHost: true, seatId: null, viewAs: { kind: 'host' } }),
 }));
 
 let container: HTMLDivElement;

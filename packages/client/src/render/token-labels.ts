@@ -27,7 +27,12 @@ export function labelState(subject: LabelSubject, actor: SelectionActor): TokenL
   if (actor.kind === 'host') return 'visible';
   if (actor.kind === 'spectator') {
     if (subject.layer === 'dm') return 'invisible';
-    return subject.labelVisibility === 'all' ? 'visible' : 'hidden';
+    if (subject.labelVisibility === 'all') return 'visible';
+    // SES-11 / D35: a spectator may watch through a DM-chosen player seat it is never told about,
+    // so it cannot re-derive ownership. The host blanks every owner label that seat may not read,
+    // so a name that arrived is one the followed seat owns. `dm` labels never reach a player seat.
+    if (subject.labelVisibility === 'owner' && subject.name.trim() !== '') return 'visible';
+    return 'hidden';
   }
   const { seat } = actor;
   if (seat.role === 'codm') return 'visible';

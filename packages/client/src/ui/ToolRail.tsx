@@ -39,7 +39,8 @@ export function ToolRail() {
   const measuring = rulerArmed || aoeActive;
 
   const role = viewerRole({ isHost, seatId, campaign: store });
-  const readOnly = isReadOnlyViewer({ isHost, seatId, campaign: store });
+  const preview = useClientStore((state) => state.viewAs.kind !== 'host');
+  const readOnly = preview || isReadOnlyViewer({ isHost, seatId, campaign: store });
   const seat = seatId === null ? undefined : store?.seats[seatId];
   const permissions = seat?.permissions ?? null;
   // Enable Interaction is a per-seat switch; the host and seat-less viewers are never switched off.

@@ -76,7 +76,9 @@ test('the map layer is explained, selectable for fixed objects, and shown on bat
   const fixedWall = entityList.getByRole('listitem').filter({ hasText: 'Fixed wall' });
   await expect(fixedWall.getByText('Map', { exact: true })).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Map', exact: true }).click();
+  // UX-27 (UI-SCN-01): the battlemap upload and calibration live in the Scenes tab.
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Scenes' })).toBeVisible();
   const mapPanel = page.getByRole('region', { name: 'Battlemap' });
   await expect(mapPanel).toContainText(
     'Battlemaps are placed on the Map layer, below tokens and movable props.',
