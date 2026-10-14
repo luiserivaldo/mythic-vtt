@@ -170,7 +170,8 @@ describe('tokenMenuName (UI-TOKEN-02, D35)', () => {
       token: { sizeCells: 1, heightCells: 1, labelVisibility: 'owner' },
     });
     expect(tokenMenuName(entity, viewerOf(outsiderSeat))).toBe(HIDDEN_TOKEN_NAME);
-    expect(tokenMenuName(entity, { kind: 'spectator' })).toBe(HIDDEN_TOKEN_NAME);
+    // D35: a spectator gets an owner name only while it follows the owning seat (SES-11).
+    expect(tokenMenuName({ ...entity, name: '' }, { kind: 'spectator' })).toBe(HIDDEN_TOKEN_NAME);
     // The owner of an owner-only label reads it, so the field is theirs to edit.
     expect(tokenMenuName(tokenEntity({ ...entity, owners: [OWNER] }), viewerOf(ownerSeat))).toBe(
       'Secret drake',
