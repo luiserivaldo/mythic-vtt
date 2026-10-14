@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 import { makeCampaign, IDS, makeEntity } from '../actions/testing.js';
-import { storeMigrate } from './registry.js';
+import { createStoreMigrate } from './registry.js';
+
+const storeMigrate = createStoreMigrate(undefined, 6);
 
 it('defaults scene caps and nested snapshots without changing old AoEs, IDs or ownership', () => {
   const state = { ...makeCampaign(), schemaVersion: 5 };

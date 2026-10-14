@@ -3,11 +3,15 @@ import { Id } from '../schema/index.js';
 import { defineAction, isHost } from './define.js';
 
 function identityHasOtherSeat(
-  seats: Readonly<Record<string, { id: string; identityId: string | null }>>,
+  seats: Readonly<
+    Record<string, { id: string; identityId: string | null; archived?: boolean | undefined }>
+  >,
   seatId: string,
   identityId: string,
 ): boolean {
-  return Object.values(seats).some((seat) => seat.id !== seatId && seat.identityId === identityId);
+  return Object.values(seats).some(
+    (seat) => !seat.archived && seat.id !== seatId && seat.identityId === identityId,
+  );
 }
 
 export const seatAssign = defineAction({
@@ -18,6 +22,7 @@ export const seatAssign = defineAction({
     return (
       isHost(actor) &&
       seat !== undefined &&
+      !seat.archived &&
       (seat.identityId === null || seat.identityId === p.identityId) &&
       !identityHasOtherSeat(state.seats, p.seatId, p.identityId)
     );

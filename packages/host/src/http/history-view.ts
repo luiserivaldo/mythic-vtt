@@ -65,11 +65,17 @@ function projection(
   }
   // Identity bindings are authentication metadata, never history content.
   const seats = Object.fromEntries(
-    Object.entries(includeSeats ? state.seats : {}).map(([id, value]) => {
-      const view: Record<string, unknown> = { ...value };
-      delete view['identityId'];
-      return [id, view];
-    }),
+    Object.entries(includeSeats ? state.seats : {})
+      // PERM-03: historical seat projections must honor today's archive visibility too.
+      .filter(
+        ([id, value]) =>
+          audience.kind === 'host' || (!value.archived && !current.seats[id]?.archived),
+      )
+      .map(([id, value]) => {
+        const view: Record<string, unknown> = { ...value };
+        delete view['identityId'];
+        return [id, view];
+      }),
   );
   // Re-filter references (for example initiative order) after intersecting entity visibility.
   return { ...visibleTo(audience, { ...filtered, scenes }), seats };

@@ -46,3 +46,4 @@ export {
 } from './scene-toggles.js';
 
 export { aoePersist } from './aoe.persist.js';
+export { seatArchive } from './seat.archive.js';

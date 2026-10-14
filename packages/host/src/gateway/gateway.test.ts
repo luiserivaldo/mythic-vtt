@@ -462,16 +462,19 @@ describe('transport RTT (UX-06)', () => {
     expect(samples[0]).toBeLessThanOrEqual(30_000);
     expect(c.received).toEqual([]);
   });
-  it.each([1, 4, 5, 6])('rejects version %i after the lasting-AoE contract upgrade', async (v) => {
-    await start();
-    const c = await connect();
-    c.send(hello({ v }));
-    expect(await c.next()).toMatchObject({
-      t: 'error',
-      code: 'protocol-mismatch',
-      supportedVersion: PROTOCOL_VERSION,
-      fatal: true,
-    });
-    await c.closed;
-  });
+  it.each([1, 2, 3, 4, 5, 6, 7])(
+    'rejects version %i after the seat-archive contract upgrade',
+    async (v) => {
+      await start();
+      const c = await connect();
+      c.send(hello({ v }));
+      expect(await c.next()).toMatchObject({
+        t: 'error',
+        code: 'protocol-mismatch',
+        supportedVersion: PROTOCOL_VERSION,
+        fatal: true,
+      });
+      await c.closed;
+    },
+  );
 });

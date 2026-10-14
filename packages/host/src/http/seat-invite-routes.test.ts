@@ -12,6 +12,7 @@ let dir: string;
 let app: FastifyInstance;
 let invites: SeatInvites;
 let result: AuthResult;
+let state: ReturnType<typeof fixtureCampaign>;
 let claimSeat: ReturnType<typeof vi.fn<(identityId: string, seatId: string) => Promise<boolean>>>;
 const logs: string[] = [];
 
@@ -27,6 +28,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'mythic-seat-routes-'));
   invites = createSeatInvites(join(dir, 'index.sqlite'), T.campaign);
   claimSeat = vi.fn(() => Promise.resolve(true));
+  state = fixtureCampaign();
   result = { ok: false, status: 401 };
   logs.length = 0;
   app = Fastify({
@@ -35,7 +37,7 @@ beforeEach(() => {
   registerSeatInviteRoutes(app, {
     auth: { authenticate: () => Promise.resolve(result) },
     invites,
-    state: fixtureCampaign,
+    state: () => state,
     claimSeat,
   });
 });
@@ -147,4 +149,23 @@ it('never writes the token or its hash to logs or error bodies', async () => {
   expect(bad.body).not.toContain(token);
   await redeem(T.seatB, token);
   expect(logs.join('\n')).not.toContain(token);
+});
+
+it('makes an existing invite unavailable after its seat is archived', async () => {
+  const token = invites.rotate(T.seatB);
+  const seat = state.seats[T.seatB];
+  if (!seat) throw new Error('missing seat');
+  seat.archived = true;
+  result = principal({ identityId: T.bob });
+  const response = await redeem(T.seatB, token);
+  expect(response.statusCode).toBe(404);
+  expect(response.json()).toEqual({ error: 'invite unavailable' });
+  expect(claimSeat).not.toHaveBeenCalled();
+  result = HOST;
+  expect((await app.inject({ method: 'GET', url: '/api/seat-invites' })).json()).toEqual({
+    seatIds: [],
+  });
+  expect(
+    (await app.inject({ method: 'POST', url: `/api/seat-invites/${T.seatB}` })).statusCode,
+  ).toBe(404);
 });

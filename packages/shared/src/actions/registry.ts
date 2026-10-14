@@ -1,3 +1,4 @@
+import { seatArchive } from './seat.archive.js';
 import { tokenSetQuickField } from './token.setQuickField.js';
 import { historyUndo } from './history.undo.js';
 import { historyRollback } from './history.rollback.js';
@@ -72,6 +73,7 @@ export const allActions: readonly AnyAction[] = [
   tokenSetQuickField,
   historyRollback,
   aoePersist,
+  seatArchive,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

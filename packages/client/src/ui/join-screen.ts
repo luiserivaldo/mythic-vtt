@@ -125,6 +125,7 @@ export function seatChoices(
   lastSeatId: string | undefined,
 ): SeatChoice[] {
   return Object.values(campaign.seats)
+    .filter((seat) => !seat.archived)
     .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id))
     .map((seat) => {
       const state: SeatState =

@@ -25,6 +25,8 @@ export function checkIntent(
   if (!parsed.success) {
     return { ok: false, reason: 'invalid-payload', detail: parsed.error.message };
   }
+  if (actor.kind === 'seat' && actor.seatId !== undefined && state.seats[actor.seatId]?.archived)
+    return { ok: false, reason: 'forbidden' };
   if (actor.kind === 'mod' && !action.modExposed) return { ok: false, reason: 'forbidden' };
   const data: unknown = parsed.data;
   if (

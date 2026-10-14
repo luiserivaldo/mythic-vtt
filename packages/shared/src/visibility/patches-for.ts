@@ -42,7 +42,10 @@ export function patchesFor(
   const touched = new Map<string, [string, string]>();
   for (const p of raw) {
     const [root, sceneId, key, entityId] = p.path;
-    const coDm = audience.kind === 'seat' && after.seats[audience.seatId]?.role === 'codm';
+    const coDm =
+      audience.kind === 'seat' &&
+      after.seats[audience.seatId]?.role === 'codm' &&
+      !after.seats[audience.seatId]?.archived;
     // PERM-03: entity/metadata fast paths are valid only within scenes this viewer may see.
     if (
       root === 'scenes' &&

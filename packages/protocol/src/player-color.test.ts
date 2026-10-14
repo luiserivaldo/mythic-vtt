@@ -33,26 +33,32 @@ it('allows bounded hex colours and rejects invalid profile/preview colours at th
   expect(RulerPreview.safeParse(preview).success).toBe(false);
 });
 
-it('still decodes the v5 join-profile golden frames, though v5 is no longer a supported version', () => {
-  const fixture = JSON.parse(
-    readFileSync(
-      new URL('../../../fixtures/protocol/v5/join-profile.json', import.meta.url),
-      'utf8',
-    ),
-  ) as { client: unknown[]; server: unknown[] };
-  for (const frame of fixture.client) {
-    const decoded = decodeClientMessage(JSON.stringify(frame));
-    expect(decoded.ok).toBe(true);
-    if (!decoded.ok) throw new Error('invalid v5 client fixture');
-    expect(JSON.parse(encodeClientMessage(decoded.message))).toEqual(frame);
-    if (decoded.message.t === 'hello') expect(isSupportedVersion(decoded.message.v)).toBe(false);
-  }
-  for (const frame of fixture.server) {
-    const decoded = decodeServerMessage(JSON.stringify(frame));
-    expect(decoded.ok).toBe(true);
-    if (!decoded.ok) throw new Error('invalid v5 server fixture');
-    expect(JSON.parse(encodeServerMessage(decoded.message))).toEqual(frame);
-  }
-  expect(isSupportedVersion(4)).toBe(false);
-  expect(isSupportedVersion(5)).toBe(false);
-});
+it.each([5, 8])(
+  'round-trips the v%s join-profile golden frames and requires a matching peer version',
+  (version) => {
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL(
+          `../../../fixtures/protocol/v${String(version)}/join-profile.json`,
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ) as { client: unknown[]; server: unknown[] };
+    for (const frame of fixture.client) {
+      const decoded = decodeClientMessage(JSON.stringify(frame));
+      expect(decoded.ok).toBe(true);
+      if (!decoded.ok) throw new Error('invalid client fixture');
+      expect(JSON.parse(encodeClientMessage(decoded.message))).toEqual(frame);
+      if (decoded.message.t === 'hello')
+        expect(isSupportedVersion(decoded.message.v)).toBe(version === PROTOCOL_VERSION);
+    }
+    for (const frame of fixture.server) {
+      const decoded = decodeServerMessage(JSON.stringify(frame));
+      expect(decoded.ok).toBe(true);
+      if (!decoded.ok) throw new Error('invalid server fixture');
+      expect(JSON.parse(encodeServerMessage(decoded.message))).toEqual(frame);
+    }
+    expect(isSupportedVersion(4)).toBe(false);
+  },
+);

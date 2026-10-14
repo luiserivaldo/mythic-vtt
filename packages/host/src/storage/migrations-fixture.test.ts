@@ -74,16 +74,26 @@ describe('golden save v1 through the shared migrate hook', () => {
       await store.close();
     }
   });
-  it.each(['v1', 'v2', 'v3', 'v4', 'v5', 'v6'])(
-    'loads and saves %s through the lasting-AoE migration chain',
+  it.each(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'])(
+    'loads and saves %s through the lasting-AoE and archive migration chain',
     async (version) => {
       const store = new LocalCampaignStore(await copyFixture(version), storeMigrate);
       try {
         const loaded = await store.load(campaignId);
         expect(loaded.campaign.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+        if (version === 'v7') {
+          expect(loaded.campaign.seats['01J8Z0000000000000000SEAT2']).toMatchObject({
+            archived: true,
+            identityId: '00000000000000000000000001',
+            interactionEnabled: false,
+          });
+          for (const scene of loaded.scenes)
+            for (const entity of Object.values(scene.entities))
+              expect(entity.owners).not.toContain('01J8Z0000000000000000SEAT2');
+        }
         for (const scene of loaded.scenes) {
           expect(scene.maxLastingAoEsPerPlayer).toBe(1);
-          if (version === 'v6') {
+          if (version === 'v6' || version === 'v7') {
             expect(Object.values(scene.entities).some((entity) => entity.lastingAoE)).toBe(true);
             expect(Object.values(scene.entities).some((entity) => entity.token?.quickFields)).toBe(
               true,
@@ -91,7 +101,10 @@ describe('golden save v1 through the shared migrate hook', () => {
           }
           await store.saveScene(campaignId, scene);
         }
-        expect((await store.load(campaignId)).scenes).toEqual(loaded.scenes);
+        await store.saveCampaign(campaignId, loaded.campaign);
+        const reloaded = await store.load(campaignId);
+        expect(reloaded.scenes).toEqual(loaded.scenes);
+        expect(reloaded.campaign).toEqual(loaded.campaign);
       } finally {
         await store.close();
       }

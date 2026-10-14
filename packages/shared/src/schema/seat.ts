@@ -10,5 +10,7 @@ export const Seat = z.object({
   role: z.enum(['player', 'codm']),
   permissions: SeatPermissions,
   interactionEnabled: z.boolean().optional(),
+  /** SES-03/05: retained for history; archived seats have no access or ownership. */
+  archived: z.boolean().optional(),
 });
 export type Seat = z.infer<typeof Seat>;

@@ -37,6 +37,7 @@ function viewKey(audience: Audience, seat?: Seat): string {
 /** The audience's view of one entity, or null if it must not be sent at all. */
 export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Entity | null {
   if (audience.kind === 'host') return entity;
+  if (seat?.archived) return viewEntity({ kind: 'spectators' }, entity);
   const key = viewKey(audience, seat);
   return memo(entityCache, entity, key, () => {
     const owner = ownsEntity(audience, entity);
@@ -116,6 +117,8 @@ function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
 export function visibleTo(audience: Audience, state: Campaign): Campaign {
   if (audience.kind === 'host') return state;
   return memo(campaignCache, state, audienceKey(audience), () => {
+    if (audience.kind === 'seat' && state.seats[audience.seatId]?.archived)
+      return visibleTo({ kind: 'spectators' }, state);
     const seat = audience.kind === 'seat' ? state.seats[audience.seatId] : undefined;
     const scenes: Campaign['scenes'] = {};
     let changed = false;
@@ -134,9 +137,11 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
       audience.kind === 'seat' && seat?.role === 'codm' && seat.permissions.view;
     const activeSceneId =
       state.activeSceneId && scenes[state.activeSceneId] ? state.activeSceneId : null;
+    const seats = Object.fromEntries(Object.entries(state.seats).filter(([, s]) => !s.archived));
+    const hideArchived = Object.keys(seats).length !== Object.keys(state.seats).length;
     const view =
-      changed || activeSceneId !== state.activeSceneId
-        ? { ...state, scenes, activeSceneId }
+      changed || hideArchived || activeSceneId !== state.activeSceneId
+        ? { ...state, scenes, seats, activeSceneId }
         : state;
     if (state.prefabs && !mayReadPrefabs) {
       const withoutPrefabs = { ...view };
