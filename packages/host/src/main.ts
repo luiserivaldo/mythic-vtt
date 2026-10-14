@@ -7,6 +7,7 @@ import { HELP, resolveConfig } from './cli.js';
 import { CampaignSelectionError } from './engine/index.js';
 import { startHost } from './server.js';
 import { LocalCampaignStore } from './storage/index.js';
+import { HOST_VERSION } from './version.js';
 
 let resolved;
 try {
@@ -57,7 +58,9 @@ try {
 const port = String(running.port);
 const buildCommit = process.env['MYTHIC_BUILD_COMMIT']?.slice(0, 12) || 'unknown';
 console.log(`Campaign: ${running.engine.state().name} (${running.engine.state().id})`);
-console.log(`mythic-host build 0.0.0+${buildCommit}; shared actions=${String(allActions.length)}`);
+console.log(
+  `mythic-host build ${HOST_VERSION}+${buildCommit}; shared actions=${String(allActions.length)}`,
+);
 // Machine-readable line: the e2e harness and dev:table wait for it.
 console.log(`mythic-host listening on ${config.host}:${port}`);
 if (!config.clientDir)
