@@ -144,15 +144,20 @@ test('UX-14 replaces the DM view with live seat/spectator filtering and always p
     expect(changed.status).toBe(200);
     await changed.arrayBuffer();
     await picker.selectOption('spectators');
-    // PERM-04/M4-02: the preview renders the spectators audience exactly as a real spectator does.
-    // A spectator who watches through a seat is never told it holds that seat (M4-02, engine
-    // `snapshotFor`), so it stays a spectator for label rules and reads no owner-only label (D35):
-    // it sees Alice's token, and the name reaches its state (checked below), but not on a label.
-    await expect(picker).toHaveValue('spectators');
-    await expect(labels).toHaveCount(0);
+    await expect(labels).toHaveText(['Alice updated UX14']);
     await spectator.waitFor('new audience', () =>
       JSON.stringify(spectator.state).includes('Alice updated UX14'),
     );
+    // MV-233: the preview matches what a real spectator page renders through the followed seat.
+    const watchContext = await browser.newContext();
+    try {
+      const watchPage = await watchContext.newPage();
+      await watchPage.goto(`${table.clientUrl}/#watch=${encodeURIComponent(token)}`);
+      await expect(watchPage.getByRole('status')).toHaveText('Connected to New campaign');
+      await expect(watchPage.getByTestId('token-label')).toHaveText(['Alice updated UX14']);
+    } finally {
+      await watchContext.close();
+    }
     await picker.selectOption(`seat:${coDmSeat}`);
     await expect
       .poll(async () => (await labels.allTextContents()).sort())

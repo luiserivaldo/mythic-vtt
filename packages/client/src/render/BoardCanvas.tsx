@@ -217,14 +217,6 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
         <ToolRail />
         {/* LAY-05: the same ping as alt-click, from the centre of the view. */}
         <PingButton />
-        {mode3d && (
-          <>
-            <span className="ui-camera-hint">
-              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom ·
-              middle-click a selected token to lock its height
-            </span>
-          </>
-        )}
       </div>
       <ToolPanelDock
         campaign={campaign}
