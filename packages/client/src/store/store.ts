@@ -97,7 +97,12 @@ function project(
   return {
     campaign: source ? visibleTo(audience, source) : null,
     isHost: false,
-    seatId: viewAs.kind === 'seat' ? viewAs.seatId : null,
+    // The local actor is the audience this view is filtered for, as it is for a real spectator
+    // (the host stamps their snapshot with the same seat id). A preview filtered for a seat must
+    // therefore read that seat's labels, not a seat-less spectator's: the label re-check in
+    // TOK-04/D35 would otherwise hide an owner-only name the filtered scene still carries. A
+    // co-DM source is not followed, so it stays seat-less here.
+    seatId: audience.kind === 'seat' ? audience.seatId : null,
     viewAs,
   };
 }

@@ -152,14 +152,21 @@ describe('UX-14 audience projection', () => {
     expect(store.getState().isHost).toBe(false);
   });
 
-  it('resolves the spectator source without granting the spectator a seat or co-DM data', () => {
+  it('resolves the spectator source to that seat, and never to a co-DM', () => {
     const store = setup();
     store.getState().setSpectatorSource(seatId);
     store.getState().setViewAs({ kind: 'spectators' });
     expect(store.getState().campaign).toEqual(visibleTo({ kind: 'seat', seatId }, world()));
-    expect(store.getState().seatId).toBeNull();
+    // The local actor is the audience this preview is filtered for. A spectator following a player
+    // seat is sent that seat's filtered view and stamped with the same seat id, so the preview
+    // must read it the same way — otherwise a label the audience may read is hidden again by a
+    // second, seat-less check (TOK-04/D35) and the preview stops matching what spectators see.
+    expect(store.getState().seatId).toBe(seatId);
+    // A co-DM source is not a spectator's view at all: it filters as a plain spectator and borrows
+    // no co-DM seat.
     store.getState().setSpectatorSource(coDmId);
     expect(store.getState().campaign).toEqual(visibleTo({ kind: 'spectators' }, world()));
+    expect(store.getState().seatId).toBeNull();
   });
 
   it('does not allow non-hosts to preview and waits for pending DM actions before switching', () => {
