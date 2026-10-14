@@ -243,3 +243,26 @@ describe('game client against a mock host', () => {
     expect(store.getState().connection).toBe('open');
   });
 });
+
+it('UX-14 preview never publishes DM intents, seat claims or tool ephemerals', async () => {
+  const { sockets, store, client } = setup();
+  client.start();
+  const ws = sockets.last();
+  ws.serverOpen();
+  ws.serverSend(snapshot(1));
+  store.getState().setHost(true);
+  store.getState().setViewAs({ kind: 'spectators' });
+  const before = ws.sent.length;
+  await expect(
+    client.submitIntent('scene.rename', { name: 'Accidental edit' }),
+  ).resolves.toMatchObject({ ok: false, reason: 'forbidden' });
+  client.join({ seatId: tid(3) });
+  client.sendEphemeral('ruler.preview', {});
+  expect(ws.sent).toHaveLength(before);
+  store.getState().setViewAs({ kind: 'host' });
+  const submitted = client.submitIntent('scene.rename', { name: 'Intentional edit' });
+  expect(ws.sent[before]).toMatchObject({ t: 'intent' });
+  ws.serverSend({ t: 'ack', clientRef: 'c1', seq: 2 });
+  await expect(submitted).resolves.toEqual({ ok: true, seq: 2 });
+  client.stop();
+});

@@ -178,7 +178,15 @@ export async function startTable(options: { publicUrl?: string } = {}): Promise<
       ['--port', String(clientPort), '--strictPort', '--host', '127.0.0.1'],
       {
         cwd: join(ROOT, 'packages/client'),
-        env: { ...process.env, MYTHIC_PORT: String(hostPort), NO_COLOR: '1', FORCE_COLOR: '0' },
+        // Vite derives import.meta.env.DEV from NODE_ENV, so an inherited NODE_ENV=production would
+        // serve the production React build and hide the dev-only diagnostics the specs read.
+        env: {
+          ...process.env,
+          NODE_ENV: 'development',
+          MYTHIC_PORT: String(hostPort),
+          NO_COLOR: '1',
+          FORCE_COLOR: '0',
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );

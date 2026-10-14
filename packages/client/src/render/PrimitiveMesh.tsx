@@ -1,25 +1,34 @@
 import { useMemo } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
-import { DoubleSide } from 'three';
+import { DoubleSide, type Texture } from 'three';
+import { assetUrl } from '../assets/asset-url.js';
 import {
   footprintFill,
   footprintOutline,
   safeColor,
   shapeFootprint,
   surfaceDrawHeight,
+  textureTiling,
   unitGeometry,
 } from './primitive-geometry.js';
 import type { RenderEntity, RenderShape } from './scene-model.js';
 import { SELECTION_COLOR } from './canvas-style.js';
+import { useTiledTexture } from './use-texture.js';
 
 export type RenderMode = '2d' | '3d';
 
 const SELECTED = SELECTION_COLOR;
 const SECRET = '#a577ce';
+/** Host origin for assets. '' = same origin (dev server proxies `/assets` to the host). */
+const ASSET_BASE_URL = '';
+/** ENV-05: the 2D footprint's UVs are already cell coordinates, so it needs no texture repeat. */
+const ONE_TILE = 1;
 
 /**
  * ENV-02 primitive. 2D: top-down footprint fill plus outline (readable, and the fill is the
  * pickable surface). 3D: the real mesh. The mesh is named with the entity id for picking.
+ * ENV-05: an uploaded texture tiles once per cell across the faces, in both modes; the author's
+ * size in cells is the tiling control. Without a texture the solid colour is drawn as before.
  */
 export function PrimitiveMesh({
   entity,
@@ -39,8 +48,15 @@ export function PrimitiveMesh({
   const [x, y, z] = entity.position;
   const color = safeColor(shape.color);
   const outline = selected ? SELECTED : entity.secret ? SECRET : '#0b1118';
+  const tiling = textureTiling(shape);
+  const threeD = mode === '3d';
+  const texture = useTiledTexture(
+    assetUrl(ASSET_BASE_URL, shape.texture),
+    threeD ? tiling.x : ONE_TILE,
+    threeD ? tiling.y : ONE_TILE,
+  );
 
-  if (mode === '3d') {
+  if (threeD) {
     return (
       <mesh
         name={entity.id}
@@ -54,7 +70,10 @@ export function PrimitiveMesh({
         {/* CAM-05 owns opacity, transparency and depthWrite temporarily; keep those out of
             JSX so a colour/selection rerender does not overwrite an active fade. */}
         <meshStandardMaterial
-          color={color}
+          // A texture replaces the solid colour (ENV-05); the key makes three compile the map.
+          key={texture ? 'textured' : 'flat'}
+          color={texture ? '#ffffff' : color}
+          {...(texture ? { map: texture } : {})}
           side={DoubleSide}
           emissive={selected ? SELECTED : '#000000'}
           emissiveIntensity={selected ? 0.35 : 0}
@@ -69,6 +88,7 @@ export function PrimitiveMesh({
       shape={shape}
       color={color}
       outline={outline}
+      texture={texture}
       renderOrder={renderOrder}
       onClick={onClick}
     />
@@ -80,6 +100,7 @@ function Footprint2D({
   shape,
   color,
   outline,
+  texture,
   renderOrder,
   onClick,
 }: {
@@ -87,6 +108,7 @@ function Footprint2D({
   shape: RenderShape;
   color: string;
   outline: string;
+  texture: Texture | null;
   renderOrder: number;
   onClick: (event: ThreeEvent<MouseEvent>) => void;
 }) {
@@ -103,7 +125,9 @@ function Footprint2D({
     <group position={[x, drawY, z]}>
       <mesh name={entity.id} geometry={geometries.fill} renderOrder={renderOrder} onClick={onClick}>
         <meshBasicMaterial
-          color={color}
+          key={texture ? 'textured' : 'flat'}
+          color={texture ? '#ffffff' : color}
+          {...(texture ? { map: texture } : {})}
           side={DoubleSide}
           transparent={!shape.walkable}
           opacity={shape.walkable ? 1 : 0.6}

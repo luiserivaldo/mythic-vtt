@@ -1,3 +1,4 @@
+import { ViewAsControl } from './ViewAsControl.js';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { ViewToggle } from '../render/ViewToggle.js';
@@ -40,6 +41,7 @@ export function TopBar() {
       >
         Reset view
       </button>
+      <ViewAsControl />
       <IdentityStatus />
     </header>
   );

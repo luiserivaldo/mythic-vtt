@@ -29,12 +29,17 @@ export function CreatePropPanel({ scene, isHost }: { scene: Scene; isHost: boole
   );
 }
 
-/** UI-TOOL-05: a mock panel for the planned Initiative tool; no behaviour until M4. */
+/**
+ * UI-TOOL-05: the mock panel behind the greyed Initiative rail entry. Initiative tracking is not
+ * built yet, so this is a label and one honest line — no field, no data, nothing sent to the host.
+ * The rail entry opens it; the panel itself has no behaviour.
+ */
 export function InitiativePanel() {
   return (
     <section className="ui-panel ui-dock-placeholder" aria-label="Initiative">
+      <h2>Initiative</h2>
       <p>
-        <strong>Work in progress.</strong> Initiative order, rounds and turns are coming soon.
+        <strong>WIP.</strong> Initiative order, rounds and turns are coming soon.
       </p>
     </section>
   );

@@ -36,6 +36,7 @@ interface Props {
  * may not use is never offered or rendered (registry predicate; the host re-checks every intent).
  */
 export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
+  const preview = useClientStore((s) => s.viewAs.kind !== 'host');
   const campaign = useClientStore((s) => s.campaign);
   const viewed = useViewedCampaign();
   const ready = useClientStore((s) => s.ready);
@@ -77,12 +78,17 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
     }
     if (!campaign || !board) return null;
     switch (active) {
+      // UI-SCN-01: the Scenes tab holds the scene list, create, and the battlemap upload with
+      // 2-point calibration (moved out of its own Map tab).
       case 'scenes':
-        return <ScenePanel campaign={campaign} />;
+        return (
+          <>
+            <ScenePanel campaign={campaign} />
+            <MapPanel campaign={board} />
+          </>
+        );
       case 'layers':
         return <LayerPanel campaign={board} role={role} />;
-      case 'map':
-        return <MapPanel campaign={board} />;
       case 'entities':
         return <EntityPanel campaign={board} />;
       case 'prefabs':
@@ -150,7 +156,9 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             aria-labelledby={tabId(active)}
             className="ui-dock-tab-body"
           >
-            <Suspense fallback={<p role="status">Loading panel…</p>}>{content()}</Suspense>
+            <fieldset className="ui-preview-content" disabled={preview}>
+              <Suspense fallback={<p role="status">Loading panel…</p>}>{content()}</Suspense>
+            </fieldset>
           </div>
         )}
         <div className="ui-context-panel-slot" ref={contextPanelRef} />

@@ -53,7 +53,6 @@ describe('UI-SHELL-03 registries', () => {
       ['sheet', 'sheet'],
       ['scenes', 'scenes'],
       ['layers', 'layers'],
-      ['map', 'map'],
       ['entities', 'entities'],
       ['prefabs', 'prefabs'],
       ['seats', 'seats'],

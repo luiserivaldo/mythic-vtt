@@ -45,10 +45,9 @@ async function cellToPixel(page: Page) {
 
 /**
  * Clicks a cell until the card appears; the first click can land before the board is laid out.
- * The canvas only takes its measured size once R3F's resize observer has run, and it reports the
- * element's 300x150 default until then, so the cell is re-measured on every attempt: a point
- * computed from the default box lands nowhere near the token and the whole retry budget is spent
- * clicking empty board.
+ * The canvas box is re-read on every attempt: the board mounts before the shell has laid the
+ * canvas out, so a box captured once can stay at its 300x150 default for the whole retry loop and
+ * every click then misses.
  */
 async function selectCell(page: Page, x: number, z: number) {
   await expect(async () => {
