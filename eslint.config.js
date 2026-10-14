@@ -36,6 +36,12 @@ export default defineConfig(
     rules: { 'no-restricted-exports': 'off' },
   },
   {
+    // The review-gate policy runs on plain Node in Actions, outside every tsconfig project; its
+    // node:test suite (run in CI) is what checks it.
+    files: ['.github/policy/**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+  },
+  {
     // shared is pure.
     files: ['packages/shared/src/**/*.ts'],
     ignores: ['**/*.test.ts'],
