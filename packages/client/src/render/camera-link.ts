@@ -19,8 +19,9 @@ import type { ViewerRole } from '../ui/viewer.js';
 export type CameraPoseViewer = 'dm' | 'player' | 'spectator';
 
 /**
- * Shortest gap between two poses of a continuous stream. The host token bucket (30/s) is far
- * above this, so the throttle is what keeps a pan from flooding the table; a pull ignores it.
+ * Shortest gap between two poses of a continuous stream. Both host budgets that carry a pose sit
+ * above this — the per-sender bucket (30/s) and, for spectators, the pose channel's own fan-out
+ * budget — so the throttle is what keeps a pan from flooding the table; a pull ignores it.
  */
 export const POSE_SEND_INTERVAL_MS = 100;
 

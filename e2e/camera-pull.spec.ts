@@ -1,5 +1,14 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { openClient, settledCameraPose, startTable, type Client, type Table } from './harness.js';
+import {
+  RawClient,
+  openClient,
+  settledCameraPose,
+  startTable,
+  testUlid,
+  type Client,
+  type Reply,
+  type Table,
+} from './harness.js';
 
 // M4-11 / CAM-06: the DM "pulls all players to my view" and a spectator can follow the DM camera.
 // The pose travels on the camera.pose ephemeral; the host refuses one from anyone but the DM, and
@@ -89,6 +98,11 @@ async function readLink(page: Page): Promise<{ sent: number; pulls: number; foll
     return link.getLink();
   });
 }
+
+/** Every setup intent below must be acked; a reject is a broken fixture, not a behaviour. */
+const ok = async (reply: Promise<Reply>) => {
+  expect(await reply).toMatchObject({ t: 'ack' });
+};
 
 /** The middle of the board, where no panel sits and dragging pans rather than selects. */
 async function boardCentre(page: Page): Promise<{ x: number; y: number }> {
@@ -261,6 +275,66 @@ test('a pull adopts the DM 3D camera, mode included', async ({ browser }) => {
     );
 
     await player.context.close();
+  } finally {
+    await close();
+  }
+  expect(errors).toEqual([]);
+});
+
+test('an ordinary DM pose never reaches a player over the wire, a pull does (M4-11 leak check)', async ({
+  browser,
+}) => {
+  const errors: string[] = [];
+  const { dm, close } = await openDm(browser, '');
+  try {
+    dm.page.on('pageerror', (error) => errors.push(error.message));
+    // The host identity is already bound to this campaign (D24), so a second connection with the
+    // same identity is the DM as well and may seat a player.
+    const identity = await dm.page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('mythic.identity.v1') ?? '{}') as {
+          identityId: string;
+          identitySecret: string;
+        },
+    );
+    const setup = await RawClient.connect(dm.table, { name: 'pose setup', ...identity });
+    await setup.waitFor('snapshot', () => setup.state !== undefined);
+    const seatId = testUlid('SEAT', 91);
+    await ok(setup.intent('seat.create', { seatId, label: 'Pose player' }));
+    await setup.close();
+
+    // A player reads the wire directly. A browser would simply ignore a stray pose, so only the
+    // frames this client was actually sent can prove the host never sent one.
+    const player = await RawClient.connect(dm.table, {
+      name: 'pose player',
+      identityId: testUlid('POSE', 91),
+      identitySecret: 'pose-player-secret',
+    });
+    await player.waitFor('snapshot', () => player.state !== undefined);
+    await ok(player.intent('session.join', { seatId, identityId: player.opts.identityId }));
+    // Everything before the ack was the seat-less spectator view; this client is a player from here.
+    const from = player.frames.length;
+    const poseFrames = (pull: boolean) =>
+      player.frames
+        .slice(from)
+        .map((raw) => JSON.parse(raw) as { channel?: string; data?: { pull?: boolean } })
+        .filter((frame) => frame.channel === 'camera.pose' && frame.data?.pull === pull).length;
+
+    // CAM-06: a DM camera that has not been asked to pull anyone still publishes — the frame loop
+    // sends the first pose and a 2 s heartbeat keeps publishing. Every one of those poses is the
+    // DM's own camera moving, and a player has no business seeing where that is.
+    const sentBefore = (await readLink(dm.page)).sent;
+    await expect
+      .poll(async () => (await readLink(dm.page)).sent, { timeout: 15_000 })
+      .toBeGreaterThan(sentBefore);
+    expect(poseFrames(false)).toBe(0);
+
+    // The explicit pull is addressed to players, and it arrives; the stream still does not.
+    await dm.page.getByRole('button', { name: 'Pull players to my view' }).click();
+    await expect.poll(() => poseFrames(true), { timeout: 10_000 }).toBeGreaterThan(0);
+    expect(poseFrames(false)).toBe(0);
+
+    await player.close();
   } finally {
     await close();
   }

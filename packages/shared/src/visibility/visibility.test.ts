@@ -4,7 +4,7 @@ import { IDS, makeCampaign, makeEntity, testId } from '../actions/testing.js';
 import type { Campaign } from '../schema/index.js';
 import type { Audience } from './audience.js';
 import { patchesFor } from './patches-for.js';
-import { visibleTo } from './visible-to.js';
+import { seesScene, visibleTo } from './visible-to.js';
 
 enablePatches();
 
@@ -544,5 +544,43 @@ describe('UI-TOP-01 scene privacy', () => {
       expect(Object.keys(after.scenes)).toEqual([inactiveId]);
       expect(visibleTo(audience, { ...activated, activeSceneId: null }).scenes).toEqual({});
     }
+  });
+});
+
+describe('seesScene', () => {
+  // M4-11 / MV-155: a sceneId-bearing ephemeral (a camera pose, a drawing) is routed by the one
+  // scene rule, read off `visibleTo` instead of a second copy of PERM-03 that can drift.
+  it('routes a sceneId-bearing ephemeral to exactly the audiences that may see that scene', () => {
+    const base = makeCampaign();
+    const cave = base.scenes[IDS.scene];
+    if (!cave) throw new Error('fixture incomplete');
+    const vaultId = testId(25);
+    const unknownId = testId(26);
+    const state: Campaign = {
+      ...base,
+      scenes: { ...base.scenes, [vaultId]: { ...cave, id: vaultId, name: 'Vault', dmOnly: true } },
+    };
+    const host: Audience = { kind: 'host' };
+    const coDm: Audience = { kind: 'seat', seatId: IDS.coDm };
+    const player: Audience = { kind: 'seat', seatId: IDS.owner };
+    const spectators: Audience = { kind: 'spectators' };
+
+    // The active, ordinary scene belongs to everyone in it.
+    for (const audience of [host, coDm, player, spectators]) {
+      expect(seesScene(state, audience, IDS.scene)).toBe(true);
+    }
+    // A DM-only scene is the host's and a co-DM's: no player or spectator is ever routed to it.
+    expect(seesScene(state, host, vaultId)).toBe(true);
+    expect(seesScene(state, coDm, vaultId)).toBe(true);
+    expect(seesScene(state, player, vaultId)).toBe(false);
+    expect(seesScene(state, spectators, vaultId)).toBe(false);
+
+    // Only the active scene is a player's or a spectator's, and an unknown scene is nobody's.
+    const behind: Campaign = { ...state, activeSceneId: vaultId };
+    expect(seesScene(behind, player, IDS.scene)).toBe(false);
+    expect(seesScene(behind, spectators, IDS.scene)).toBe(false);
+    expect(seesScene(behind, player, vaultId)).toBe(false);
+    expect(seesScene(state, host, unknownId)).toBe(false);
+    expect(seesScene(state, player, unknownId)).toBe(false);
   });
 });

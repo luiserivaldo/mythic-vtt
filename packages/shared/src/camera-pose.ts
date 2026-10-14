@@ -13,8 +13,7 @@
  */
 import { isHost, seatOf } from './actions/define.js';
 import type { Actor } from './actions/envelope.js';
-import type { Campaign, Seat } from './schema/index.js';
-import type { Audience } from './visibility/audience.js';
+import type { Campaign } from './schema/index.js';
 
 /** Ephemeral channel carrying the DM's camera pose (CAM-06). */
 export const CAMERA_POSE_CHANNEL = 'camera.pose';
@@ -93,28 +92,12 @@ export function parseCameraPose(data: unknown): CameraPoseMessage | null {
  * Who may move everyone else's camera: the DM and an enabled co-DM, and nobody else (a spectator
  * or a plain player that sent a pose is dropped by the host relay). A seat with interaction
  * disabled sends nothing, matching UI-SEAT-05 and the rest of the ephemeral path.
+ *
+ * Which audiences may see the scene a pose names is not decided here: that is PERM-03's one scene
+ * rule, and the relay asks the shared `seesScene` (the `visibleTo` filter) rather than a copy.
  */
 export function canSendCameraPose(state: Campaign, actor: Actor): boolean {
   if (isHost(actor)) return true;
   const seat = seatOf(state, actor);
   return seat !== undefined && seat.role === 'codm' && seat.interactionEnabled !== false;
-}
-
-/**
- * May this audience see the scene a pose was taken in? The host and a co-DM seat see every scene;
- * a player or spectator knows only its active, not-DM-only scene (PERM-03, the same rule the
- * campaign snapshot is filtered by). A pose for a scene the target cannot see is never delivered,
- * so a DM camera in a hidden scene cannot move a player's or a spectator's view.
- */
-export function canViewScene(
-  state: Campaign,
-  audience: Audience,
-  seat: Seat | undefined,
-  sceneId: string,
-): boolean {
-  const scene = state.scenes[sceneId];
-  if (scene === undefined) return false;
-  if (audience.kind === 'host') return true;
-  if (seat?.role === 'codm') return true;
-  return scene.dmOnly !== true && sceneId === state.activeSceneId;
 }

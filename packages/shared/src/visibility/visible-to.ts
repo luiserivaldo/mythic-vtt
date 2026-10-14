@@ -105,6 +105,16 @@ function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
   });
 }
 
+/**
+ * PERM-03: may this audience see this scene at all? The one scene rule, read off `visibleTo`
+ * instead of restated: the host and a co-DM seat see every scene, everyone else sees only the
+ * active, not-DM-only one, and an unknown scene exists for nobody. A sceneId-bearing ephemeral
+ * (a camera pose, a drawing) routes by this same filter.
+ */
+export function seesScene(state: Campaign, audience: Audience, sceneId: string): boolean {
+  return visibleTo(audience, state).scenes[sceneId] !== undefined;
+}
+
 export function visibleTo(audience: Audience, state: Campaign): Campaign {
   if (audience.kind === 'host') return state;
   return memo(campaignCache, state, audienceKey(audience), () => {

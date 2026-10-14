@@ -4,7 +4,6 @@ import type { Actor } from './actions/envelope.js';
 import {
   CAMERA_POSE_CHANNEL,
   canSendCameraPose,
-  canViewScene,
   parseCameraPose,
   type CameraPose,
 } from './camera-pose.js';
@@ -118,41 +117,5 @@ describe('camera pose ephemeral (M4-11, CAM-06)', () => {
     coDm.identityId = IDS.identity;
     coDm.interactionEnabled = false;
     expect(canSendCameraPose(state, seatActor(IDS.coDm, IDS.identity))).toBe(false);
-  });
-
-  it('delivers a pose only to audiences that may see its scene (PERM-03)', () => {
-    const state = makeCampaign();
-    const coDm = state.seats[IDS.coDm];
-    const player = state.seats[IDS.owner];
-    const base = state.scenes[sceneId];
-    if (!coDm || !player || !base) throw new Error('fixture incomplete');
-    const dmSeat = { kind: 'seat', seatId: IDS.coDm } as const;
-    const playerSeat = { kind: 'seat', seatId: IDS.owner } as const;
-    const hiddenSceneId = '01HIDDENSCENE0000000000000';
-    const withDmScene = {
-      ...state,
-      scenes: { ...state.scenes, [hiddenSceneId]: { ...base, id: hiddenSceneId, dmOnly: true } },
-    };
-
-    // The active, ordinary scene reaches everyone who is in it.
-    expect(canViewScene(withDmScene, { kind: 'host' }, undefined, sceneId)).toBe(true);
-    expect(canViewScene(withDmScene, dmSeat, coDm, sceneId)).toBe(true);
-    expect(canViewScene(withDmScene, playerSeat, player, sceneId)).toBe(true);
-    expect(canViewScene(withDmScene, { kind: 'spectators' }, undefined, sceneId)).toBe(true);
-
-    // A DM-only scene is the host's and a co-DM's only; a player or spectator never receives it.
-    expect(canViewScene(withDmScene, { kind: 'host' }, undefined, hiddenSceneId)).toBe(true);
-    expect(canViewScene(withDmScene, dmSeat, coDm, hiddenSceneId)).toBe(true);
-    expect(canViewScene(withDmScene, playerSeat, player, hiddenSceneId)).toBe(false);
-    expect(canViewScene(withDmScene, { kind: 'spectators' }, undefined, hiddenSceneId)).toBe(false);
-
-    // A scene that is not the active one is no longer any player's or spectator's; an unknown
-    // scene reaches nobody at all.
-    const behind = { ...withDmScene, activeSceneId: hiddenSceneId };
-    expect(canViewScene(behind, playerSeat, player, sceneId)).toBe(false);
-    expect(canViewScene(behind, { kind: 'spectators' }, undefined, sceneId)).toBe(false);
-    expect(
-      canViewScene(withDmScene, { kind: 'host' }, undefined, '01NOSUCHSCENE000000000000'),
-    ).toBe(false);
   });
 });

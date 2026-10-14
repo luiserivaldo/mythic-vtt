@@ -107,6 +107,119 @@ describe('ephemeral relay', () => {
     expect(relay.stats().dropped.forbidden).toBe(1);
   });
 
+  it('gives the camera pose its own spectator budget, so a ruler still reaches a spectator (M4-11)', () => {
+    // One frozen tick: nothing replenishes, so every bucket only spends its burst. The shared
+    // spectator fan-out defaults to burst 10 — exactly what a pose stream at 10/s spends — so the
+    // continuous stream must not spend from it, or a player's ruler preview is dropped mid-pan.
+    const state = fixtureCampaign();
+    const host = fakeConnection(T.host, { isHost: true });
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [host, alice, spectator]);
+    const relay = createEphemeralRelay(() => 1_000);
+    const stream = () => {
+      relay.relay(
+        host,
+        {
+          t: 'ephemeral',
+          channel: 'camera.pose',
+          data: { mode: '2d', centerX: 1, centerZ: 2, zoom: 48, sceneId: T.scene, pull: false },
+        },
+        state,
+        targets,
+      );
+    };
+    const poses = () =>
+      spectator.received.filter((m) => m.t === 'ephemeral' && m.channel === 'camera.pose').length;
+
+    for (let i = 0; i < 10; i++) stream();
+    expect(poses()).toBe(10);
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(0);
+
+    relay.relay(
+      alice,
+      {
+        t: 'ephemeral',
+        channel: 'ruler.preview',
+        data: { sceneId: T.scene, points: [{ x: 0, y: 0, z: 0 }], phase: 'active' },
+      },
+      state,
+      targets,
+    );
+    // The ruler preview reaches the spectator during the pose stream, with nothing rate-limited.
+    expect(spectator.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: 'ruler.preview',
+      from: T.alice,
+    });
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(0);
+  });
+
+  it('rate-limits the pose stream on its own budget, never on the shared one (M4-11)', () => {
+    // Both budgets are pinned to a different size, so each assertion says which one was spent.
+    const state = fixtureCampaign();
+    const host = fakeConnection(T.host, { isHost: true });
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [host, alice, spectator]);
+    const relay = createEphemeralRelay(() => 1_000, {
+      cameraPoseDeliveryRate: { ratePerSecond: 1, burst: 4 },
+      spectatorDeliveryRate: { ratePerSecond: 1, burst: 1 },
+    });
+    const stream = () => {
+      relay.relay(
+        host,
+        {
+          t: 'ephemeral',
+          channel: 'camera.pose',
+          data: { mode: '2d', centerX: 1, centerZ: 2, zoom: 48, sceneId: T.scene, pull: false },
+        },
+        state,
+        targets,
+      );
+    };
+    const poses = () =>
+      spectator.received.filter((m) => m.t === 'ephemeral' && m.channel === 'camera.pose').length;
+
+    for (let i = 0; i < 6; i++) stream();
+    // Four poses are the pose budget's whole burst; the stream is still rate-limited, on its own
+    // bucket, so the shared spectator budget keeps its single token for the ruler below.
+    expect(poses()).toBe(4);
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(2);
+
+    relay.relay(
+      alice,
+      {
+        t: 'ephemeral',
+        channel: 'ruler.preview',
+        data: { sceneId: T.scene, points: [{ x: 0, y: 0, z: 0 }], phase: 'active' },
+      },
+      state,
+      targets,
+    );
+    expect(spectator.received.at(-1)).toMatchObject({ channel: 'ruler.preview' });
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(2);
+  });
+
+  it('never fans out a malformed camera pose (M4-11, CAM-06)', () => {
+    const state = fixtureCampaign();
+    const host = fakeConnection(T.host, { isHost: true });
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [spectator]);
+    const relay = createEphemeralRelay(() => 1_000);
+    for (const data of [
+      // A zoom and a distance no camera can adopt, a non-finite centre, and a 3D pose with no
+      // distance at all: the host parses a pose exactly as a receiving client does.
+      { mode: '2d', centerX: 1, centerZ: 2, zoom: 0, sceneId: T.scene },
+      { mode: '2d', centerX: Number.NaN, centerZ: 2, zoom: 48, sceneId: T.scene },
+      { mode: '3d', targetX: 1, targetY: 0, targetZ: 1, azimuth: 0, polar: 0.9, sceneId: T.scene },
+    ]) {
+      relay.relay(host, { t: 'ephemeral', channel: 'camera.pose', data }, state, targets);
+    }
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats().dropped['invalid-camera-pose']).toBe(3);
+  });
+
   it('never hands a camera pose to a target that cannot see its scene (M4-11 leak check)', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];
@@ -120,10 +233,10 @@ describe('ephemeral relay', () => {
     const spectator = fakeConnection(T.bob);
     const targets = recipients(state, [host, coDm, alice, spectator]);
     const relay = createEphemeralRelay(() => 1_000);
-    const pose = (sceneId: string) => ({
+    const pose = (sceneId: string, pull = true) => ({
       t: 'ephemeral' as const,
       channel: 'camera.pose',
-      data: { mode: '2d' as const, centerX: 1, centerZ: 2, zoom: 48, sceneId, pull: true },
+      data: { mode: '2d' as const, centerX: 1, centerZ: 2, zoom: 48, sceneId, pull },
     });
 
     // The DM's camera in a DM-only scene is the host's and a co-DM's business only.
@@ -139,11 +252,28 @@ describe('ephemeral relay', () => {
     expect(alice.received).toHaveLength(1);
     expect(spectator.received).toHaveLength(1);
 
-    // Once the DM moves to the hidden scene, the old scene is out of the player's view as well.
-    state.activeSceneId = T.newScene;
-    relay.relay(host, pose(T.scene), state, targets);
+    // CAM-06: an ordinary pose is the DM's own camera moving, not an instruction to anyone. Only a
+    // spectator that chose to follow uses it, so a player is never handed where the DM is looking —
+    // and neither are the DM's own co-DM peers, whose cameras this frame cannot move.
+    relay.relay(host, pose(T.scene, false), state, targets);
+    expect(host.received).toHaveLength(2);
+    expect(coDm.received).toHaveLength(2);
     expect(alice.received).toHaveLength(1);
-    expect(spectator.received).toHaveLength(1);
+    expect(spectator.received).toHaveLength(2);
+    expect(relay.stats().dropped['audience-filtered']).toBe(3);
+
+    // A pull is the DM's explicit "everyone, look here", and it is addressed to every viewer.
+    relay.relay(host, pose(T.scene), state, targets);
+    expect(alice.received).toHaveLength(2);
+    expect(spectator.received).toHaveLength(3);
+
+    // Once the DM moves to the hidden scene, the old scene is out of the player's view as well.
+    // PERM-03's filter is memoised per state object (`visible-to.ts`), exactly as the snapshot path
+    // uses it, so a scene switch is a new state — which is what an action produces.
+    const switched = { ...state, activeSceneId: T.newScene };
+    relay.relay(host, pose(T.scene), switched, targets);
+    expect(alice.received).toHaveLength(2);
+    expect(spectator.received).toHaveLength(3);
     expect(relay.stats().dropped['hidden-scene']).toBe(4);
 
     // A pose that names no scene at all is malformed, and moves nobody.
@@ -153,8 +283,8 @@ describe('ephemeral relay', () => {
       state,
       targets,
     );
-    expect(relay.stats().dropped['invalid-scene-reference']).toBe(1);
-    expect(alice.received).toHaveLength(1);
+    expect(relay.stats().dropped['invalid-camera-pose']).toBe(1);
+    expect(alice.received).toHaveLength(2);
   });
 
   it('filters entity previews by current audience, including D32 co-DM visibility', () => {
