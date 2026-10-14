@@ -68,6 +68,19 @@ main > p {
   border: 1px solid var(--ui-border);
   border-radius: 3px;
 }
+/* The identity QR block sits in the dock or the join screen, next to the file controls. */
+.ui-identity-qr {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.35rem 0;
+}
+.ui-identity-qr svg {
+  align-self: flex-start;
+  max-width: 100%;
+  height: auto;
+  border-radius: 3px;
+}
 
 .ui-shell {
   padding: var(--ui-bar-pad) 0.6rem;
