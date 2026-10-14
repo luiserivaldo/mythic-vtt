@@ -276,15 +276,20 @@ export function createEphemeralRelay(
     }
   }
 
-  /** Runs one drawing message: `null` means it was dropped (and counted) and must not relay. */
-  function applyDrawing(
+  /**
+   * Authorises one drawing message. `null` means it was dropped (and counted) and must not relay;
+   * otherwise the result is the change to the owner map, which the caller applies only once the
+   * frame has passed every later check too. A rejected message never changes relay state, so a
+   * refused erase or clear can never leave a stroke on the boards that nobody may erase any more.
+   */
+  function authoriseDrawing(
     sender: GatewayConnection,
     senderAudience: Audience,
     message: EphemeralMessage,
     state: Campaign,
     actor: Actor,
     kind: DrawChannel,
-  ): string | null {
+  ): (() => void) | null {
     switch (kind) {
       case 'stroke': {
         // The scene toggle gate above already proved the scene exists, for every sender.
@@ -305,8 +310,9 @@ export function createEphemeralRelay(
           drop('forbidden');
           return null;
         }
-        recordStroke(sceneId, strokeId, sender.identityId);
-        return sceneId;
+        return () => {
+          recordStroke(sceneId, strokeId, sender.identityId);
+        };
       }
       case 'erase': {
         const parsed = DrawEraseData.safeParse(message.data);
@@ -314,8 +320,8 @@ export function createEphemeralRelay(
           drop('invalid-drawing');
           return null;
         }
-        const strokes = drawings.get(parsed.data.sceneId);
-        const owner = strokes?.get(parsed.data.strokeId);
+        const { sceneId, strokeId } = parsed.data;
+        const owner = drawings.get(sceneId)?.get(strokeId);
         if (owner === undefined) {
           drop('invalid-drawing');
           return null;
@@ -324,8 +330,15 @@ export function createEphemeralRelay(
           drop('forbidden');
           return null;
         }
-        strokes?.delete(parsed.data.strokeId);
-        return parsed.data.sceneId;
+        // PERM-03: an author who can no longer see the scene may not erase on it; the stroke
+        // stays remembered, so the DM can still erase it.
+        if (!seesScene(state, senderAudience, sceneId)) {
+          drop('forbidden');
+          return null;
+        }
+        return () => {
+          drawings.get(sceneId)?.delete(strokeId);
+        };
       }
       case 'clear': {
         const parsed = DrawClearData.safeParse(message.data);
@@ -333,13 +346,19 @@ export function createEphemeralRelay(
           drop('invalid-drawing');
           return null;
         }
+        const { sceneId } = parsed.data;
         // Role before scene, so a refusal never tells a player which scenes exist.
         if (!canClearDrawings(state, actor)) {
           drop('forbidden');
           return null;
         }
-        drawings.delete(parsed.data.sceneId);
-        return parsed.data.sceneId;
+        if (!seesScene(state, senderAudience, sceneId)) {
+          drop('forbidden');
+          return null;
+        }
+        return () => {
+          drawings.delete(sceneId);
+        };
       }
     }
   }
@@ -402,13 +421,14 @@ export function createEphemeralRelay(
 
       // LAY-05: drawings are relayed like other tool ephemerals, but erasing and clearing are
       // authorised here — the author for one stroke, the DM or a co-DM for all of them.
+      // The owner-map change is applied just before fan-out, after every check below has passed.
       const drawing = drawChannelOf(message.channel);
       const senderAudience = audienceFor(state, sender);
-      if (
-        drawing !== null &&
-        applyDrawing(sender, senderAudience, message, state, senderActor, drawing) === null
-      )
-        return;
+      const commitDrawing =
+        drawing === null
+          ? undefined
+          : authoriseDrawing(sender, senderAudience, message, state, senderActor, drawing);
+      if (commitDrawing === null) return;
 
       const refs = entityReferences(message.data);
       if (refs === undefined) {
@@ -529,6 +549,8 @@ export function createEphemeralRelay(
         if (!sendToSpectators) drop('spectator-rate-limited', spectatorTargets.length);
       }
 
+      // LAY-05: every check has passed, so the frame is accepted and the owner map may change.
+      commitDrawing?.();
       for (const target of addressed) {
         if (isSpectatorTarget(target) && !sendToSpectators) continue;
         target.conn.sendRaw(frame);
