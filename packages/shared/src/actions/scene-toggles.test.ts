@@ -8,7 +8,12 @@ import {
   type ActionEnvelope,
 } from '../index.js';
 import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix } from './testing.js';
-import { canUseSceneToggle, TOGGLE_FOR_CHANNEL } from './scene-toggles.js';
+import {
+  canUseSceneToggle,
+  PING_CHANNEL,
+  PING_TOGGLE,
+  TOGGLE_FOR_CHANNEL,
+} from './scene-toggles.js';
 import { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
 import { DRAW_CLEAR_CHANNEL, DRAW_ERASE_CHANNEL, DRAW_STROKE_CHANNEL } from '../drawing.js';
 
@@ -122,6 +127,15 @@ describe('scene player toggles (PERM-05)', () => {
       draw: true,
       measure: false,
     });
+  });
+
+  it('registers the ephemeral channels a scene toggle gates, and leaves the rest open', () => {
+    // PERM-05: ruler and ping are the channels the host gates; cursors and drag previews are not.
+    expect(TOGGLE_FOR_CHANNEL['ruler.preview']).toBe('measure');
+    expect(TOGGLE_FOR_CHANNEL[PING_CHANNEL]).toBe(PING_TOGGLE);
+    expect(PING_TOGGLE).toBe('pins');
+    expect(TOGGLE_FOR_CHANNEL['cursor']).toBeUndefined();
+    expect(TOGGLE_FOR_CHANNEL['token.drag-preview']).toBeUndefined();
   });
 
   it('never leaks a DM-only scene or its toggles to players or spectators', () => {

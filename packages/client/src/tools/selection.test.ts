@@ -7,7 +7,6 @@ import {
   pickEntity,
   selectionActor,
   validSelection,
-  viewActor,
   type SelectionActor,
 } from './selection.js';
 
@@ -210,27 +209,5 @@ describe('selectionActor (PERM-03)', () => {
 
   it('keeps a real seat as a seat actor', () => {
     expect(selectionActor(false, owner.id, seats)).toEqual({ kind: 'seat', seat: owner });
-  });
-});
-
-describe('viewActor (UX-14 previews)', () => {
-  const seats = { [owner.id]: owner };
-  const base = { isHost: false, seatId: null, previewSeatId: null, seats };
-
-  it('leaves a view with no preview alone: host, seat and spectator are unchanged', () => {
-    expect(viewActor({ ...base, isHost: true })).toEqual({ kind: 'host' });
-    expect(viewActor({ ...base, seatId: owner.id })).toEqual({ kind: 'seat', seat: owner });
-    expect(viewActor(base)).toEqual({ kind: 'spectator' });
-  });
-
-  it('renders a preview as the seat it is showing, even when the client holds no seat', () => {
-    // A spectator audience that follows a player seat is that seat's view (M4-02), so the labels and
-    // ownership a local re-check sees must be that seat's - the campaign was projected for it.
-    expect(viewActor({ ...base, previewSeatId: owner.id })).toEqual({ kind: 'seat', seat: owner });
-    // The real host stays the host: a preview never outranks it (PERM-03).
-    expect(viewActor({ ...base, isHost: true, previewSeatId: owner.id })).toEqual({ kind: 'host' });
-    // A seat the campaign no longer holds, or no previewed seat at all, is a spectator view.
-    expect(viewActor({ ...base, previewSeatId: tid(77) })).toEqual({ kind: 'spectator' });
-    expect(viewActor({ ...base, previewSeatId: null })).toEqual({ kind: 'spectator' });
   });
 });

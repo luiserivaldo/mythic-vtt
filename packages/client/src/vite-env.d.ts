@@ -22,6 +22,10 @@ declare global {
         poses: number;
       };
     };
+    /** Development-only camera-link counters for the CAM-06 pull/follow e2e. */
+    __mythicCameraLink?: {
+      getLink(): { sent: number; pulls: number; following: boolean };
+    };
     /** Development/test-only render counters for performance assertions. */
     __mythicRender?: {
       getFrameCount(): number;

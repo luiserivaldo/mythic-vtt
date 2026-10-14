@@ -1,17 +1,22 @@
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import {
+  CAMERA_POSE_CHANNEL,
   canClearDrawings,
   canEraseDrawing,
+  canSendCameraPose,
   canUseSceneToggle,
   checkIntent,
   drawChannelOf,
   DrawClearData,
   DrawEraseData,
   DrawStrokeData,
+  parseCameraPose,
+  parsePingPayload,
+  PING_CHANNEL,
   seatOf,
+  seesScene,
   TOGGLE_FOR_CHANNEL,
   viewEntity,
-  visibleTo,
   type Actor,
   type Audience,
   type Campaign,
@@ -38,17 +43,26 @@ export interface EphemeralRelayOptions {
   readonly spectatorRate?: Partial<TokenBucketConfig>;
   /** Shared spectator audience fan-out rate. */
   readonly spectatorDeliveryRate?: Partial<TokenBucketConfig>;
+  /**
+   * CAM-06: spectator fan-out rate for the camera-pose stream alone. A DM moving the camera
+   * publishes at 10/s, which would spend the whole shared spectator budget and drop every ruler,
+   * drag preview and cursor to spectators; the pose channel therefore has its own.
+   */
+  readonly cameraPoseDeliveryRate?: Partial<TokenBucketConfig>;
 }
 
 export type EphemeralDropReason =
   | 'rate-limited'
   | 'spectator-rate-limited'
   | 'payload-too-large'
+  | 'invalid-payload'
   | 'invalid-entity-reference'
   | 'invalid-drawing'
+  | 'invalid-camera-pose'
   | 'forbidden'
   | 'hidden-entity'
-  | 'hidden-scene';
+  | 'hidden-scene'
+  | 'audience-filtered';
 
 export interface EphemeralRelayStats {
   readonly relayed: number;
@@ -77,6 +91,13 @@ export interface EphemeralRelay {
 const DEFAULT_ACTIVE_RATE: TokenBucketConfig = { ratePerSecond: 30, burst: 60 };
 const DEFAULT_SPECTATOR_RATE: TokenBucketConfig = { ratePerSecond: 5, burst: 10 };
 const DEFAULT_SPECTATOR_DELIVERY_RATE: TokenBucketConfig = { ratePerSecond: 10, burst: 10 };
+/**
+ * CAM-06: the pose stream is published at 10/s (the client's own throttle), plus a slow heartbeat,
+ * so its own spectator budget has to sit just above that. Keeping it separate is the point: a DM
+ * panning must never spend the shared spectator budget that rulers, cursors and drag previews fan
+ * out through.
+ */
+const DEFAULT_CAMERA_POSE_DELIVERY_RATE: TokenBucketConfig = { ratePerSecond: 15, burst: 15 };
 
 /**
  * LAY-05: how many drawings the relay remembers per scene, and how many scenes it tracks at all.
@@ -139,6 +160,19 @@ function sceneIdOf(data: unknown): string | undefined {
   return typeof sceneId === 'string' ? sceneId : undefined;
 }
 
+/**
+ * PERM-03: does this audience see every scene a frame names? An empty set is vacuously true, so
+ * channels that carry no scene (cursors) are never filtered by scene.
+ */
+function seesEveryScene(
+  state: Campaign,
+  audience: Audience,
+  sceneIds: ReadonlySet<string>,
+): boolean {
+  for (const sceneId of sceneIds) if (!seesScene(state, audience, sceneId)) return false;
+  return true;
+}
+
 function rate(
   defaults: TokenBucketConfig,
   override?: Partial<TokenBucketConfig>,
@@ -184,21 +218,29 @@ export function createEphemeralRelay(
     DEFAULT_SPECTATOR_DELIVERY_RATE,
     options.spectatorDeliveryRate,
   );
+  const cameraPoseDeliveryRate = rate(
+    DEFAULT_CAMERA_POSE_DELIVERY_RATE,
+    options.cameraPoseDeliveryRate,
+  );
   const senders = new Map<
     string,
     { readonly kind: 'active' | 'spectator'; readonly bucket: TokenBucket }
   >();
   let spectatorDelivery: TokenBucket | undefined;
+  let cameraPoseDelivery: TokenBucket | undefined;
   let relayed = 0;
   const dropped: Record<EphemeralDropReason, number> = {
     'rate-limited': 0,
     'spectator-rate-limited': 0,
     'payload-too-large': 0,
+    'invalid-payload': 0,
     'invalid-entity-reference': 0,
     'invalid-drawing': 0,
+    'invalid-camera-pose': 0,
     forbidden: 0,
     'hidden-entity': 0,
     'hidden-scene': 0,
+    'audience-filtered': 0,
   };
 
   const drop = (reason: EphemeralDropReason, count = 1) => {
@@ -232,16 +274,6 @@ export function createEphemeralRelay(
       if (oldest === undefined) break;
       strokes.delete(oldest);
     }
-  }
-
-  /**
-   * PERM-03: a scene a viewer may not see does not exist for them, so drawings are relayed only to
-   * targets that can see the scene they were drawn on, and a sender can only draw on a scene they
-   * see themselves. `visibleTo` keeps the host and co-DMs on every scene and a player or spectator
-   * on the active, non-DM-only one: no second copy of the rule to drift.
-   */
-  function seesScene(state: Campaign, audience: Audience, sceneId: string): boolean {
-    return visibleTo(audience, state).scenes[sceneId] !== undefined;
   }
 
   /** Runs one drawing message: `null` means it was dropped (and counted) and must not relay. */
@@ -330,6 +362,21 @@ export function createEphemeralRelay(
           return;
         }
       }
+      // CAM-06: only the DM (or an enabled co-DM) may move everyone else's camera. The pose is
+      // parsed here with the same contract a receiving client parses it with, so a malformed frame
+      // is never fanned out, and it has to name the scene it was taken in so it can be filtered
+      // per audience below.
+      const pose = message.channel === CAMERA_POSE_CHANNEL ? parseCameraPose(message.data) : null;
+      if (message.channel === CAMERA_POSE_CHANNEL) {
+        if (!canSendCameraPose(state, senderActor)) {
+          drop('forbidden');
+          return;
+        }
+        if (pose === null) {
+          drop('invalid-camera-pose');
+          return;
+        }
+      }
       const kind =
         senderActor.seatId === undefined && senderActor.kind !== 'host' ? 'spectator' : 'active';
       let senderLimit = senders.get(sender.connectionId);
@@ -342,6 +389,14 @@ export function createEphemeralRelay(
       }
       if (!senderLimit.bucket.take(now)) {
         drop('rate-limited');
+        return;
+      }
+
+      // M4-14 / LAY-05: the `ping` channel is gated by a scene toggle, so the host — not only the
+      // client that draws the marker — owns its shape. A strict parse keeps an arbitrary (up to the
+      // payload cap) `data` blob, or a non-finite coordinate, from being fanned out to the table.
+      if (message.channel === PING_CHANNEL && parsePingPayload(message.data) === null) {
+        drop('invalid-payload');
         return;
       }
 
@@ -379,6 +434,23 @@ export function createEphemeralRelay(
         return;
       }
 
+      // PERM-03 / M4-14: a channel whose data names a scene (a ping's `sceneId`, a ruler's, an
+      // entity reference's) may cross only between viewers who can see that scene. The toggle gate
+      // above decides *whether* a sender may use the channel; this decides *who* receives it, so a
+      // DM pinging, measuring or dragging on a DM-only or inactive scene never leaks its id or
+      // coordinates to players or spectators. A sender must see the scene too.
+      const scenesNamed = new Set<string>();
+      const namedSceneId = sceneIdOf(message.data);
+      if (namedSceneId !== undefined) scenesNamed.add(namedSceneId);
+      for (const ref of refs) scenesNamed.add(ref.sceneId);
+      // CAM-06: a pose names the scene it was taken in (the parsed `sceneId`, the same field read
+      // above), so it is filtered by this one scene rule like every other scene-bearing channel.
+      if (pose !== null) scenesNamed.add(pose.sceneId);
+      if (!seesEveryScene(state, senderAudience, scenesNamed)) {
+        drop('forbidden');
+        return;
+      }
+
       if (message.channel === 'token.drag-preview') {
         const check = checkIntent(state, senderActor, 'token.move', message.data);
         if (!check.ok) {
@@ -387,8 +459,12 @@ export function createEphemeralRelay(
         }
       }
 
-      // UI-JOIN-01: shared tool colours come from the validated connection profile, not a spoofed preview.
-      const coloredTool = message.channel === 'ruler.preview' || message.channel === 'cursor';
+      // UI-JOIN-01: shared tool colours come from the validated connection profile, not a spoofed
+      // preview. Pings carry the sender's colour too, so the marker is identifiable on every board.
+      const coloredTool =
+        message.channel === 'ruler.preview' ||
+        message.channel === 'cursor' ||
+        message.channel === PING_CHANNEL;
       const data =
         coloredTool &&
         sender.color !== undefined &&
@@ -411,16 +487,12 @@ export function createEphemeralRelay(
       }
 
       const targets = Array.from(recipients);
-      // PERM-03: a scene a target cannot see does not exist for them, so every channel that names
-      // a scene — drawings, ruler previews, drag previews — is relayed only to targets that can see
-      // it. One filter for all of them (via `visibleTo`), so the rule cannot drift per channel.
-      const sceneId = sceneIdOf(message.data);
-      const sceneTargets =
-        sceneId === undefined
-          ? targets
-          : targets.filter((target) => seesScene(state, target.audience, sceneId));
+      // First by scene: a target that cannot see a scene the message names never learns the frame.
+      const sceneTargets = targets.filter((target) =>
+        seesEveryScene(state, target.audience, scenesNamed),
+      );
       drop('hidden-scene', targets.length - sceneTargets.length);
-
+      // Then by entity, within the scenes they can see.
       const visibleTargets = sceneTargets.filter((target) => {
         for (const ref of refs) {
           const entity = state.scenes[ref.sceneId]?.entities[ref.entityId];
@@ -431,22 +503,33 @@ export function createEphemeralRelay(
         }
         return true;
       });
-      // Counted against the scene-filtered targets: a drawing has no entity to hide, and a target
-      // already dropped as hidden-scene must not be counted twice under a second reason.
       drop('hidden-entity', sceneTargets.length - visibleTargets.length);
 
+      // CAM-06: an ordinary pose is the DM's own camera moving, not an instruction to anyone. Only
+      // a spectator that chose to follow uses it, so it is never handed to a player — where the DM
+      // is looking is the DM's own business, at 10 frames a second. A pull is the DM's explicit
+      // "everyone, look here" and is addressed to players and spectators alike.
+      const addressed =
+        pose === null || pose.pull ? visibleTargets : visibleTargets.filter(isSpectatorTarget);
+      drop('audience-filtered', visibleTargets.length - addressed.length);
+
       // M4-02: a spectator watching through a seat has a seat audience but is still a spectator.
-      const spectatorTargets = visibleTargets.filter(isSpectatorTarget);
+      const spectatorTargets = addressed.filter(isSpectatorTarget);
       let sendToSpectators = true;
       // LAY-05: a drawing's closing frame is never coalesced away; see `isFinalDrawFrame`.
       const finalDraw = drawing !== null && isFinalDrawFrame(drawing, message.data);
       if (spectatorTargets.length > 0 && !finalDraw) {
-        spectatorDelivery ??= new TokenBucket(spectatorDeliveryRate, now);
-        sendToSpectators = spectatorDelivery.take(now);
+        // CAM-06: camera poses spend their own budget, so the stream they carry cannot starve the
+        // shared one that every other ephemeral fans out through.
+        const delivery =
+          pose === null
+            ? (spectatorDelivery ??= new TokenBucket(spectatorDeliveryRate, now))
+            : (cameraPoseDelivery ??= new TokenBucket(cameraPoseDeliveryRate, now));
+        sendToSpectators = delivery.take(now);
         if (!sendToSpectators) drop('spectator-rate-limited', spectatorTargets.length);
       }
 
-      for (const target of visibleTargets) {
+      for (const target of addressed) {
         if (isSpectatorTarget(target) && !sendToSpectators) continue;
         target.conn.sendRaw(frame);
         relayed += 1;

@@ -13,7 +13,7 @@ import { useStore } from 'zustand';
 import { UploadError, uploadFailureMessage, type ImageUploader } from '../assets/image-upload.js';
 import { useClientStore } from '../store/react.js';
 import { nextElevation, formatUnits } from '../tools/elevation.js';
-import { viewActor, type SelectionActor } from '../tools/selection.js';
+import { selectionActor, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { defaultUploader } from '../ui/default-uploader.js';
 import { isValidEntityName, LAYER_LABELS } from '../ui/entity-panel.js';
@@ -103,7 +103,6 @@ export function TokenMenus({
   const campaign = useClientStore((state) => state.campaign);
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
-  const previewSeatId = useClientStore((state) => state.previewSeatId);
   const selection = useStore(selectionStore, (state) => state.ids);
   const fullId = useStore(tokenMenuStore, (state) => state.entityId);
   const contextId = useStore(tokenMenuStore, (state) => state.contextEntityId);
@@ -135,12 +134,7 @@ export function TokenMenus({
     : seatId === null
       ? { kind: 'seat' }
       : { kind: 'seat', seatId };
-  const viewer: SelectionActor = viewActor({
-    isHost,
-    seatId,
-    previewSeatId,
-    seats: campaign.seats,
-  });
+  const viewer: SelectionActor = selectionActor(isHost, seatId, campaign.seats);
 
   return (
     <>
