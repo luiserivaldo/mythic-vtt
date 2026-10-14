@@ -150,8 +150,8 @@ export function ToolPanelDock({
       )}
       {showToken && (
         <PanelFrame id="token" label="Token" collapsed={collapsed.token}>
-          {/* UI-SHEET-01: the token's right-click menu has not landed yet, so See Sheet lives on
-              the selected token's panel and jumps the dock to the Sheet tab. */}
+          {/* UI-SHEET-01: See Sheet also lives in the token's right-click menu (UI-TOKEN-03); the
+              selected token's panel keeps the same shortcut. */}
           <button type="button" onClick={seeSheet}>
             See Sheet
           </button>
