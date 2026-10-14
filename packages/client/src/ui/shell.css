@@ -841,9 +841,15 @@ main [tabindex]:focus-visible {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* UI-TOOL-05: the Initiative placeholder is greyed and dashed so it cannot be taken for a real
+   tool. It stays clickable (a click opens its mock panel), so the greying is colour only: the
+   pressed look keeps the accent. */
 .ui-rail-tool[data-wip] {
   border-style: dashed;
   font-style: italic;
+}
+.ui-rail-tool[data-wip]:not([aria-pressed='true']) {
+  color: var(--ui-muted);
 }
 .ui-rail-wip {
   margin-left: auto;
