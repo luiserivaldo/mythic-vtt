@@ -4,7 +4,7 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
 import { Fragment, lazy, Suspense, useEffect, useMemo } from 'react';
 import { useClientStore } from '../store/react.js';
-import { canSelect, pickEntity, selectionActor, validSelection } from '../tools/selection.js';
+import { canSelect, pickEntity, validSelection, viewActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { tokenMenuStore } from '../ui/token-menu-store.js';
 import { focusStore } from './focus-store.js';
@@ -59,10 +59,12 @@ export function PickableEntities({
 }) {
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
+  const previewSeatId = useClientStore((state) => state.previewSeatId);
   const seats = useClientStore((state) => state.campaign?.seats ?? NO_SEATS);
   const selected = useStore(selectionStore, (state) => state.ids);
   const hiddenLayers = useUiStore((state) => state.hiddenLayers);
-  const actor = selectionActor(isHost, seatId, seats);
+  // UX-14: a preview draws the audience it projected, so its labels and picks are that seat's.
+  const actor = viewActor({ isHost, seatId, previewSeatId, seats });
   const walkables = useMemo(
     () =>
       Object.values(scene?.entities ?? {}).flatMap((entity) => {

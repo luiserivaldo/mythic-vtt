@@ -24,6 +24,23 @@ export function selectionActor(
   return seat ? { kind: 'seat', seat } : { kind: 'spectator' };
 }
 
+/**
+ * UX-14 + M4-02: the actor of the *rendered* view. `seatId` is what this client may act as — a DM
+ * preview acts as nobody, so it stays null — but a preview draws the audience it projected, and a
+ * spectator audience that follows a player seat is that seat's view. Every local re-check (token
+ * labels, ownership, what a click may pick) must run as the seat whose data is on screen, or it
+ * hides again what the host already sent for that seat. The real host is never overridden.
+ */
+export function viewActor(input: {
+  isHost: boolean;
+  seatId: string | null;
+  /** The seat a preview is showing, or null for the host view and a seat-less audience. */
+  previewSeatId: string | null;
+  seats: Readonly<Record<string, Seat>>;
+}): SelectionActor {
+  return selectionActor(input.isHost, input.previewSeatId ?? input.seatId, input.seats);
+}
+
 /** PERM-01/02: local selection grants no authority to change game state. */
 export function canSelect(entity: Entity, scene: Scene, actor: SelectionActor): boolean {
   if (scene.layers[entity.layer]?.locked) return false;

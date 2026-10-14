@@ -23,6 +23,12 @@ export interface ClientState {
   realSeatId: string | null;
   viewAs: Audience;
   spectatorSeatId: string | null;
+  /**
+   * UX-14 + M4-02: the seat whose view a preview is drawing, when the projected audience is a seat
+   * — a seat preview, or a spectator audience that follows a player seat. Null outside a preview.
+   * Local, view-only state: `seatId` is what this client may *act* as, and a preview acts as nobody.
+   */
+  previewSeatId: string | null;
   /** Last applied `seq`; null until the first snapshot. */
   seq: number | null;
   seatId: string | null;
@@ -70,6 +76,7 @@ const initial: ClientState = {
   realSeatId: null,
   viewAs: { kind: 'host' },
   spectatorSeatId: null,
+  previewSeatId: null,
   seq: null,
   seatId: null,
   isHost: false,
@@ -82,12 +89,19 @@ const initial: ClientState = {
 /** Recompute from the received state, never from a previously filtered preview (PERM-04). */
 function project(
   state: ClientState,
-): Pick<ClientState, 'campaign' | 'isHost' | 'seatId' | 'viewAs'> {
+): Pick<ClientState, 'campaign' | 'isHost' | 'seatId' | 'viewAs' | 'previewSeatId'> {
   let viewAs = state.realIsHost ? state.viewAs : { kind: 'host' as const };
   const source = state.sourceCampaign;
   if (viewAs.kind === 'seat' && !source?.seats[viewAs.seatId]) viewAs = { kind: 'spectators' };
   if (viewAs.kind === 'host') {
-    return { campaign: source, isHost: state.realIsHost, seatId: state.realSeatId, viewAs };
+    return {
+      campaign: source,
+      isHost: state.realIsHost,
+      seatId: state.realSeatId,
+      viewAs,
+      // The host view is this client's own: no preview is drawing someone else's seat.
+      previewSeatId: null,
+    };
   }
   const spectatorSeat = state.spectatorSeatId ? source?.seats[state.spectatorSeatId] : undefined;
   const audience =
@@ -98,6 +112,9 @@ function project(
     campaign: source ? visibleTo(audience, source) : null,
     isHost: false,
     seatId: viewAs.kind === 'seat' ? viewAs.seatId : null,
+    // M4-02: a spectator audience that follows a player seat is that seat's view, so the preview
+    // must render it as that seat does — the campaign above is already that seat's.
+    previewSeatId: audience.kind === 'seat' ? audience.seatId : null,
     viewAs,
   };
 }

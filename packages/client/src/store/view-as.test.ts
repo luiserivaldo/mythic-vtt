@@ -158,8 +158,23 @@ describe('UX-14 audience projection', () => {
     store.getState().setViewAs({ kind: 'spectators' });
     expect(store.getState().campaign).toEqual(visibleTo({ kind: 'seat', seatId }, world()));
     expect(store.getState().seatId).toBeNull();
+    // M4-02/UX-14: the preview renders that seat's view, so the view actor is that seat even though
+    // this client holds no seat of its own (it can only read; every intent is host-only).
+    expect(store.getState().previewSeatId).toBe(seatId);
     store.getState().setSpectatorSource(coDmId);
     expect(store.getState().campaign).toEqual(visibleTo({ kind: 'spectators' }, world()));
+    expect(store.getState().previewSeatId).toBeNull();
+  });
+
+  it('names the previewed seat for every preview, and none outside one', () => {
+    const store = setup();
+    expect(store.getState().previewSeatId).toBeNull();
+    store.getState().setViewAs({ kind: 'seat', seatId });
+    expect(store.getState().previewSeatId).toBe(seatId);
+    store.getState().setViewAs({ kind: 'spectators' });
+    expect(store.getState().previewSeatId).toBeNull();
+    store.getState().setViewAs({ kind: 'host' });
+    expect(store.getState().previewSeatId).toBeNull();
   });
 
   it('does not allow non-hosts to preview and waits for pending DM actions before switching', () => {

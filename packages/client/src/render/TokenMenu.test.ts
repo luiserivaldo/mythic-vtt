@@ -18,6 +18,7 @@ import { TokenMenus } from './TokenMenu.js';
 interface MockState {
   isHost: boolean;
   seatId: string | null;
+  previewSeatId: string | null;
   campaign: Campaign | null;
   confirmBeforeDeleting: boolean;
 }
@@ -25,6 +26,7 @@ interface MockState {
 const mock = vi.hoisted((): MockState => ({
   isHost: true,
   seatId: null,
+  previewSeatId: null,
   campaign: null,
   confirmBeforeDeleting: true,
 }));
@@ -41,7 +43,12 @@ vi.mock('@react-three/drei', async () => {
 });
 vi.mock('../store/react.js', () => ({
   useClientStore: (select: (state: unknown) => unknown) =>
-    select({ campaign: mock.campaign, isHost: mock.isHost, seatId: mock.seatId }),
+    select({
+      campaign: mock.campaign,
+      isHost: mock.isHost,
+      seatId: mock.seatId,
+      previewSeatId: mock.previewSeatId,
+    }),
 }));
 vi.mock('../ui/ViewerPreferencesProvider.js', () => ({
   useViewerPreferences: () => ({
