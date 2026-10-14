@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadOrCreateIdentity, type KeyValueStore } from './identity.js';
 import { serializeIdentityFile } from './identity-file.js';
+import { QR_GOLDEN } from './qr-golden.js';
 import {
   IDENTITY_QR_ERROR,
   encodeIdentityQr,
@@ -24,6 +25,14 @@ describe('identity QR codes (SES-09)', () => {
     expect(identityQrPayload(identity)).toBe(serializeIdentityFile(identity));
     // A real identity is 136 bytes of JSON: version 7 at level L.
     expect(encodeIdentityQr(identity)).toMatchObject({ version: 7, size: 45 });
+  });
+
+  it('emits a version the external reference symbols cover', () => {
+    // A real identity document is 136 bytes, so the card is version 7 (SES-09). `qr-golden.ts`
+    // carries the symbol an independent encoder produced for that version, so the size the product
+    // actually emits is pinned against something other than our own encoder.
+    const code = encodeIdentityQr(loadOrCreateIdentity(memory(), 123, () => 7));
+    expect(QR_GOLDEN.map((golden) => golden.version)).toContain(code.version);
   });
 
   it('accepts the payload back, and nothing else', () => {
