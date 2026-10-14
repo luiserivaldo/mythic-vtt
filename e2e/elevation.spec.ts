@@ -64,6 +64,15 @@ test('host sets elevation through the panel and sees the badge in scene units', 
 
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
+  // r3f gives the canvas its real frame only after its first measure; before that it is the
+  // browser's 300x150 default, and a click aimed at a cell through that box misses the token
+  // however often it is retried. The other board specs wait for the same measure.
+  await expect
+    .poll(async () => {
+      const box = await canvas.boundingBox();
+      return box === null ? 0 : Math.min(box.width, box.height);
+    })
+    .toBeGreaterThan(200);
   const box = await canvas.boundingBox();
   if (!box) throw new Error('no canvas box');
   const zoom = Math.min(box.width / 42, box.height / 32);

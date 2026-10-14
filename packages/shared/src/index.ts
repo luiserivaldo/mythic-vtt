@@ -6,3 +6,4 @@ export * from './visibility/index.js';
 export * from './migrations/index.js';
 export * from './history.js';
 export * from './seat-templates.js';
+export * from './ephemeral.js';

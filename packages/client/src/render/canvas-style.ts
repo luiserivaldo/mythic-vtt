@@ -9,6 +9,11 @@ export const LABEL_TEXT_COLOR = '#f8fafc';
 export const SELECTION_COLOR = '#9f1239';
 export const RULER_LOCAL_COLOR = '#075985';
 export const RULER_REMOTE_COLOR = '#9a3412';
+/**
+ * LAY-05: a ping uses the sender's profile colour when they have one, else this. It reads on the
+ * grey default board and on dark scene backgrounds alike.
+ */
+export const PING_FALLBACK_COLOR = '#a21caf';
 export const AOE_HIGHLIGHT_COLOR = '#9a3412';
 export const GHOST_COLOR = '#6d28d9';
 export const DEFAULT_TOKEN_COLOR = '#0e7490';
