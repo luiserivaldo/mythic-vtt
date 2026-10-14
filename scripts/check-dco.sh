@@ -2,12 +2,15 @@
 # Fails if a commit in <base>..<head> lacks a Signed-off-by line whose email matches the commit's
 # author or committer. Merge commits are skipped. An optional third argument excludes commits
 # already reachable from that ref (used for develop -> main, whose commits were checked earlier).
+# Released commits (reachable from origin/main, when that ref exists) are also skipped: they went
+# through main's protected PR and review, so they count as certified.
 set -euo pipefail
 
 base=${1:?usage: check-dco.sh <base> <head> [exclude-ref]}
 head=${2:?usage: check-dco.sh <base> <head> [exclude-ref]}
 range=("$base..$head")
 if [ -n "${3:-}" ]; then range+=("^$3"); fi
+if git rev-parse -q --verify origin/main >/dev/null; then range+=("^origin/main"); fi
 
 fail=0
 checked=0
