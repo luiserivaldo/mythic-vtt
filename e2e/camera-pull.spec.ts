@@ -340,3 +340,85 @@ test('an ordinary DM pose never reaches a player over the wire, a pull does (M4-
   }
   expect(errors).toEqual([]);
 });
+
+// A pose stream and the shared spectator budget carry ten and ten frames: either way the whole
+// burst arrives when the pose channel spends its own bucket, and the ten shared frames are all
+// dropped when it spends the shared one instead.
+const POSE_BURST = 10;
+const SHARED_BURST = 10;
+
+test('a pose stream never starves the shared spectator budget: ruler previews still land (M4-11)', async () => {
+  const table = await startTable();
+  // The host token is single use, so the first `hello` carrying it claims the DM link: this raw
+  // connection is the DM, and no browser is on this table to spend a budget behind the test's back.
+  const identity = { identityId: testUlid('HOST', 92), identitySecret: 'pose-stream-secret' };
+  const dm = await RawClient.connect(table, {
+    name: 'pose stream',
+    hostToken: table.hostToken,
+    ...identity,
+  });
+  const clients: RawClient[] = [dm];
+  try {
+    await dm.waitFor('snapshot', () => dm.state !== undefined);
+    const sceneId = (dm.state as { activeSceneId: string }).activeSceneId;
+
+    const link = await fetch(`http://127.0.0.1:${String(table.hostPort)}/api/spectator-link`, {
+      method: 'POST',
+      // The route takes no body (Fastify rejects an empty JSON one) and the host's HTTP auth uses
+      // its own scheme.
+      headers: { Authorization: `Mythic ${identity.identityId}.${identity.identitySecret}` },
+    });
+    expect(link.status).toBe(200);
+    const { token } = (await link.json()) as { token: string };
+    const spectator = await RawClient.connect(table, {
+      name: 'budget watcher',
+      identityId: testUlid('WATCH', 92),
+      identitySecret: 'budget-watch-secret',
+      watchToken: token,
+    });
+    clients.push(spectator);
+    await spectator.waitFor('snapshot', () => spectator.state !== undefined);
+    // Only the frames this spectator is sent from here on can say anything about the budgets.
+    const from = spectator.frames.length;
+    const channels = (): string[] =>
+      spectator.frames.slice(from).flatMap((raw) => {
+        const { channel } = JSON.parse(raw) as { channel?: string };
+        return channel === undefined ? [] : [channel];
+      });
+
+    // The DM pans at the pose stream's own ceiling, then ten shared ruler previews follow in the
+    // same burst: nothing has time to refill, so whichever budget the poses spend is spent flat.
+    for (let step = 0; step < POSE_BURST; step++) {
+      dm.ephemeral('camera.pose', {
+        mode: '2d',
+        centerX: step,
+        centerZ: 15,
+        zoom: 48,
+        sceneId,
+        pull: false,
+      });
+    }
+    for (let step = 0; step < SHARED_BURST; step++) {
+      dm.ephemeral('ruler.preview', {
+        sceneId,
+        points: [
+          { x: 0, y: 0, z: 0 },
+          { x: step + 1, y: 0, z: 0 },
+        ],
+        phase: 'active',
+      });
+    }
+
+    // Every shared frame reaches the spectator: the poses spent the pose channel's own budget, never
+    // the shared one a ruler, a drag preview or a cursor fans out through.
+    await spectator.waitFor(
+      'the shared ephemerals',
+      () => channels().filter((channel) => channel === 'ruler.preview').length === SHARED_BURST,
+    );
+    // And the pose stream itself was real: its whole burst reached the spectator as well.
+    expect(channels().filter((channel) => channel === 'camera.pose')).toHaveLength(POSE_BURST);
+  } finally {
+    await Promise.all(clients.map((client) => client.close()));
+    await table.stop();
+  }
+});
