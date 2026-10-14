@@ -177,6 +177,57 @@ describe('ephemeral relay', () => {
     expect(relay.stats().dropped.forbidden).toBe(1);
   });
 
+  it('filters a ping on an inactive scene per recipient: players and spectators learn nothing, the DM and co-DM do', () => {
+    const state = fixtureCampaign();
+    const coDmSeat = state.seats[T.coDm];
+    const active = state.scenes[T.scene];
+    if (!coDmSeat || !active) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    // The other half of the review's "dmOnly or inactive prep scene": a scene the DM is preparing but
+    // has not activated is equally absent for players and spectators (UI-TOP-01), even with its `pins`
+    // toggle open, so neither its id nor the pinged coordinates may be fanned out to them.
+    state.scenes[T.newScene] = {
+      ...active,
+      id: T.newScene,
+      name: 'Prepared',
+      playerToggles: { pins: true },
+    };
+
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000);
+    const ping = {
+      t: 'ephemeral' as const,
+      channel: PING_CHANNEL,
+      data: { sceneId: T.newScene, x: 4.5, y: 0, z: 9.75 },
+    };
+
+    relay.relay(host, ping, state, recipients(state, [host, coDm, alice, spectator]));
+
+    expect(host.received).toHaveLength(1);
+    expect(coDm.received).toHaveLength(1);
+    expect(alice.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({ relayed: 2, dropped: { 'hidden-scene': 2 } });
+    const nonDmWire = alice.wire() + spectator.wire();
+    expect(nonDmWire).not.toContain(T.newScene);
+    expect(nonDmWire).not.toContain('9.75');
+
+    // A co-DM sender is held to the same per-recipient rule — being exempt from the scene *toggle*
+    // does not let a frame naming an unactivated scene reach the player or the spectator.
+    alice.clear();
+    spectator.clear();
+    relay.relay(coDm, ping, state, recipients(state, [host, coDm, alice, spectator]));
+    expect(host.received).toHaveLength(2);
+    expect(coDm.received).toHaveLength(2);
+    expect(alice.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({ relayed: 4, dropped: { 'hidden-scene': 4 } });
+    expect(alice.wire() + spectator.wire()).not.toContain(T.newScene);
+  });
+
   it('rate-limits a ping flood per connection before relaying it', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];

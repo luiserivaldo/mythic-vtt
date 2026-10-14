@@ -207,8 +207,10 @@ test('a ping on a DM-only scene reaches the DM only, never a player or a spectat
   const publicScene = testUlid('SCENE', 3);
   const prepScene = testUlid('SCENE', 4);
   const seatId = testUlid('SEAT', 3);
+  const coDmSeatId = testUlid('SEAT', 4);
   const hostId = testUlid('HOST', 3);
   const viewerId = testUlid('VIEWER', 3);
+  const codmId = testUlid('CODM', 3);
   const clients: RawClient[] = [];
   try {
     const host = await RawClient.connect(table, {
@@ -223,6 +225,7 @@ test('a ping on a DM-only scene reaches the DM only, never a player or a spectat
     await ok(host.intent('scene.create', { sceneId: prepScene, name: 'Prep', dmOnly: true }));
     await ok(host.intent('scene.activate', { sceneId: publicScene }));
     await ok(host.intent('seat.create', { seatId, label: 'Pinger' }));
+    await ok(host.intent('seat.create', { seatId: coDmSeatId, label: 'Co-DM', role: 'codm' }));
 
     const player = await RawClient.connect(table, { name: 'leak-player', ...PLAYER });
     clients.push(player);
@@ -241,15 +244,32 @@ test('a ping on a DM-only scene reaches the DM only, never a player or a spectat
     clients.push(spectator);
     await spectator.waitFor('snapshot', () => spectator.state !== undefined);
 
+    // A co-DM is a seat audience, not a spectator: the DM-only scene does exist for it (L4/D32).
+    const coDm = await RawClient.connect(table, {
+      name: 'leak-codm',
+      identityId: codmId,
+      identitySecret: 'leak-codm',
+    });
+    clients.push(coDm);
+    await coDm.waitFor('snapshot', () => coDm.state !== undefined);
+    coDm.join(coDmSeatId);
+    await coDm.waitFor('co-DM joined', () => JSON.stringify(coDm.state).includes(codmId));
+
     // PERM-03: the DM-only prep scene does not exist for a player or a spectator.
     expect(JSON.stringify(player.state)).not.toContain(prepScene);
     expect(JSON.stringify(spectator.state)).not.toContain(prepScene);
+    expect(JSON.stringify(coDm.state)).toContain(prepScene);
 
-    // The DM browses the prep scene (UX-04) and pings it; the relay gives the marker back to the DM.
+    // The DM browses the prep scene (UX-04) and pings it; the relay gives the marker back to the DM
+    // and to the co-DM, who may see that scene, while the player and the spectator get nothing at all.
     host.ephemeral('ping', { sceneId: prepScene, x: 1, y: 0, z: 1 });
     await host.waitFor(
       'the prep ping relayed to the DM',
       () => framesFrom(host.frames, hostId) === 1,
+    );
+    await coDm.waitFor(
+      'the prep ping relayed to the co-DM',
+      () => framesFrom(coDm.frames, hostId) === 1,
     );
 
     // A control ping on the public scene proves the pipe works. Frames arrive in order on one
@@ -268,6 +288,13 @@ test('a ping on a DM-only scene reaches the DM only, never a player or a spectat
     expect(framesFrom(spectator.frames, hostId)).toBe(1);
     expect(player.frames.join('\n')).not.toContain(prepScene);
     expect(spectator.frames.join('\n')).not.toContain(prepScene);
+    // The co-DM saw both pings, the prep one included; the player and spectator only ever saw the
+    // public one, so the hidden scene's id and coordinates never reached either of them.
+    await coDm.waitFor(
+      'the public ping also reached the co-DM',
+      () => framesFrom(coDm.frames, hostId) === 2,
+    );
+    expect(coDm.frames.join('\n')).toContain(prepScene);
   } finally {
     await Promise.all(clients.map((client) => client.close()));
     await table.stop();
