@@ -1,0 +1,280 @@
+import { describe, expect, it } from 'vitest';
+import { Entity, Scene } from '@mythic/shared';
+import { makeCampaign, tid } from '../testing.js';
+import {
+  activeRenderScene,
+  gridToWorld,
+  mapScene,
+  orderedEntities,
+  RENDER_LAYERS,
+  renderLayer,
+  type RenderEntity,
+} from './scene-model.js';
+
+const entity = (id: number, layer: Entity['layer'], x = 0, y = 0, z = 0) =>
+  Entity.parse({
+    id: tid(id),
+    layer,
+    name: 'Fixture',
+    owners: [],
+    transform: {
+      position: { x, y, z },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+  });
+
+const scene = Scene.parse({
+  id: tid(8),
+  name: 'Scene',
+  grid: {
+    type: 'square',
+    sizePx: 70,
+    unitsPerCell: 5,
+    unitLabel: 'ft',
+    diagonal: 'chebyshev',
+    snap: true,
+  },
+  environment: { background: '#102030' },
+  layers: {},
+  entities: {
+    [tid(3)]: entity(3, 'effects'),
+    [tid(4)]: entity(4, 'tokens', 2, 4, -3),
+    [tid(5)]: entity(5, 'props'),
+    [tid(6)]: entity(6, 'map'),
+  },
+});
+
+describe('render layer ordering', () => {
+  it('keeps the documented order including reserved slots', () => {
+    expect(RENDER_LAYERS).toEqual(['map', 'props-under', 'tokens', 'props-over', 'effects', 'ui']);
+    const entries = [...RENDER_LAYERS].reverse().map((layer, index): RenderEntity => ({
+      id: String(index),
+      layer,
+      position: [0, 0, 0],
+      sizeCells: 1,
+      secret: false,
+    }));
+    expect(orderedEntities(entries).map((item) => item.layer)).toEqual(RENDER_LAYERS);
+    expect(entries[0]?.layer).toBe('ui');
+  });
+
+  it('places received DM tokens in the token slot', () => {
+    const hidden = Entity.parse({
+      ...entity(7, 'dm'),
+      token: {
+        sizeCells: 2,
+        heightCells: 1,
+        labelVisibility: 'dm',
+      },
+    });
+    expect(renderLayer(hidden)).toBe('tokens');
+  });
+
+  it('places tokens from every authored layer above props in the token slot', () => {
+    for (const layer of ['map', 'props', 'tokens', 'dm'] as const) {
+      const subject = Entity.parse({
+        ...entity(7, layer),
+        token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+      });
+      expect(renderLayer(subject)).toBe('tokens');
+    }
+    expect(renderLayer(entity(8, 'map'))).toBe('map');
+    expect(renderLayer(entity(9, 'props'))).toBe('props-under');
+  });
+});
+
+describe('store to scene mapping', () => {
+  it('uses the active Scene and its received entities only', () => {
+    const campaign = makeCampaign();
+    campaign.scenes[scene.id] = scene;
+    expect(activeRenderScene(campaign)).toBeNull();
+    campaign.activeSceneId = scene.id;
+    const mapped = activeRenderScene(campaign);
+    expect(mapped).toEqual(mapScene(scene));
+    expect(mapped?.background).toBe('#102030');
+    expect(mapped?.entities.map((item) => item.layer)).toEqual([
+      'map',
+      'props-under',
+      'tokens',
+      'effects',
+    ]);
+    expect(mapped?.entities.find((item) => item.id === tid(4))?.position).toEqual([2, 4, -3]);
+    campaign.activeSceneId = tid(9);
+    expect(activeRenderScene(campaign)).toBeNull();
+  });
+});
+
+describe('grid coordinates', () => {
+  it('maps grid X/Y and elevation to world X/Z/Y across signed values', () => {
+    for (const x of [-100, -0.5, 0, 0.25, 100]) {
+      for (const y of [-50, 0, 50]) {
+        for (const elevation of [-2, 0, 9]) {
+          expect(gridToWorld(x, y, elevation)).toEqual([x, elevation, y]);
+        }
+      }
+    }
+    expect(gridToWorld(1, 2)).toEqual([1, 0, 2]);
+  });
+});
+
+describe('primitive shapes (ENV-02)', () => {
+  const shaped = (kind: 'box' | 'plane' | 'wedge', scale: { x: number; y: number; z: number }) =>
+    Entity.parse({
+      id: tid(20),
+      layer: 'props',
+      name: 'Platform',
+      owners: [],
+      transform: {
+        position: { x: 3, y: 1, z: 4 },
+        rotation: { x: 0, y: Math.sin(Math.PI / 4), z: 0, w: Math.cos(Math.PI / 4) },
+        scale,
+      },
+      shape: { kind, color: '#aa5522', walkable: true },
+    });
+  const map = (entity: Entity) =>
+    mapScene({ ...scene, entities: { [entity.id]: entity } }).entities[0];
+
+  it('maps shape data, size, yaw and base position', () => {
+    const rendered = map(shaped('box', { x: 2, y: 3, z: 4 }));
+    expect(rendered?.position).toEqual([3, 1, 4]);
+    expect(rendered?.shape).toMatchObject({
+      kind: 'box',
+      color: '#aa5522',
+      walkable: true,
+      width: 2,
+      height: 3,
+      depth: 4,
+    });
+    expect(rendered?.shape?.yaw).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('gives planes a fixed thickness and omits shape for non-shapes', () => {
+    expect(map(shaped('plane', { x: 5, y: 9, z: 5 }))?.shape?.height).toBeLessThan(0.1);
+    expect(map(entity(30, 'props'))?.shape).toBeUndefined();
+  });
+
+  it('carries an uploaded texture, and omits the key when there is none (ENV-05)', () => {
+    const texture = { source: 'local' as const, hash: 'a'.repeat(64), kind: 'image' as const };
+    const textured = Entity.parse({
+      ...shaped('box', { x: 2, y: 1, z: 2 }),
+      shape: { kind: 'box', color: '#aa5522', walkable: true, texture },
+    });
+    expect(map(textured)?.shape).toMatchObject({ texture });
+    expect(map(shaped('box', { x: 2, y: 1, z: 2 }))?.shape).not.toHaveProperty('texture');
+  });
+});
+
+describe('image skybox (ENV-07)', () => {
+  const asset = { source: 'local', hash: 'a'.repeat(64), kind: 'image' } as const;
+  const withSkybox = Scene.parse({
+    ...scene,
+    environment: { ...scene.environment, skybox: asset },
+  });
+
+  it('carries the scene skybox into the render scene', () => {
+    expect(mapScene(freshScene()).skybox).toBeUndefined();
+    expect(mapScene(withSkybox).skybox).toEqual(asset);
+  });
+
+  it('keeps the colour and gradient alongside the image for the fallback', () => {
+    const gradient = Scene.parse({
+      ...scene,
+      environment: { background: '#102030', zenith: '#6688aa', skybox: asset },
+    });
+    expect(mapScene(gradient)).toMatchObject({
+      background: '#102030',
+      zenith: '#6688aa',
+      skybox: asset,
+    });
+  });
+
+  function freshScene() {
+    return Scene.parse({ ...scene, environment: { background: '#102030' } });
+  }
+});
+
+describe('token yaw (M1-34)', () => {
+  const tokenEntity = (id: number, rotation: { x: number; y: number; z: number; w: number }) =>
+    Entity.parse({
+      id: tid(id),
+      layer: 'tokens',
+      name: 'Token',
+      owners: [],
+      transform: {
+        position: { x: 0, y: 0, z: 0 },
+        rotation,
+        scale: { x: 1, y: 1, z: 1 },
+      },
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+    });
+  const yawOf = (entity: Entity) =>
+    mapScene({ ...scene, entities: { [entity.id]: entity } }).entities.find(
+      (e) => e.id === entity.id,
+    )?.token?.yaw;
+
+  it('maps an unrotated token to zero yaw', () => {
+    expect(yawOf(tokenEntity(40, { x: 0, y: 0, z: 0, w: 1 }))).toBe(0);
+  });
+
+  it('maps a Y-rotated token to the same yaw across signed angles', () => {
+    for (const theta of [
+      (-3 * Math.PI) / 4,
+      -Math.PI / 2,
+      -Math.PI / 4,
+      0,
+      Math.PI / 4,
+      Math.PI / 2,
+      (3 * Math.PI) / 4,
+    ]) {
+      const yaw = yawOf(
+        tokenEntity(41, { x: 0, y: Math.sin(theta / 2), z: 0, w: Math.cos(theta / 2) }),
+      );
+      expect(yaw).toBeCloseTo(theta, 5);
+    }
+  });
+
+  it('wraps a 180-degree rotation to the principal yaw', () => {
+    for (const s of [1, -1]) {
+      const yaw = yawOf(tokenEntity(42, { x: 0, y: s, z: 0, w: 0 }));
+      // NaN fails toBeCloseTo, so an undefined yaw would surface here.
+      expect(Math.abs(yaw ?? NaN)).toBeCloseTo(Math.PI, 5);
+    }
+  });
+
+  it('leaves non-token entities without a token entry', () => {
+    expect(yawOf(entity(43, 'props'))).toBeUndefined();
+  });
+});
+
+describe('status markers (TOK-06)', () => {
+  const markers = [
+    { kind: 'icon', icon: 'blinded' },
+    { kind: 'text', text: 'Moon marked' },
+  ] as const;
+  const tokenWith = (id: number, statusMarkers?: typeof markers) =>
+    Entity.parse({
+      id: tid(id),
+      layer: 'tokens',
+      name: 'Token',
+      owners: [],
+      transform: {
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0, w: 1 },
+        scale: { x: 1, y: 1, z: 1 },
+      },
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all', statusMarkers },
+    });
+  const renderToken = (subject: Entity) =>
+    mapScene({ ...scene, entities: { [subject.id]: subject } }).entities[0]?.token;
+
+  it('carries a token marker list through to the renderer', () => {
+    expect(renderToken(tokenWith(50, markers))?.statusMarkers).toEqual(markers);
+  });
+
+  it('omits the field entirely when the host stripped the markers', () => {
+    // The host removes the list when this viewer may not read the label (PERM-03); the renderer
+    // must not see an empty list it could mistake for "no markers".
+    expect(renderToken(tokenWith(51))?.statusMarkers).toBeUndefined();
+  });
+});

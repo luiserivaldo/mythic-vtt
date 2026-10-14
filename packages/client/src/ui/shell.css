@@ -1,0 +1,1024 @@
+/*
+ * Shared look for the table UI: one dark palette for page, toolbars, drawer and board overlays.
+ * Contrast (WCAG AA, checked): --ui-fg on --ui-bg 13.6:1, --ui-muted on --ui-bg 7.4:1,
+ * --ui-fg on --ui-control 10.3:1, --ui-on-accent on --ui-accent 9.4:1.
+ */
+:root {
+  color-scheme: dark;
+  --ui-page: #0b1118;
+  --ui-bg: #17212b;
+  --ui-bg-raised: #1f2c39;
+  --ui-control: #26384a;
+  --ui-control-hover: #2f465c;
+  --ui-input: #0f1720;
+  --ui-fg: #e8eef4;
+  --ui-muted: #a9b6c3;
+  --ui-border: #4a5b6c;
+  --ui-accent: #f0ae55;
+  --ui-on-accent: #14110b;
+  --ui-danger: #ff9b8f;
+  /* UI-TOP-06: the seat status dot's tones; the thresholds that pick them live in seat-avatars.ts. */
+  --ui-seat-good: #4ade80;
+  --ui-seat-poor: #f0ae55;
+  --ui-seat-bad: #ff9b8f;
+  --ui-bar-pad: 0.4rem;
+  --ui-drawer-width: min(28rem, 100vw);
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--ui-page);
+  color: var(--ui-fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+/* The table fills the window: header rows, then the board takes whatever remains. */
+main {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+main > h1 {
+  margin: 0;
+  padding: var(--ui-bar-pad) 0.6rem 0;
+  font-size: 1.05rem;
+}
+main > p {
+  margin: 0;
+  padding: 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--ui-muted);
+}
+.ui-identity-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.ui-identity-status span {
+  padding: 0 0.35rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+}
+/* The identity QR block sits in the dock or the join screen, next to the file controls. */
+.ui-identity-qr {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.35rem 0;
+}
+.ui-identity-qr svg {
+  align-self: flex-start;
+  max-width: 100%;
+  height: auto;
+  border-radius: 3px;
+}
+
+.ui-shell {
+  padding: var(--ui-bar-pad) 0.6rem;
+}
+.ui-board {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 16rem;
+  width: 100%;
+}
+
+/* Toolbar groups: the DM toolbar and the board controls share one segmented-button look. */
+.ui-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.ui-board-controls {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1;
+  max-width: calc(100% - 1rem);
+  padding: 0.25rem;
+  background: color-mix(in srgb, var(--ui-bg) 88%, transparent);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+}
+/* DM panels open as a drawer over the board; `top` is set from the measured header height. */
+.ui-drawer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: var(--ui-drawer-width);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  overflow-y: auto;
+  background: var(--ui-bg);
+  border-left: 1px solid var(--ui-border);
+  box-shadow: -6px 0 18px rgb(0 0 0 / 45%);
+}
+.ui-drawer-head {
+  position: sticky;
+  top: -0.5rem;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.5rem -0.5rem 0;
+  padding: 0.4rem 0.5rem;
+  background: var(--ui-bg);
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-drawer .ui-panel,
+.ui-dock-tab-body .ui-panel {
+  max-height: none;
+  overflow: visible;
+}
+
+.ui-panel {
+  box-sizing: border-box;
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  padding: 0.6rem;
+}
+.ui-drawer .ui-panel,
+.ui-dock-tab-body .ui-panel {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.ui-panel h2,
+.ui-panel h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+.ui-panel h3 {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--ui-muted);
+}
+.ui-panel form {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-create-form {
+  row-gap: 0.65rem;
+}
+.ui-create-form .ui-primary-action {
+  flex: 1 0 100%;
+  width: 100%;
+  min-height: 2.5rem;
+  margin-top: 0.25rem;
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+  font-weight: 700;
+}
+.ui-create-form .ui-primary-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-accent) 88%, white);
+}
+
+/* Legacy panel positioning is neutralised inside the ordered tool dock below. */
+.ui-overlay {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 1;
+  min-width: 11rem;
+  max-width: calc(100% - 1rem);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+}
+
+/* M1-37: tool panels share one scrollable dock in Entity, Transform, AoE order. */
+.ui-tool-dock {
+  position: absolute;
+  top: 3.25rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 2;
+  width: min(22rem, calc(100% - 1rem));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  overflow-y: auto;
+  pointer-events: none;
+}
+.ui-tool-panel,
+.ui-tool-peek {
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+.ui-tool-panel {
+  overflow: hidden;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+}
+.ui-tool-panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--ui-bg-raised);
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-tool-panel-content > .ui-panel {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.ui-tool-peek {
+  align-self: flex-end;
+  min-width: 7rem;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+}
+.ui-aoe-affected {
+  right: 0.5rem;
+  left: auto;
+  min-width: 9rem;
+  max-width: min(16rem, calc(100% - 1rem));
+  font-size: 0.82rem;
+}
+.ui-aoe-affected strong,
+.ui-aoe-affected-count,
+.ui-aoe-affected-empty {
+  display: block;
+}
+.ui-aoe-affected-count,
+.ui-aoe-affected-empty {
+  color: var(--ui-muted);
+}
+.ui-aoe-affected ul {
+  margin: 0.3rem 0 0;
+  padding-left: 1.1rem;
+}
+/* MEAS-04: one row per affected token, with its distance in scene units beside the name. */
+.ui-aoe-affected ul ul {
+  margin-top: 0.15rem;
+  padding-left: 0.9rem;
+}
+.ui-aoe-affected-distance {
+  margin-left: 0.35rem;
+  color: var(--ui-muted);
+}
+/* D35: the viewer sees the token but may not read this name. */
+.ui-aoe-affected-hidden .ui-aoe-affected-name {
+  font-style: italic;
+  opacity: 0.75;
+}
+.ui-field {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--ui-muted);
+}
+.ui-field input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.15rem;
+}
+
+.ui-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ui-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ui-share-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ui-share-row a {
+  overflow-wrap: anywhere;
+  color: var(--ui-fg);
+}
+.ui-badge {
+  font-size: 0.8em;
+  padding: 0 0.4em;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-muted);
+}
+.ui-validation {
+  flex-basis: 100%;
+  color: var(--ui-danger);
+  font-size: 0.82rem;
+}
+.ui-file-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ui-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.ui-file-button {
+  min-height: 2rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ui-file-button:hover {
+  background: var(--ui-control-hover);
+}
+.ui-file-input:focus-visible + .ui-file-button {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+.ui-file-input:disabled + .ui-file-button {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ui-file-name {
+  color: var(--ui-muted);
+  font-size: 0.82rem;
+}
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Controls (the board overlay is outside .ui-shell, so style by class and by page). */
+main button,
+main select,
+main input {
+  font: inherit;
+  color: var(--ui-fg);
+}
+main button {
+  min-height: 2rem;
+  padding: 0.2rem 0.65rem;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+main button:hover:not(:disabled):not([aria-pressed='true']) {
+  background: var(--ui-control-hover);
+}
+main button[aria-pressed='true'] {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+main button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+main select,
+main input:not([type='checkbox']):not([type='color']):not([type='file']) {
+  background: var(--ui-input);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+  min-height: 2rem;
+  box-sizing: border-box;
+}
+main input[type='color'] {
+  min-height: 2rem;
+  min-width: 2.5rem;
+  padding: 0 2px;
+  background: var(--ui-input);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+}
+main [role='alert'] {
+  color: var(--ui-danger);
+}
+main button:focus-visible,
+main input:focus-visible,
+main select:focus-visible,
+main [tabindex]:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+.ui-entity[data-selected='true'] {
+  border-left: 3px solid var(--ui-accent);
+  padding-left: 0.4rem;
+}
+
+/* Phone width: the drawer is a bottom sheet leaving the board's top visible. */
+@media (max-width: 40rem) {
+  .ui-drawer {
+    width: 100vw;
+    top: auto !important;
+    height: 62dvh;
+    border-left: 0;
+    border-top: 1px solid var(--ui-border);
+    box-shadow: 0 -6px 18px rgb(0 0 0 / 45%);
+  }
+  .ui-overlay {
+    min-width: 0;
+    width: calc(100% - 1rem);
+  }
+  .ui-overlay .ui-field {
+    display: inline-block;
+    width: 48%;
+  }
+  .ui-tool-dock {
+    top: auto;
+    left: 0.5rem;
+    max-height: 62%;
+    width: calc(100% - 1rem);
+  }
+  .ui-tool-dock .ui-overlay {
+    width: 100%;
+  }
+}
+
+.ui-elevation {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ui-toast-stack {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  width: min(34rem, calc(100vw - 1.5rem));
+  flex-direction: column;
+  gap: 0.45rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.ui-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  color: #fff4f2;
+  background: #611f24;
+  border: 1px solid #ff9b8f;
+  border-radius: 6px;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 55%);
+  pointer-events: auto;
+}
+.ui-toast button {
+  min-width: 2rem;
+  padding: 0;
+  color: #fff4f2;
+  background: #421317;
+  border-color: #ff9b8f;
+}
+
+.ui-dev-overlay {
+  position: fixed;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 50;
+  width: min(35rem, calc(100vw - 1rem));
+  max-height: min(70dvh, 42rem);
+  box-sizing: border-box;
+  padding: 0.65rem;
+  overflow: auto;
+  color: #eff7ff;
+  background: rgb(10 20 30 / 96%);
+  border: 1px solid #7d91a5;
+  border-radius: 6px;
+  box-shadow: 0 5px 22px rgb(0 0 0 / 60%);
+  font-size: 0.78rem;
+}
+.ui-dev-overlay header,
+.ui-dev-overlay dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.ui-dev-overlay dl {
+  margin: 0.5rem 0;
+}
+.ui-dev-overlay dt {
+  flex: 0 0 7rem;
+  color: #b7c8d9;
+}
+.ui-dev-overlay dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.ui-dev-overlay h2 {
+  margin: 0.65rem 0 0.25rem;
+  font-size: 0.85rem;
+}
+.ui-dev-overlay ol,
+.ui-dev-overlay p {
+  margin: 0;
+}
+.ui-dev-overlay li {
+  margin-bottom: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+/* UI-SHELL-01: the dock participates in layout, so its width changes the board viewport. */
+.ui-app {
+  --ui-page: #0c1a2c;
+  --ui-bg: #172b45;
+  --ui-bg-raised: #213954;
+  --ui-control: #29425e;
+  --ui-control-hover: #365573;
+  --ui-input: #102238;
+  --ui-border: #58708a;
+  --ui-fg: #f1f5fa;
+  --ui-muted: #bac9d8;
+  color: var(--ui-fg);
+  overflow: hidden;
+  background: var(--ui-page);
+}
+.ui-app[data-theme='light'] {
+  color-scheme: light;
+  --ui-page: #dce8f2;
+  --ui-bg: #f4f8fc;
+  --ui-bg-raised: #e6eef6;
+  --ui-control: #e4ecf4;
+  --ui-control-hover: #cfdfed;
+  --ui-input: #ffffff;
+  --ui-border: #758ca5;
+  --ui-fg: #172b45;
+  --ui-muted: #36506a;
+  --ui-accent: #9b5717;
+  --ui-on-accent: #ffffff;
+  --ui-danger: #a12626;
+  --ui-seat-good: #1f7a3d;
+  --ui-seat-poor: #8a4a10;
+  --ui-seat-bad: #a12626;
+}
+.ui-top-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 1rem;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0.25rem 0.75rem;
+  background: var(--ui-bg);
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-scene-heading {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-top-bar .ui-identity-status {
+  margin-left: auto;
+  padding: 0;
+}
+/* UI-TOP-06: one badge per occupied seat, right-aligned beside the identity; the strip is absent
+   for players and spectators, who receive no presence feed, so the identity keeps the auto margin. */
+.ui-top-bar .ui-seat-avatars {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.ui-top-bar .ui-seat-avatars + .ui-identity-status {
+  margin-left: 0;
+}
+.ui-seat-avatar {
+  position: relative;
+  border-radius: 50%;
+}
+.ui-seat-avatar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+/* The dot's shape, not only its colour, says the state: filled good/poor/bad, a ring offline,
+   a dashed ring before the host has a first reading. */
+.ui-seat-avatar-dot {
+  position: absolute;
+  right: -0.1rem;
+  bottom: -0.1rem;
+  width: 0.65rem;
+  height: 0.65rem;
+  box-sizing: border-box;
+  border: 2px solid var(--ui-bg);
+  border-radius: 50%;
+}
+.ui-seat-avatar-dot[data-tone='green'] {
+  background: var(--ui-seat-good);
+}
+.ui-seat-avatar-dot[data-tone='orange'] {
+  background: var(--ui-seat-poor);
+}
+.ui-seat-avatar-dot[data-tone='red'] {
+  background: var(--ui-seat-bad);
+}
+.ui-seat-avatar-dot[data-tone='grey'] {
+  background: transparent;
+  border-color: var(--ui-muted);
+}
+/* Offline is a ring; "not measured yet" is the same ring, dashed, so the two differ by shape too. */
+.ui-seat-avatar-dot[data-quality='unknown'] {
+  border-style: dashed;
+}
+/* Hover or keyboard focus opens the seat's name and latency; the same text is the element's title. */
+.ui-seat-avatar-popup {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 30;
+  display: none;
+  width: max-content;
+  max-width: 16rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--ui-bg-raised);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+  font-size: 0.78rem;
+}
+.ui-seat-avatar:hover .ui-seat-avatar-popup,
+.ui-seat-avatar:focus .ui-seat-avatar-popup {
+  display: block;
+}
+.ui-app-body {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+}
+.ui-app-body > .ui-board {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: auto;
+}
+.ui-right-dock {
+  flex: 0 0 22rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--ui-bg);
+  border-left: 1px solid var(--ui-border);
+  transition: flex-basis 150ms ease;
+}
+.ui-right-dock[data-collapsed='true'] {
+  flex-basis: 3rem;
+}
+.ui-right-dock-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-right-dock-head button {
+  min-width: 2rem;
+  padding-inline: 0;
+}
+.ui-right-dock-content {
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.5rem;
+}
+.ui-right-dock-content[hidden] {
+  display: none;
+}
+/* UI-DOCK-01: the tab strip is a row of icons that becomes a column when the dock collapses. */
+.ui-dock-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ui-right-dock[data-collapsed='true'] .ui-dock-tabs {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-y: auto;
+  border-bottom: 0;
+}
+.ui-right-dock[data-collapsed='true'] .ui-dock-tabs [role='tab'] {
+  width: 2.25rem;
+}
+.ui-dock-tabs [role='tab'] {
+  min-width: 2rem;
+  padding-inline: 0.3rem;
+}
+.ui-dock-tabs [role='tab'][aria-selected='true'] {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+.ui-dock-placeholder h2 {
+  margin: 0 0 0.4rem;
+}
+/* UI-CHAT-01: the message list scrolls, the composer stays under it, rolls carry their own colour. */
+.ui-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ui-chat-log {
+  min-height: 4rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.ui-chat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-chat-row {
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  background: var(--ui-bg-raised);
+  overflow-wrap: anywhere;
+}
+.ui-chat-roll {
+  font-weight: 600;
+}
+.ui-chat-empty,
+.ui-chat-note {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
+.ui-chat-composer {
+  display: flex;
+  gap: 0.4rem;
+}
+/* UI-CHAT-02: the game-log toggle sits just above the composer, small and greyed (`main button:disabled`). */
+.ui-chat-log-toggle {
+  align-self: flex-start;
+}
+.ui-chat-composer input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.35rem 0.4rem;
+  color: var(--ui-fg);
+  background: var(--ui-input);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+}
+.ui-dock-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-right: 0.8rem;
+}
+/* UX-29: the help tab is static reference text; the dt carries the input, the dd the action. */
+.ui-help-section h3 {
+  margin: 0.6rem 0 0.3rem;
+}
+.ui-help-list {
+  margin: 0;
+}
+.ui-help-row {
+  margin-bottom: 0.4rem;
+}
+.ui-help-row dt {
+  font-weight: 600;
+}
+.ui-help-row dd {
+  margin: 0.1rem 0 0;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
+.ui-app .ui-tool-dock {
+  position: static;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+}
+.ui-context-panel-slot {
+  margin-top: 0.75rem;
+}
+.ui-shell-error {
+  position: fixed;
+  z-index: 60;
+  top: 3.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 0.8rem;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-danger);
+  border-radius: 5px;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 40%);
+}
+/* Existing board controls provide the first floating rail; UX-15 replaces its entries. */
+.ui-app .ui-board-controls {
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 10rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+@media (max-width: 40rem) {
+  .ui-right-dock {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    width: min(22rem, 75vw);
+    max-height: 70%;
+    border-top: 1px solid var(--ui-border);
+  }
+  .ui-right-dock[data-collapsed='true'] {
+    width: 3rem;
+  }
+  .ui-app .ui-board-controls {
+    top: 0.5rem;
+    transform: none;
+  }
+}
+/* History lives in the right dock like the other panels: it scrolls with the dock and never overlaps it. */
+.ui-history-tools {
+  margin-top: 0.5rem;
+}
+.ui-history-tools code {
+  overflow-wrap: anywhere;
+}
+.ui-history-tools .ui-panel ol {
+  padding-left: 1.1rem;
+}
+/* HIST-04: DM selection and the right-click menu in the History log. */
+.ui-history-tools li[data-selected] {
+  background: color-mix(in srgb, var(--ui-accent, #7dd3fc) 18%, transparent);
+}
+.ui-history-tools li > input[type='checkbox'] {
+  margin-right: 0.35rem;
+}
+.ui-history-menu {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 9rem;
+  padding: 0.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.4rem;
+  background: var(--ui-panel-bg, Canvas);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
+}
+/* UX-15: the tool rail inside the board's control column. */
+.ui-rail-divider {
+  align-self: stretch;
+  margin: 0.2rem 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+}
+.ui-board-controls .ui-rail-tool {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: left;
+}
+.ui-rail-glyph {
+  width: 1.1rem;
+  text-align: center;
+}
+.ui-board-controls button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* UI-TOOL-05: the Initiative placeholder is greyed and dashed so it cannot be taken for a real
+   tool. It stays clickable (a click opens its mock panel), so the greying is colour only: the
+   pressed look keeps the accent. */
+.ui-rail-tool[data-wip] {
+  border-style: dashed;
+  font-style: italic;
+}
+.ui-rail-tool[data-wip]:not([aria-pressed='true']) {
+  color: var(--ui-muted);
+}
+.ui-rail-wip {
+  margin-left: auto;
+  padding: 0 0.3rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-style: normal;
+}
+
+.ui-view-mode {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+.ui-view-mode button {
+  border-radius: 0;
+}
+.ui-view-mode button:first-child {
+  border-radius: 0.3rem 0 0 0.3rem;
+}
+.ui-view-mode button:last-child {
+  border-radius: 0 0.3rem 0.3rem 0;
+}
+.ui-scene-heading {
+  min-width: 0;
+  max-width: 35%;
+}
+
+.ui-view-as {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.ui-view-as-chip {
+  color: var(--ui-accent);
+  font-size: 0.85rem;
+}
+.ui-view-as-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 30;
+  min-width: 15rem;
+  max-width: 90vw;
+  padding: 0.75rem;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  display: grid;
+  gap: 0.5rem;
+}
+.ui-view-as-menu label {
+  display: grid;
+  gap: 0.25rem;
+}
+.ui-preview-content {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}

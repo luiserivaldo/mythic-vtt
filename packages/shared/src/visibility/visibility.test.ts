@@ -1,0 +1,630 @@
+import { applyPatches, current, enablePatches, produce, produceWithPatches } from 'immer';
+import { describe, expect, it } from 'vitest';
+import { IDS, makeCampaign, makeEntity, testId } from '../actions/testing.js';
+import type { Campaign } from '../schema/index.js';
+import type { Audience } from './audience.js';
+import { patchesFor } from './patches-for.js';
+import { seesScene, visibleTo } from './visible-to.js';
+
+enablePatches();
+
+const audiences: Record<string, Audience> = {
+  owner: { kind: 'seat', seatId: IDS.owner },
+  other: { kind: 'seat', seatId: IDS.other },
+  spectators: { kind: 'spectators' },
+};
+const SECRET = 'SECRET-DM-NOTE';
+const dmId = testId(10);
+const pubId = testId(11);
+const privId = testId(12);
+
+function withEntities(): Campaign {
+  return produce(makeCampaign(), (d) => {
+    const s = d.scenes[IDS.scene];
+    if (!s) return;
+    s.entities[dmId] = makeEntity(dmId, { layer: 'dm', name: SECRET, owners: [IDS.owner] });
+    s.entities[pubId] = makeEntity(pubId, { name: 'Visible orc' });
+    s.entities[privId] = makeEntity(privId, {
+      name: 'Hidden-label',
+      owners: [IDS.owner],
+      perms: { view: false },
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'owner' },
+    });
+  });
+}
+
+describe('visibleTo', () => {
+  it('returns the host everything, by reference', () => {
+    const s = withEntities();
+    expect(visibleTo({ kind: 'host' }, s)).toBe(s);
+  });
+
+  it.each(Object.entries(audiences))('strips the DM layer for %s (even for its owner)', (_n, a) => {
+    const json = JSON.stringify(visibleTo(a, withEntities()));
+    expect(json).not.toContain(SECRET);
+    expect(json).not.toContain(dmId);
+  });
+
+  it('hides view-disabled entities from non-owners and masks owner-only labels', () => {
+    const s = withEntities();
+    const other = visibleTo(audiences.other as Audience, s).scenes[IDS.scene]?.entities ?? {};
+    expect(privId in other).toBe(false);
+    const owner = visibleTo(audiences.owner as Audience, s).scenes[IDS.scene]?.entities ?? {};
+    expect(owner[privId]?.name).toBe('Hidden-label');
+    expect(owner[pubId]?.name).toBe('Visible orc');
+  });
+
+  it('hides all entities when a seat-level view permission is disabled', () => {
+    const s = produce(withEntities(), (d) => {
+      const seat = d.seats[IDS.other];
+      if (seat) seat.permissions.view = false;
+    });
+    expect(visibleTo(audiences.other as Audience, s).scenes[IDS.scene]?.entities).toEqual({});
+  });
+
+  it('masks owner-only token labels for non-owners', () => {
+    const s = produce(withEntities(), (d) => {
+      const e = d.scenes[IDS.scene]?.entities[pubId];
+      if (e) {
+        e.owners = [IDS.owner];
+        e.token = { sizeCells: 1, heightCells: 1, labelVisibility: 'owner' };
+      }
+    });
+    expect(visibleTo(audiences.other as Audience, s).scenes[IDS.scene]?.entities[pubId]?.name).toBe(
+      '',
+    );
+    expect(visibleTo(audiences.owner as Audience, s).scenes[IDS.scene]?.entities[pubId]?.name).toBe(
+      'Visible orc',
+    );
+  });
+
+  it('does not mutate its input and is stable across calls', () => {
+    const s = withEntities();
+    const snapshot = JSON.stringify(s);
+    const a = visibleTo(audiences.other as Audience, s);
+    expect(JSON.stringify(s)).toBe(snapshot);
+    expect(visibleTo(audiences.other as Audience, s)).toBe(a);
+  });
+});
+
+describe('seesScene', () => {
+  const dmOnlyId = testId(20);
+  const inactiveId = testId(21);
+  const coDm: Audience = { kind: 'seat', seatId: IDS.coDm };
+
+  function withScenes(): Campaign {
+    const base = makeCampaign();
+    const scene = base.scenes[IDS.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    return {
+      ...base,
+      scenes: {
+        ...base.scenes,
+        [dmOnlyId]: { ...scene, id: dmOnlyId, name: 'Prep', dmOnly: true },
+        [inactiveId]: { ...scene, id: inactiveId, name: 'Backstage' },
+      },
+    };
+  }
+
+  it('is false for a scene the campaign does not hold, for every audience', () => {
+    const s = withScenes();
+    for (const audience of [...Object.values(audiences), coDm, { kind: 'host' } as Audience]) {
+      expect(seesScene(s, audience, testId(30))).toBe(false);
+    }
+  });
+
+  it('lets the host and co-DM seats see every scene, DM-only and inactive included', () => {
+    const s = withScenes();
+    for (const sceneId of [IDS.scene, dmOnlyId, inactiveId]) {
+      expect(seesScene(s, { kind: 'host' }, sceneId)).toBe(true);
+      expect(seesScene(s, coDm, sceneId)).toBe(true);
+    }
+  });
+
+  it('limits players and spectators to the active, non-DM-only scene', () => {
+    const s = withScenes();
+    for (const audience of [audiences.owner, audiences.other, audiences.spectators] as Audience[]) {
+      expect(seesScene(s, audience, IDS.scene)).toBe(true);
+      expect(seesScene(s, audience, dmOnlyId)).toBe(false);
+      expect(seesScene(s, audience, inactiveId)).toBe(false);
+    }
+  });
+});
+
+describe('patchesFor (non-leak)', () => {
+  const move = (layer: 'dm' | 'tokens') => (before: Campaign) =>
+    produce(before, (d) => {
+      const e = d.scenes[IDS.scene]?.entities[pubId];
+      if (e) e.layer = layer;
+    });
+
+  it('moving an entity onto the DM layer becomes a removal for players and spectators', () => {
+    const before = withEntities();
+    const after = move('dm')(before);
+    for (const a of Object.values(audiences)) {
+      const patches = patchesFor(a, before, after);
+      expect(patches).toEqual([{ op: 'remove', path: ['scenes', IDS.scene, 'entities', pubId] }]);
+    }
+    expect(patchesFor({ kind: 'host' }, before, after)).toEqual([
+      { op: 'replace', path: ['scenes', IDS.scene, 'entities', pubId, 'layer'], value: 'dm' },
+    ]);
+  });
+
+  it('moving an entity off the DM layer becomes an add; no earlier DM state is revealed', () => {
+    const before = withEntities();
+    const after = produce(before, (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) e.layer = 'tokens';
+    });
+    const patches = patchesFor(audiences.other as Audience, before, after);
+    expect(patches).toHaveLength(1);
+    expect(patches[0]).toMatchObject({ op: 'add', path: ['scenes', IDS.scene, 'entities', dmId] });
+  });
+
+  it('edits to DM-layer entities produce no patches for players', () => {
+    const before = withEntities();
+    const after = produce(before, (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) {
+        e.name = 'Changed secret';
+        e.transform.position.x = 9;
+      }
+    });
+    for (const a of Object.values(audiences)) expect(patchesFor(a, before, after)).toEqual([]);
+    expect(JSON.stringify(patchesFor(audiences.other as Audience, before, after))).not.toContain(
+      'secret',
+    );
+  });
+
+  it('applying audience patches to the audience view equals the new audience view', () => {
+    const before = withEntities();
+    const after = produce(before, (d) => {
+      const s = d.scenes[IDS.scene];
+      if (!s) return;
+      s.name = 'Renamed';
+      const e = s.entities[pubId];
+      if (e) e.transform.position.x = 4;
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- test removes a known key
+      delete s.entities[dmId];
+      s.entities[testId(13)] = makeEntity(testId(13), { layer: 'dm', name: SECRET });
+    });
+    for (const a of Object.values(audiences)) {
+      const patched = applyPatches(visibleTo(a, before), patchesFor(a, before, after));
+      expect(patched).toEqual(visibleTo(a, after));
+    }
+  });
+});
+
+describe('patchesFor with raw patches (hybrid translation, D21)', () => {
+  const scenes = [
+    [
+      'entity edit',
+      (d: Campaign) => {
+        const e = d.scenes[IDS.scene]?.entities[pubId];
+        if (e) e.transform.position.z = 3;
+      },
+    ],
+    [
+      'layer to dm',
+      (d: Campaign) => {
+        const e = d.scenes[IDS.scene]?.entities[pubId];
+        if (e) e.layer = 'dm';
+      },
+    ],
+    [
+      'layer off dm',
+      (d: Campaign) => {
+        const e = d.scenes[IDS.scene]?.entities[dmId];
+        if (e) e.layer = 'tokens';
+      },
+    ],
+    [
+      'dm entity edit',
+      (d: Campaign) => {
+        const e = d.scenes[IDS.scene]?.entities[dmId];
+        if (e) e.name = 'x';
+      },
+    ],
+    [
+      'perm view toggled',
+      (d: Campaign) => {
+        const e = d.scenes[IDS.scene]?.entities[privId];
+        if (e) e.perms = { view: true };
+      },
+    ],
+    [
+      'scene rename',
+      (d: Campaign) => {
+        const s = d.scenes[IDS.scene];
+        if (s) s.name = 'N';
+      },
+    ],
+    [
+      'scene added (fallback)',
+      (d: Campaign) => {
+        const s = d.scenes[IDS.scene];
+        if (s) d.scenes[testId(20)] = { ...structuredClone(current(s)), id: testId(20) };
+      },
+    ],
+    [
+      'entities replaced (fallback)',
+      (d: Campaign) => {
+        const s = d.scenes[IDS.scene];
+        if (s) s.entities = {};
+      },
+    ],
+    [
+      'activeSceneId',
+      (d: Campaign) => {
+        d.activeSceneId = null;
+      },
+    ],
+  ] as const;
+
+  it.each(scenes)('%s: matches the diff oracle and never contains DM data', (_n, recipe) => {
+    const before = withEntities();
+    const [after, raw] = produceWithPatches(before, recipe);
+    for (const a of Object.values(audiences)) {
+      const fast = patchesFor(a, before, after, raw);
+      const view = visibleTo(a, before);
+      expect(applyPatches(view, fast)).toEqual(visibleTo(a, after));
+      if (_n === 'dm entity edit') expect(fast).toEqual([]);
+    }
+  });
+});
+
+// D32: co-DM seats see the DM layer; players and spectators never do.
+describe('co-DM audience (D32)', () => {
+  const coDm: Audience = { kind: 'seat', seatId: IDS.coDm };
+  const players = [audiences.owner, audiences.other, audiences.spectators] as Audience[];
+  const entPath = (id: string) => ['scenes', IDS.scene, 'entities', id];
+
+  it('includes DM-layer entities in the co-DM snapshot only', () => {
+    const s = withEntities();
+    expect(visibleTo(coDm, s).scenes[IDS.scene]?.entities[dmId]?.name).toBe(SECRET);
+    for (const a of players) expect(JSON.stringify(visibleTo(a, s))).not.toContain(SECRET);
+  });
+
+  it('stops being a co-DM view once the role is demoted', () => {
+    const s = withEntities();
+    const demoted = produce(s, (d) => {
+      const seat = d.seats[IDS.coDm];
+      if (seat) seat.role = 'player';
+    });
+    expect(visibleTo(coDm, demoted).scenes[IDS.scene]?.entities[dmId]).toBeUndefined();
+  });
+
+  const recipes: Record<string, (d: Campaign) => void> = {
+    create: (d) => {
+      const s = d.scenes[IDS.scene];
+      if (s) s.entities[testId(13)] = makeEntity(testId(13), { layer: 'dm', name: SECRET });
+    },
+    edit: (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) e.name = 'Changed';
+    },
+    move: (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) e.transform.position.x = 9;
+    },
+    delete: (d) => {
+      const s = d.scenes[IDS.scene];
+      if (s) Reflect.deleteProperty(s.entities, dmId);
+    },
+    'layer onto dm': (d) => {
+      const e = d.scenes[IDS.scene]?.entities[pubId];
+      if (e) e.layer = 'dm';
+    },
+    'layer off dm': (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) e.layer = 'tokens';
+    },
+  };
+
+  it.each(Object.entries(recipes))('%s: co-DM gets patches, players get none', (name, recipe) => {
+    const before = withEntities();
+    const [after, raw] = produceWithPatches(before, recipe);
+    const fast = patchesFor(coDm, before, after, raw);
+    expect(applyPatches(visibleTo(coDm, before), fast)).toEqual(visibleTo(coDm, after));
+    expect(fast).toEqual(patchesFor(coDm, before, after));
+    const ops = fast.map((p) => p.op);
+    if (name === 'create') expect(ops).toEqual(['add']);
+    if (name === 'delete') expect(ops).toEqual(['remove']);
+    if (name === 'edit' || name === 'move') expect(fast.length).toBeGreaterThan(0);
+    if (name === 'layer onto dm')
+      expect(fast).toEqual([{ op: 'replace', path: [...entPath(pubId), 'layer'], value: 'dm' }]);
+    if (name !== 'layer onto dm' && name !== 'layer off dm') {
+      for (const a of players) expect(patchesFor(a, before, after, raw)).toEqual([]);
+    }
+    if (name !== 'layer off dm') {
+      for (const a of players) {
+        expect(JSON.stringify(patchesFor(a, before, after, raw))).not.toContain(SECRET);
+      }
+    }
+  });
+
+  it('role promotion changes the audience view of the same state', () => {
+    const before = withEntities();
+    const after = produce(before, (d) => {
+      const seat = d.seats[IDS.other];
+      if (seat) seat.role = 'codm';
+    });
+    const other = audiences.other as Audience;
+    expect(visibleTo(other, before).scenes[IDS.scene]?.entities[dmId]).toBeUndefined();
+    expect(visibleTo(other, after).scenes[IDS.scene]?.entities[dmId]).toBeDefined();
+  });
+});
+
+describe('label visibility (D35, TOK-04 + PERM-03)', () => {
+  const NAME = 'Archmage Zorn the Unseen';
+  const labelId = testId(20);
+  const host: Audience = { kind: 'host' };
+  const coDm: Audience = { kind: 'seat', seatId: IDS.coDm };
+  const owner = audiences.owner as Audience;
+  const other = audiences.other as Audience;
+  const spectators = audiences.spectators as Audience;
+  const everyone: [string, Audience][] = [
+    ['host', host],
+    ['co-DM', coDm],
+    ['owner', owner],
+    ['other player', other],
+    ['spectator', spectators],
+  ];
+  type Mode = 'all' | 'owner' | 'dm';
+  // Who may read the real name, per mode.
+  const allowed: Record<Mode, string[]> = {
+    all: ['host', 'co-DM', 'owner', 'other player', 'spectator'],
+    owner: ['host', 'co-DM', 'owner'],
+    dm: ['host', 'co-DM'],
+  };
+
+  const withLabel = (mode: Mode): Campaign =>
+    produce(makeCampaign(), (d) => {
+      const s = d.scenes[IDS.scene];
+      if (!s) return;
+      s.entities[labelId] = makeEntity(labelId, {
+        name: NAME,
+        owners: [IDS.owner],
+        token: { sizeCells: 1, heightCells: 1, labelVisibility: mode },
+      });
+    });
+  const nameFor = (a: Audience, s: Campaign) =>
+    visibleTo(a, s).scenes[IDS.scene]?.entities[labelId]?.name;
+
+  describe.each(['all', 'owner', 'dm'] as Mode[])('mode %s', (mode) => {
+    it.each(everyone)('%s: sees the name only when allowed, never in serialized form', (who, a) => {
+      const s = withLabel(mode);
+      const view = visibleTo(a, s);
+      expect(view.scenes[IDS.scene]?.entities[labelId]).toBeDefined(); // the token itself stays
+      if (allowed[mode].includes(who)) expect(nameFor(a, s)).toBe(NAME);
+      else {
+        expect(nameFor(a, s)).toBe('');
+        expect(JSON.stringify(view)).not.toContain(NAME);
+      }
+    });
+  });
+
+  it('keeps every other field of a masked entity intact', () => {
+    const s = withLabel('dm');
+    const real = s.scenes[IDS.scene]?.entities[labelId];
+    expect(nameFor(other, s)).toBe('');
+    expect({ ...visibleTo(other, s).scenes[IDS.scene]?.entities[labelId], name: NAME }).toEqual(
+      real,
+    );
+  });
+
+  const hiddenFrom = (mode: Mode) => everyone.filter(([who]) => !allowed[mode].includes(who));
+
+  it('rename while hidden yields no patch and no name for non-allowed audiences', () => {
+    const before = withLabel('dm');
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const e = d.scenes[IDS.scene]?.entities[labelId];
+      if (e) e.name = 'Renamed-Secret-Name';
+    });
+    for (const [who, a] of everyone) {
+      const fast = patchesFor(a, before, after, raw);
+      expect(fast, who).toEqual(patchesFor(a, before, after));
+      if (allowed.dm.includes(who)) expect(fast.length, who).toBeGreaterThan(0);
+      else expect(fast, who).toEqual([]);
+    }
+  });
+
+  it('creating a hidden-label entity never carries the name for non-allowed audiences', () => {
+    const before = makeCampaign();
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const s = d.scenes[IDS.scene];
+      if (s)
+        s.entities[labelId] = makeEntity(labelId, {
+          name: NAME,
+          token: { sizeCells: 1, heightCells: 1, labelVisibility: 'owner' },
+        });
+    });
+    for (const [who, a] of hiddenFrom('owner')) {
+      const fast = patchesFor(a, before, after, raw);
+      expect(fast, who).toEqual(patchesFor(a, before, after));
+      expect(JSON.stringify(fast), who).not.toContain(NAME);
+      expect(
+        fast.map((p) => p.op),
+        who,
+      ).toEqual(['add']);
+    }
+  });
+
+  const flips: [Mode, Mode][] = [
+    ['all', 'owner'],
+    ['all', 'dm'],
+    ['owner', 'all'],
+    ['owner', 'dm'],
+    ['dm', 'all'],
+    ['dm', 'owner'],
+  ];
+  it.each(flips)('flipping labelVisibility %s -> %s reveals or hides consistently', (from, to) => {
+    const before = withLabel(from);
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const t = d.scenes[IDS.scene]?.entities[labelId]?.token;
+      if (t) t.labelVisibility = to;
+    });
+    for (const [who, a] of everyone) {
+      const fast = patchesFor(a, before, after, raw);
+      expect(fast, who).toEqual(patchesFor(a, before, after)); // oracle
+      expect(applyPatches(visibleTo(a, before), fast), who).toEqual(visibleTo(a, after));
+      const sees = (m: Mode) => allowed[m].includes(who);
+      if (!sees(from) && sees(to)) expect(JSON.stringify(fast), who).toContain(NAME);
+      if (!sees(to)) expect(JSON.stringify(fast), who).not.toContain(NAME);
+    }
+  });
+
+  it('changing owners flips the name for the affected seat (owner mode)', () => {
+    const before = withLabel('owner');
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const e = d.scenes[IDS.scene]?.entities[labelId];
+      if (e) e.owners = [IDS.other];
+    });
+    for (const [who, a] of everyone) {
+      const fast = patchesFor(a, before, after, raw);
+      expect(fast, who).toEqual(patchesFor(a, before, after));
+      expect(applyPatches(visibleTo(a, before), fast), who).toEqual(visibleTo(a, after));
+    }
+    expect(nameFor(other, after)).toBe(NAME);
+    expect(nameFor(owner, after)).toBe('');
+  });
+
+  it('demoting a co-DM masks dm-only names in its view', () => {
+    const s = withLabel('dm');
+    const demoted = produce(s, (d) => {
+      const seat = d.seats[IDS.coDm];
+      if (seat) seat.role = 'player';
+    });
+    expect(nameFor(coDm, s)).toBe(NAME);
+    expect(nameFor(coDm, demoted)).toBe('');
+  });
+});
+
+describe('switching the audience of one state (M4-02 cache safety)', () => {
+  // A spectator watching through seat X is served `{kind:'seat', seatId: X}`; flipping between
+  // that and `{kind:'spectators'}` on the very same state object must never reuse the other view.
+  const ownerLabel = 'OWNER-ONLY-LABEL';
+  const labelled = () =>
+    produce(withEntities(), (d) => {
+      const s = d.scenes[IDS.scene];
+      if (!s) return;
+      s.entities[testId(13)] = makeEntity(testId(13), {
+        name: ownerLabel,
+        owners: [IDS.owner],
+        token: { sizeCells: 1, heightCells: 1, labelVisibility: 'owner' },
+      });
+    });
+
+  it('serves each audience its own view in any order, never a stale one', () => {
+    const state = labelled();
+    const seen = (a: Audience) => JSON.stringify(visibleTo(a, state));
+    const modes: Audience[] = [
+      { kind: 'spectators' },
+      { kind: 'seat', seatId: IDS.owner },
+      { kind: 'spectators' },
+      { kind: 'seat', seatId: IDS.other },
+      { kind: 'seat', seatId: IDS.owner },
+      { kind: 'spectators' },
+    ];
+    for (const mode of modes) {
+      const json = seen(mode);
+      expect(json).not.toContain(SECRET);
+      const owner = mode.kind === 'seat' && mode.seatId === IDS.owner;
+      expect(json.includes(ownerLabel)).toBe(owner);
+    }
+  });
+
+  it('patches for a seat-view spectator equal that seat’s patches and never carry DM data', () => {
+    const before = labelled();
+    const [after, raw] = produceWithPatches(before, (d) => {
+      const e = d.scenes[IDS.scene]?.entities[dmId];
+      if (e) e.name = `${SECRET}-2`;
+      const o = d.scenes[IDS.scene]?.entities[testId(13)];
+      if (o) o.name = `${ownerLabel}-2`;
+    });
+    const seatView: Audience = { kind: 'seat', seatId: IDS.owner };
+    const asSeat = patchesFor(seatView, before, after, raw);
+    const asPlayers = patchesFor({ kind: 'spectators' }, before, after, raw);
+    expect(JSON.stringify(asSeat)).not.toContain(SECRET);
+    expect(JSON.stringify(asSeat)).toContain(`${ownerLabel}-2`);
+    expect(JSON.stringify(asPlayers)).not.toContain(ownerLabel);
+    expect(applyPatches(visibleTo(seatView, before), asSeat)).toEqual(visibleTo(seatView, after));
+  });
+});
+
+describe('UI-TOP-01 scene privacy', () => {
+  it('projects only the active scene and filters inactive edits and activation patches', () => {
+    const inactiveId = testId(24);
+    const state = produce(makeCampaign(), (draft) => {
+      const active = draft.scenes[IDS.scene];
+      if (!active) throw new Error('fixture scene missing');
+      draft.scenes[inactiveId] = {
+        ...structuredClone(current(active)),
+        id: inactiveId,
+        name: 'Unvisited public scene',
+      };
+    });
+    expect(Object.keys(visibleTo({ kind: 'host' }, state).scenes)).toHaveLength(2);
+    expect(Object.keys(visibleTo({ kind: 'seat', seatId: IDS.coDm }, state).scenes)).toHaveLength(
+      2,
+    );
+    const [edited, rawEdit] = produceWithPatches(state, (draft) => {
+      const scene = draft.scenes[inactiveId];
+      if (!scene) throw new Error('fixture scene missing');
+      scene.name = 'Still private to current players';
+      scene.entities[pubId] = makeEntity(pubId, { name: 'Inactive entity' });
+    });
+    const [activated, rawActivation] = produceWithPatches(edited, (draft) => {
+      draft.activeSceneId = inactiveId;
+    });
+    for (const audience of Object.values(audiences)) {
+      const before = visibleTo(audience, state);
+      expect(Object.keys(before.scenes)).toEqual([IDS.scene]);
+      expect(JSON.stringify(before)).not.toContain(inactiveId);
+      expect(patchesFor(audience, state, edited, rawEdit)).toEqual([]);
+      const patches = patchesFor(audience, edited, activated, rawActivation);
+      const after = applyPatches(before, patches);
+      expect(after).toEqual(visibleTo(audience, activated));
+      expect(Object.keys(after.scenes)).toEqual([inactiveId]);
+      expect(visibleTo(audience, { ...activated, activeSceneId: null }).scenes).toEqual({});
+    }
+  });
+});
+
+describe('seesScene', () => {
+  // M4-11 / MV-155: a sceneId-bearing ephemeral (a camera pose, a drawing) is routed by the one
+  // scene rule, read off `visibleTo` instead of a second copy of PERM-03 that can drift.
+  it('routes a sceneId-bearing ephemeral to exactly the audiences that may see that scene', () => {
+    const base = makeCampaign();
+    const cave = base.scenes[IDS.scene];
+    if (!cave) throw new Error('fixture incomplete');
+    const vaultId = testId(25);
+    const unknownId = testId(26);
+    const state: Campaign = {
+      ...base,
+      scenes: { ...base.scenes, [vaultId]: { ...cave, id: vaultId, name: 'Vault', dmOnly: true } },
+    };
+    const host: Audience = { kind: 'host' };
+    const coDm: Audience = { kind: 'seat', seatId: IDS.coDm };
+    const player: Audience = { kind: 'seat', seatId: IDS.owner };
+    const spectators: Audience = { kind: 'spectators' };
+
+    // The active, ordinary scene belongs to everyone in it.
+    for (const audience of [host, coDm, player, spectators]) {
+      expect(seesScene(state, audience, IDS.scene)).toBe(true);
+    }
+    // A DM-only scene is the host's and a co-DM's: no player or spectator is ever routed to it.
+    expect(seesScene(state, host, vaultId)).toBe(true);
+    expect(seesScene(state, coDm, vaultId)).toBe(true);
+    expect(seesScene(state, player, vaultId)).toBe(false);
+    expect(seesScene(state, spectators, vaultId)).toBe(false);
+
+    // Only the active scene is a player's or a spectator's, and an unknown scene is nobody's.
+    const behind: Campaign = { ...state, activeSceneId: vaultId };
+    expect(seesScene(behind, player, IDS.scene)).toBe(false);
+    expect(seesScene(behind, spectators, IDS.scene)).toBe(false);
+    expect(seesScene(behind, player, vaultId)).toBe(false);
+    expect(seesScene(state, host, unknownId)).toBe(false);
+    expect(seesScene(state, player, unknownId)).toBe(false);
+  });
+});

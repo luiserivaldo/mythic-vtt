@@ -1,0 +1,51 @@
+import js from '@eslint/js';
+import { defineConfig } from 'eslint/config';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+export default defineConfig(
+  {
+    // Generated Playwright output (gitignored): linting the trace viewer's own bundles fails the
+    // project service for files that are not part of any tsconfig.
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
+      'fixtures/**',
+    ],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.strictTypeChecked,
+  {
+    languageOptions: {
+      globals: { ...globals.node },
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      // Project convention: named exports only, no `any`, no unexplained non-null assertions.
+      'no-restricted-exports': ['error', { restrictDefaultExports: { direct: true } }],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'error',
+    },
+  },
+  {
+    // Tool configs are default exports by convention.
+    files: ['*.config.{js,ts}', '**/*.config.{js,ts}'],
+    rules: { 'no-restricted-exports': 'off' },
+  },
+  {
+    // shared is pure.
+    files: ['packages/shared/src/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-globals': ['error', 'window', 'document', 'process', 'Buffer', 'fetch'],
+      'no-restricted-properties': [
+        'error',
+        { object: 'Math', property: 'random', message: 'shared must be pure' },
+        { object: 'Date', property: 'now', message: 'shared must be pure' },
+      ],
+    },
+  },
+);

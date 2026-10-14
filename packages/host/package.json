@@ -1,0 +1,47 @@
+{
+  "name": "@mythic/host",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "default": "./dist/storage/index.js"
+    },
+    "./storage/conformance": {
+      "types": "./dist/storage/conformance.d.ts",
+      "default": "./dist/storage/conformance.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "node dist/main.js"
+  },
+  "dependencies": {
+    "@mythic/protocol": "workspace:*",
+    "@mythic/shared": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.3",
+    "fastify": "^5.12.5",
+    "fflate": "^0.8.3",
+    "immer": "^10.2.0",
+    "sharp": "^0.35.5",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/ws": "^8.18.2",
+    "vitest": "^5.0.3"
+  },
+  "bin": {
+    "mythic-host": "./dist/main.js"
+  }
+}

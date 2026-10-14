@@ -1,0 +1,376 @@
+import { canPerform, SEAT_TEMPLATES, type Campaign, type Entity, type Scene } from '@mythic/shared';
+import { describe, expect, it } from 'vitest';
+import { createClientStore } from '../store/store.js';
+import { makeCampaign, tid } from '../testing.js';
+import {
+  entityMoveLayerIntent,
+  layerLockIntent,
+  sceneActivateIntent,
+  sceneBoundsIntent,
+  sceneCreateIntent,
+  sceneRenameIntent,
+  seatAssignIntent,
+  seatCreateIntent,
+  seatPermissionIntent,
+  seatReleaseIntent,
+  seatRoleIntent,
+  type IntentSpec,
+} from './intent-specs.js';
+import {
+  DEFAULT_ACTIVE_LAYER,
+  LAYER_ROWS,
+  layerRows,
+  moveTargets,
+  toggleHidden,
+} from './layer-panel.js';
+import { sceneRows, isValidSceneName } from './scene-list.js';
+import { connectedIdentityRows, isValidIdentityId, isValidLabel, seatRows } from './seat-panel.js';
+import { toolbarItems } from './toolbar-items.js';
+import { createUiStore } from './ui-store.js';
+import {
+  canManageSeats,
+  identitySummary,
+  isAdminRole,
+  isReadOnlyViewer,
+  viewerRole,
+} from './viewer.js';
+
+const S = tid(2);
+const E = tid(3);
+const P = tid(4);
+const C = tid(5);
+
+const entity = (layer: Entity['layer']): Entity => ({
+  id: E,
+  layer,
+  name: 'Goblin',
+  owners: [],
+  transform: {
+    position: { x: 0, y: 0, z: 0 },
+    rotation: { x: 0, y: 0, z: 0, w: 1 },
+    scale: { x: 1, y: 1, z: 1 },
+  },
+});
+
+function world(): Campaign {
+  const base = makeCampaign();
+  const perms = { view: true, move: true, edit: false, delete: false };
+  return {
+    ...base,
+    seats: {
+      [P]: {
+        id: P,
+        label: 'Pia',
+        binding: 'persistent',
+        identityId: null,
+        role: 'player',
+        permissions: perms,
+      },
+      [C]: {
+        id: C,
+        label: 'Cleo',
+        binding: 'persistent',
+        identityId: tid(9),
+        role: 'codm',
+        permissions: perms,
+      },
+    },
+    scenes: {
+      [S]: {
+        id: S,
+        name: 'Cave',
+        grid: {
+          type: 'square',
+          sizePx: 70,
+          unitsPerCell: 5,
+          unitLabel: 'ft',
+          diagonal: 'alternating',
+          snap: true,
+        },
+        environment: { background: '#000000' },
+        layers: { props: { locked: true } },
+        entities: { [E]: entity('tokens') },
+      },
+    },
+    activeSceneId: S,
+  };
+}
+
+const sceneOf = (c: Campaign): Scene => {
+  const scene = c.scenes[S];
+  if (!scene) throw new Error('fixture scene missing');
+  return scene;
+};
+
+describe('viewerRole', () => {
+  const campaign = world();
+  it('derives the role from the host claim and the seat', () => {
+    expect(viewerRole({ isHost: true, seatId: null, campaign })).toBe('host');
+    expect(viewerRole({ isHost: false, seatId: C, campaign })).toBe('codm');
+    expect(viewerRole({ isHost: false, seatId: P, campaign })).toBe('player');
+    expect(viewerRole({ isHost: false, seatId: null, campaign })).toBe('observer');
+    expect(viewerRole({ isHost: false, seatId: tid(20), campaign })).toBe('observer');
+    expect(viewerRole({ isHost: false, seatId: P, campaign: null })).toBe('observer');
+  });
+  it('only admins see scene and layer panels; only the host sees seats', () => {
+    expect(isAdminRole('codm')).toBe(true);
+    expect(isAdminRole('player')).toBe(false);
+    expect(canManageSeats('codm')).toBe(false);
+    const everyone = ['chat', 'sheet'];
+    const info = ['help', 'settings'];
+    expect(toolbarItems('player').map((i) => i.id)).toEqual([...everyone, ...info]);
+    expect(toolbarItems('observer').map((i) => i.id)).toEqual([...everyone, ...info]);
+    expect(toolbarItems('codm').map((i) => i.id)).toEqual([
+      ...everyone,
+      'scenes',
+      'layers',
+      'entities',
+      'prefabs',
+      ...info,
+    ]);
+    expect(toolbarItems('host').map((i) => i.id)).toEqual([
+      ...everyone,
+      'scenes',
+      'layers',
+      'entities',
+      'prefabs',
+      'seats',
+      'share',
+      ...info,
+    ]);
+  });
+  it('describes the current identity, role and seat', () => {
+    expect(identitySummary({ displayName: 'DM', isHost: true, seatId: null, campaign })).toEqual({
+      displayName: 'DM',
+      roleLabel: 'DM',
+      seatLabel: 'Host',
+    });
+    expect(identitySummary({ displayName: 'Cleo', isHost: false, seatId: C, campaign })).toEqual({
+      displayName: 'Cleo',
+      roleLabel: 'Co-DM',
+      seatLabel: 'Cleo',
+    });
+    expect(identitySummary({ displayName: 'Pia', isHost: false, seatId: P, campaign })).toEqual({
+      displayName: 'Pia',
+      roleLabel: 'Player',
+      seatLabel: 'Pia',
+    });
+    expect(
+      identitySummary({ displayName: 'Quinn', isHost: false, seatId: null, campaign }),
+    ).toEqual({
+      displayName: 'Quinn',
+      roleLabel: 'Spectator',
+      seatLabel: 'Spectator',
+    });
+  });
+  it('treats seat-less observers and no-action player slots as camera-only viewers', () => {
+    const campaign = world();
+    expect(isReadOnlyViewer({ isHost: false, seatId: null, campaign })).toBe(true);
+    expect(isReadOnlyViewer({ isHost: true, seatId: null, campaign })).toBe(false);
+    expect(isReadOnlyViewer({ isHost: false, seatId: C, campaign })).toBe(false);
+    const player = campaign.seats[P];
+    if (!player) throw new Error('missing player fixture');
+    const readOnlyCampaign = {
+      ...campaign,
+      seats: {
+        ...campaign.seats,
+        [P]: {
+          ...player,
+          permissions: { view: true, move: false, edit: false, delete: false },
+        },
+      },
+    };
+    expect(isReadOnlyViewer({ isHost: false, seatId: P, campaign: readOnlyCampaign })).toBe(true);
+  });
+});
+
+describe('store host hint', () => {
+  it('defaults to false and is set explicitly', () => {
+    const store = createClientStore();
+    expect(store.getState().isHost).toBe(false);
+    store.getState().setHost(true);
+    expect(store.getState().isHost).toBe(true);
+  });
+});
+
+describe('ui store active layer (UI-LAY-01)', () => {
+  it('starts on Tokens and moves locally without an action', () => {
+    const store = createUiStore();
+    expect(store.getState().activeLayer).toBe(DEFAULT_ACTIVE_LAYER);
+    store.getState().setActiveLayer('props');
+    expect(store.getState().activeLayer).toBe('props');
+  });
+});
+
+describe('view models', () => {
+  it('lists layers top row first, highest draw band first (UI-LAY-01)', () => {
+    expect(LAYER_ROWS).toEqual(['effects', 'tokens', 'props', 'dm', 'map']);
+  });
+  it('lists rows with lock, local hidden and the active layer, DM row included for the host', () => {
+    const rows = layerRows(sceneOf(world()), new Set(['dm'] as const), {
+      role: 'host',
+      activeLayer: 'props',
+    });
+    expect(rows.map((r) => r.layer)).toEqual(['effects', 'tokens', 'props', 'dm', 'map']);
+    expect(rows.find((r) => r.layer === 'props')).toMatchObject({
+      locked: true,
+      active: true,
+      lockDisabledReason: null,
+    });
+    expect(rows.filter((r) => r.active)).toHaveLength(1);
+    expect(rows.find((r) => r.layer === 'dm')?.hidden).toBe(true);
+    expect(rows.find((r) => r.layer === 'map')).toMatchObject({
+      description: 'Battlemap images, ground, terrain and fixed objects',
+      locked: false,
+      hidden: false,
+    });
+  });
+  it('never shows the DM row to a player or spectator, and offers neither a lock', () => {
+    for (const role of ['player', 'observer'] as const) {
+      const rows = layerRows(sceneOf(world()), new Set(), { role, activeLayer: 'tokens' });
+      expect(rows.map((r) => r.layer)).toEqual(['effects', 'tokens', 'props', 'map']);
+      expect(rows.every((r) => r.lockDisabledReason !== null)).toBe(true);
+    }
+  });
+  it('shows a co-DM the DM row read-only: locking it stays host-only (LAY-06, D32)', () => {
+    const rows = layerRows(sceneOf(world()), new Set(), { role: 'codm', activeLayer: 'dm' });
+    expect(rows.map((r) => r.layer)).toContain('dm');
+    expect(rows.find((r) => r.layer === 'dm')).toMatchObject({ active: true });
+    expect(rows.find((r) => r.layer === 'dm')?.lockDisabledReason).toMatch(/host/i);
+    expect(rows.find((r) => r.layer === 'tokens')?.lockDisabledReason).toBeNull();
+  });
+  it('toggles hidden without mutating the input', () => {
+    const a = new Set(['dm'] as const);
+    expect([...toggleHidden(a, 'map')].sort()).toEqual(['dm', 'map']);
+    expect([...toggleHidden(a, 'dm')]).toEqual([]);
+    expect([...a]).toEqual(['dm']);
+  });
+  it('disables move targets the host would refuse', () => {
+    const scene = sceneOf(world());
+    const targets = moveTargets(scene, entity('tokens'));
+    expect(targets.map((t) => t.layer)).not.toContain('tokens');
+    expect(targets.find((t) => t.layer === 'props')?.disabledReason).toMatch(/locked/);
+    expect(targets.find((t) => t.layer === 'map')?.disabledReason).toBeNull();
+    const fromLocked = moveTargets(scene, entity('props'));
+    expect(fromLocked.every((t) => t.disabledReason !== null)).toBe(true);
+  });
+  it('lists scenes with the active one marked', () => {
+    expect(sceneRows(world())).toEqual([{ id: S, name: 'Cave', active: true }]);
+    expect(isValidSceneName('  ')).toBe(false);
+    expect(isValidSceneName(' Cave ')).toBe(true);
+    expect(isValidSceneName('x'.repeat(121))).toBe(false);
+  });
+  it('lists seats with occupancy, presence and Co-DM wording', () => {
+    const rows = seatRows(world(), [{ seatId: C, connected: true }]);
+    expect(rows.map((r) => [r.label, r.roleLabel, r.occupied, r.connected])).toEqual([
+      ['Cleo', 'Co-DM', true, true],
+      ['Pia', 'Player', false, false],
+    ]);
+    expect(seatRows(world(), null).every((r) => !r.connected)).toBe(true);
+    const readOnly = world();
+    const player = readOnly.seats[P];
+    if (!player) throw new Error('missing player fixture');
+    player.permissions = { view: true, move: false, edit: false, delete: false };
+    expect(seatRows(readOnly, null).find((row) => row.id === P)?.roleLabel).toBe('Spectator');
+  });
+  it('joins the host-only roster to seat labels and includes unseated spectators', () => {
+    expect(
+      connectedIdentityRows(
+        world(),
+        [
+          { seatId: C, connected: true, displayName: 'Cleo Client' },
+          { seatId: P, connected: false, displayName: 'Pia Client' },
+        ],
+        [{ identityId: tid(10), displayName: 'Quinn' }],
+      ),
+    ).toEqual([
+      {
+        key: `seat-${C}`,
+        displayName: 'Cleo Client',
+        seatLabel: 'Cleo',
+        roleLabel: 'Co-DM',
+      },
+      {
+        key: `identity-${tid(10)}`,
+        displayName: 'Quinn',
+        seatLabel: 'Unseated',
+        roleLabel: 'Spectator',
+      },
+    ]);
+  });
+  it('validates typed input', () => {
+    expect(isValidLabel('')).toBe(false);
+    expect(isValidLabel('Pia')).toBe(true);
+    expect(isValidIdentityId('nope')).toBe(false);
+    expect(isValidIdentityId(` ${tid(9)} `)).toBe(true);
+  });
+});
+
+describe('intent specs are accepted by the shared actions', () => {
+  const state = world();
+  const host = { kind: 'host' } as const;
+  const specs: IntentSpec[] = [
+    sceneCreateIntent(tid(11), '  Inn  '),
+    sceneRenameIntent(S, ' Deep cave '),
+    sceneActivateIntent(S),
+    layerLockIntent(S, 'map', true),
+    entityMoveLayerIntent(S, E, 'map'),
+    seatCreateIntent(tid(12), ' Dax ', 'player'),
+    seatAssignIntent(P, ` ${tid(13)} `),
+    seatReleaseIntent(C),
+    seatRoleIntent(P, 'codm'),
+    seatPermissionIntent(P, 'edit', true),
+  ];
+  it.each(specs.map((s) => [s.type, s] as const))('%s', (_type, spec) => {
+    expect(canPerform(state, host, spec.type, spec.payload)).toBe(true);
+  });
+  it('trims names and ids in the payload', () => {
+    expect(sceneCreateIntent(tid(11), '  Inn  ').payload).toEqual({
+      sceneId: tid(11),
+      name: 'Inn',
+    });
+    expect(seatAssignIntent(P, ` ${tid(13)} `).payload).toEqual({ seatId: P, identityId: tid(13) });
+  });
+  it('builds an accepted atomic create intent for every role template', () => {
+    for (const [index, template] of SEAT_TEMPLATES.entries()) {
+      const spec = seatCreateIntent(
+        tid(20 + index),
+        template.label,
+        template.role,
+        template.permissions,
+      );
+      expect(canPerform(state, host, spec.type, spec.payload)).toBe(true);
+      expect(spec.payload).toMatchObject({
+        label: template.label,
+        role: template.role,
+        permissions: template.permissions,
+      });
+    }
+  });
+  it('a co-DM may manage layers but cannot activate the players scene or manage seats', () => {
+    const coDm = { kind: 'seat', seatId: C } as const;
+    expect(canPerform(state, coDm, 'layer.lock', layerLockIntent(S, 'map', true).payload)).toBe(
+      true,
+    );
+    expect(canPerform(state, coDm, 'scene.activate', sceneActivateIntent(S).payload)).toBe(false);
+    expect(canPerform(state, coDm, 'seat.update', seatRoleIntent(P, 'codm').payload)).toBe(false);
+  });
+});
+
+describe('scene bounds intents (D37)', () => {
+  it('sceneCreateIntent carries bounds only when given', () => {
+    expect(sceneCreateIntent(tid(11), 'Inn').payload).toEqual({ sceneId: tid(11), name: 'Inn' });
+    expect(sceneCreateIntent(tid(11), 'Inn', { width: 20, height: 10 }).payload).toEqual({
+      sceneId: tid(11),
+      name: 'Inn',
+      bounds: { width: 20, height: 10 },
+    });
+  });
+  it('sceneBoundsIntent is a scene.update', () => {
+    expect(sceneBoundsIntent(S, { width: 9, height: 8 })).toEqual({
+      type: 'scene.update',
+      payload: { sceneId: S, bounds: { width: 9, height: 8 } },
+      sceneId: S,
+    });
+  });
+});

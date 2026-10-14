@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 2,
+  "id": "01J8Z0000000000000000CAMP1",
+  "name": "The Sunken Chapel",
+  "settings": {
+    "defaultBinding": "persistent",
+    "instanceMode": "linked",
+    "spectators": {
+      "enabled": true,
+      "view": "players"
+    }
+  },
+  "seats": {
+    "01J8Z0000000000000000SEAT1": {
+      "id": "01J8Z0000000000000000SEAT1",
+      "label": "Dungeon Master",
+      "binding": "persistent",
+      "identityId": null,
+      "role": "codm",
+      "permissions": {
+        "view": true,
+        "move": true,
+        "edit": true,
+        "delete": true
+      }
+    },
+    "01J8Z0000000000000000SEAT2": {
+      "id": "01J8Z0000000000000000SEAT2",
+      "label": "Mira",
+      "binding": "persistent",
+      "identityId": null,
+      "role": "player",
+      "permissions": {
+        "view": true,
+        "move": true,
+        "edit": false,
+        "delete": false
+      }
+    }
+  },
+  "activeSceneId": "01J8Z0000000000000000SCN01",
+  "prefabs": {
+    "01J8Z0000000000000000PREF1": {
+      "id": "01J8Z0000000000000000PREF1",
+      "name": "Reusable fixture",
+      "entity": {
+        "layer": "tokens",
+        "name": "Mira",
+        "transform": {
+          "position": {
+            "x": 4,
+            "y": 0,
+            "z": 6
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "w": 1
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        },
+        "token": {
+          "sizeCells": 1,
+          "heightCells": 1,
+          "labelVisibility": "all",
+          "facing": 90
+        },
+        "owners": ["01J8Z0000000000000000SEAT2"]
+      }
+    }
+  }
+}

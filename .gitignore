@@ -6,6 +6,10 @@ DESIGN.md
 TECHNICAL.md
 TASKS.md
 
+# Internal hand-off notes and playtest results (environment specific)
+docs/HANDOFF.md
+docs/playtests/
+
 # Dependencies and build output
 node_modules/
 dist/

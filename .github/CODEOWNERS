@@ -1,0 +1,14 @@
+# Code owners are requested automatically on pull requests that touch these paths.
+# Everything falls back to the maintainer.
+*                                  @luiserivaldo
+
+# Contracts and security-sensitive areas: changes need maintainer review.
+/.github/                          @luiserivaldo
+/LICENSE                           @luiserivaldo
+/packages/protocol/                @luiserivaldo
+/packages/shared/src/schema/       @luiserivaldo
+/packages/shared/src/actions/      @luiserivaldo
+/packages/shared/src/visibility/   @luiserivaldo
+/packages/shared/src/migrations/   @luiserivaldo
+/packages/host/src/gateway/        @luiserivaldo
+/fixtures/saves/                   @luiserivaldo

@@ -1,0 +1,69 @@
+{
+  "client": [
+    {
+      "t": "hello",
+      "v": 8,
+      "identityId": "00000000000000000000000001",
+      "identitySecret": "synthetic-fixture-secret",
+      "displayName": "Fixture guest",
+      "color": "#c04e32"
+    },
+    {
+      "t": "ephemeral",
+      "channel": "ruler.preview",
+      "data": {
+        "sceneId": "00000000000000000000000002",
+        "points": [
+          {
+            "x": 1,
+            "y": 0,
+            "z": 2
+          }
+        ],
+        "phase": "active",
+        "color": "#c04e32"
+      }
+    },
+    {
+      "t": "intent",
+      "type": "seat.archive",
+      "payload": {
+        "seatId": "00000000000000000000000003"
+      },
+      "clientRef": "archive-fixture"
+    }
+  ],
+  "server": [
+    {
+      "t": "presence",
+      "seats": [
+        {
+          "seatId": "00000000000000000000000003",
+          "displayName": "Fixture guest",
+          "color": "#c04e32",
+          "connected": true,
+          "latencyMs": null
+        }
+      ],
+      "spectators": 0,
+      "unseated": []
+    },
+    {
+      "t": "ephemeral",
+      "channel": "ruler.preview",
+      "from": "00000000000000000000000001",
+      "data": {
+        "sceneId": "00000000000000000000000002",
+        "points": [
+          {
+            "x": 1,
+            "y": 0,
+            "z": 2
+          }
+        ],
+        "phase": "active",
+        "color": "#c04e32"
+      }
+    }
+  ]
+}
