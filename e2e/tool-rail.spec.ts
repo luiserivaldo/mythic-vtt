@@ -49,10 +49,21 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     for (const absent of ['Draw', 'Pin', 'Lighting', 'Fog'])
       await expect(rail(dm, absent)).toHaveCount(0);
 
-    // Initiative is a labelled placeholder that opens a mock panel.
-    await expect(rail(dm, 'Initiative')).toContainText('WIP');
-    await rail(dm, 'Initiative').click();
-    await expect(dm.getByRole('region', { name: 'Initiative' })).toContainText('Work in progress');
+    // UI-TOOL-05: Initiative is a greyed, labelled placeholder. It reads as inactive but stays
+    // clickable, and using it opens a mock panel with nothing to operate.
+    const initiative = rail(dm, 'Initiative');
+    await expect(initiative).toContainText('WIP');
+    await expect(initiative).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(initiative).toHaveCSS('color', 'rgb(186, 201, 216)');
+    await expect(initiative).toHaveCSS('border-style', 'dashed');
+    // Nothing is open until the entry is used.
+    await expect(dm.getByRole('complementary', { name: 'Tool panels' })).toHaveCount(0);
+    await initiative.click();
+    const mock = dm.getByRole('region', { name: 'Initiative' });
+    await expect(mock).toContainText('WIP');
+    await expect(mock).toContainText('coming soon');
+    // A mock panel: nothing in it can be operated.
+    await expect(mock.locator('button, input, select, textarea, form')).toHaveCount(0);
 
     // Pan is its own active tool; Measure arms the ruler and takes the rail over.
     await rail(dm, 'Pan').click();
@@ -106,6 +117,27 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     }
     expect((await setup.intent('seat.update', { seatId, interactionEnabled: true })).t).toBe('ack');
     await expect(rail(player, 'Select')).not.toHaveAttribute('aria-disabled', 'true');
+
+    // UI-TOOL-05: a spectator may open the same placeholder, and it opens only when the entry is
+    // used — a read-only viewer still gets no editing panels of their own.
+    const spectatorContext = await browser.newContext();
+    try {
+      const spectator = await spectatorContext.newPage();
+      await spectator.goto(table.clientUrl);
+      await spectator.getByLabel('Display name').fill('Rail watcher');
+      await spectator.getByRole('button', { name: 'Continue', exact: true }).click();
+      await spectator.getByRole('button', { name: 'Join as spectator' }).click();
+      await expect(spectator.getByRole('dialog')).toHaveCount(0);
+      await expect(spectator.getByRole('region', { name: 'Initiative' })).toHaveCount(0);
+      const watcherRail = rail(spectator, 'Initiative');
+      await expect(watcherRail).not.toHaveAttribute('aria-disabled', 'true');
+      await watcherRail.click();
+      await expect(spectator.getByRole('region', { name: 'Initiative' })).toContainText(
+        'coming soon',
+      );
+    } finally {
+      await spectatorContext.close();
+    }
 
     expect(errors).toEqual([]);
     await setup.close();

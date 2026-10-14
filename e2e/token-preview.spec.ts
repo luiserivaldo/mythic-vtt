@@ -51,11 +51,16 @@ async function cellToPixel(page: Page) {
   });
 }
 
-/** Clicks a cell until the card appears; the first click can land before the board is laid out. */
+/**
+ * Clicks a cell until the card appears; the first click can land before the board is laid out.
+ * The canvas box is re-read on every attempt: the board mounts before the shell has laid the
+ * canvas out, so a box captured once can stay at its 300x150 default for the whole retry loop and
+ * every click then misses.
+ */
 async function selectCell(page: Page, x: number, z: number) {
-  const at = await cellToPixel(page);
-  const point = at(x, z);
   await expect(async () => {
+    const at = await cellToPixel(page);
+    const point = at(x, z);
     await page.mouse.click(point.x, point.y);
     await expect(page.getByTestId('token-preview')).toBeVisible({ timeout: 1000 });
   }).toPass();
