@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { storeMigrate } from './registry.js';
+import { createStoreMigrate, MIGRATION_STEPS } from './registry.js';
 import { makeCampaign, IDS } from '../actions/testing.js';
+import { v4ToV5 } from './v4-to-v5.js';
+const storeMigrate = createStoreMigrate(
+  MIGRATION_STEPS.filter((step) => step.from < 5),
+  5,
+);
 import { Campaign } from '../schema/index.js';
 
 describe('v4 to v5 quick-fields migration', () => {
@@ -23,7 +28,7 @@ describe('v4 to v5 quick-fields migration', () => {
   });
   it('leaves scene payloads unchanged', () => {
     const scene = { name: 'Old scene' };
-    expect(storeMigrate('scene', 4, scene)).toBe(scene);
+    expect(createStoreMigrate([v4ToV5], 5)('scene', 4, scene)).toBe(scene);
   });
   it('migrates every older snapshot version through the whole chain', () => {
     for (const version of [1, 2, 3, 4]) {

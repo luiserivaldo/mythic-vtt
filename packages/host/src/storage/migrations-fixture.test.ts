@@ -74,6 +74,29 @@ describe('golden save v1 through the shared migrate hook', () => {
       await store.close();
     }
   });
+  it.each(['v1', 'v2', 'v3', 'v4', 'v5', 'v6'])(
+    'loads and saves %s through the lasting-AoE migration chain',
+    async (version) => {
+      const store = new LocalCampaignStore(await copyFixture(version), storeMigrate);
+      try {
+        const loaded = await store.load(campaignId);
+        expect(loaded.campaign.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+        for (const scene of loaded.scenes) {
+          expect(scene.maxLastingAoEsPerPlayer).toBe(1);
+          if (version === 'v6') {
+            expect(Object.values(scene.entities).some((entity) => entity.lastingAoE)).toBe(true);
+            expect(Object.values(scene.entities).some((entity) => entity.token?.quickFields)).toBe(
+              true,
+            );
+          }
+          await store.saveScene(campaignId, scene);
+        }
+        expect((await store.load(campaignId)).scenes).toEqual(loaded.scenes);
+      } finally {
+        await store.close();
+      }
+    },
+  );
   it('still rejects a newer schemaVersion as unsupported', async () => {
     const root = await copyFixture();
     const path = join(root, 'campaigns', campaignId);

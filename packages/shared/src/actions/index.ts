@@ -44,3 +44,5 @@ export {
   PING_TOGGLE,
   TOGGLE_FOR_CHANNEL,
 } from './scene-toggles.js';
+
+export { aoePersist } from './aoe.persist.js';

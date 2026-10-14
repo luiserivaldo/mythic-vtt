@@ -32,6 +32,6 @@ describe('v3 to v4 interaction migration', () => {
       Campaign.parse(storeMigrate('campaign', 3, state)).seats[IDS.owner]?.interactionEnabled,
     ).toBe(false);
     const scene = { name: 'Old scene' };
-    expect(storeMigrate('scene', 3, scene)).toBe(scene);
+    expect(createStoreMigrate([v3ToV4], 4)('scene', 3, scene)).toBe(scene);
   });
 });

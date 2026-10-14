@@ -10,6 +10,7 @@ import { rulerStore } from '../tools/ruler-store.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { activateMeasurement, MEASUREMENT_SHAPES } from '../tools/measurement-tool.js';
 import { AoEToolPanel } from './AoEToolPanel.js';
+import { LastingAoELimitControls } from './LastingAoELimitControls.js';
 
 /** Q29: measurement settings share one DOM panel in either board view. */
 export function RulerPanel({ scene }: { scene: Scene }) {
@@ -131,7 +132,8 @@ export function RulerPanel({ scene }: { scene: Scene }) {
         />{' '}
         Broadcast to others
       </label>
-      <p>Ruler previews can be private. Placed AoEs remain shared until replaced or deleted.</p>
+      <p>Measuring AoEs replace your previous template. Use Place AoE to keep one until deleted.</p>
+      <LastingAoELimitControls key={scene.id} scene={scene} />
       {aoeActive && <AoEToolPanel scene={scene} unified />}
     </section>
   );

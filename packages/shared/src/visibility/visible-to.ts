@@ -31,7 +31,7 @@ function ownsEntity(audience: Audience, entity: Entity): boolean {
 
 function viewKey(audience: Audience, seat?: Seat): string {
   const role = seat?.role === 'codm' ? 'codm' : 'player';
-  return `${audienceKey(audience)}:view=${seat?.permissions.view === false ? 'off' : 'on'}:${role}`;
+  return `${audienceKey(audience)}:view=${seat?.permissions.view === false ? 'off' : 'on'}:${role}:identity=${seat?.identityId ?? ''}`;
 }
 
 /** The audience's view of one entity, or null if it must not be sent at all. */
@@ -69,6 +69,12 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
         view = { ...view, token: { ...view.token, quickFields: Object.fromEntries(shared) } };
       }
     }
+    // PERM-03: placement provenance stays host/placer-private after seat reassignment.
+    if (
+      view.lastingAoE?.creatorIdentityId !== undefined &&
+      seat?.identityId !== view.lastingAoE.creatorIdentityId
+    )
+      view = { ...view, lastingAoE: {} };
     return view;
   });
 }
@@ -79,12 +85,14 @@ export function viewPrefab(audience: Audience, prefab: Prefab, seat?: Seat): Pre
   if (audience.kind !== 'seat' || seat?.role !== 'codm' || !seat.permissions.view) return null;
   // Older experimental blueprints did not capture visibility; keep them host-only.
   if (prefab.entity.owners === undefined) return null;
-  return viewEntity(
+  const view = viewEntity(
     audience,
     { ...prefab.entity, id: prefab.id, owners: prefab.entity.owners },
     seat,
-  ) === null
-    ? null
+  );
+  if (!view) return null;
+  return view.lastingAoE && view.lastingAoE !== prefab.entity.lastingAoE
+    ? { ...prefab, entity: { ...prefab.entity, lastingAoE: view.lastingAoE } }
     : prefab;
 }
 
@@ -140,8 +148,10 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
       let hidden = false;
       for (const [id, prefab] of Object.entries(state.prefabs)) {
         const allowed = viewPrefab(audience, prefab, seat);
-        if (allowed) prefabs[id] = allowed;
-        else hidden = true;
+        if (allowed) {
+          prefabs[id] = allowed;
+          if (allowed !== prefab) hidden = true;
+        } else hidden = true;
       }
       if (hidden) return { ...view, prefabs };
     }

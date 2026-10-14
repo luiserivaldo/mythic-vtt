@@ -54,11 +54,11 @@ describe(`${T} schema`, () => {
 });
 
 describe(`${T} permissions`, () => {
-  it('allows host and co-DM identities but denies non-admin and mismatched identities', () => {
+  it('allows identity-bound measuring templates but denies spectators and mismatched identities', () => {
     const state = makeCampaign();
     expect(aoePlace.permission(state, host, payload)).toBe(true);
     expect(aoePlace.permission(state, coDm, payload)).toBe(true);
-    expect(aoePlace.permission(state, { ...ACTORS.owner, identityId: aoeId }, payload)).toBe(false);
+    expect(aoePlace.permission(state, { ...ACTORS.owner, identityId: aoeId }, payload)).toBe(true);
     expect(aoePlace.permission(state, { ...ACTORS.spectator, identityId: aoeId }, payload)).toBe(
       false,
     );
@@ -68,11 +68,14 @@ describe(`${T} permissions`, () => {
     ).toBe(false);
   });
 
-  it('does not let a seat-level edit grant bypass admin-only placement', () => {
+  it('does not let a seat-level edit grant bypass admin-only props placement', () => {
     const state = makeCampaign();
     const seat = state.seats[IDS.owner];
     if (seat) seat.permissions.edit = true;
-    const owned = { ...payload, entity: { ...entity, owners: [IDS.owner] } };
+    const owned = {
+      ...payload,
+      entity: { ...entity, layer: 'props' as const, owners: [IDS.owner] },
+    };
     expect(aoePlace.permission(state, { ...ACTORS.owner, identityId: aoeId }, owned)).toBe(false);
   });
 
@@ -118,7 +121,10 @@ describe(`${T} reducer and visibility`, () => {
       scene.entities[otherId] = otherAoE;
     }
     const result = reduceAction(before, envelope());
-    expect(result.state.scenes[IDS.scene]?.entities[aoeId]).toEqual(entity);
+    expect(result.state.scenes[IDS.scene]?.entities[aoeId]).toEqual({
+      ...entity,
+      measuringAoE: true,
+    });
     expect(result.state.scenes[IDS.scene]?.entities[otherId]).toEqual(otherAoE);
     expect(before.scenes[IDS.scene]?.entities[aoeId]?.name).toBe('Previous AoE');
   });

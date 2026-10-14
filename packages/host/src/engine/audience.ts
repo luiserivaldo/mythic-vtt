@@ -72,5 +72,6 @@ export function audienceViewKey(state: Campaign, p: Participant): string {
     return audience.kind === 'seat' ? `spectators:${audience.seatId}:player` : 'spectators';
   }
   if (audience.kind !== 'seat') return audienceKey(audience);
-  return `${audienceKey(audience)}:${state.seats[audience.seatId]?.role ?? 'player'}`;
+  const seat = state.seats[audience.seatId];
+  return `${audienceKey(audience)}:${seat?.role ?? 'player'}:view=${seat?.permissions.view === false ? 'off' : 'on'}:identity=${seat?.identityId ?? ''}`;
 }
