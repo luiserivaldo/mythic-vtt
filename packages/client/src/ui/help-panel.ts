@@ -121,6 +121,18 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
         action:
           "Selects it, and shows a small card beside it with the token's name and quick values. Shift, Ctrl or Cmd click adds it to the selection or takes it out.",
       },
+      // UI-INPUT-04 / UI-TOKEN-03: a right click on a token this viewer may select opens the short
+      // menu to its right (PickableEntities.onContextMenu). A right drag in 3D orbits instead — the
+      // camera supplies the threshold — and an unclaimed right press is left to the tool.
+      {
+        input: 'Right click a token',
+        action: 'Selects it and opens a short menu beside it.',
+      },
+      // UI-TOKEN-02 / CAM-06: the second click focuses the camera and opens the full menu.
+      {
+        input: 'Double click a token',
+        action: 'Brings it to the centre of the view and opens its full menu.',
+      },
       // UI-INPUT-03 / TOK-03 / Q26: the drag threshold separates the click from the pan.
       {
         input: 'Middle click on the selected token',

@@ -92,6 +92,16 @@ describe('UI-HELP-01 help content', () => {
     expect(textOf('token').toLowerCase()).toContain('card beside it');
   });
 
+  it('documents the two token menus the board opens today (UI-TOKEN-02, UI-TOKEN-03)', () => {
+    // UX-20 (render/PickableEntities.tsx, ui/token-menu-store.ts): a right click opens the short
+    // menu beside the token, and a double click focuses it and opens the full menu.
+    const token = textOf('token').toLowerCase();
+    expect(token).toContain('right click a token');
+    expect(token).toContain('short menu');
+    expect(token).toContain('double click a token');
+    expect(token).toContain('full menu');
+  });
+
   it('documents the two move/measure gestures the board has today', () => {
     const moving = textOf('moving').toLowerCase();
     // TOK-02 / GRID-03: tokenDrop snaps the footprint to the grid while the scene has snapping on,
