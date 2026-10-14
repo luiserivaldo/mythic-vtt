@@ -210,14 +210,6 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
         {/* UI-TOOL-01..07: the rail lists every tool; one a seat may not use is disabled, not hidden. */}
         <ToolRail />
-        {mode3d && (
-          <>
-            <span className="ui-camera-hint">
-              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom ·
-              middle-click a selected token to lock its height
-            </span>
-          </>
-        )}
       </div>
       <ToolPanelDock
         campaign={campaign}

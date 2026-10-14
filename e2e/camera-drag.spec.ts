@@ -63,8 +63,10 @@ test('held right orbits while middle and available left pan monotonically', asyn
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
   await page.getByRole('button', { name: '3D view' }).click();
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
-  await expect(page.getByText('left-drag empty board or middle-drag pan')).toBeVisible();
-  await expect(page.getByText('right-drag orbit')).toBeVisible();
+  // UX-29: the on-screen mouse hint is gone (it was the board's status line); the mapping now
+  // lives in the Help tab, so the board keeps no such text.
+  await expect(page.getByText('left-drag empty board or middle-drag pan')).toHaveCount(0);
+  await expect(page.getByText('right-drag orbit')).toHaveCount(0);
   await waitForCameraToRest(page);
 
   const canvas = page.locator('canvas');
