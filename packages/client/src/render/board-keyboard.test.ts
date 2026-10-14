@@ -11,7 +11,11 @@ import { BoardCanvas } from './BoardCanvas.js';
 // The WebGL canvas and dock are irrelevant here; render the actual board's DOM key handler.
 vi.mock('@react-three/fiber', () => ({ Canvas: () => null }));
 vi.mock('../ui/ToolPanelDock.js', () => ({ ToolPanelDock: () => null }));
-vi.mock('../store/react.js', () => ({ useClientStore: () => null }));
+// A host viewer, so the tool rail (which disarms tools its viewer cannot use) leaves the ruler alone.
+vi.mock('../store/react.js', () => ({
+  useClientStore: (select: (state: object) => unknown) =>
+    select({ campaign: null, isHost: true, seatId: null, viewAs: { kind: 'host' } }),
+}));
 
 let container: HTMLDivElement;
 let root: Root;

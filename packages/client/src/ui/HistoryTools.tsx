@@ -3,13 +3,21 @@ import { HistoryPage, type HistoryEntry } from '@mythic/shared';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { loadOrCreateIdentity } from '../net/identity.js';
 import { useClientStore } from '../store/react.js';
-import { isUndoableType, prune, select, type Selection } from './history-selection.js';
+import {
+  canRollbackTo,
+  isUndoableType,
+  prune,
+  select,
+  type Selection,
+} from './history-selection.js';
 import { SubmitContext } from './submit.js';
 import { viewerRole } from './viewer.js';
 
 function HistoryPanel({ canUndo }: { canUndo: boolean }) {
   const campaign = useClientStore((state) => state.campaign);
+  const currentSeq = useClientStore((state) => state.seq);
   const submit = useContext(SubmitContext);
+  const [confirmRollback, setConfirmRollback] = useState<number>();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [selection, setSelection] = useState<Selection>({ selected: new Set() });
   const [menu, setMenu] = useState<{ x: number; y: number }>();
@@ -34,6 +42,14 @@ function HistoryPanel({ canUndo }: { canUndo: boolean }) {
     const result = await submit('history.undo', {
       targetSeqs: [...selection.selected].sort((a, b) => a - b),
     });
+    if (!result.ok) return; // the shell has already shown why
+    setSelection({ selected: new Set() });
+    await load();
+  }
+  async function rollBackTo(toSeq: number) {
+    setConfirmRollback(undefined);
+    if (!submit) return;
+    const result = await submit('history.rollback', { toSeq });
     if (!result.ok) return; // the shell has already shown why
     setSelection({ selected: new Set() });
     await load();
@@ -212,6 +228,44 @@ function HistoryPanel({ canUndo }: { canUndo: boolean }) {
                       ))}
                     </ul>
                   </details>
+                  {canUndo && canRollbackTo(entry.seq, currentSeq) && (
+                    <div className="ui-history-rollback">
+                      {confirmRollback === entry.seq ? (
+                        <>
+                          <p>
+                            Return the table to just after #{entry.seq}? Nothing is erased; the
+                            rollback is logged and every player's board updates.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void rollBackTo(entry.seq);
+                            }}
+                          >
+                            Confirm roll back to #{entry.seq}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmRollback(undefined);
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            setConfirmRollback(entry.seq);
+                          }}
+                        >
+                          Roll back to #{entry.seq}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ol>
@@ -263,12 +317,15 @@ function HistoryPanel({ canUndo }: { canUndo: boolean }) {
 }
 
 export function HistoryTools() {
+  const preview = useClientStore((state) => state.viewAs.kind !== 'host');
   const campaign = useClientStore((state) => state.campaign);
   const ready = useClientStore((state) => state.ready);
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const [open, setOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
+  // History authenticates as the real identity; its DM response cannot represent a seat.
+  if (preview) return <p>Back to DM to view history.</p>;
   if (!campaign || !ready) return null;
   const role = viewerRole({ campaign, isHost, seatId });
   const close = () => {

@@ -1,10 +1,15 @@
-import { lazy, Suspense, useId, useState, type Ref } from 'react';
+import { lazy, Suspense, useId, type Ref } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
-import { DEFAULT_DOCK_TAB, DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
+import { ChatPanel } from './ChatPanel.js';
+import { SheetPanel } from './SheetPanel.js';
+import { seatColorsOf } from './chat-panel.js';
+import { DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
+import { SettingsPanel } from './SettingsPanel.js';
 import { HistoryTools } from './HistoryTools.js';
 import { IdentityTransfer } from './IdentityTransfer.js';
 import { joinUrlsFromNotices } from './share-panel.js';
+import { useDockState } from './dock-store.js';
 import { viewerRole } from './viewer.js';
 
 const ScenePanel = lazy(async () => ({ default: (await import('./ScenePanel.js')).ScenePanel }));
@@ -39,6 +44,7 @@ function Placeholder({ title, children }: { title: string; children: string }) {
  * may not use is never offered or rendered (registry predicate; the host re-checks every intent).
  */
 export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
+  const preview = useClientStore((s) => s.viewAs.kind !== 'host');
   const campaign = useClientStore((s) => s.campaign);
   const viewed = useViewedCampaign();
   const ready = useClientStore((s) => s.ready);
@@ -46,8 +52,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
   const seatId = useClientStore((s) => s.seatId);
   const presence = useClientStore((s) => s.presence);
   const notices = useClientStore((s) => s.notices);
-  const [collapsed, setCollapsed] = useState(false);
-  const [requested, setRequested] = useState(DEFAULT_DOCK_TAB);
+  const { collapsed, requested, open, toggleCollapsed } = useDockState();
   const idBase = useId();
 
   const role = viewerRole({ isHost, seatId, campaign });
@@ -58,17 +63,14 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
   const tabId = (id: string) => `${idBase}-tab-${id}`;
   const panelId = `${idBase}-panel`;
   const board = viewed ?? campaign;
+  const joinUrls = joinUrlsFromNotices(notices);
 
   const content = () => {
     switch (active) {
       case 'chat':
-        return (
-          <Placeholder title="Chat">
-            Chat is coming soon. Rolls and messages will appear here.
-          </Placeholder>
-        );
+        return <ChatPanel entries={[]} seatColors={seatColorsOf(presence?.seats)} />;
       case 'sheet':
-        return <Placeholder title="Sheet">Character sheets are coming soon.</Placeholder>;
+        return <SheetPanel />;
       case 'help':
         return (
           <Placeholder title="Help">
@@ -79,22 +81,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'settings':
         return (
           <>
-            <fieldset className="ui-dock-settings">
-              <legend>Appearance</legend>
-              {(['dark', 'light'] as const).map((value) => (
-                <label key={value}>
-                  <input
-                    type="radio"
-                    name="theme"
-                    checked={theme === value}
-                    onChange={() => {
-                      onThemeChange(value);
-                    }}
-                  />
-                  {value === 'dark' ? 'Dark' : 'Light'}
-                </label>
-              ))}
-            </fieldset>
+            <SettingsPanel theme={theme} onThemeChange={onThemeChange} />
             {ready && <IdentityTransfer />}
             <HistoryTools />
           </>
@@ -104,12 +91,17 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
     }
     if (!campaign || !board) return null;
     switch (active) {
+      // UI-SCN-01: the Scenes tab holds the scene list, create, and the battlemap upload with
+      // 2-point calibration (moved out of its own Map tab).
       case 'scenes':
-        return <ScenePanel campaign={campaign} />;
+        return (
+          <>
+            <ScenePanel campaign={campaign} />
+            <MapPanel campaign={board} />
+          </>
+        );
       case 'layers':
-        return <LayerPanel campaign={board} />;
-      case 'map':
-        return <MapPanel campaign={board} />;
+        return <LayerPanel campaign={board} role={role} />;
       case 'entities':
         return <EntityPanel campaign={board} />;
       case 'prefabs':
@@ -120,10 +112,11 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             campaign={campaign}
             presence={presence?.seats ?? null}
             unseated={presence?.unseated}
+            joinUrls={joinUrls}
           />
         );
       case 'share':
-        return <SharePanel joinUrls={joinUrlsFromNotices(notices)} />;
+        return <SharePanel joinUrls={joinUrls} />;
       default:
         return null;
     }
@@ -137,7 +130,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
           aria-label={collapsed ? 'Expand dock' : 'Collapse dock'}
           aria-expanded={!collapsed}
           onClick={() => {
-            setCollapsed((value) => !value);
+            toggleCollapsed();
           }}
         >
           {collapsed ? '›' : '‹'}
@@ -161,8 +154,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             aria-selected={active === tab.id}
             aria-controls={panelId}
             onClick={() => {
-              setRequested(tab.id);
-              setCollapsed(false);
+              open(tab.id);
             }}
           >
             <span aria-hidden="true">{DOCK_ICONS[tab.icon]}</span>
@@ -177,7 +169,9 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             aria-labelledby={tabId(active)}
             className="ui-dock-tab-body"
           >
-            <Suspense fallback={<p role="status">Loading panel…</p>}>{content()}</Suspense>
+            <fieldset className="ui-preview-content" disabled={preview}>
+              <Suspense fallback={<p role="status">Loading panel…</p>}>{content()}</Suspense>
+            </fieldset>
           </div>
         )}
         <div className="ui-context-panel-slot" ref={contextPanelRef} />

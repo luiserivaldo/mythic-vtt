@@ -4,10 +4,14 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { useStore } from 'zustand';
 import { Fragment, lazy, Suspense, useEffect, useMemo } from 'react';
 import { useClientStore } from '../store/react.js';
-import { pickEntity, validSelection, type SelectionActor } from '../tools/selection.js';
+import { canSelect, pickEntity, selectionActor, validSelection } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
+import { tokenMenuStore } from '../ui/token-menu-store.js';
+import { focusStore } from './focus-store.js';
 import { MapImageMesh } from './MapImage.js';
 import { ElevationBadge, SelectionRing, TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { TokenStatusMarkers } from './TokenStatusMarkers.js';
+import { markerAnchor2d } from './status-markers.js';
 import { entityFill } from './token-fill.js';
 import { TOKEN_GROUND_FRAME } from './token-frame.js';
 import { PrimitiveMesh, type RenderMode } from './PrimitiveMesh.js';
@@ -34,12 +38,6 @@ const ElevatedSurfaceGrid = lazy(async () => {
   return { default: module.ElevatedSurfaceGrid };
 });
 
-function actorFor(seatId: string | null, seats: SceneSelectionSeats): SelectionActor {
-  if (seatId === null) return { kind: 'host' };
-  const seat = seats[seatId];
-  return seat ? { kind: 'seat', seat } : { kind: 'spectator' };
-}
-
 type SceneSelectionSeats = Record<string, Seat>;
 
 // Stable fallback: a fresh `{}` inside a store selector changes identity on every read and
@@ -59,11 +57,12 @@ export function PickableEntities({
   /** GRID-05: scene grid style for walkable tops (3D only). */
   grid?: RenderGrid | null;
 }) {
+  const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const seats = useClientStore((state) => state.campaign?.seats ?? NO_SEATS);
   const selected = useStore(selectionStore, (state) => state.ids);
   const hiddenLayers = useUiStore((state) => state.hiddenLayers);
-  const actor = actorFor(seatId, seats);
+  const actor = selectionActor(isHost, seatId, seats);
   const walkables = useMemo(
     () =>
       Object.values(scene?.entities ?? {}).flatMap((entity) => {
@@ -86,7 +85,7 @@ export function PickableEntities({
   useEffect(() => {
     const state = selectionStore.getState();
     state.reconcile(scene?.id ?? null, validSelection(state.ids, scene, actor));
-  }, [scene, seatId, seats]);
+  }, [scene, isHost, seatId, seats]);
 
   function onClick(event: ThreeEvent<MouseEvent>) {
     if (!scene) return;
@@ -94,6 +93,49 @@ export function PickableEntities({
     const hits = event.intersections.map(({ object, distance }) => ({ id: object.name, distance }));
     const id = pickEntity(hits, scene, actor);
     selectionStore.getState().pick(scene.id, id, event.shiftKey || event.ctrlKey || event.metaKey);
+  }
+
+  /**
+   * CAM-06: the second click of a double-click focuses the camera on a token. Only tokens are
+   * focus targets; the camera move is per-client view state (never an action, never sent), so a
+   * spectator may focus too. The ruler tool claims a double-click of its own before this runs.
+   */
+  function focusOnDoubleClick(entity: RenderEntity) {
+    if (!entity.token) return;
+    // The token's own base position: world X/Y/Z, so a flying token is framed where it is (TOK-03).
+    focusStore.getState().request(entity.position[0], entity.position[1], entity.position[2]);
+  }
+
+  /**
+   * UI-TOKEN-02/03: both token menus are offered only for a token this viewer may select, so a
+   * spectator or an entity on a locked layer opens nothing (PERM-01/02).
+   */
+  function menuToken(entity: RenderEntity): string | null {
+    const source = scene?.entities[entity.id];
+    if (!source?.token || !scene || !canSelect(source, scene, actor)) return null;
+    return entity.id;
+  }
+
+  /** UI-TOKEN-02: a double-click still focuses (CAM-06) and now also opens the full menu. */
+  function openMenuOnDoubleClick(entity: RenderEntity) {
+    const id = menuToken(entity);
+    if (id !== null) tokenMenuStore.getState().open(id);
+  }
+
+  /**
+   * UI-TOKEN-03: a right click on a token opens the short menu to its right. Which token is under
+   * the pointer is resolved through `pickEntity`, exactly like a left click.
+   */
+  function onContextMenu(event: ThreeEvent<MouseEvent>) {
+    if (!scene) return;
+    const hits = event.intersections.map(({ object, distance }) => ({ id: object.name, distance }));
+    const id = pickEntity(hits, scene, actor);
+    const entity = id === null ? undefined : scene.entities[id];
+    if (id === null || !entity?.token || !canSelect(entity, scene, actor)) return;
+    event.stopPropagation();
+    event.nativeEvent.preventDefault();
+    selectionStore.getState().pick(scene.id, id, false);
+    tokenMenuStore.getState().openContext(id);
   }
 
   return (
@@ -188,6 +230,11 @@ export function PickableEntities({
                     actor={actor}
                     renderOrder={order}
                     onClick={onClick}
+                    onDoubleClick={() => {
+                      focusOnDoubleClick(entity);
+                      openMenuOnDoubleClick(entity);
+                    }}
+                    onContextMenu={onContextMenu}
                   />
                 </Suspense>
               ) : (
@@ -201,6 +248,11 @@ export function PickableEntities({
                         rotation={[-Math.PI / 2, 0, 0]}
                         renderOrder={order}
                         onClick={onClick}
+                        onContextMenu={onContextMenu}
+                        onDoubleClick={() => {
+                          focusOnDoubleClick(entity);
+                          openMenuOnDoubleClick(entity);
+                        }}
                       >
                         <planeGeometry args={[entity.sizeCells, entity.sizeCells]} />
                         <TokenMaterial
@@ -216,6 +268,11 @@ export function PickableEntities({
                     <group rotation={TOKEN_GROUND_FRAME}>
                       <TokenLabel entity={entity} actor={actor} />
                       <ElevationBadge entity={entity} actor={actor} />
+                      <TokenStatusMarkers
+                        entity={entity}
+                        actor={actor}
+                        anchor={markerAnchor2d(entity.sizeCells)}
+                      />
                     </group>
                   </group>
                 </Fragment>

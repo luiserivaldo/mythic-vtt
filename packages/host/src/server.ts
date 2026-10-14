@@ -1,6 +1,8 @@
 import { createSeatInvites } from './gateway/seat-invites.js';
 import { createSpectatorLinks } from './gateway/spectator-links.js';
 import { registerSpectatorRoutes } from './http/spectator-routes.js';
+import { registerSpectatorViewRoutes } from './http/spectator-view-routes.js';
+import { createSpectatorView } from './gateway/spectator-view.js';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { storeMigrate } from '@mythic/shared';
@@ -33,6 +35,7 @@ import {
   type Gateway,
 } from './gateway/index.js';
 import { recoverCampaign, saveCampaignCheckpoint } from './engine/recovery.js';
+import { readHistoryChunk, type HistoryPosition } from './storage/history-log-reader.js';
 import { playerJoinUrls, type PlayerJoinUrl } from './lan.js';
 import {
   LocalAssetStore,
@@ -123,6 +126,19 @@ export async function startHost(
       clock,
       random,
       initialSeq: seq,
+      // HIST-07: rollback walks the on-disk log backwards, newest first, across Sessions.
+      readLog: async function* () {
+        await store.flushLogs();
+        const sessions = (await store.readSessions(campaign.id, 1024))
+          .reverse()
+          .map((session) => session.sessionId);
+        let position: HistoryPosition | undefined = { session: 0 };
+        while (position) {
+          const chunk = await readHistoryChunk(store.folder(campaign.id), sessions, position);
+          yield chunk.entries;
+          position = chunk.next;
+        }
+      },
       hostJoinUrls: () => reportedJoinUrls,
       onApplied: async (state, appliedSeq) => {
         if (appliedSeq % config.autosaveEvery === 0)
@@ -141,6 +157,12 @@ export async function startHost(
     join(config.dataDir, 'index.sqlite'),
     engine.state().id,
   );
+  const spectatorView = createSpectatorView(
+    join(config.dataDir, 'index.sqlite'),
+    engine.state().id,
+  );
+  // Restore the persisted choice; an unknown or co-DM seat quietly keeps the player view.
+  await engine.setSpectatorView(spectatorView.get());
   const seatInvites = createSeatInvites(join(config.dataDir, 'index.sqlite'), engine.state().id);
   const gateway = createGateway({
     spectatorTokenValid: (token) => spectatorLinks.valid(token),
@@ -170,6 +192,11 @@ export async function startHost(
     disconnect: () => {
       gateway.disconnectSpectators();
     },
+  });
+  registerSpectatorViewRoutes(gateway.app, {
+    auth: httpAuth,
+    view: spectatorView,
+    apply: (seatId) => engine.setSpectatorView(seatId),
   });
   registerSeatInviteRoutes(gateway.app, {
     auth: httpAuth,
@@ -205,6 +232,7 @@ export async function startHost(
   } catch (error) {
     await gateway.close();
     spectatorLinks.close();
+    spectatorView.close();
     seatInvites.close();
     await closeStores();
     throw error;
@@ -238,6 +266,7 @@ export async function startHost(
           );
         } finally {
           spectatorLinks.close();
+          spectatorView.close();
           seatInvites.close();
           await closeStores();
         }

@@ -49,7 +49,8 @@ test('the host creates a scene, a token and a box from the Entities panel and se
   await chooser.setFiles([]);
   expect(chooserCount).toBe(1);
 
-  await page.getByRole('tab', { name: 'Map', exact: true }).click();
+  // UX-27 (UI-SCN-01): the battlemap upload lives in the Scenes tab.
+  await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
   const mapFile = page.getByRole('group', { name: 'Upload image' }).locator('input[type="file"]');
   expect(await mapFile.boundingBox()).toMatchObject({ width: 1, height: 1 });
   await page.getByRole('tab', { name: 'Entities', exact: true }).click();
@@ -77,7 +78,7 @@ test('the host creates a scene, a token and a box from the Entities panel and se
 
   const propName = page.getByLabel('Prop name');
   await propName.fill('Crate');
-  await page.getByRole('button', { name: 'Create prop' }).click();
+  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
   await expect(propName).toHaveValue('');
   await expect(propName).toBeFocused();
 

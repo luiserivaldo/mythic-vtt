@@ -36,6 +36,8 @@ export function patchesFor(
   if (audience.kind === 'host') return raw ? [...raw] : diffPatches(before, after);
   if (!raw) return diffPatchesFor(audience, before, after);
 
+  // Scene activation changes the entire audience projection, not only the active id.
+  if (before.activeSceneId !== after.activeSceneId) return diffPatchesFor(audience, before, after);
   const passthrough: Patch[] = [];
   const touched = new Map<string, [string, string]>();
   for (const p of raw) {
@@ -49,7 +51,10 @@ export function patchesFor(
       root === 'scenes' &&
       typeof sceneId === 'string' &&
       !coDm &&
-      (before.scenes[sceneId]?.dmOnly || after.scenes[sceneId]?.dmOnly)
+      (before.scenes[sceneId]?.dmOnly ||
+        after.scenes[sceneId]?.dmOnly ||
+        sceneId !== before.activeSceneId ||
+        sceneId !== after.activeSceneId)
     ) {
       return diffPatchesFor(audience, before, after);
     }

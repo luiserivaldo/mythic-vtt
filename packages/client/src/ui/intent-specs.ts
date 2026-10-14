@@ -1,4 +1,4 @@
-import type { LayerId, Seat } from '@mythic/shared';
+import type { AssetRef, LayerId, Seat } from '@mythic/shared';
 
 /** One intent to submit through the client queue; the UI never builds state itself. */
 export interface IntentSpec {
@@ -99,5 +99,12 @@ export const sceneBackgroundIntent = (
 ): IntentSpec => ({
   type: 'scene.update',
   payload: { sceneId, background, zenith },
+  sceneId,
+});
+
+/** ENV-07: set the image skybox, or clear it (null) back to the colour/gradient. */
+export const sceneSkyboxIntent = (sceneId: string, skybox: AssetRef | null): IntentSpec => ({
+  type: 'scene.update',
+  payload: { sceneId, skybox },
   sceneId,
 });

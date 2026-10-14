@@ -115,7 +115,8 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
     const scenes: Campaign['scenes'] = {};
     let changed = false;
     for (const [id, scene] of Object.entries(state.scenes)) {
-      if (scene.dmOnly && seat?.role !== 'codm') {
+      // UI-TOP-01 / PERM-03: players and spectators know only their active scene.
+      if (seat?.role !== 'codm' && (scene.dmOnly || id !== state.activeSceneId)) {
         changed = true;
         continue;
       }

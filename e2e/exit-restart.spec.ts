@@ -73,6 +73,12 @@ test('M0 exit: browser sync survives clean and SIGKILL host restarts', async ({ 
     await dm.getByRole('tab', { name: 'Entities', exact: true }).click();
     await dm.getByLabel('Token name').fill('Persistent knight');
     await dm.getByRole('button', { name: 'Create token' }).click();
+    // The host patch may arrive before the form clears its draft on ack. Wait for both
+    // before typing the next name, so the first creation cannot erase the second draft.
+    await expect(
+      dm.getByTestId('token-label').filter({ hasText: 'Persistent knight' }),
+    ).toBeVisible();
+    await expect(dm.getByLabel('Token name')).toHaveValue('');
     await dm.getByLabel('Token name').fill('Persistent mage');
     await dm.getByRole('button', { name: 'Create token' }).click();
     await dm.getByRole('tab', { name: 'Chat', exact: true }).click();

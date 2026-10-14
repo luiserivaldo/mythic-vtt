@@ -1,4 +1,5 @@
-import type { Campaign, LayerId, Scene } from '@mythic/shared';
+import type { Campaign, Entity, LayerId, Scene } from '@mythic/shared';
+import { useViewerPreferences } from './ViewerPreferencesProvider.js';
 import { useId, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { useStore } from 'zustand';
 import { UploadError, uploadFailureMessage, type ImageUploader } from '../assets/image-upload.js';
@@ -12,12 +13,15 @@ import {
   entityCreateLayers,
   entityRenameIntent,
   entityShowGridOnTopIntent,
+  entityTextureIntent,
   entityRows,
   isValidColour,
   isValidEntityName,
   isValidPropSize,
   LABEL_VISIBILITIES,
   LAYER_LABELS,
+  layerForCreate,
+  localImageAsset,
   ownerOptions,
   PRIMITIVE_KINDS,
   propCreateIntent,
@@ -33,6 +37,7 @@ import { entityMoveLayerIntent } from './intent-specs.js';
 import { moveTargets } from './layer-panel.js';
 import { NameForm } from './NameForm.js';
 import { useSubmit, type SendIntent } from './submit.js';
+import { useUiStore } from './ui-store.js';
 
 function LayerSelect({
   value,
@@ -67,6 +72,7 @@ function TokenForm({
   campaign,
   scene,
   isHost,
+  activeLayer,
   uploader,
   send,
   onError,
@@ -74,13 +80,16 @@ function TokenForm({
   campaign: Campaign;
   scene: Scene;
   isHost: boolean;
+  activeLayer: LayerId;
   send: SendIntent;
   uploader: ImageUploader;
   onError: (message: string | null) => void;
 }) {
   const [name, setName] = useState<string>(TOKEN_FORM_DEFAULTS.name);
   const [size, setSize] = useState<TokenSizeName>(TOKEN_FORM_DEFAULTS.size);
-  const [layer, setLayer] = useState<LayerId>(TOKEN_FORM_DEFAULTS.layer);
+  const [layer, setLayer] = useState<LayerId>(() =>
+    layerForCreate(activeLayer, entityCreateLayers(isHost), TOKEN_FORM_DEFAULTS.layer),
+  );
   const [labels, setLabels] = useState<LabelVisibility>(TOKEN_FORM_DEFAULTS.labelVisibility);
   const [owner, setOwner] = useState<string>(TOKEN_FORM_DEFAULTS.ownerId);
   const [file, setFile] = useState<File | null>(null);
@@ -241,15 +250,19 @@ function TokenForm({
   );
 }
 
-function PropForm({
+export function PropForm({
   scene,
   isHost,
+  activeLayer,
   send,
+  uploader = defaultUploader,
   onError,
 }: {
   scene: Scene;
   isHost: boolean;
+  activeLayer: LayerId;
   send: SendIntent;
+  uploader?: ImageUploader;
   onError: (message: string | null) => void;
 }) {
   const [name, setName] = useState('');
@@ -259,9 +272,14 @@ function PropForm({
   const [sy, setSy] = useState('1');
   const [sz, setSz] = useState('1');
   const [walkable, setWalkable] = useState(false);
-  const [layer, setLayer] = useState<LayerId>('props');
+  const [layer, setLayer] = useState<LayerId>(() =>
+    layerForCreate(activeLayer, entityCreateLayers(isHost), 'props'),
+  );
+  const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const textureInputRef = useRef<HTMLInputElement>(null);
+  const textureInputId = useId();
   const size = { x: Number(sx), y: Number(sy), z: Number(sz) };
   const valid =
     isValidEntityName(name) &&
@@ -269,6 +287,43 @@ function PropForm({
     isValidPropSize(size.x) &&
     isValidPropSize(size.y) &&
     isValidPropSize(size.z);
+
+  async function submit() {
+    setBusy(true);
+    onError(null);
+    try {
+      const entityId = newId();
+      const uploaded = file ? await uploader(file) : null;
+      const ok = await send(
+        propCreateIntent(scene, {
+          sceneId: scene.id,
+          entityId,
+          name,
+          kind,
+          color,
+          size,
+          walkable,
+          layer,
+          // ENV-05: the texture tiles once per cell; the colour stays as the fallback.
+          ...(uploaded ? { texture: localImageAsset(uploaded.hash, name.trim()) } : {}),
+        }),
+      );
+      if (ok) {
+        setName('');
+        setFile(null);
+        // Clear the input too, so re-picking the same file still fires a change event.
+        if (textureInputRef.current) textureInputRef.current.value = '';
+        selectionStore.getState().pick(scene.id, entityId, false);
+        nameInputRef.current?.focus();
+      }
+    } catch (e) {
+      onError(
+        e instanceof UploadError ? uploadFailureMessage(e) : 'The upload failed unexpectedly.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const dim = (label: string, value: string, set: (v: string) => void) => (
     <label>
@@ -291,31 +346,7 @@ function PropForm({
       aria-label="Create prop"
       onSubmit={(e) => {
         e.preventDefault();
-        setBusy(true);
-        onError(null);
-        const entityId = newId();
-        void send(
-          propCreateIntent(scene, {
-            sceneId: scene.id,
-            entityId,
-            name,
-            kind,
-            color,
-            size,
-            walkable,
-            layer,
-          }),
-        )
-          .then((ok) => {
-            if (ok) {
-              setName('');
-              selectionStore.getState().pick(scene.id, entityId, false);
-              nameInputRef.current?.focus();
-            }
-          })
-          .finally(() => {
-            setBusy(false);
-          });
+        void submit();
       }}
     >
       <label>
@@ -351,11 +382,31 @@ function PropForm({
         <input
           type="color"
           value={isValidColour(color) ? color : '#000000'}
+          disabled={file !== null}
           onChange={(e) => {
             setColor(e.target.value);
           }}
         />
       </label>
+      {/* ENV-05: an uploaded image tiles over the prop; without one the colour above is drawn. */}
+      <div className="ui-file-field" role="group" aria-labelledby={`${textureInputId}-title`}>
+        <span id={`${textureInputId}-title`}>Texture image (optional, tiles once per cell)</span>
+        <input
+          id={textureInputId}
+          ref={textureInputRef}
+          className="ui-file-input"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          aria-labelledby={`${textureInputId}-title ${textureInputId}-button`}
+          onChange={(e) => {
+            setFile(e.target.files?.[0] ?? null);
+          }}
+        />
+        <label id={`${textureInputId}-button`} className="ui-file-button" htmlFor={textureInputId}>
+          Choose file
+        </label>
+        <span className="ui-file-name">{file?.name ?? 'No file chosen'}</span>
+      </div>
       {dim('Width (cells)', sx, setSx)}
       {dim('Height (cells)', sy, setSy)}
       {dim('Depth (cells)', sz, setSz)}
@@ -382,17 +433,24 @@ function EntityRowView({
   scene,
   entityId,
   send,
+  uploader,
+  onError,
 }: {
   campaign: Campaign;
   scene: Scene;
   entityId: string;
   send: SendIntent;
+  uploader: ImageUploader;
+  onError: (message: string | null) => void;
 }) {
   const selected = useStore(
     selectionStore,
     (s) => s.sceneId === scene.id && s.ids.includes(entityId),
   );
   const [confirming, setConfirming] = useState(false);
+  const { preferences } = useViewerPreferences();
+  const [textureBusy, setTextureBusy] = useState(false);
+  const textureInputId = useId();
   const entity = scene.entities[entityId];
   const row = useMemo(
     () => entityRows(campaign, scene).find((r) => r.id === entityId),
@@ -400,6 +458,32 @@ function EntityRowView({
   );
   if (!entity || !row) return null;
   const targets = moveTargets(scene, entity);
+  const shape = entity.shape;
+  const entityName = entity.name;
+
+  /** ENV-05: upload an image and store it as the prop's texture (entity.update replaces the shape). */
+  async function setTexture(current: NonNullable<Entity['shape']>, file: File) {
+    setTextureBusy(true);
+    onError(null);
+    try {
+      const uploaded = await uploader(file);
+      const ok = await send(
+        entityTextureIntent(
+          scene.id,
+          entityId,
+          current,
+          localImageAsset(uploaded.hash, entityName),
+        ),
+      );
+      if (!ok) onError('The texture was not applied.');
+    } catch (e) {
+      onError(
+        e instanceof UploadError ? uploadFailureMessage(e) : 'The upload failed unexpectedly.',
+      );
+    } finally {
+      setTextureBusy(false);
+    }
+  }
 
   return (
     <li className="ui-entity" data-selected={selected}>
@@ -460,6 +544,43 @@ function EntityRowView({
               Show grid on top of {entity.name}
             </label>
           )}
+          {shape && (
+            <div className="ui-file-field" role="group" aria-labelledby={`${textureInputId}-title`}>
+              <span id={`${textureInputId}-title`}>
+                Texture for {entityName} (tiles once per cell)
+              </span>
+              <input
+                id={textureInputId}
+                className="ui-file-input"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={textureBusy}
+                aria-labelledby={`${textureInputId}-title ${textureInputId}-button`}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) void setTexture(shape, file);
+                }}
+              />
+              <label
+                id={`${textureInputId}-button`}
+                className="ui-file-button"
+                htmlFor={textureInputId}
+              >
+                {shape.texture ? 'Replace texture' : 'Set texture'}
+              </label>
+              {shape.texture && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void send(entityTextureIntent(scene.id, entityId, shape, null));
+                  }}
+                >
+                  Remove texture from {entityName}
+                </button>
+              )}
+            </div>
+          )}
           {confirming ? (
             <>
               <button
@@ -486,7 +607,11 @@ function EntityRowView({
             <button
               type="button"
               onClick={() => {
-                setConfirming(true);
+                if (preferences.confirmBeforeDeleting) setConfirming(true);
+                else
+                  void send(entityDeleteIntent(scene.id, entityId)).then((ok) => {
+                    if (ok) selectionStore.getState().clear();
+                  });
               }}
             >
               Delete {entity.name}
@@ -507,6 +632,7 @@ export function EntityPanel({
   uploader?: ImageUploader;
 }) {
   const isHost = useClientStore((s) => s.isHost);
+  const activeLayer = useUiStore((s) => s.activeLayer);
   const [error, setError] = useState<string | null>(null);
   const { send, error: submitError } = useSubmit();
   const scene = campaign.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;
@@ -527,11 +653,19 @@ export function EntityPanel({
         campaign={campaign}
         scene={scene}
         isHost={isHost}
+        activeLayer={activeLayer}
         uploader={uploader}
         send={send}
         onError={setError}
       />
-      <PropForm scene={scene} isHost={isHost} send={send} onError={setError} />
+      <PropForm
+        scene={scene}
+        isHost={isHost}
+        activeLayer={activeLayer}
+        send={send}
+        uploader={uploader}
+        onError={setError}
+      />
       <h3>In {scene.name}</h3>
       {rows.length === 0 && <p>Nothing here yet.</p>}
       <ul className="ui-list" aria-label="Entities in this scene">
@@ -542,6 +676,8 @@ export function EntityPanel({
             scene={scene}
             entityId={row.id}
             send={send}
+            uploader={uploader}
+            onError={setError}
           />
         ))}
       </ul>

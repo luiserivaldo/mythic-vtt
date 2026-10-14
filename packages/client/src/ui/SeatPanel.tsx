@@ -9,6 +9,8 @@ import {
   seatRoleIntent,
 } from './intent-specs.js';
 import { NameForm } from './NameForm.js';
+import { SeatInvites } from './SeatInvites.js';
+import type { JoinUrl } from './share-panel.js';
 import {
   connectedIdentityRows,
   isValidIdentityId,
@@ -25,11 +27,14 @@ interface Props {
     readonly { seatId: string; connected: boolean; displayName?: string | undefined }[] | null;
   /** M1-11: connected identities without a seat (host only), offered as a dropdown. */
   unseated?: readonly { identityId: string; displayName: string }[] | undefined;
+  /** SES-04: the host's player join URLs; the first one carries the per-seat invite links. */
+  joinUrls: readonly JoinUrl[];
 }
 
-export function SeatPanel({ campaign, presence, unseated }: Props) {
+export function SeatPanel({ campaign, presence, unseated, joinUrls }: Props) {
   const roster = rosterOptions(unseated);
   const connected = connectedIdentityRows(campaign, presence, unseated);
+  const rows = seatRows(campaign, presence);
   const { send, error } = useSubmit();
   const [archiveId, setArchiveId] = useState<string | null>(null);
   const [identity, setIdentity] = useState<Record<string, string>>({});
@@ -109,7 +114,7 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
       )}
       <h3>Participants</h3>
       <ul className="ui-list" aria-label="Participants">
-        {seatRows(campaign, presence).map((row) => {
+        {rows.map((row) => {
           const typed = identity[row.id] ?? '';
           return (
             <li key={row.id} aria-label={`${row.label} participant`}>
@@ -230,6 +235,10 @@ export function SeatPanel({ campaign, presence, unseated }: Props) {
           );
         })}
       </ul>
+      <SeatInvites
+        seats={rows.map((row) => ({ id: row.id, label: row.label }))}
+        playerUrl={joinUrls[0]?.url}
+      />
       <fieldset>
         <legend>Add a participant template</legend>
         <div className="ui-row">

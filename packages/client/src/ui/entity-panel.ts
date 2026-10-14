@@ -48,6 +48,18 @@ export function entityCreateLayers(isHost: boolean): LayerId[] {
   return isHost ? [...publicLayers, 'dm'] : publicLayers;
 }
 
+/**
+ * UI-LAY-01: creation defaults to the viewer's active layer, still limited by what they may create
+ * on — a co-DM's active DM layer falls back to the form's own default (the host would refuse it).
+ */
+export function layerForCreate(
+  active: LayerId,
+  allowed: readonly LayerId[],
+  fallback: LayerId,
+): LayerId {
+  return allowed.includes(active) ? active : fallback;
+}
+
 export const DEFAULT_TOKEN_COLOR = DEFAULT_BOARD_TOKEN_COLOR;
 export const MAX_PROP_CELLS = 50;
 const UNIT_ROTATION = { x: 0, y: 0, z: 0, w: 1 } as const;
@@ -170,6 +182,14 @@ export function tokenCreateIntent(scene: Scene, d: TokenDraft): IntentSpec {
   });
 }
 
+/** D38/ENV-05: the AssetRef a locally uploaded image is stored under (`name` labels the asset). */
+export const localImageAsset = (hash: string, name: string): AssetRef => ({
+  source: 'local',
+  hash,
+  kind: 'image',
+  name,
+});
+
 export interface PropDraft {
   sceneId: string;
   entityId: string;
@@ -179,6 +199,8 @@ export interface PropDraft {
   size: { x: number; y: number; z: number };
   walkable: boolean;
   layer: LayerId;
+  /** ENV-05: uploaded image, tiled once per cell; the colour is the fallback. */
+  texture?: AssetRef;
 }
 
 /** ENV-02: a primitive prop; scale is its size in cells and its base sits at elevation 0. */
@@ -193,7 +215,12 @@ export function propCreateIntent(scene: Scene, d: PropDraft): IntentSpec {
       rotation: UNIT_ROTATION,
       scale: { ...d.size },
     },
-    shape: { kind: d.kind, color: d.color, walkable: d.walkable },
+    shape: {
+      kind: d.kind,
+      color: d.color,
+      walkable: d.walkable,
+      ...(d.texture ? { texture: d.texture } : {}),
+    },
   });
 }
 
@@ -218,6 +245,27 @@ export const entityShowGridOnTopIntent = (
   payload: { sceneId, entityId, changes: { shape: { ...shape, showGridOnTop } } },
   sceneId,
 });
+
+/**
+ * ENV-05: replaces the shape with (or without) an uploaded texture. entity.update merges
+ * top-level fields, so the whole shape is replaced and the key is deleted rather than left
+ * undefined over the wire.
+ */
+export const entityTextureIntent = (
+  sceneId: string,
+  entityId: string,
+  shape: NonNullable<Entity['shape']>,
+  texture: AssetRef | null,
+): IntentSpec => {
+  const next = { ...shape };
+  if (texture) next.texture = texture;
+  else delete next.texture;
+  return {
+    type: 'entity.update',
+    payload: { sceneId, entityId, changes: { shape: next } },
+    sceneId,
+  };
+};
 
 export const entityDeleteIntent = (sceneId: string, entityId: string): IntentSpec => ({
   type: 'entity.delete',

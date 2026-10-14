@@ -5,8 +5,10 @@ import {
   type AssetRef,
   type Campaign,
   type Entity,
+  type LayerId,
   type PrimitiveKind,
   type Scene,
+  type TokenStatusMarker,
 } from '@mythic/shared';
 import { footprintCells } from './token-footprint.js';
 import type { Volume } from './aoe-geometry.js';
@@ -48,6 +50,9 @@ export interface RenderEntity {
     yaw: number;
     /** TOK-03: height is locked; drawn with a flying indicator. */
     flying?: boolean;
+    /** TOK-06: conditions and custom markers drawn over the token. Absent when the host stripped
+     * them for this viewer (PERM-03), never an empty list. */
+    statusMarkers?: readonly TokenStatusMarker[];
   };
 }
 
@@ -55,6 +60,8 @@ export interface RenderEntity {
 export interface RenderShape {
   kind: PrimitiveKind;
   color: string;
+  /** ENV-05: uploaded image tiled once per cell across the faces; the colour is the fallback. */
+  texture?: AssetRef;
   walkable: boolean;
   /** GRID-05: show the scene grid on the walkable top in 3D. */
   showGridOnTop: boolean;
@@ -72,6 +79,8 @@ export interface RenderScene {
   background: string;
   /** ENV-07: optional gradient top colour (3D only). */
   zenith?: string;
+  /** ENV-07: optional uploaded image used as the 3D skybox; the colour/gradient is the fallback. */
+  skybox?: AssetRef;
   entities: RenderEntity[];
 }
 
@@ -84,11 +93,9 @@ export function gridToWorld(
   return [x, elevation, y];
 }
 
-export function renderLayer(entity: Entity): RenderLayer {
-  // TOK-02: component determines the visual surface. A token authored on map/props still needs
-  // to be visible and pickable above primitive footprints in the 2D table.
-  if (entity.token) return 'tokens';
-  switch (entity.layer) {
+/** The draw band a layer's plain entities use (§6.4); DM primitives draw with props. */
+export function layerRenderBand(layer: LayerId): RenderLayer {
+  switch (layer) {
     case 'map':
       return 'map';
     case 'props':
@@ -102,6 +109,13 @@ export function renderLayer(entity: Entity): RenderLayer {
   }
 }
 
+export function renderLayer(entity: Entity): RenderLayer {
+  // TOK-02: component determines the visual surface. A token authored on map/props still needs
+  // to be visible and pickable above primitive footprints in the 2D table.
+  if (entity.token) return 'tokens';
+  return layerRenderBand(entity.layer);
+}
+
 export function orderedEntities(entities: readonly RenderEntity[]): RenderEntity[] {
   const rank = (layer: RenderLayer) => RENDER_LAYERS.indexOf(layer);
   return [...entities].sort((a, b) => rank(a.layer) - rank(b.layer));
@@ -112,6 +126,7 @@ function renderShape(entity: Entity, shape: NonNullable<Entity['shape']>): Rende
   return {
     kind: shape.kind,
     color: shape.color,
+    ...(shape.texture ? { texture: shape.texture } : {}),
     walkable: shape.walkable,
     showGridOnTop: shape.showGridOnTop === true,
     width,
@@ -143,6 +158,7 @@ export function mapScene(scene: Scene): RenderScene {
     id: scene.id,
     background: scene.environment.background,
     ...(scene.environment.zenith ? { zenith: scene.environment.zenith } : {}),
+    ...(scene.environment.skybox ? { skybox: scene.environment.skybox } : {}),
     entities: orderedEntities(
       Object.values(scene.entities).map((entity) => ({
         id: entity.id,
@@ -184,6 +200,10 @@ export function mapScene(scene: Scene): RenderScene {
                 labelVisibility: entity.token.labelVisibility,
                 yaw: yawFromQuaternion(entity.transform.rotation),
                 ...(entity.token.flying ? { flying: true } : {}),
+                // TOK-06: an empty list stays absent, so the strip never mounts for nothing.
+                ...(entity.token.statusMarkers?.length
+                  ? { statusMarkers: entity.token.statusMarkers }
+                  : {}),
               },
             }
           : {}),
