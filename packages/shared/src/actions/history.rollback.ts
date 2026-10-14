@@ -2,6 +2,7 @@ import { applyPatches, type Patch } from 'immer';
 import { z } from 'zod';
 import { defineAction, isHost } from './define.js';
 import { UndoPatch } from './history.undo.js';
+import { removeArchivedOwners } from './archived-owners.js';
 
 /** Most patches one rollback may carry; a bigger jump back is refused ("pick a nearer point"). */
 export const ROLLBACK_MAX_PATCHES = 20_000;
@@ -34,6 +35,7 @@ export const historyRollback = defineAction({
   permission: (_state, actor) => isHost(actor),
   reduce: (draft, a) => {
     applyPatches(draft, a.payload.patches as Patch[]);
+    removeArchivedOwners(draft);
   },
   modExposed: false,
 });

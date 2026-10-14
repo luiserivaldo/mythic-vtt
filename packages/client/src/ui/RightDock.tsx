@@ -5,6 +5,7 @@ import { ChatPanel } from './ChatPanel.js';
 import { SheetPanel } from './SheetPanel.js';
 import { seatColorsOf } from './chat-panel.js';
 import { DOCK_ICONS, resolveActiveTab, visibleDockTabs } from './dock-tabs.js';
+import { HelpPanel } from './HelpPanel.js';
 import { SettingsPanel } from './SettingsPanel.js';
 import { HistoryTools } from './HistoryTools.js';
 import { IdentityTransfer } from './IdentityTransfer.js';
@@ -27,15 +28,6 @@ interface Props {
   onThemeChange: (theme: DockTheme) => void;
   /** Where the board's selection-driven tool panels (Transform, AoE, Token, Ruler) portal in. */
   contextPanelRef: Ref<HTMLDivElement>;
-}
-
-function Placeholder({ title, children }: { title: string; children: string }) {
-  return (
-    <section className="ui-panel ui-dock-placeholder" aria-label={title}>
-      <h2>{title}</h2>
-      <p>{children}</p>
-    </section>
-  );
 }
 
 /**
@@ -72,12 +64,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'sheet':
         return <SheetPanel />;
       case 'help':
-        return (
-          <Placeholder title="Help">
-            Drag a token to move it, use the Ruler to measure, and drag with the right mouse button
-            to orbit the camera in 3D.
-          </Placeholder>
-        );
+        return <HelpPanel />;
       case 'settings':
         return (
           <>

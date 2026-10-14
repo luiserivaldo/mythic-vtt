@@ -1,0 +1,10 @@
+{
+  "t": "intent",
+  "type": "aoe.persist",
+  "payload": {
+    "sceneId": "00000000000000000000000001",
+    "sourceId": "00000000000000000000000002",
+    "entityId": "00000000000000000000000003"
+  },
+  "clientRef": "lasting-fixture"
+}

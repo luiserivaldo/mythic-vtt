@@ -421,7 +421,9 @@ export function createEngine(options: EngineOptions): Engine {
     endSession() {
       return serialize(async () => {
         const seatIds = Object.values(state.seats)
-          .filter((seat) => seat.binding === 'session' && seat.identityId !== null)
+          .filter(
+            (seat) => !seat.archived && seat.binding === 'session' && seat.identityId !== null,
+          )
           .map((seat) => seat.id);
         for (const seatId of seatIds) {
           const outcome = await apply(

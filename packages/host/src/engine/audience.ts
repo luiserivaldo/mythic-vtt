@@ -26,7 +26,8 @@ export function spectatorSourceSeat(
 
 /** The seat this identity currently occupies (SES-03: at most one), if any. */
 export function seatIdOf(state: Campaign, identityId: string): string | undefined {
-  for (const seat of Object.values(state.seats)) if (seat.identityId === identityId) return seat.id;
+  for (const seat of Object.values(state.seats))
+    if (!seat.archived && seat.identityId === identityId) return seat.id;
   return undefined;
 }
 
@@ -72,5 +73,6 @@ export function audienceViewKey(state: Campaign, p: Participant): string {
     return audience.kind === 'seat' ? `spectators:${audience.seatId}:player` : 'spectators';
   }
   if (audience.kind !== 'seat') return audienceKey(audience);
-  return `${audienceKey(audience)}:${state.seats[audience.seatId]?.role ?? 'player'}`;
+  const seat = state.seats[audience.seatId];
+  return `${audienceKey(audience)}:${seat?.role ?? 'player'}:view=${seat?.permissions.view === false ? 'off' : 'on'}:identity=${seat?.identityId ?? ''}`;
 }

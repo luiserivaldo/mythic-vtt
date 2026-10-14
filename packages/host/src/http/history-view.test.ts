@@ -275,3 +275,26 @@ describe('history work budgets and checkpoints', () => {
     expect(second.page.entries).toEqual([]);
   });
 });
+
+it('keeps archived seat records out of historical diffs for every non-host audience', () => {
+  const f = fixture();
+  f.apply('seat.update', { seatId: IDS.owner, label: 'PRIVATE ARCHIVED SEAT' });
+  f.apply('seat.archive', { seatId: IDS.owner });
+  for (const audience of [
+    spectator,
+    { kind: 'seat', seatId: IDS.other },
+    { kind: 'seat', seatId: IDS.coDm },
+    { kind: 'seat', seatId: IDS.owner },
+  ] as const) {
+    const page = historyPage(f.state, f.log.length, f.log, audience, { limit: 50 });
+    const wire = JSON.stringify(page);
+    expect(wire).not.toContain('PRIVATE ARCHIVED SEAT');
+    expect(wire).not.toContain('archived');
+    expect(
+      page.entries.flatMap((entry) => entry.changes).some((change) => change.path[0] === 'seats'),
+    ).toBe(false);
+  }
+  expect(
+    JSON.stringify(historyPage(f.state, f.log.length, f.log, { kind: 'host' }, { limit: 50 })),
+  ).toContain('PRIVATE ARCHIVED SEAT');
+});

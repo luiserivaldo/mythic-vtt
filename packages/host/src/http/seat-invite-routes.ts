@@ -45,14 +45,21 @@ export function registerSeatInviteRoutes(
   };
   const seatParam = (request: FastifyRequest): string | undefined => {
     const seatId = (request.params as { seatId?: unknown }).seatId;
-    return typeof seatId === 'string' && SEAT_ID.test(seatId) && seatId in options.state().seats
+    return typeof seatId === 'string' &&
+      SEAT_ID.test(seatId) &&
+      seatId in options.state().seats &&
+      !options.state().seats[seatId]?.archived
       ? seatId
       : undefined;
   };
 
   app.get('/api/seat-invites', async (request, reply) => {
     if (!(await hostOnly(request, reply))) return reply;
-    return { seatIds: options.invites.seatIds() };
+    return {
+      seatIds: options.invites
+        .seatIds()
+        .filter((id) => options.state().seats[id] && !options.state().seats[id]?.archived),
+    };
   });
   app.post('/api/seat-invites/:seatId', async (request, reply) => {
     if (!(await hostOnly(request, reply))) return reply;
@@ -85,7 +92,11 @@ export function registerSeatInviteRoutes(
     const body = SeatInviteRedeemRequest.safeParse(request.body);
     if (!body.success) return unavailable();
     const { seatId, token } = body.data;
-    if (!(seatId in options.state().seats) || !options.invites.valid(seatId, token))
+    if (
+      !(seatId in options.state().seats) ||
+      options.state().seats[seatId]?.archived ||
+      !options.invites.valid(seatId, token)
+    )
       return unavailable();
     if (!(await options.claimSeat(identityId, seatId)))
       return reply.code(409).send({ error: 'seat unavailable' });

@@ -135,10 +135,5 @@
     "tint": "#8090ff",
     "tintOpacity": 0.15,
     "darkness": 0.2
-  },
-  "initiative": {
-    "round": 2,
-    "order": ["01J8Z0000000000000000ENT01", "01J8Z0000000000000000ENT02"],
-    "activeEntityId": "01J8Z0000000000000000ENT01"
   }
 }

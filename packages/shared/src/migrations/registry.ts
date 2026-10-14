@@ -1,3 +1,5 @@
+import { v7ToV8 } from './v7-to-v8.js';
+import { v5ToV6 } from './v5-to-v6.js';
 import { v4ToV5 } from './v4-to-v5.js';
 import { v3ToV4 } from './v3-to-v4.js';
 import { v2ToV3 } from './v2-to-v3.js';
@@ -9,7 +11,15 @@ import { runMigrations, type MigrationStep, type SaveKind } from './runner.js';
  * Append-only list of real migrations (one file per step: `v<N>-to-v<N+1>.ts`).
  * There is no v0 save format.
  */
-export const MIGRATION_STEPS: readonly MigrationStep[] = [v1ToV2, v2ToV3, v3ToV4, v4ToV5];
+export const MIGRATION_STEPS: readonly MigrationStep[] = [
+  v1ToV2,
+  v2ToV3,
+  v3ToV4,
+  v4ToV5,
+  v5ToV6,
+  v6ToV7,
+  v7ToV8,
+];
 
 /**
  * Ready-made hook for the host store's injectable `migrate` option
@@ -24,3 +34,4 @@ export function createStoreMigrate(
 }
 
 export const storeMigrate = createStoreMigrate();
+import { v6ToV7 } from './v6-to-v7.js';

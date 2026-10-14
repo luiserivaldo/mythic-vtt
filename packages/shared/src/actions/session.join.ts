@@ -8,10 +8,12 @@ export const sessionJoin = defineAction({
   permission: (state, actor, p) => {
     const seat = state.seats[p.seatId];
     if (state.activeSceneId === null && !isHost(actor) && seat?.role !== 'codm') return false;
-    if (!seat || (seat.identityId !== null && seat.identityId !== p.identityId)) return false;
+    if (!seat || seat.archived || (seat.identityId !== null && seat.identityId !== p.identityId))
+      return false;
     if (
       Object.values(state.seats).some(
-        (candidate) => candidate.identityId === p.identityId && candidate.id !== p.seatId,
+        (candidate) =>
+          !candidate.archived && candidate.identityId === p.identityId && candidate.id !== p.seatId,
       )
     ) {
       return false;

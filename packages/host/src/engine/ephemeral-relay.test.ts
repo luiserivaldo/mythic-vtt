@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PING_CHANNEL, PING_TOGGLE } from '@mythic/shared';
 import { audienceFor } from './audience.js';
 import { createEphemeralRelay, type EphemeralRecipient } from './ephemeral-relay.js';
 import { T, fakeConnection, fixtureCampaign, type FakeConnection } from './testing.js';
@@ -69,6 +70,444 @@ describe('ephemeral relay', () => {
     seat.interactionEnabled = false; // both gates must allow
     send(alice);
     expect(watcher.received).toHaveLength(3);
+  });
+
+  it('relays a camera pose from the DM and a co-DM only (M4-11, CAM-06)', () => {
+    const state = fixtureCampaign();
+    const coDmSeat = state.seats[T.coDm];
+    if (!coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const relay = createEphemeralRelay(() => 1_000);
+    const pose = {
+      t: 'ephemeral' as const,
+      channel: 'camera.pose',
+      data: { mode: '2d' as const, centerX: 4, centerZ: 6, zoom: 48, sceneId: T.scene, pull: true },
+    };
+    const send = (from: FakeConnection) => {
+      relay.relay(from, pose, state, recipients(state, [watcher]));
+    };
+
+    // A player may not move anyone else's camera: the frame is dropped, not an error.
+    send(alice);
+    expect(watcher.received).toEqual([]);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+
+    send(host);
+    send(coDm);
+    expect(watcher.received).toHaveLength(2);
+    expect(watcher.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: 'camera.pose',
+      from: T.carol,
+      data: pose.data,
+    });
+    expect(relay.stats().dropped.forbidden).toBe(1);
+  });
+
+  it('gives the camera pose its own spectator budget, so a ruler still reaches a spectator (M4-11)', () => {
+    // One frozen tick: nothing replenishes, so every bucket only spends its burst. The shared
+    // spectator fan-out defaults to burst 10 — exactly what a pose stream at 10/s spends — so the
+    // continuous stream must not spend from it, or a player's ruler preview is dropped mid-pan.
+    const state = fixtureCampaign();
+    const host = fakeConnection(T.host, { isHost: true });
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [host, alice, spectator]);
+    const relay = createEphemeralRelay(() => 1_000);
+    const stream = () => {
+      relay.relay(
+        host,
+        {
+          t: 'ephemeral',
+          channel: 'camera.pose',
+          data: { mode: '2d', centerX: 1, centerZ: 2, zoom: 48, sceneId: T.scene, pull: false },
+        },
+        state,
+        targets,
+      );
+    };
+    const poses = () =>
+      spectator.received.filter((m) => m.t === 'ephemeral' && m.channel === 'camera.pose').length;
+
+    for (let i = 0; i < 10; i++) stream();
+    expect(poses()).toBe(10);
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(0);
+
+    relay.relay(
+      alice,
+      {
+        t: 'ephemeral',
+        channel: 'ruler.preview',
+        data: { sceneId: T.scene, points: [{ x: 0, y: 0, z: 0 }], phase: 'active' },
+      },
+      state,
+      targets,
+    );
+    // The ruler preview reaches the spectator during the pose stream, with nothing rate-limited.
+    expect(spectator.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: 'ruler.preview',
+      from: T.alice,
+    });
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(0);
+  });
+
+  it('rate-limits the pose stream on its own budget, never on the shared one (M4-11)', () => {
+    // Both budgets are pinned to a different size, so each assertion says which one was spent.
+    const state = fixtureCampaign();
+    const host = fakeConnection(T.host, { isHost: true });
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [host, alice, spectator]);
+    const relay = createEphemeralRelay(() => 1_000, {
+      cameraPoseDeliveryRate: { ratePerSecond: 1, burst: 4 },
+      spectatorDeliveryRate: { ratePerSecond: 1, burst: 1 },
+    });
+    const stream = () => {
+      relay.relay(
+        host,
+        {
+          t: 'ephemeral',
+          channel: 'camera.pose',
+          data: { mode: '2d', centerX: 1, centerZ: 2, zoom: 48, sceneId: T.scene, pull: false },
+        },
+        state,
+        targets,
+      );
+    };
+    const poses = () =>
+      spectator.received.filter((m) => m.t === 'ephemeral' && m.channel === 'camera.pose').length;
+
+    for (let i = 0; i < 6; i++) stream();
+    // Four poses are the pose budget's whole burst; the stream is still rate-limited, on its own
+    // bucket, so the shared spectator budget keeps its single token for the ruler below.
+    expect(poses()).toBe(4);
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(2);
+
+    relay.relay(
+      alice,
+      {
+        t: 'ephemeral',
+        channel: 'ruler.preview',
+        data: { sceneId: T.scene, points: [{ x: 0, y: 0, z: 0 }], phase: 'active' },
+      },
+      state,
+      targets,
+    );
+    expect(spectator.received.at(-1)).toMatchObject({ channel: 'ruler.preview' });
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(2);
+  });
+
+  it('never fans out a malformed camera pose (M4-11, CAM-06)', () => {
+    const state = fixtureCampaign();
+    const host = fakeConnection(T.host, { isHost: true });
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [spectator]);
+    const relay = createEphemeralRelay(() => 1_000);
+    for (const data of [
+      // A zoom and a distance no camera can adopt, a non-finite centre, and a 3D pose with no
+      // distance at all: the host parses a pose exactly as a receiving client does.
+      { mode: '2d', centerX: 1, centerZ: 2, zoom: 0, sceneId: T.scene },
+      { mode: '2d', centerX: Number.NaN, centerZ: 2, zoom: 48, sceneId: T.scene },
+      { mode: '3d', targetX: 1, targetY: 0, targetZ: 1, azimuth: 0, polar: 0.9, sceneId: T.scene },
+    ]) {
+      relay.relay(host, { t: 'ephemeral', channel: 'camera.pose', data }, state, targets);
+    }
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats().dropped['invalid-camera-pose']).toBe(3);
+  });
+
+  it('never hands a camera pose to a target that cannot see its scene (M4-11 leak check)', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    if (!scene || !coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    state.scenes[T.newScene] = { ...scene, id: T.newScene, name: 'DM notes', dmOnly: true };
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [host, coDm, alice, spectator]);
+    const relay = createEphemeralRelay(() => 1_000);
+    const pose = (sceneId: string, pull = true) => ({
+      t: 'ephemeral' as const,
+      channel: 'camera.pose',
+      data: { mode: '2d' as const, centerX: 1, centerZ: 2, zoom: 48, sceneId, pull },
+    });
+
+    // The DM's camera in a DM-only scene is the host's and a co-DM's business only.
+    relay.relay(host, pose(T.newScene), state, targets);
+    expect(host.received).toHaveLength(1);
+    expect(coDm.received).toHaveLength(1);
+    expect(alice.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({ relayed: 2, dropped: { 'hidden-scene': 2 } });
+
+    // The active scene belongs to everyone, so the same pull reaches the player and the spectator.
+    relay.relay(host, pose(T.scene), state, targets);
+    expect(alice.received).toHaveLength(1);
+    expect(spectator.received).toHaveLength(1);
+
+    // CAM-06: an ordinary pose is the DM's own camera moving, not an instruction to anyone. Only a
+    // spectator that chose to follow uses it, so a player is never handed where the DM is looking —
+    // and neither are the DM's own co-DM peers, whose cameras this frame cannot move.
+    relay.relay(host, pose(T.scene, false), state, targets);
+    expect(host.received).toHaveLength(2);
+    expect(coDm.received).toHaveLength(2);
+    expect(alice.received).toHaveLength(1);
+    expect(spectator.received).toHaveLength(2);
+    expect(relay.stats().dropped['audience-filtered']).toBe(3);
+
+    // A pull is the DM's explicit "everyone, look here", and it is addressed to every viewer.
+    relay.relay(host, pose(T.scene), state, targets);
+    expect(alice.received).toHaveLength(2);
+    expect(spectator.received).toHaveLength(3);
+
+    // Once the DM moves to the hidden scene, the old scene is out of the player's view as well.
+    // PERM-03's filter is memoised per state object (`visible-to.ts`), exactly as the snapshot path
+    // uses it, so a scene switch is a new state — which is what an action produces.
+    const switched = { ...state, activeSceneId: T.newScene };
+    relay.relay(host, pose(T.scene), switched, targets);
+    expect(alice.received).toHaveLength(2);
+    expect(spectator.received).toHaveLength(3);
+    expect(relay.stats().dropped['hidden-scene']).toBe(4);
+
+    // A pose that names no scene at all is malformed, and moves nobody.
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: 'camera.pose', data: { mode: '2d', centerX: 1, centerZ: 2 } },
+      state,
+      targets,
+    );
+    expect(relay.stats().dropped['invalid-camera-pose']).toBe(1);
+    expect(alice.received).toHaveLength(2);
+  });
+
+  it('gates pings on the scene pins toggle: players dropped, host and co-DM unaffected', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    if (!scene || !coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const watcher = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000);
+    const ping = {
+      t: 'ephemeral' as const,
+      channel: PING_CHANNEL,
+      data: { sceneId: T.scene, x: 2, y: 0, z: 3 },
+    };
+    const send = (from: FakeConnection) => {
+      relay.relay(from, ping, state, recipients(state, [watcher]));
+    };
+
+    // `pins` is opt-in by default, so a player's ping never leaves the host.
+    expect(PING_TOGGLE).toBe('pins');
+    send(alice);
+    expect(watcher.received).toHaveLength(0);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+
+    scene.playerToggles = { pins: true };
+    send(alice);
+    send(host);
+    send(coDm);
+    expect(watcher.received).toHaveLength(3);
+    expect(watcher.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: PING_CHANNEL,
+      from: T.carol,
+      data: { sceneId: T.scene, x: 2, y: 0, z: 3 },
+    });
+
+    // A ping naming a scene the host does not have (or one the sender cannot see) is denied too.
+    relay.relay(
+      alice,
+      { ...ping, data: { ...ping.data, sceneId: T.newScene } },
+      state,
+      recipients(state, [watcher]),
+    );
+    expect(watcher.received).toHaveLength(3);
+    expect(relay.stats().dropped.forbidden).toBe(2);
+
+    // The seat-level Enable Interaction switch still applies on top of an open toggle.
+    const seat = state.seats[T.seatA];
+    if (!seat) throw new Error('missing seat');
+    seat.interactionEnabled = false;
+    send(alice);
+    expect(watcher.received).toHaveLength(3);
+    seat.interactionEnabled = true;
+    send(alice);
+    expect(watcher.received).toHaveLength(4);
+  });
+
+  it('filters a ping by scene visibility per recipient: a hidden scene id and its coordinates never leak', () => {
+    const state = fixtureCampaign();
+    const coDmSeat = state.seats[T.coDm];
+    const active = state.scenes[T.scene];
+    if (!coDmSeat || !active) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    // A DM-only prep scene the DM is browsing (UX-04): it does not exist for players or spectators,
+    // even with its `pins` toggle open.
+    state.scenes[T.newScene] = {
+      ...active,
+      id: T.newScene,
+      name: 'Prep',
+      dmOnly: true,
+      playerToggles: { pins: true },
+    };
+
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000);
+    const ping = (sceneId: string) => ({
+      t: 'ephemeral' as const,
+      channel: PING_CHANNEL,
+      data: { sceneId, x: 2.5, y: 0, z: 3.25 },
+    });
+
+    relay.relay(host, ping(T.newScene), state, recipients(state, [host, coDm, alice, spectator]));
+
+    // The DM and co-DM see the DM-only scene and get the marker; players and spectators get
+    // nothing at all — neither the hidden scene's id nor the pinged coordinates reach them.
+    expect(host.received).toHaveLength(1);
+    expect(coDm.received).toHaveLength(1);
+    expect(alice.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({ relayed: 2, dropped: { 'hidden-scene': 2 } });
+    const nonDmWire = alice.wire() + spectator.wire();
+    expect(nonDmWire).not.toContain(T.newScene);
+    expect(nonDmWire).not.toContain('3.25');
+
+    // A player cannot originate a ping naming a scene they cannot see, even with the toggle open.
+    relay.relay(alice, ping(T.newScene), state, recipients(state, [host]));
+    expect(host.received).toHaveLength(1);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+  });
+
+  it('filters a ping on an inactive scene per recipient: players and spectators learn nothing, the DM and co-DM do', () => {
+    const state = fixtureCampaign();
+    const coDmSeat = state.seats[T.coDm];
+    const active = state.scenes[T.scene];
+    if (!coDmSeat || !active) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    // The other half of the review's "dmOnly or inactive prep scene": a scene the DM is preparing but
+    // has not activated is equally absent for players and spectators (UI-TOP-01), even with its `pins`
+    // toggle open, so neither its id nor the pinged coordinates may be fanned out to them.
+    state.scenes[T.newScene] = {
+      ...active,
+      id: T.newScene,
+      name: 'Prepared',
+      playerToggles: { pins: true },
+    };
+
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000);
+    const ping = {
+      t: 'ephemeral' as const,
+      channel: PING_CHANNEL,
+      data: { sceneId: T.newScene, x: 4.5, y: 0, z: 9.75 },
+    };
+
+    relay.relay(host, ping, state, recipients(state, [host, coDm, alice, spectator]));
+
+    expect(host.received).toHaveLength(1);
+    expect(coDm.received).toHaveLength(1);
+    expect(alice.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({ relayed: 2, dropped: { 'hidden-scene': 2 } });
+    const nonDmWire = alice.wire() + spectator.wire();
+    expect(nonDmWire).not.toContain(T.newScene);
+    expect(nonDmWire).not.toContain('9.75');
+
+    // A co-DM sender is held to the same per-recipient rule — being exempt from the scene *toggle*
+    // does not let a frame naming an unactivated scene reach the player or the spectator.
+    alice.clear();
+    spectator.clear();
+    relay.relay(coDm, ping, state, recipients(state, [host, coDm, alice, spectator]));
+    expect(host.received).toHaveLength(2);
+    expect(coDm.received).toHaveLength(2);
+    expect(alice.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({ relayed: 4, dropped: { 'hidden-scene': 4 } });
+    expect(alice.wire() + spectator.wire()).not.toContain(T.newScene);
+  });
+
+  it('rate-limits a ping flood per connection before relaying it', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { pins: true };
+    const alice = fakeConnection(T.alice);
+    const watcher = fakeConnection(T.bob);
+    // A frozen clock: the bucket never refills, so exactly `burst` pings get through.
+    const relay = createEphemeralRelay(() => 1_000, { activeRate: { ratePerSecond: 1, burst: 2 } });
+    const ping = {
+      t: 'ephemeral' as const,
+      channel: PING_CHANNEL,
+      data: { sceneId: T.scene, x: 1, y: 0, z: 1 },
+    };
+    for (let index = 0; index < 5; index += 1) {
+      relay.relay(alice, ping, state, recipients(state, [watcher]));
+    }
+    expect(relay.stats()).toMatchObject({ relayed: 2, dropped: { 'rate-limited': 3 } });
+  });
+
+  it('drops a malformed ping payload instead of fanning junk out on the gated channel', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { pins: true };
+    const alice = { ...fakeConnection(T.alice), color: '#ab1234' };
+    const watcher = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000);
+    // Every case still names a scene the sender may use, so the toggle, scene and entity gates all
+    // pass and only the payload shape can reject the frame.
+    const malformed: unknown[] = [
+      { sceneId: T.scene },
+      { sceneId: T.scene, x: 1, y: 0 },
+      { sceneId: T.scene, x: '1', y: 0, z: 0 },
+      { sceneId: T.scene, x: Number.NaN, y: 0, z: 0 },
+      { sceneId: T.scene, x: Number.POSITIVE_INFINITY, y: 0, z: 0 },
+      { sceneId: T.scene, x: 1, y: 0, z: 1, color: 'red' },
+      { sceneId: T.scene, x: 1, y: 0, z: 1, padding: 'x'.repeat(4096) },
+    ];
+    const send = (data: unknown) => {
+      relay.relay(
+        alice,
+        { t: 'ephemeral', channel: PING_CHANNEL, data },
+        state,
+        recipients(state, [watcher]),
+      );
+    };
+    for (const data of malformed) send(data);
+
+    expect(watcher.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({
+      relayed: 0,
+      dropped: { 'invalid-payload': malformed.length },
+    });
+
+    // A well-formed ping is unaffected: it is relayed, with the sender's own profile colour.
+    send({ sceneId: T.scene, x: 1, y: 0, z: 2, color: '#ffffff' });
+    expect(watcher.received).toHaveLength(1);
+    expect(watcher.received[0]).toMatchObject({
+      t: 'ephemeral',
+      channel: PING_CHANNEL,
+      data: { sceneId: T.scene, x: 1, y: 0, z: 2, color: '#ab1234' },
+    });
+    expect(relay.stats().relayed).toBe(1);
   });
 
   it('filters entity previews by current audience, including D32 co-DM visibility', () => {
@@ -171,8 +610,8 @@ describe('ephemeral relay', () => {
       state,
       targets,
     );
-    relay.relay(spectator, { t: 'ephemeral', channel: 'ping', data: { x: 1 } }, state, targets);
-    relay.relay(spectator, { t: 'ephemeral', channel: 'ping', data: { x: 2 } }, state, targets);
+    relay.relay(spectator, { t: 'ephemeral', channel: 'cursor', data: { x: 1 } }, state, targets);
+    relay.relay(spectator, { t: 'ephemeral', channel: 'cursor', data: { x: 2 } }, state, targets);
 
     expect(alice.received.filter((m) => m.t === 'error')).toEqual([]);
     expect(spectator.received.filter((m) => m.t === 'error')).toEqual([]);
@@ -190,12 +629,16 @@ describe('ephemeral relay', () => {
   });
 });
 
-it('shares the validated profile colour for rulers and cursors instead of a spoofed preview colour', () => {
+it('shares the validated profile colour for rulers, cursors and pings instead of a spoofed preview colour', () => {
   const state = fixtureCampaign();
+  const scene = state.scenes[T.scene];
+  if (!scene) throw new Error('fixture incomplete');
+  // LAY-05: a player may ping only where the DM opened the scene's pins toggle.
+  scene.playerToggles = { pins: true };
   const alice = { ...fakeConnection(T.alice), color: '#ab1234' };
   const host = fakeConnection(T.host, { isHost: true });
   const relay = createEphemeralRelay(() => 1000);
-  for (const channel of ['ruler.preview', 'cursor']) {
+  for (const channel of ['ruler.preview', 'cursor', PING_CHANNEL]) {
     const data =
       channel === 'ruler.preview'
         ? {
@@ -207,7 +650,9 @@ it('shares the validated profile colour for rulers and cursors instead of a spoo
             phase: 'active',
             color: '#ffffff',
           }
-        : { x: 1, color: '#ffffff' };
+        : channel === PING_CHANNEL
+          ? { sceneId: T.scene, x: 1, y: 0, z: 2, color: '#ffffff' }
+          : { x: 1, color: '#ffffff' };
     relay.relay(alice, { t: 'ephemeral', channel, data }, state, recipients(state, [host]));
     expect(host.received.at(-1)).toMatchObject({
       t: 'ephemeral',

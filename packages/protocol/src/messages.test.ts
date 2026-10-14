@@ -196,3 +196,43 @@ describe('v2 presence latency', () => {
     expect(valid({ ...seat, identitySecret: 'not-a-real-secret' })).toBe(false);
   });
 });
+
+describe('v7 lasting AoE', () => {
+  it('round-trips the synthetic lasting placement intent', () => {
+    const raw = readFileSync(
+      new URL('../../../fixtures/protocol/v7/lasting-aoe.json', import.meta.url),
+      'utf8',
+    );
+    const decoded = decodeClientMessage(raw);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) throw new Error('invalid golden fixture');
+    expect(decodeClientMessage(encodeClientMessage(decoded.message))).toEqual(decoded);
+  });
+});
+
+describe('v9 initiative', () => {
+  it('round-trips the synthetic initiative frames and pins the handshake to v9', () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL('../../../fixtures/protocol/v9/initiative.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { client: unknown[]; server: unknown[] };
+    expect(fixture.client).toHaveLength(3);
+    for (const frame of fixture.client) {
+      const decoded = decodeClientMessage(JSON.stringify(frame));
+      expect(decoded.ok).toBe(true);
+      if (!decoded.ok) throw new Error('invalid client fixture');
+      expect(JSON.parse(encodeClientMessage(decoded.message))).toEqual(frame);
+      if (decoded.message.t === 'hello') expect(decoded.message.v).toBe(PROTOCOL_VERSION);
+    }
+    for (const frame of fixture.server) {
+      const decoded = decodeServerMessage(JSON.stringify(frame));
+      expect(decoded.ok).toBe(true);
+      if (!decoded.ok) throw new Error('invalid server fixture');
+      expect(JSON.parse(encodeServerMessage(decoded.message))).toEqual(frame);
+    }
+    expect(PROTOCOL_VERSION).toBe(9);
+    expect(isSupportedVersion(8)).toBe(false);
+  });
+});

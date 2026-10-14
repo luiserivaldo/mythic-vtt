@@ -93,7 +93,7 @@ export function createHttpAuthenticator(options: HttpAuthOptions): HttpAuthentic
 
       const isHost = (await options.identities.getHostIdentityId()) === credential.identityId;
       const seat = Object.values(options.state().seats).find(
-        (s) => s.identityId === credential.identityId,
+        (s) => !s.archived && s.identityId === credential.identityId,
       );
       const role: HttpRole = isHost
         ? 'host'

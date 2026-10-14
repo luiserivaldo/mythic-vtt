@@ -31,12 +31,13 @@ function ownsEntity(audience: Audience, entity: Entity): boolean {
 
 function viewKey(audience: Audience, seat?: Seat): string {
   const role = seat?.role === 'codm' ? 'codm' : 'player';
-  return `${audienceKey(audience)}:view=${seat?.permissions.view === false ? 'off' : 'on'}:${role}`;
+  return `${audienceKey(audience)}:view=${seat?.permissions.view === false ? 'off' : 'on'}:${role}:identity=${seat?.identityId ?? ''}`;
 }
 
 /** The audience's view of one entity, or null if it must not be sent at all. */
 export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Entity | null {
   if (audience.kind === 'host') return entity;
+  if (seat?.archived) return viewEntity({ kind: 'spectators' }, entity);
   const key = viewKey(audience, seat);
   return memo(entityCache, entity, key, () => {
     const owner = ownsEntity(audience, entity);
@@ -69,6 +70,12 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
         view = { ...view, token: { ...view.token, quickFields: Object.fromEntries(shared) } };
       }
     }
+    // PERM-03: placement provenance stays host/placer-private after seat reassignment.
+    if (
+      view.lastingAoE?.creatorIdentityId !== undefined &&
+      seat?.identityId !== view.lastingAoE.creatorIdentityId
+    )
+      view = { ...view, lastingAoE: {} };
     return view;
   });
 }
@@ -79,12 +86,14 @@ export function viewPrefab(audience: Audience, prefab: Prefab, seat?: Seat): Pre
   if (audience.kind !== 'seat' || seat?.role !== 'codm' || !seat.permissions.view) return null;
   // Older experimental blueprints did not capture visibility; keep them host-only.
   if (prefab.entity.owners === undefined) return null;
-  return viewEntity(
+  const view = viewEntity(
     audience,
     { ...prefab.entity, id: prefab.id, owners: prefab.entity.owners },
     seat,
-  ) === null
-    ? null
+  );
+  if (!view) return null;
+  return view.lastingAoE && view.lastingAoE !== prefab.entity.lastingAoE
+    ? { ...prefab, entity: { ...prefab.entity, lastingAoE: view.lastingAoE } }
     : prefab;
 }
 
@@ -124,6 +133,8 @@ function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
 export function visibleTo(audience: Audience, state: Campaign): Campaign {
   if (audience.kind === 'host') return state;
   return memo(campaignCache, state, audienceKey(audience), () => {
+    if (audience.kind === 'seat' && state.seats[audience.seatId]?.archived)
+      return visibleTo({ kind: 'spectators' }, state);
     const seat = audience.kind === 'seat' ? state.seats[audience.seatId] : undefined;
     const scenes: Campaign['scenes'] = {};
     let changed = false;
@@ -142,9 +153,11 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
       audience.kind === 'seat' && seat?.role === 'codm' && seat.permissions.view;
     const activeSceneId =
       state.activeSceneId && scenes[state.activeSceneId] ? state.activeSceneId : null;
+    const seats = Object.fromEntries(Object.entries(state.seats).filter(([, s]) => !s.archived));
+    const hideArchived = Object.keys(seats).length !== Object.keys(state.seats).length;
     const view =
-      changed || activeSceneId !== state.activeSceneId
-        ? { ...state, scenes, activeSceneId }
+      changed || hideArchived || activeSceneId !== state.activeSceneId
+        ? { ...state, scenes, seats, activeSceneId }
         : state;
     if (state.prefabs && !mayReadPrefabs) {
       const withoutPrefabs = { ...view };
@@ -156,11 +169,25 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
       let hidden = false;
       for (const [id, prefab] of Object.entries(state.prefabs)) {
         const allowed = viewPrefab(audience, prefab, seat);
-        if (allowed) prefabs[id] = allowed;
-        else hidden = true;
+        if (allowed) {
+          prefabs[id] = allowed;
+          if (allowed !== prefab) hidden = true;
+        } else hidden = true;
       }
       if (hidden) return { ...view, prefabs };
     }
     return view;
   });
+}
+
+/**
+ * PERM-03 / LAY-05: whether an audience may see a scene at all. `visibleTo` omits every scene a
+ * viewer cannot see — a player or spectator knows only the active, non-DM-only one, while the host
+ * and co-DM seats keep them all — so this is the one source of truth for "does this scene exist for
+ * them". The ephemeral relay uses it to keep a hidden scene's id and coordinates off the wire
+ * (M4-14 pings, and every other channel whose data names a scene) instead of copying the rule.
+ * A scene the campaign does not hold is never seen, by anyone.
+ */
+export function seesScene(state: Campaign, audience: Audience, sceneId: string): boolean {
+  return visibleTo(audience, state).scenes[sceneId] !== undefined;
 }

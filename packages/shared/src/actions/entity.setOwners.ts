@@ -13,7 +13,7 @@ export const entitySetOwners = defineAction({
       isAdmin(state, actor) &&
       isAdminOn(state, actor, entity.layer) &&
       new Set(p.owners).size === p.owners.length &&
-      p.owners.every((ownerId) => ownerId in state.seats)
+      p.owners.every((ownerId) => ownerId in state.seats && !state.seats[ownerId]?.archived)
     );
   },
   reduce: (draft, a) => {

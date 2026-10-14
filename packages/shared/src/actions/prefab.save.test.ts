@@ -74,6 +74,34 @@ describe('campaign prefabs', () => {
       false,
     );
   });
+  it('redacts lasting provenance in blueprints and charges AoE copies to their new placer', () => {
+    const before = fixture(),
+      scene = before.scenes[IDS.scene];
+    if (!scene) throw new Error('scene');
+    scene.entities[IDS.entity] = makeEntity(IDS.entity, {
+      layer: 'effects',
+      owners: [IDS.owner],
+      aoe: { kind: 'sphere', radius: 2, color: '#ff8800' },
+      lastingAoE: { creatorIdentityId: IDS.identity },
+    });
+    const saved = reduceAction(before, action).state;
+    expect(
+      visibleTo({ kind: 'seat', seatId: IDS.coDm }, saved).prefabs?.[prefabId]?.entity.lastingAoE,
+    ).toEqual({});
+    const placed = reduceAction(saved, {
+      ...action,
+      actor: { ...ACTORS.coDm, identityId: IDS.otherIdentity },
+      type: 'prefab.place',
+      payload: { sceneId: targetId, prefabId, entityId: copyId, to: { x: 5, y: 0, z: 5 } },
+    }).state;
+    expect(placed.scenes[targetId]?.entities[copyId]?.lastingAoE).toEqual({
+      creatorIdentityId: IDS.otherIdentity,
+    });
+    expect(placed.scenes[targetId]?.entities[copyId]?.measuringAoE).toBeUndefined();
+    expect(saved.prefabs?.[prefabId]?.entity.lastingAoE).toEqual({
+      creatorIdentityId: IDS.identity,
+    });
+  });
   it('copies configuration independently across scenes and clears instance rights', () => {
     const before = fixture(),
       saved = reduceAction(before, action);
