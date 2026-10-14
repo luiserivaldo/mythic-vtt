@@ -399,7 +399,8 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
         if (!done.moved) toggleFlying(done.entityId);
       }
       // UX-21: a mouse `pointerup` fires only once every button is up, so the right release during
-      // a drag never reaches here; the left release still ends the move as usual.
+      // a drag never reaches here; the left release still ends the move as usual, now wherever the
+      // pointer happens to be (M3-11).
       if (press && e.pointerId === press.pointerId) end(false);
     };
     const onCancel = (e: PointerEvent) => {
@@ -427,7 +428,10 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
     window.addEventListener('pointerdown', onDown, true);
     window.addEventListener('mousedown', onMouseDown, true);
     el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerup', onUp);
+    // M3-11: the release is heard on the window, not on the canvas. A 3D ruler readout is an HTML
+    // pill, so it is a DOM node outside the canvas subtree: a release over it reaches no canvas
+    // listener and would strand the drag. Capture, like the ruler tool, so nothing can eat it.
+    window.addEventListener('pointerup', onUp, true);
     el.addEventListener('pointercancel', onCancel);
     el.addEventListener('click', onClickCapture, true);
     window.addEventListener('contextmenu', onContextMenu, true);
@@ -437,7 +441,7 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
       window.removeEventListener('pointerdown', onDown, true);
       window.removeEventListener('mousedown', onMouseDown, true);
       el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointerup', onUp, true);
       el.removeEventListener('pointercancel', onCancel);
       el.removeEventListener('click', onClickCapture, true);
       window.removeEventListener('contextmenu', onContextMenu, true);

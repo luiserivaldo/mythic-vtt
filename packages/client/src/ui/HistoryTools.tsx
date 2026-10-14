@@ -317,12 +317,15 @@ function HistoryPanel({ canUndo }: { canUndo: boolean }) {
 }
 
 export function HistoryTools() {
+  const preview = useClientStore((state) => state.viewAs.kind !== 'host');
   const campaign = useClientStore((state) => state.campaign);
   const ready = useClientStore((state) => state.ready);
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const [open, setOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
+  // History authenticates as the real identity; its DM response cannot represent a seat.
+  if (preview) return <p>Back to DM to view history.</p>;
   if (!campaign || !ready) return null;
   const role = viewerRole({ campaign, isHost, seatId });
   const close = () => {

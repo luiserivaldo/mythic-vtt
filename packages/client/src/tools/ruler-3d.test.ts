@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Entity, Scene } from '@mythic/shared';
-import { prepareRulerPoint3d, rulerGuideCorner } from './ruler-3d.js';
+import { prepareRulerPoint3d } from './ruler-3d.js';
 
 const box: Entity = {
   id: 'B'.repeat(26),
@@ -71,13 +71,5 @@ describe('3D ruler picks (MEAS-02)', () => {
       },
     };
     expect(prepareRulerPoint3d({ x: 5, y: 5, z: 5 }, nonWalkable, box.id).y).toBe(5);
-  });
-
-  it('keeps the guide horizontal at the first point before its vertical leg', () => {
-    expect(rulerGuideCorner({ x: 1, y: 0, z: 2 }, { x: 4, y: 10, z: 7 })).toEqual({
-      x: 4,
-      y: 0,
-      z: 7,
-    });
   });
 });

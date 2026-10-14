@@ -1,4 +1,5 @@
 import { useStore } from 'zustand';
+import { ViewAsControl } from './ViewAsControl.js';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { cameraLinkStore } from '../render/camera-link-store.js';
@@ -67,6 +68,7 @@ export function TopBar() {
           Follow the DM camera
         </button>
       )}
+      <ViewAsControl />
       <IdentityStatus />
     </header>
   );

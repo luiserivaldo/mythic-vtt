@@ -32,8 +32,9 @@ function projectToCanvas(
   };
 }
 
-// M3-06 (MEAS-02): use the real DM link, place a tall walkable surface, and verify that a
-// surface-to-ground ruler exposes horizontal, vertical and total scene-unit distances remotely.
+// M3-06 (MEAS-02) + M3-11: use the real DM link, place a tall walkable surface, and verify that
+// a surface-to-ground ruler draws one straight segment labelled with the total length only, while
+// hovering the line or its label restores the horizontal/vertical breakdown.
 let table: Table | undefined;
 
 test.beforeAll(async () => {
@@ -80,8 +81,11 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   const box = await canvas.boundingBox();
   if (!box) throw new Error('no canvas box');
   const pose = await settledCameraPose(page);
-  const ground = projectToCanvas(pose, box, { x: 20, y: 0, z: 25 });
-  const platformTop = projectToCanvas(pose, box, { x: 20, y: 10, z: 15 });
+  // Aim at cell centres, never cell boundaries: a surface pick snaps X/Z to the nearest cell, so a
+  // world point that sits on an integer flips a whole cell on sub-pixel rounding (this is what made
+  // this spec read 80 ft instead of 75 ft on CI).
+  const ground = projectToCanvas(pose, box, { x: 20.5, y: 0, z: 25.5 });
+  const platformTop = projectToCanvas(pose, box, { x: 20.5, y: 10, z: 15.5 });
   await page.getByRole('button', { name: 'Measure', exact: true }).click();
   await page.getByLabel('Measurement mode').selectOption('3d');
   await page.getByLabel('Ruler fade').selectOption('linger');
@@ -92,13 +96,28 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   await page.mouse.move(platformTop.x, platformTop.y, { steps: 8 });
   await page.mouse.up();
 
-  const detailed = /^H .+ · V (?!0(?:\.0+)? ft).+ · T .+$/;
-  await expect(page.getByTestId('ruler-total')).toHaveText(detailed);
+  // The pointer is still resting on the segment's end point, which the 3D line raycast treats
+  // as a hover (MEAS-02), so the breakdown is shown. Step away first to assert the default
+  // total-only label; the hover state is exercised explicitly below.
+  await page.mouse.move(box.x + 10, box.y + 10);
+
+  // M3-11: the 3D ruler is one straight segment labelled with the total length only. The
+  // platform spawns at scene centre: 10 cells of horizontal run and 10 of elevation, so the
+  // alternating diagonal rule reports 10 + 10/2 = 15 cells, i.e. 75 ft.
+  const total = /^75 ft$/;
+  await expect(page.getByTestId('ruler-total')).toHaveText(total);
+  // The MEAS-02 breakdown appears while the ruler or its label is hovered (2D is unaffected).
+  await page.getByTestId('ruler-total').hover();
+  await expect(page.getByTestId('ruler-total')).toHaveText(/^H 50 ft · V 50 ft · T 75 ft$/);
   // M1-33: 3D also keeps the host echo out of the sender's remote-ruler layer.
   await expect(page.getByTestId('remote-ruler-total')).toHaveCount(0);
+  await expect(viewer.page.getByTestId('remote-ruler-total')).toHaveText(/^DM: 75 ft$/);
+  await viewer.page.getByTestId('remote-ruler-total').hover();
   await expect(viewer.page.getByTestId('remote-ruler-total')).toHaveText(
-    /^DM: H .+ · V (?!0(?:\.0+)? ft).+ · T .+$/,
+    /^DM: H 50 ft · V 50 ft · T 75 ft$/,
   );
+  await page.mouse.move(box.x + 10, box.y + 10); // leave the labels
+  await expect(page.getByTestId('ruler-total')).toHaveText(total);
   await page.screenshot({ path: testInfo.outputPath('ruler-3d.png') });
   expect(errors).toEqual([]);
 
