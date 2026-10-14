@@ -34,7 +34,9 @@ export function useViewedCampaign(): Campaign | null {
   const campaign = useClientStore((s) => s.campaign);
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
-  const sceneId = useStore(sceneBrowseStore, (s) => s.sceneId);
+  const browsing = useStore(sceneBrowseStore, (s) => s.sceneId);
+  const preview = useClientStore((s) => s.viewAs.kind !== 'host');
+  const sceneId = preview ? null : browsing;
   const admin = isHost || (!!seatId && campaign?.seats[seatId]?.role === 'codm');
   return useMemo(() => viewedCampaign(campaign, admin, sceneId), [campaign, admin, sceneId]);
 }
