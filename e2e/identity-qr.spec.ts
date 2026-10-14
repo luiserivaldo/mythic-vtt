@@ -36,14 +36,15 @@ test.afterAll(async () => {
 function stubReader(input: ReaderStub): void {
   const scope = globalThis as unknown as ReaderScope;
   const scanned = input.scanned;
-  const opened = Date.now();
   const delayMs = input.delayMs ?? 0;
   scope.BarcodeDetector =
     scanned === null
       ? undefined
       : class {
+          // Counted from when the reader opens, not from page load: the test clicks in between.
+          private readonly opened = Date.now();
           detect(): Promise<{ rawValue: string }[]> {
-            if (Date.now() - opened < delayMs) return Promise.resolve([]);
+            if (Date.now() - this.opened < delayMs) return Promise.resolve([]);
             return Promise.resolve([{ rawValue: scanned }]);
           }
         };
