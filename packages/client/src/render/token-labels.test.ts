@@ -31,7 +31,8 @@ describe('labelVisible (TOK-04)', () => {
     expect(labelVisible(s, player)).toBe(false);
     expect(labelVisible({ ...s, owners: [seat.id] }, player)).toBe(true);
     expect(labelVisible(s, { kind: 'host' })).toBe(true);
-    expect(labelVisible(s, { kind: 'spectator' })).toBe(false);
+    // A spectator relies on the host's D35 blanking: it may follow the owner's seat (SES-11).
+    expect(labelVisible({ ...s, name: '' }, { kind: 'spectator' })).toBe(false);
   });
   it('shows "dm" labels only to host and co-DM', () => {
     const s = subject({ labelVisibility: 'dm', owners: [seat.id] });
@@ -77,9 +78,16 @@ describe('labelState (D35 affected-token panel)', () => {
     expect(labelState(subject({ name: '' }), { kind: 'host' })).toBe('visible');
   });
 
-  it('gives spectators a label only for "all", and hosts and co-DMs every label', () => {
+  it('gives spectators "all" labels and sent owner names, and hosts and co-DMs every label', () => {
     expect(labelState(subject(), { kind: 'spectator' })).toBe('visible');
-    expect(labelState(subject({ labelVisibility: 'owner' }), { kind: 'spectator' })).toBe('hidden');
+    // SES-11 / D35: an owner name reaches a spectator only when it follows the owning seat.
+    expect(labelState(subject({ labelVisibility: 'owner' }), { kind: 'spectator' })).toBe(
+      'visible',
+    );
+    expect(labelState(subject({ name: '', labelVisibility: 'owner' }), { kind: 'spectator' })).toBe(
+      'hidden',
+    );
+    expect(labelState(subject({ labelVisibility: 'dm' }), { kind: 'spectator' })).toBe('hidden');
     expect(labelState(subject({ layer: 'dm' }), { kind: 'spectator' })).toBe('invisible');
     expect(labelState(subject({ labelVisibility: 'dm' }), { kind: 'host' })).toBe('visible');
     expect(

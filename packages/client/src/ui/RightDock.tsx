@@ -44,6 +44,7 @@ function Placeholder({ title, children }: { title: string; children: string }) {
  * may not use is never offered or rendered (registry predicate; the host re-checks every intent).
  */
 export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
+  const preview = useClientStore((s) => s.viewAs.kind !== 'host');
   const campaign = useClientStore((s) => s.campaign);
   const viewed = useViewedCampaign();
   const ready = useClientStore((s) => s.ready);
@@ -168,7 +169,9 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             aria-labelledby={tabId(active)}
             className="ui-dock-tab-body"
           >
-            <Suspense fallback={<p role="status">Loading panel…</p>}>{content()}</Suspense>
+            <fieldset className="ui-preview-content" disabled={preview}>
+              <Suspense fallback={<p role="status">Loading panel…</p>}>{content()}</Suspense>
+            </fieldset>
           </div>
         )}
         <div className="ui-context-panel-slot" ref={contextPanelRef} />
