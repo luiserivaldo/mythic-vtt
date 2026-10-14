@@ -18,6 +18,7 @@ import { rulerStore } from '../tools/ruler-store.js';
 import { RulerPanel } from './RulerPanel.js';
 import { seeSheet } from './sheet-panel.js';
 import { CreatePropPanel, InitiativePanel } from './RailPanels.js';
+import { DrawPanel } from './DrawPanel.js';
 
 const TransformPanel3D = lazy(async () => {
   const module = await import('./TransformPanel3D.js');
@@ -106,11 +107,13 @@ export function ToolPanelDock({
   // UI-TOOL-04/05: the rail's own panels. Measuring (the ruler or an AoE) takes the rail over.
   const measuring = rulerActive || aoeActive;
   const showCreateProp = scene !== null && !measuring && activeTool === 'create-prop';
+  const showDraw = scene !== null && !measuring && activeTool === 'draw';
   const showInitiative = !measuring && activeTool === 'initiative';
   // Read-only viewers get no editing panels, only the Initiative placeholder.
   if (!container) return null;
   if (
-    (readOnly || (!showTransform && !showAoE && !showToken && !showRuler && !showCreateProp)) &&
+    (readOnly ||
+      (!showTransform && !showAoE && !showToken && !showRuler && !showCreateProp && !showDraw)) &&
     !showInitiative
   )
     return null;
@@ -129,6 +132,11 @@ export function ToolPanelDock({
       {showCreateProp && (
         <PanelFrame id="create-prop" label="Create Prop" collapsed={collapsed['create-prop']}>
           <CreatePropPanel scene={scene} isHost={isHost} />
+        </PanelFrame>
+      )}
+      {showDraw && (
+        <PanelFrame id="draw" label="Draw" collapsed={collapsed.draw}>
+          <DrawPanel scene={scene} />
         </PanelFrame>
       )}
       {showInitiative && (

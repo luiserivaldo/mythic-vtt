@@ -6,6 +6,7 @@ export const TOOL_PANEL_ORDER = [
   'aoe',
   'token',
   'ruler',
+  'draw',
   'create-prop',
   'initiative',
 ] as const;
@@ -24,6 +25,7 @@ export const toolPanelLayoutStore = createStore<ToolPanelLayoutState>()((set) =>
     aoe: false,
     token: true,
     ruler: false,
+    draw: false,
     'create-prop': false,
     initiative: false,
   },

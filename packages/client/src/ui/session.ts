@@ -36,6 +36,19 @@ export function createSession(deps: SessionDeps): Session {
   let client: GameClient | undefined;
   let currentProfile: Pick<Profile, 'displayName' | 'avatar' | 'color'> | null = null;
   const listeners = new Set<() => void>();
+  // M4-13 (LAY-05): the board mounts behind the join screen, so a tool asks for the ephemeral
+  // stream while there is no socket yet. Keep those requests here and attach them to every client
+  // the session starts, so a visitor who joins later — and one whose client is replaced — gets the
+  // remote rulers, drag previews and drawings the tools subscribe to.
+  const ephemeralListeners = new Map<Parameters<GameClient['onEphemeral']>[0], () => void>();
+  const attachEphemeral = () => {
+    const current = client;
+    for (const [listener, detach] of ephemeralListeners) {
+      detach();
+      // Setting an existing key keeps the iteration order and size, so this map stays safe to walk.
+      ephemeralListeners.set(listener, current ? current.onEphemeral(listener) : () => undefined);
+    }
+  };
   const notify = () => {
     for (const l of listeners) l();
   };
@@ -54,6 +67,7 @@ export function createSession(deps: SessionDeps): Session {
         createSocket: deps.createSocket,
       });
       client.start();
+      attachEphemeral();
       notify();
     },
     stop() {
@@ -73,8 +87,11 @@ export function createSession(deps: SessionDeps): Session {
     },
     sendEphemeral: (channel, data) => client?.sendEphemeral(channel, data),
     onEphemeral: (listener) => {
-      const unsubscribe = client?.onEphemeral(listener);
-      return () => unsubscribe?.();
+      ephemeralListeners.set(listener, client?.onEphemeral(listener) ?? (() => undefined));
+      return () => {
+        ephemeralListeners.get(listener)?.();
+        ephemeralListeners.delete(listener);
+      };
     },
     submitIntent: (type, payload, sceneId) =>
       client

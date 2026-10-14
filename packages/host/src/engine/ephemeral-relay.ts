@@ -1,9 +1,15 @@
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import {
   CAMERA_POSE_CHANNEL,
+  canClearDrawings,
+  canEraseDrawing,
   canSendCameraPose,
   canUseSceneToggle,
   checkIntent,
+  drawChannelOf,
+  DrawClearData,
+  DrawEraseData,
+  DrawStrokeData,
   parseCameraPose,
   parsePingPayload,
   PING_CHANNEL,
@@ -11,8 +17,10 @@ import {
   seesScene,
   TOGGLE_FOR_CHANNEL,
   viewEntity,
+  type Actor,
   type Audience,
   type Campaign,
+  type DrawChannel,
 } from '@mythic/shared';
 import type { GatewayConnection } from '../gateway/engine-seam.js';
 import { actorFor, audienceFor } from './audience.js';
@@ -49,6 +57,7 @@ export type EphemeralDropReason =
   | 'payload-too-large'
   | 'invalid-payload'
   | 'invalid-entity-reference'
+  | 'invalid-drawing'
   | 'invalid-camera-pose'
   | 'forbidden'
   | 'hidden-entity'
@@ -89,6 +98,14 @@ const DEFAULT_SPECTATOR_DELIVERY_RATE: TokenBucketConfig = { ratePerSecond: 10, 
  * out through.
  */
 const DEFAULT_CAMERA_POSE_DELIVERY_RATE: TokenBucketConfig = { ratePerSecond: 15, burst: 15 };
+
+/**
+ * LAY-05: how many drawings the relay remembers per scene, and how many scenes it tracks at all.
+ * A session drawing more than this is throttled out of memory oldest-first; the drawings stay on
+ * the board for everyone who already has them.
+ */
+const MAX_DRAWINGS_PER_SCENE = 512;
+const MAX_DRAWING_SCENES = 64;
 
 class TokenBucket {
   private tokens: number;
@@ -171,6 +188,19 @@ function rate(
 }
 
 /**
+ * LAY-05: the frame that finishes a drawing. The spectator delivery bucket must never drop it — a
+ * short stroke may have sent nothing but its first sample, so losing the closing frame loses the
+ * whole drawing for that spectator. Erasing and clearing are as final as a finished stroke, and
+ * every drawing frame is already rate-limited per sender above.
+ */
+function isFinalDrawFrame(kind: DrawChannel, data: unknown): boolean {
+  if (kind !== 'stroke') return true;
+  return (
+    typeof data === 'object' && data !== null && (data as { phase?: unknown }).phase === 'finished'
+  );
+}
+
+/**
  * Host-side, non-durable ephemeral path. It owns no campaign state and never calls storage.
  * Sender identity is always replaced from the authenticated connection.
  */
@@ -205,6 +235,7 @@ export function createEphemeralRelay(
     'payload-too-large': 0,
     'invalid-payload': 0,
     'invalid-entity-reference': 0,
+    'invalid-drawing': 0,
     'invalid-camera-pose': 0,
     forbidden: 0,
     'hidden-entity': 0,
@@ -215,6 +246,122 @@ export function createEphemeralRelay(
   const drop = (reason: EphemeralDropReason, count = 1) => {
     dropped[reason] += count;
   };
+
+  /**
+   * LAY-05: drawings are relayed live and are never campaign state, so the host remembers only
+   * who drew each stroke — the minimum it needs to authorise erasing. It is bounded and in
+   * memory only: a restart, an eviction or a `draw.clear` forgets the stroke, and an evicted
+   * stroke is nobody's to erase. Nothing here is persisted or logged, so a client that joins late
+   * or reconnects sees no existing drawings — the geometry lives only on the clients that were
+   * there when it was drawn.
+   */
+  const drawings = new Map<string, Map<string, string>>();
+
+  function recordStroke(sceneId: string, strokeId: string, owner: string): void {
+    let strokes = drawings.get(sceneId);
+    if (!strokes) {
+      if (drawings.size >= MAX_DRAWING_SCENES) {
+        const oldest = drawings.keys().next().value;
+        if (oldest !== undefined) drawings.delete(oldest);
+      }
+      strokes = new Map();
+      drawings.set(sceneId, strokes);
+    }
+    strokes.delete(strokeId);
+    strokes.set(strokeId, owner);
+    while (strokes.size > MAX_DRAWINGS_PER_SCENE) {
+      const oldest = strokes.keys().next().value;
+      if (oldest === undefined) break;
+      strokes.delete(oldest);
+    }
+  }
+
+  /**
+   * Authorises one drawing message. `null` means it was dropped (and counted) and must not relay;
+   * otherwise the result is the change to the owner map, which the caller applies only once the
+   * frame has passed every later check too. A rejected message never changes relay state, so a
+   * refused erase or clear can never leave a stroke on the boards that nobody may erase any more.
+   */
+  function authoriseDrawing(
+    sender: GatewayConnection,
+    senderAudience: Audience,
+    message: EphemeralMessage,
+    state: Campaign,
+    actor: Actor,
+    kind: DrawChannel,
+  ): (() => void) | null {
+    switch (kind) {
+      case 'stroke': {
+        // The scene toggle gate above already proved the scene exists, for every sender.
+        const parsed = DrawStrokeData.safeParse(message.data);
+        if (!parsed.success) {
+          drop('invalid-drawing');
+          return null;
+        }
+        const { sceneId, strokeId } = parsed.data;
+        if (!seesScene(state, senderAudience, sceneId)) {
+          drop('forbidden');
+          return null;
+        }
+        const owner = drawings.get(sceneId)?.get(strokeId);
+        // A client may update its own stroke while the pointer is down, but never take over a
+        // stroke that is already someone else's: that would hand it the author's erase right.
+        if (owner !== undefined && owner !== sender.identityId) {
+          drop('forbidden');
+          return null;
+        }
+        return () => {
+          recordStroke(sceneId, strokeId, sender.identityId);
+        };
+      }
+      case 'erase': {
+        const parsed = DrawEraseData.safeParse(message.data);
+        if (!parsed.success) {
+          drop('invalid-drawing');
+          return null;
+        }
+        const { sceneId, strokeId } = parsed.data;
+        const owner = drawings.get(sceneId)?.get(strokeId);
+        if (owner === undefined) {
+          drop('invalid-drawing');
+          return null;
+        }
+        if (!canEraseDrawing(state, actor, owner)) {
+          drop('forbidden');
+          return null;
+        }
+        // PERM-03: an author who can no longer see the scene may not erase on it; the stroke
+        // stays remembered, so the DM can still erase it.
+        if (!seesScene(state, senderAudience, sceneId)) {
+          drop('forbidden');
+          return null;
+        }
+        return () => {
+          drawings.get(sceneId)?.delete(strokeId);
+        };
+      }
+      case 'clear': {
+        const parsed = DrawClearData.safeParse(message.data);
+        if (!parsed.success) {
+          drop('invalid-drawing');
+          return null;
+        }
+        const { sceneId } = parsed.data;
+        // Role before scene, so a refusal never tells a player which scenes exist.
+        if (!canClearDrawings(state, actor)) {
+          drop('forbidden');
+          return null;
+        }
+        if (!seesScene(state, senderAudience, sceneId)) {
+          drop('forbidden');
+          return null;
+        }
+        return () => {
+          drawings.delete(sceneId);
+        };
+      }
+    }
+  }
 
   return {
     relay(sender, message, state, recipients) {
@@ -272,6 +419,17 @@ export function createEphemeralRelay(
         return;
       }
 
+      // LAY-05: drawings are relayed like other tool ephemerals, but erasing and clearing are
+      // authorised here — the author for one stroke, the DM or a co-DM for all of them.
+      // The owner-map change is applied just before fan-out, after every check below has passed.
+      const drawing = drawChannelOf(message.channel);
+      const senderAudience = audienceFor(state, sender);
+      const commitDrawing =
+        drawing === null
+          ? undefined
+          : authoriseDrawing(sender, senderAudience, message, state, senderActor, drawing);
+      if (commitDrawing === null) return;
+
       const refs = entityReferences(message.data);
       if (refs === undefined) {
         drop('invalid-entity-reference');
@@ -284,7 +442,6 @@ export function createEphemeralRelay(
         }
       }
 
-      const senderAudience = audienceFor(state, sender);
       const senderSeat =
         senderAudience.kind === 'seat' ? state.seats[senderAudience.seatId] : undefined;
       if (
@@ -379,7 +536,9 @@ export function createEphemeralRelay(
       // M4-02: a spectator watching through a seat has a seat audience but is still a spectator.
       const spectatorTargets = addressed.filter(isSpectatorTarget);
       let sendToSpectators = true;
-      if (spectatorTargets.length > 0) {
+      // LAY-05: a drawing's closing frame is never coalesced away; see `isFinalDrawFrame`.
+      const finalDraw = drawing !== null && isFinalDrawFrame(drawing, message.data);
+      if (spectatorTargets.length > 0 && !finalDraw) {
         // CAM-06: camera poses spend their own budget, so the stream they carry cannot starve the
         // shared one that every other ephemeral fans out through.
         const delivery =
@@ -390,6 +549,8 @@ export function createEphemeralRelay(
         if (!sendToSpectators) drop('spectator-rate-limited', spectatorTargets.length);
       }
 
+      // LAY-05: every check has passed, so the frame is accepted and the owner map may change.
+      commitDrawing?.();
       for (const target of addressed) {
         if (isSpectatorTarget(target) && !sendToSpectators) continue;
         target.conn.sendRaw(frame);

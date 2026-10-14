@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { PING_CHANNEL, PING_TOGGLE } from '@mythic/shared';
+import {
+  appendDrawPoint,
+  DEFAULT_DRAW_COLOR,
+  DEFAULT_DRAW_WIDTH,
+  DRAW_CLEAR_CHANNEL,
+  DRAW_COORD_LIMIT,
+  DRAW_ERASE_CHANNEL,
+  DRAW_STROKE_CHANNEL,
+  MAX_DRAW_POINTS,
+  MAX_STROKE_SAMPLES,
+  PING_CHANNEL,
+  PING_TOGGLE,
+  simplifyDrawPoints,
+} from '@mythic/shared';
 import { audienceFor } from './audience.js';
 import { createEphemeralRelay, type EphemeralRecipient } from './ephemeral-relay.js';
-import { T, fakeConnection, fixtureCampaign, type FakeConnection } from './testing.js';
+import { T, fakeConnection, fixtureCampaign, tid, type FakeConnection } from './testing.js';
 
 function recipients(
   state: ReturnType<typeof fixtureCampaign>,
@@ -626,6 +639,463 @@ describe('ephemeral relay', () => {
 
     relay.relay(alice, { t: 'ephemeral', channel: 'cursor', data: { x: 3 } }, state, targets);
     expect(relay.stats().dropped['spectator-rate-limited']).toBe(1);
+  });
+});
+
+describe('drawing relay (LAY-05)', () => {
+  const STROKE = tid(20);
+  const OTHER_STROKE = tid(21);
+
+  function strokeMessage(strokeId: string, over: Record<string, unknown> = {}) {
+    return {
+      t: 'ephemeral' as const,
+      channel: DRAW_STROKE_CHANNEL,
+      data: {
+        sceneId: T.scene,
+        strokeId,
+        color: DEFAULT_DRAW_COLOR,
+        width: DEFAULT_DRAW_WIDTH,
+        phase: 'finished',
+        points: [
+          { x: 1, y: 0, z: 1 },
+          { x: 2, y: 0, z: 1 },
+        ],
+        ...over,
+      },
+    };
+  }
+
+  it('gates live drawing on the scene toggle, with the host and co-DM exempt', () => {
+    const state = fixtureCampaign();
+    const coDmSeat = state.seats[T.coDm];
+    if (!coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    const alice = fakeConnection(T.alice);
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const targets = recipients(state, [watcher]);
+    const relay = createEphemeralRelay(() => 1_000);
+
+    relay.relay(alice, strokeMessage(STROKE), state, targets);
+    expect(watcher.received).toEqual([]);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+
+    relay.relay(host, strokeMessage(STROKE), state, targets);
+    relay.relay(coDm, strokeMessage(OTHER_STROKE), state, targets);
+    expect(watcher.received).toHaveLength(2);
+    expect(watcher.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: DRAW_STROKE_CHANNEL,
+      from: T.carol,
+      data: { strokeId: OTHER_STROKE, color: DEFAULT_DRAW_COLOR },
+    });
+
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { draw: true };
+    relay.relay(alice, strokeMessage(tid(22)), state, targets);
+    expect(watcher.received).toHaveLength(3);
+    expect(watcher.received.at(-1)).toMatchObject({ from: T.alice });
+  });
+
+  it('drops a malformed stroke as invalid-drawing and never relays it', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { draw: true };
+    const alice = fakeConnection(T.alice);
+    const host = fakeConnection(T.host, { isHost: true });
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const targets = recipients(state, [watcher]);
+    const relay = createEphemeralRelay(() => 1_000);
+
+    for (const bad of [
+      strokeMessage(STROKE, { width: DEFAULT_DRAW_WIDTH * 100 }),
+      strokeMessage(STROKE, { width: Number.NaN }),
+      strokeMessage(STROKE, { points: [] }),
+      strokeMessage(STROKE, { points: [{ x: Number.NaN, y: 0, z: 0 }] }),
+      strokeMessage(STROKE, { color: 'red' }),
+      strokeMessage(STROKE, { phase: 'cancelled' }),
+      strokeMessage(STROKE, { strokeId: 'not-a-ulid' }),
+      strokeMessage(STROKE, { extra: 1 }),
+    ]) {
+      relay.relay(alice, bad, state, targets);
+      relay.relay(host, bad, state, targets);
+    }
+    // The host is exempt from the scene toggle, but an unknown scene is refused by the gate itself.
+    relay.relay(host, strokeMessage(STROKE, { sceneId: T.newScene }), state, targets);
+    expect(watcher.received).toEqual([]);
+    expect(relay.stats().dropped).toMatchObject({ 'invalid-drawing': 16, forbidden: 1 });
+  });
+
+  it('lets an author erase their own drawing, and the DM or a co-DM erase any', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    const seatB = state.seats[T.seatB];
+    if (!scene || !coDmSeat || !seatB) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    seatB.identityId = T.bob;
+    scene.playerToggles = { draw: true };
+    const alice = fakeConnection(T.alice);
+    const bob = fakeConnection(T.bob);
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const targets = recipients(state, [watcher]);
+    const relay = createEphemeralRelay(() => 1_000);
+    const erase = (strokeId: string) => ({
+      t: 'ephemeral' as const,
+      channel: DRAW_ERASE_CHANNEL,
+      data: { sceneId: T.scene, strokeId },
+    });
+
+    relay.relay(alice, strokeMessage(STROKE), state, targets);
+    relay.relay(bob, strokeMessage(OTHER_STROKE), state, targets);
+    expect(watcher.received).toHaveLength(2);
+
+    // Bob may not erase Alice's drawing, and an unknown stroke is nobody's to erase.
+    relay.relay(bob, erase(STROKE), state, targets);
+    relay.relay(alice, erase(tid(22)), state, targets);
+    expect(watcher.received).toHaveLength(2);
+    expect(relay.stats().dropped).toMatchObject({ forbidden: 1, 'invalid-drawing': 1 });
+
+    relay.relay(alice, erase(STROKE), state, targets);
+    expect(watcher.received).toHaveLength(3);
+    expect(watcher.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: DRAW_ERASE_CHANNEL,
+      from: T.alice,
+      data: { strokeId: STROKE },
+    });
+    // The erased stroke is gone: erasing it again finds nothing.
+    relay.relay(alice, erase(STROKE), state, targets);
+    expect(relay.stats().dropped['invalid-drawing']).toBe(2);
+
+    relay.relay(coDm, erase(OTHER_STROKE), state, targets);
+    expect(watcher.received).toHaveLength(4);
+    expect(watcher.received.at(-1)).toMatchObject({ from: T.carol });
+    // The host may erase any drawing, but a stroke that is not there is not a drawing.
+    relay.relay(host, erase(tid(23)), state, targets);
+    expect(watcher.received).toHaveLength(4);
+    expect(relay.stats().dropped['invalid-drawing']).toBe(3);
+  });
+
+  it('lets only the DM and co-DMs clear every drawing on the scene', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    if (!scene || !coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    scene.playerToggles = { draw: true };
+    const alice = fakeConnection(T.alice);
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const targets = recipients(state, [watcher]);
+    const relay = createEphemeralRelay(() => 1_000);
+    const clear = (sceneId: string) => ({
+      t: 'ephemeral' as const,
+      channel: DRAW_CLEAR_CHANNEL,
+      data: { sceneId },
+    });
+
+    relay.relay(alice, strokeMessage(STROKE), state, targets);
+    // A player may not clear, and the refusal does not reveal whether the scene exists.
+    relay.relay(alice, clear(T.scene), state, targets);
+    relay.relay(alice, clear(T.newScene), state, targets);
+    expect(watcher.received).toHaveLength(1);
+    expect(relay.stats().dropped.forbidden).toBe(2);
+
+    relay.relay(coDm, clear(T.scene), state, targets);
+    expect(watcher.received).toHaveLength(2);
+    expect(watcher.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: DRAW_CLEAR_CHANNEL,
+      from: T.carol,
+      data: { sceneId: T.scene },
+    });
+    // Cleared: Alice's stroke is gone, so erasing it finds nothing.
+    relay.relay(
+      alice,
+      { t: 'ephemeral', channel: DRAW_ERASE_CHANNEL, data: { sceneId: T.scene, strokeId: STROKE } },
+      state,
+      targets,
+    );
+    expect(relay.stats().dropped['invalid-drawing']).toBe(1);
+    relay.relay(host, clear(T.scene), state, targets);
+    expect(watcher.received).toHaveLength(3);
+    expect(watcher.received.at(-1)).toMatchObject({ from: T.host });
+  });
+
+  it('a refused erase changes nothing: the stroke stays erasable by the DM', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { draw: true };
+    const alice = fakeConnection(T.alice);
+    const host = fakeConnection(T.host, { isHost: true });
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const targets = recipients(state, [watcher]);
+    const relay = createEphemeralRelay(() => 1_000);
+    const erase = {
+      t: 'ephemeral' as const,
+      channel: DRAW_ERASE_CHANNEL,
+      data: { sceneId: T.scene, strokeId: STROKE },
+    };
+
+    relay.relay(alice, strokeMessage(STROKE), state, targets);
+    expect(watcher.received).toHaveLength(1);
+
+    // The DM moves the table to another scene: Alice may no longer see the one she drew on, so her
+    // erase is refused there. A scene switch is a new state, as an action produces.
+    const switched = {
+      ...state,
+      scenes: { ...state.scenes, [T.newScene]: { ...scene, id: T.newScene, name: 'Elsewhere' } },
+      activeSceneId: T.newScene,
+    };
+    relay.relay(alice, erase, switched, targets);
+    expect(watcher.received).toHaveLength(1);
+    expect(relay.stats().dropped).toMatchObject({ forbidden: 1, 'invalid-drawing': 0 });
+
+    // The refusal left the owner map alone, so the stroke is still on record and the DM erases it.
+    relay.relay(host, erase, switched, targets);
+    expect(watcher.received).toHaveLength(2);
+    expect(watcher.received.at(-1)).toMatchObject({
+      t: 'ephemeral',
+      channel: DRAW_ERASE_CHANNEL,
+      from: T.host,
+      data: { strokeId: STROKE },
+    });
+    expect(relay.stats().dropped['invalid-drawing']).toBe(0);
+  });
+
+  it('a refused clear changes nothing: the scene keeps its remembered strokes', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    state.scenes[T.newScene] = { ...scene, id: T.newScene, name: 'Annex' };
+    const host = fakeConnection(T.host, { isHost: true });
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const targets = recipients(state, [watcher]);
+    const relay = createEphemeralRelay(() => 1_000);
+
+    relay.relay(host, strokeMessage(STROKE, { sceneId: T.newScene }), state, targets);
+    expect(watcher.received).toHaveLength(1);
+
+    // The scene is gone from the campaign, so it exists for nobody, not even the DM: a clear naming
+    // it is refused, and the refusal must not forget the strokes the relay remembers for it.
+    const without = {
+      ...state,
+      scenes: Object.fromEntries(Object.entries(state.scenes).filter(([id]) => id !== T.newScene)),
+    };
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: DRAW_CLEAR_CHANNEL, data: { sceneId: T.newScene } },
+      without,
+      targets,
+    );
+    expect(watcher.received).toHaveLength(1);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+
+    // With the scene back, the stroke is still on record: erasing it relays instead of finding
+    // nothing.
+    relay.relay(
+      host,
+      {
+        t: 'ephemeral',
+        channel: DRAW_ERASE_CHANNEL,
+        data: { sceneId: T.newScene, strokeId: STROKE },
+      },
+      state,
+      targets,
+    );
+    expect(watcher.received).toHaveLength(2);
+    expect(relay.stats().dropped['invalid-drawing']).toBe(0);
+  });
+
+  it('a stroke dropped for size is not recorded, so its id stays free', () => {
+    const state = fixtureCampaign();
+    const host = fakeConnection(T.host, { isHost: true });
+    const alice = fakeConnection(T.alice);
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { draw: true };
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const targets = recipients(state, [watcher]);
+    // A stroke frame above the smallest cap: it passes authorisation, then fails the size check.
+    const tiny = createEphemeralRelay(() => 1_000, { maxPayloadBytes: 256 });
+    const long = {
+      points: Array.from({ length: 20 }, (_, i) => ({ x: i, y: 0, z: i * 2 })),
+    };
+
+    tiny.relay(host, strokeMessage(STROKE, long), state, targets);
+    expect(watcher.received).toEqual([]);
+    expect(tiny.stats().dropped['payload-too-large']).toBe(1);
+
+    // Had the refused stroke been recorded as the host's, Alice's frame under the same id would be
+    // refused as a takeover (forbidden); it only meets the same size cap.
+    tiny.relay(alice, strokeMessage(STROKE, long), state, targets);
+    expect(tiny.stats().dropped).toMatchObject({ forbidden: 0, 'payload-too-large': 2 });
+  });
+
+  it('relays drawings to spectators too: effects are visible to everyone (LAY-05)', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { draw: true };
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000, {
+      spectatorDeliveryRate: { ratePerSecond: 100, burst: 100 },
+    });
+    relay.relay(alice, strokeMessage(STROKE), state, recipients(state, [spectator]));
+    expect(spectator.received).toHaveLength(1);
+    expect(spectator.received[0]).toMatchObject({ t: 'ephemeral', from: T.alice });
+  });
+
+  it('never sends a drawing of a scene a target cannot see, and refuses to draw on one', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    if (!scene || !coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    // A second, DM-only scene that is not the active one: a player knows nothing about it.
+    state.scenes[T.newScene] = {
+      ...scene,
+      id: T.newScene,
+      name: 'SECRET-SCENE',
+      dmOnly: true,
+      playerToggles: { draw: true },
+    };
+    state.activeSceneId = T.scene;
+
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const player = fakeConnection(T.alice);
+    // A seat-less identity is a spectator: the same `visibleTo` path as a player, made explicit.
+    const spectator = fakeConnection(T.bob);
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const relay = createEphemeralRelay(() => 1_000);
+    const secret = strokeMessage(STROKE, { sceneId: T.newScene });
+
+    relay.relay(host, secret, state, recipients(state, [watcher, coDm, player, spectator]));
+    expect(watcher.received).toHaveLength(1);
+    expect(coDm.received).toHaveLength(1);
+    expect(player.received).toEqual([]);
+    expect(player.wire()).not.toContain(T.newScene);
+    expect(player.wire()).not.toContain('SECRET-SCENE');
+    expect(spectator.received).toEqual([]);
+    expect(spectator.wire()).not.toContain(T.newScene);
+
+    // A player may not draw on a scene they cannot see, even with the toggle on for it.
+    relay.relay(player, secret, state, recipients(state, [watcher]));
+    expect(watcher.received).toHaveLength(1);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+    // The host, the co-DM and a seat-less spectator all saw the count: only the co-DM could see it.
+    expect(relay.stats().dropped['hidden-scene']).toBe(2);
+    // A scene-hidden target is counted once: a drawing carries no entity of its own.
+    expect(relay.stats().dropped['hidden-entity']).toBe(0);
+    expect(spectator.received).toEqual([]);
+    expect(spectator.wire()).not.toContain(T.newScene);
+  });
+
+  it('relays a full-length stroke instead of dropping it as an oversized frame', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { draw: true };
+    const alice = fakeConnection(T.alice);
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const relay = createEphemeralRelay(() => 1_000);
+
+    // The worst stroke a client can produce: a raw gesture that spans the whole drawing domain,
+    // corner to corner, put through the same quantise-and-simplify path `DrawTool` uses, at the
+    // wire cap. If this frame does not fit the relay's 4096-byte default, ordinary strokes are
+    // silently dropped again (MV-155).
+    let gesture: readonly { x: number; y: number; z: number }[] = [];
+    for (let index = 0; index < MAX_STROKE_SAMPLES * 2; index += 1)
+      gesture = appendDrawPoint(gesture, {
+        x: -DRAW_COORD_LIMIT + (index * (2 * DRAW_COORD_LIMIT)) / (MAX_STROKE_SAMPLES * 2),
+        y: -DRAW_COORD_LIMIT,
+        z: index % 2 === 0 ? -DRAW_COORD_LIMIT : DRAW_COORD_LIMIT,
+      });
+    expect(gesture).toHaveLength(MAX_STROKE_SAMPLES);
+    const points = simplifyDrawPoints(gesture);
+    expect(points).toHaveLength(MAX_DRAW_POINTS);
+
+    relay.relay(alice, strokeMessage(STROKE, { points }), state, recipients(state, [watcher]));
+    expect(relay.stats().dropped['payload-too-large']).toBe(0);
+    expect(relay.stats().relayed).toBe(1);
+    expect(watcher.received).toHaveLength(1);
+    expect(watcher.received[0]).toMatchObject({ t: 'ephemeral', from: T.alice });
+    expect(Buffer.byteLength(watcher.wire(), 'utf8')).toBeLessThan(4096);
+  });
+
+  it('never rate-drops a drawing’s closing frame for spectators (LAY-05)', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { draw: true };
+    const alice = fakeConnection(T.alice);
+    // An identity with no seat is a spectator audience (SES-11).
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [spectator]);
+    const relay = createEphemeralRelay(() => 1_000, {
+      spectatorDeliveryRate: { ratePerSecond: 1, burst: 1 },
+    });
+
+    // The first live frame takes the only spectator delivery token.
+    relay.relay(alice, strokeMessage(STROKE, { phase: 'active' }), state, targets);
+    expect(spectator.received).toHaveLength(1);
+    // The closing frame is what makes the stroke stick: it must never be the one dropped, because
+    // a short stroke may have sent nothing else and the spectator would lose the drawing entirely.
+    relay.relay(alice, strokeMessage(STROKE), state, targets);
+    expect(spectator.received).toHaveLength(2);
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(0);
+    // Ordinary live frames are still coalesced for spectators.
+    relay.relay(alice, strokeMessage(OTHER_STROKE, { phase: 'active' }), state, targets);
+    expect(spectator.received).toHaveLength(2);
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(1);
+  });
+
+  it('never relays a ruler preview of a scene a target cannot see (PERM-03)', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    if (!scene || !coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    state.scenes[T.newScene] = {
+      ...scene,
+      id: T.newScene,
+      name: 'SECRET-SCENE',
+      dmOnly: true,
+      playerToggles: { measure: true },
+    };
+    state.activeSceneId = T.scene;
+    const coDm = fakeConnection(T.carol);
+    const player = fakeConnection(T.alice);
+    const relay = createEphemeralRelay(() => 1_000);
+    const ruler = {
+      t: 'ephemeral' as const,
+      channel: 'ruler.preview',
+      data: {
+        sceneId: T.newScene,
+        points: [
+          { x: 1, y: 0, z: 1 },
+          { x: 2, y: 0, z: 1 },
+        ],
+        phase: 'active',
+      },
+    };
+
+    // The co-DM is exempt from the measure toggle, so only the scene filter can refuse this: one
+    // filter for every sceneId-bearing channel, drawings and rulers alike.
+    relay.relay(coDm, ruler, state, recipients(state, [player]));
+    expect(player.received).toEqual([]);
+    expect(player.wire()).not.toContain(T.newScene);
+    expect(relay.stats().dropped['hidden-scene']).toBe(1);
   });
 });
 

@@ -19,6 +19,7 @@ import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
 import { PingTool } from './PingTool.js';
 import { RulerTool } from './RulerTool.js';
+import { DrawTool } from './DrawTool.js';
 import { ToolRail } from '../ui/ToolRail.js';
 import { PingButton } from '../ui/PingButton.js';
 import { rulerStore } from '../tools/ruler-store.js';
@@ -162,6 +163,9 @@ function BoardScene({
           empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
       <RulerTool mode={mode3d ? '3d' : '2d'} readOnly={readOnly} />
+      {/* LAY-05: freehand drawings, mounted beside the ruler so a draw press is claimed before
+          TokenDrag; the layer renders for every viewer, including read-only ones. */}
+      <DrawTool mode={mode3d ? '3d' : '2d'} readOnly={readOnly} />
       {!aoeActive && <TokenDrag readOnly={readOnly} />}
       <PickableEntities rendered={shown} scene={source} mode={mode3d ? '3d' : '2d'} grid={grid} />
       {/* MEAS-05: hovering a token with one token selected shows the token-to-token range. */}

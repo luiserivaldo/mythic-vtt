@@ -76,6 +76,14 @@ export const railTools = createRegistry<RailTool>([
     panel: 'measure',
   },
   {
+    id: 'draw',
+    label: 'Draw',
+    icon: 'pen',
+    group: 'measure',
+    allowed: canView,
+    panel: 'draw',
+  },
+  {
     id: 'create-prop',
     label: 'Create Prop',
     icon: 'cube',

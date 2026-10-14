@@ -1,4 +1,5 @@
 import { resolvePlayerToggles, type Campaign, type PlayerToggle } from '../schema/index.js';
+import { DRAW_STROKE_CHANNEL } from '../drawing.js';
 import { isCoDm, isHost, seatOf } from './define.js';
 import type { Actor } from './envelope.js';
 
@@ -15,11 +16,15 @@ export const PING_CHANNEL = 'ping';
 export const PING_TOGGLE: PlayerToggle = 'pins';
 
 /**
- * PERM-05: ephemeral channels that a scene toggle gates. MV-155 (drawing) and MV-156 (pings)
- * register their channels here so the host relay enforces them without a second code path.
+ * PERM-05: ephemeral channels that a scene toggle gates. `ruler.preview` (measure), the drawing
+ * stroke (draw) and pings (pins) are the registered channels, so the host relay enforces those
+ * toggles without a second code path. Erasing a drawing and clearing them are not scene-wide player
+ * permissions: the host relay checks the author and the role instead (see `canEraseDrawing` /
+ * `canClearDrawings`).
  */
 export const TOGGLE_FOR_CHANNEL: Readonly<Record<string, PlayerToggle>> = {
   'ruler.preview': 'measure',
+  [DRAW_STROKE_CHANNEL]: 'draw',
   [PING_CHANNEL]: PING_TOGGLE,
 };
 
