@@ -89,6 +89,51 @@ describe('pathsOverlap', () => {
 });
 
 describe('history.undo', () => {
+  it.each(['entity.setOwners', 'entity.delete'])(
+    'restores entities without archived owners through %s',
+    async (type) => {
+      const { engine, host, alice, watcher, log } = await ready();
+      expect(
+        (
+          await send(engine, host, 'entity.setOwners', {
+            sceneId: T.scene,
+            entityId: T.token,
+            owners: [T.seatA, T.seatB],
+          })
+        ).t,
+      ).toBe('ack');
+      const original = structuredClone(engine.state().scenes[T.scene]?.entities[T.token]);
+      const changed = await send(engine, host, type, {
+        sceneId: T.scene,
+        entityId: T.token,
+        ...(type === 'entity.setOwners' ? { owners: [T.seatB] } : {}),
+      });
+      const moved = await send(engine, host, 'token.move', move(T.secret, 9));
+      expect((await send(engine, host, 'seat.archive', { seatId: T.seatA })).t).toBe('ack');
+      if (changed.t !== 'ack' || moved.t !== 'ack') throw new Error('setup');
+      const entries = log.entries.length;
+      alice.clear();
+      watcher.clear();
+
+      expect(
+        await send(engine, host, 'history.undo', {
+          targetSeqs: [changed.seq, moved.seq],
+        }),
+      ).toMatchObject({ t: 'ack' });
+      expect(engine.state().scenes[T.scene]?.entities[T.token]).toEqual({
+        ...original,
+        owners: [T.seatB],
+      });
+      expect(engine.state().seats[T.seatA]?.archived).toBe(true);
+      expect(log.entries).toHaveLength(entries + 1);
+      for (const conn of [alice, watcher]) expect(conn.wire()).not.toContain(T.seatA);
+      expect(x(engine, T.secret)).toBe(0);
+      let replayed = campaign();
+      for (const entry of log.entries) replayed = reduceAction(replayed, entry.envelope).state;
+      expect(replayed).toEqual(engine.state());
+    },
+  );
+
   it('Ctrl+Z reverts only the caller’s own last action, step by step', async () => {
     const { engine, host, alice } = await ready();
     expect((await send(engine, alice, 'token.move', move(T.token, 3))).t).toBe('ack');

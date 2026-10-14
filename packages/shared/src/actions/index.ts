@@ -39,4 +39,5 @@ export {
 } from './history.rollback.js';
 export { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
 export { canUseSceneToggle, TOGGLE_FOR_CHANNEL } from './scene-toggles.js';
+export { aoePersist } from './aoe.persist.js';
 export { seatArchive } from './seat.archive.js';

@@ -37,8 +37,7 @@
         "edit": false,
         "delete": false
       },
-      "interactionEnabled": false,
-      "archived": true
+      "interactionEnabled": true
     }
   },
   "activeSceneId": "01J8Z0000000000000000SCN01"

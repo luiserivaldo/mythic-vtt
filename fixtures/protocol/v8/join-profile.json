@@ -2,7 +2,7 @@
   "client": [
     {
       "t": "hello",
-      "v": 7,
+      "v": 8,
       "identityId": "00000000000000000000000001",
       "identitySecret": "synthetic-fixture-secret",
       "displayName": "Fixture guest",
@@ -23,6 +23,14 @@
         "phase": "active",
         "color": "#c04e32"
       }
+    },
+    {
+      "t": "intent",
+      "type": "seat.archive",
+      "payload": {
+        "seatId": "00000000000000000000000003"
+      },
+      "clientRef": "archive-fixture"
     }
   ],
   "server": [

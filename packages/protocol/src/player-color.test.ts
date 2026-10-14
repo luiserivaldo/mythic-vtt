@@ -33,7 +33,7 @@ it('allows bounded hex colours and rejects invalid profile/preview colours at th
   expect(RulerPreview.safeParse(preview).success).toBe(false);
 });
 
-it.each([5, 6, 7])(
+it.each([5, 6, 8])(
   'round-trips the v%s join-profile golden frames and requires a matching peer version',
   (version) => {
     const fixture = JSON.parse(

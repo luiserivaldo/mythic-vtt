@@ -110,6 +110,55 @@ const x = (engine: ReturnType<typeof setup>['engine'], entityId = T.token) =>
   engine.state().scenes[T.scene]?.entities[entityId]?.transform.position.x;
 
 describe('history.rollback', () => {
+  it.each(['entity.delete', 'scene.delete'])(
+    'restores %s content without restoring archived ownership',
+    async (type) => {
+      const { engine, log, host, alice, watcher } = await ready();
+      expect(
+        (
+          await send(engine, host, 'entity.setOwners', {
+            sceneId: T.scene,
+            entityId: T.token,
+            owners: [T.seatA, T.seatB],
+          })
+        ).t,
+      ).toBe('ack');
+      const original = structuredClone(engine.state().scenes[T.scene]?.entities[T.token]);
+      expect(
+        (
+          await send(engine, host, 'scene.create', {
+            sceneId: SECOND_SCENE,
+            name: 'Second',
+          })
+        ).t,
+      ).toBe('ack');
+      const toSeq = engine.seq();
+      expect(
+        (
+          await send(engine, host, type, {
+            sceneId: T.scene,
+            ...(type === 'entity.delete' ? { entityId: T.token } : {}),
+          })
+        ).t,
+      ).toBe('ack');
+      expect((await send(engine, host, 'seat.archive', { seatId: T.seatA })).t).toBe('ack');
+      const archivedSeat = structuredClone(engine.state().seats[T.seatA]);
+      alice.clear();
+      watcher.clear();
+
+      expect((await send(engine, host, 'history.rollback', { toSeq })).t).toBe('ack');
+      expect(engine.state().scenes[T.scene]?.entities[T.token]).toEqual({
+        ...original,
+        owners: [T.seatB],
+      });
+      expect(engine.state().seats[T.seatA]).toEqual(archivedSeat);
+      for (const conn of [alice, watcher]) expect(conn.wire()).not.toContain(T.seatA);
+      let replayed = campaign();
+      for (const entry of log.entries) replayed = reduceAction(replayed, entry.envelope).state;
+      expect(replayed).toEqual(engine.state());
+    },
+  );
+
   it('returns scenes to the target point and logs one more action without touching the log', async () => {
     const { engine, log, host } = await ready();
     expect((await send(engine, host, 'scene.rename', rename('A'))).t).toBe('ack'); // 1

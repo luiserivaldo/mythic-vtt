@@ -1,6 +1,3 @@
-# UX-03 matched protocol v7
+# Protocol v7 — lasting AoEs
 
-Seat archive adds a durable action and optional seat state. Matching peers use
-protocol v7; v6 and earlier peers are rejected during hello. Existing profile
-colour and quick-field wire semantics are retained. Older wire fixtures remain
-as compatibility coverage for message shapes, not supported peer versions.
+Synthetic aoe.persist intent. Protocol v7 follows the accepted v6 quick-field contract; mismatched clients are rejected. Existing fixtures remain unchanged.

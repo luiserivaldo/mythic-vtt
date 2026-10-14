@@ -116,13 +116,13 @@ it('never sends archived seat data or DM data to player/spectator or stale co-DM
   }
 });
 it('migrates campaign and nested snapshots without losing historical seat data', () => {
-  const state = { ...campaign(), schemaVersion: 4 };
+  const state = { ...campaign(), schemaVersion: 6 };
   const before = structuredClone(state);
-  expect(storeMigrate('campaign', 4, state)).toEqual({
+  expect(storeMigrate('campaign', 6, state)).toEqual({
     ...state,
     schemaVersion: CURRENT_SCHEMA_VERSION,
   });
-  expect(storeMigrate('snapshot', 4, { seq: 10, state })).toEqual({
+  expect(storeMigrate('snapshot', 6, { seq: 10, state })).toEqual({
     seq: 10,
     state: { ...state, schemaVersion: CURRENT_SCHEMA_VERSION },
   });

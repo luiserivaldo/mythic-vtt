@@ -1,12 +1,3 @@
-# UX-03 seat archive (MV-191)
+# Save v6 — lasting AoEs
 
-Save schema v6 adds optional `Seat.archived` (absent means active) and the
-host-only `seat.archive` action. The pure v5-to-v6 migration preserves seats,
-login history, interaction settings and token quick fields, including nested
-snapshot state. Accepted v1-v5 migrations and fixtures remain unchanged.
-This fixture retains the v5 quick fields and archives a disabled seat, handing
-its token ownership back without losing token data.
-
-Matched protocol v7 follows quick-fields protocol v6. Archived records never
-enter non-host snapshots, patches or history; archived logins and invites
-cannot restore seat privileges.
+Synthetic golden save retaining the v5 quick fields and adding a lasting AoE and the per-player scene cap. All v1–v5 fixtures are preserved. The pure v5-to-v6 migration defaults caps without inferring placement provenance for legacy objects.

@@ -1,6 +1,7 @@
 import { applyPatches, type Patch } from 'immer';
 import { z } from 'zod';
 import { defineAction, isHost, seatOf } from './define.js';
+import { removeArchivedOwners } from './archived-owners.js';
 
 /**
  * What a client may send (HIST-04). Omitting `targetSeqs` means "undo my last action" (Ctrl+Z);
@@ -40,6 +41,7 @@ export const historyUndo = defineAction({
   permission: (state, actor) => isHost(actor) || seatOf(state, actor) !== undefined,
   reduce: (draft, a) => {
     applyPatches(draft, a.payload.patches as Patch[]);
+    removeArchivedOwners(draft);
   },
   modExposed: false,
 });

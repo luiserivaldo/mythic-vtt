@@ -1,7 +1,7 @@
 import { applyPatches, enablePatches, type Patch } from 'immer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ServerMessage } from '@mythic/protocol';
-import { ActionEnvelope, visibleTo, type Audience, type Campaign } from '@mythic/shared';
+import { ActionEnvelope, visibleTo, Campaign, type Audience } from '@mythic/shared';
 import { createEngine, type EngineOptions } from './engine.js';
 import {
   SECRETS,
@@ -473,6 +473,66 @@ describe('reconnect', () => {
       await ctx.engine.onIntent(host, rename(`S${String(i)}`, `r${String(i)}`));
     return { ...ctx, host };
   }
+
+  it('sends fresh redacted snapshots after a seat is rebound or view is disabled', async () => {
+    const campaign = fixtureCampaign();
+    const scene = campaign.scenes[T.scene];
+    if (!scene) throw new Error('missing scene');
+    const template = {
+      ...scene.entities[T.token],
+      id: T.alice,
+      name: 'Spell',
+      layer: 'effects' as const,
+      owners: [T.seatA],
+      aoe: { kind: 'sphere' as const, radius: 2, color: '#ff8800' },
+      measuringAoE: true as const,
+    };
+    // The token supplies a fully typed transform; parse the new component boundary.
+    scene.entities[T.alice] =
+      Campaign.parse({
+        ...campaign,
+        scenes: {
+          ...campaign.scenes,
+          [T.scene]: { ...scene, entities: { ...scene.entities, [T.alice]: template } },
+        },
+      }).scenes[T.scene]?.entities[T.alice] ??
+      (() => {
+        throw new Error('missing template');
+      })();
+    const { engine } = setup({ campaign });
+    const host = fakeConnection(T.host, { isHost: true });
+    await engine.onConnect(host);
+    const alice = fakeConnection(T.alice);
+    await engine.onConnect(alice);
+    await engine.onIntent(
+      alice,
+      intent('aoe.persist', { sceneId: T.scene, sourceId: T.alice, entityId: tid(40) }, 'persist'),
+    );
+    expect(ofType(alice, 'ack')).toHaveLength(1);
+    await engine.onIntent(host, intent('seat.release', { seatId: T.seatA }, 'release'));
+    await engine.onIntent(
+      host,
+      intent('seat.assign', { seatId: T.seatA, identityId: T.bob }, 'rebind'),
+    );
+    expect(ofType(host, 'ack')).toHaveLength(2);
+    const bob = fakeConnection(T.bob, { lastSeq: 0 });
+    await engine.onConnect(bob);
+    expect(bob.received.map((m) => m.t)).toEqual(['snapshot']);
+    expect(bob.wire()).not.toContain('creatorIdentityId');
+    await engine.onIntent(
+      host,
+      intent(
+        'permission.update',
+        { target: 'seat', seatId: T.seatA, permissions: { view: false } },
+        'hide',
+      ),
+    );
+    const rebound = fakeConnection(T.bob, { lastSeq: 3 });
+    await engine.onConnect(rebound);
+    expect(rebound.received.map((m) => m.t)).toEqual(['snapshot']);
+    expect(rebound.wire()).not.toContain('creatorIdentityId');
+    expect(clientView(rebound).state?.scenes[T.scene]?.entities[tid(40)]).toBeUndefined();
+  });
 
   it('replays only the missed patches when they are cached', async () => {
     const { engine } = await played();
