@@ -43,8 +43,3 @@ export function prepareRulerPoint3d(raw: Vec3, scene: Scene, entityId?: string):
   const y = dropped > 0 || raw.y <= 0 ? dropped : highest;
   return { ...horizontal, y };
 }
-
-/** Corner used by the 3D right-angle guide: horizontal first, then vertical. */
-export function rulerGuideCorner(from: Vec3, to: Vec3): Vec3 {
-  return { x: to.x, y: from.y, z: to.z };
-}

@@ -1,6 +1,6 @@
 import { useThree } from '@react-three/fiber';
-import { useEffect, useSyncExternalStore } from 'react';
-import { SRGBColorSpace, TextureLoader, type Texture } from 'three';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { RepeatWrapping, SRGBColorSpace, TextureLoader, type Texture } from 'three';
 import { createTextureCache } from '../assets/texture-cache.js';
 
 // Separate cache from TokenSprite's so map images (large) can be evicted independently later.
@@ -52,4 +52,33 @@ export function mapTextureAspect(entry: ReturnType<typeof useMapTexture>): numbe
     height > 0
     ? width / height
     : 1;
+}
+
+/**
+ * ENV-05: a ready texture prepared for tiling. Cloned so each primitive owns its repeat and wrap;
+ * the cache entry is shared with map images and must keep its own settings. Null while loading, on
+ * error or without an image, so the caller falls back to the plain colour.
+ */
+export function useTiledTexture(
+  url: string | null,
+  repeatX: number,
+  repeatY: number,
+): Texture | null {
+  const entry = useMapTexture(url);
+  const tiled = useMemo(() => {
+    if (entry.status !== 'ready') return null;
+    const texture = entry.texture.clone();
+    texture.wrapS = RepeatWrapping;
+    texture.wrapT = RepeatWrapping;
+    texture.repeat.set(repeatX, repeatY);
+    texture.needsUpdate = true;
+    return texture;
+  }, [entry, repeatX, repeatY]);
+  useEffect(
+    () => () => {
+      tiled?.dispose();
+    },
+    [tiled],
+  );
+  return tiled;
 }

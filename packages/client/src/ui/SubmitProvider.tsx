@@ -151,6 +151,7 @@ export function SubmitProvider({
   submit: SubmitIntent;
   children: ReactNode;
 }) {
+  const preview = useClientStore((state) => state.viewAs.kind !== 'host');
   const nextId = useRef(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [diagnostics, setDiagnostics] = useState<IntentDiagnostic[]>([]);
@@ -192,7 +193,7 @@ export function SubmitProvider({
           <ToastItem key={toast.id} toast={toast} dismiss={dismiss} />
         ))}
       </section>
-      {import.meta.env.DEV && <DevOverlay diagnostics={diagnostics} submit={wrapped} />}
+      {import.meta.env.DEV && !preview && <DevOverlay diagnostics={diagnostics} submit={wrapped} />}
     </SubmitContext.Provider>
   );
 }

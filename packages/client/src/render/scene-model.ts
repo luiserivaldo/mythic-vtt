@@ -60,6 +60,8 @@ export interface RenderEntity {
 export interface RenderShape {
   kind: PrimitiveKind;
   color: string;
+  /** ENV-05: uploaded image tiled once per cell across the faces; the colour is the fallback. */
+  texture?: AssetRef;
   walkable: boolean;
   /** GRID-05: show the scene grid on the walkable top in 3D. */
   showGridOnTop: boolean;
@@ -124,6 +126,7 @@ function renderShape(entity: Entity, shape: NonNullable<Entity['shape']>): Rende
   return {
     kind: shape.kind,
     color: shape.color,
+    ...(shape.texture ? { texture: shape.texture } : {}),
     walkable: shape.walkable,
     showGridOnTop: shape.showGridOnTop === true,
     width,

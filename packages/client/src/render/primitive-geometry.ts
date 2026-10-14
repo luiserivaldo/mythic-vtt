@@ -53,16 +53,37 @@ export function unitGeometry(kind: PrimitiveKind): BufferGeometry {
   return geometry;
 }
 
-/** Flat triangle fan of a convex footprint, lying in the XZ plane at y = 0. */
+/**
+ * Flat triangle fan of a convex footprint, lying in the XZ plane at y = 0. ENV-05: UVs are the
+ * local cell coordinates (v negated like a battlemap image's plane), so a repeating texture shows
+ * one tile per cell in 2D without touching the texture's shared repeat.
+ */
 export function footprintFill(points: readonly Point2[]): BufferGeometry {
   const positions: number[] = [];
-  for (const p of points) positions.push(p.x, 0, p.z);
+  const uvs: number[] = [];
+  for (const p of points) {
+    positions.push(p.x, 0, p.z);
+    uvs.push(p.x, -p.z);
+  }
   const indices: number[] = [];
   for (let i = 1; i < points.length - 1; i++) indices.push(0, i, i + 1);
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   return geometry;
+}
+
+/**
+ * ENV-05: how often a texture repeats across the unit geometry's faces, one tile per cell, so the
+ * prop's size in cells is its tiling control. Sub-cell, NaN and infinite sizes keep a single tile.
+ */
+export function textureTiling(shape: Pick<RenderShape, 'width' | 'depth'>): {
+  x: number;
+  y: number;
+} {
+  const tiles = (cells: number) => (Number.isFinite(cells) && cells > 1 ? cells : 1);
+  return { x: tiles(shape.width), y: tiles(shape.depth) };
 }
 
 /** Closed outline for a LineLoop. */
