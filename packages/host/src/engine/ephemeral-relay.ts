@@ -2,6 +2,7 @@ import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@my
 import {
   canUseSceneToggle,
   checkIntent,
+  parsePingPayload,
   PING_CHANNEL,
   seatOf,
   seesScene,
@@ -37,6 +38,7 @@ export type EphemeralDropReason =
   | 'rate-limited'
   | 'spectator-rate-limited'
   | 'payload-too-large'
+  | 'invalid-payload'
   | 'invalid-entity-reference'
   | 'forbidden'
   | 'hidden-entity'
@@ -178,6 +180,7 @@ export function createEphemeralRelay(
     'rate-limited': 0,
     'spectator-rate-limited': 0,
     'payload-too-large': 0,
+    'invalid-payload': 0,
     'invalid-entity-reference': 0,
     forbidden: 0,
     'hidden-entity': 0,
@@ -218,6 +221,14 @@ export function createEphemeralRelay(
       }
       if (!senderLimit.bucket.take(now)) {
         drop('rate-limited');
+        return;
+      }
+
+      // M4-14 / LAY-05: the `ping` channel is gated by a scene toggle, so the host — not only the
+      // client that draws the marker — owns its shape. A strict parse keeps an arbitrary (up to the
+      // payload cap) `data` blob, or a non-finite coordinate, from being fanned out to the table.
+      if (message.channel === PING_CHANNEL && parsePingPayload(message.data) === null) {
+        drop('invalid-payload');
         return;
       }
 

@@ -2,13 +2,12 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useContext, useEffect, useMemo, useRef } from 'react';
 import { DoubleSide, Raycaster, Vector2, type Group, type MeshBasicMaterial } from 'three';
 import { useStore } from 'zustand';
-import { PING_CHANNEL, type Scene, type Vec3 } from '@mythic/shared';
+import { PING_CHANNEL, PingPayload, type Scene, type Vec3 } from '@mythic/shared';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { useClientStore } from '../store/react.js';
 import { EphemeralContext, isRemoteEphemeralSender } from '../ui/ephemeral-context.js';
 import { pingStore } from '../tools/ping-store.js';
 import {
-  PingPayload,
   canPing,
   pingPayload,
   pingPoint,

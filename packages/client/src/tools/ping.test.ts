@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import type { Scene, Vec3 } from '@mythic/shared';
+import { parsePingPayload, type Scene, type Vec3 } from '@mythic/shared';
 import { IDS, makeCampaign } from '../../../shared/src/actions/testing.js';
 import {
   MAX_ACTIVE_PINGS,
   PING_END_RADIUS,
   PING_START_RADIUS,
   PING_TTL_MS,
-  PingPayload,
   canPing,
   pingExpired,
   pingPayload,
@@ -20,36 +19,16 @@ const scene: Pick<Scene, 'bounds'> = { bounds: { width: 10, height: 8 } };
 const noBounds: Pick<Scene, 'bounds'> = {};
 
 describe('ping payload (LAY-05)', () => {
-  it('accepts a ping built from a scene point and rejects anything malformed', () => {
+  it('sends exactly the fields the shared contract accepts, and no colour of its own', () => {
     const point: Vec3 = { x: 2.5, y: 0, z: 3.25 };
-    expect(pingPayload('01ARZ3NDEKTSV4RRFFQ69G5FAV', point)).toEqual({
-      sceneId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
-      x: 2.5,
-      y: 0,
-      z: 3.25,
+    const payload = pingPayload('01ARZ3NDEKTSV4RRFFQ69G5FAV', point);
+    expect(payload).toEqual({ sceneId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', x: 2.5, y: 0, z: 3.25 });
+    expect(parsePingPayload(payload)).toEqual(payload);
+    // The relay stamps the sender's validated profile colour, which the client then accepts.
+    expect(parsePingPayload({ ...payload, color: '#a1B2c3' })).toEqual({
+      ...payload,
+      color: '#a1B2c3',
     });
-    expect(PingPayload.safeParse(pingPayload('S', point)).success).toBe(true);
-
-    const invalid: unknown[] = [
-      null,
-      'x',
-      [],
-      {},
-      { sceneId: '', x: 0, y: 0, z: 0 },
-      { sceneId: 'S', x: NaN, y: 0, z: 0 },
-      { sceneId: 'S', x: 0, y: Infinity, z: 0 },
-      { sceneId: 'S', x: 0, y: 0, z: -Infinity },
-      { sceneId: 'S', x: '1', y: 0, z: 0 },
-      { sceneId: 'S'.repeat(65), x: 0, y: 0, z: 0 },
-      { sceneId: 'S', x: 0, y: 0, z: 0, color: 'red' },
-      { sceneId: 'S', x: 0, y: 0, z: 0, extra: true },
-    ];
-    for (const bad of invalid) expect(PingPayload.safeParse(bad).success).toBe(false);
-
-    // The relay stamps the sender's validated profile colour, which the client accepts.
-    expect(
-      PingPayload.safeParse({ sceneId: 'S', x: 0, y: 0, z: 0, color: '#a1B2c3' }).success,
-    ).toBe(true);
   });
 });
 

@@ -197,6 +197,52 @@ describe('ephemeral relay', () => {
     expect(relay.stats()).toMatchObject({ relayed: 2, dropped: { 'rate-limited': 3 } });
   });
 
+  it('drops a malformed ping payload instead of fanning junk out on the gated channel', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { pins: true };
+    const alice = { ...fakeConnection(T.alice), color: '#ab1234' };
+    const watcher = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000);
+    // Every case still names a scene the sender may use, so the toggle, scene and entity gates all
+    // pass and only the payload shape can reject the frame.
+    const malformed: unknown[] = [
+      { sceneId: T.scene },
+      { sceneId: T.scene, x: 1, y: 0 },
+      { sceneId: T.scene, x: '1', y: 0, z: 0 },
+      { sceneId: T.scene, x: Number.NaN, y: 0, z: 0 },
+      { sceneId: T.scene, x: Number.POSITIVE_INFINITY, y: 0, z: 0 },
+      { sceneId: T.scene, x: 1, y: 0, z: 1, color: 'red' },
+      { sceneId: T.scene, x: 1, y: 0, z: 1, padding: 'x'.repeat(4096) },
+    ];
+    const send = (data: unknown) => {
+      relay.relay(
+        alice,
+        { t: 'ephemeral', channel: PING_CHANNEL, data },
+        state,
+        recipients(state, [watcher]),
+      );
+    };
+    for (const data of malformed) send(data);
+
+    expect(watcher.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({
+      relayed: 0,
+      dropped: { 'invalid-payload': malformed.length },
+    });
+
+    // A well-formed ping is unaffected: it is relayed, with the sender's own profile colour.
+    send({ sceneId: T.scene, x: 1, y: 0, z: 2, color: '#ffffff' });
+    expect(watcher.received).toHaveLength(1);
+    expect(watcher.received[0]).toMatchObject({
+      t: 'ephemeral',
+      channel: PING_CHANNEL,
+      data: { sceneId: T.scene, x: 1, y: 0, z: 2, color: '#ab1234' },
+    });
+    expect(relay.stats().relayed).toBe(1);
+  });
+
   it('filters entity previews by current audience, including D32 co-DM visibility', () => {
     const state = fixtureCampaign();
     const coDmSeat = state.seats[T.coDm];

@@ -4,15 +4,16 @@ import {
   resolveSceneBounds,
   type Actor,
   type Campaign,
+  type PingPayload,
   type Scene,
   type Vec3,
 } from '@mythic/shared';
-import { z } from 'zod';
 
 /**
  * LAY-05: render-local ping markers. A ping is an ephemeral message only — it never enters campaign
- * state, the action log or a save (`TECHNICAL.md` §4.3). This module is the wire shape and the
- * animation maths; the marker list lives in `ping-store.ts` and the board wiring in `PingTool`.
+ * state, the action log or a save (`TECHNICAL.md` §4.3). This module is the ping's outgoing payload
+ * and the animation maths; the wire contract both ends check lives in `@mythic/shared`, the marker
+ * list in `ping-store.ts` and the board wiring in `PingTool`.
  */
 
 /** How long a ping stays on the board. Short: it is an attention cue, not a note. */
@@ -25,24 +26,7 @@ export const PING_END_RADIUS = 1.5;
 /** Markers kept at once; a burst beyond this only costs the oldest one, never the frame rate. */
 export const MAX_ACTIVE_PINGS = 64;
 
-/**
- * The relayed ping payload. There is no protocol schema for this channel yet, so the client
- * validates the boundary itself. `color` is added by the host from the sender's validated
- * connection profile (UI-JOIN-01), so a spoofed colour never reaches a peer.
- */
-export const PingPayload = z.strictObject({
-  sceneId: z.string().min(1).max(64),
-  x: z.number(),
-  y: z.number(),
-  z: z.number(),
-  color: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .optional(),
-});
-export type PingPayload = z.infer<typeof PingPayload>;
-
-/** LAY-05: the outgoing payload for a ping at a scene point. */
+/** LAY-05: the outgoing payload for a ping at a scene point. The relay adds the sender's colour. */
 export function pingPayload(sceneId: string, point: Vec3): PingPayload {
   return { sceneId, x: point.x, y: point.y, z: point.z };
 }
