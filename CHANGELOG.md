@@ -15,14 +15,14 @@ First tagged version of Mythic VTT. This is a pre-alpha for playtesting, not for
 - Switch between a 2D board and a 3D view at any time. Tokens can be elevated, with platforms and shapes in 3D.
 - Seats show avatars and connection quality, so you can see who is online and how well.
 - Move a seat to another browser by scanning a QR code, or by exporting and importing an identity file.
-- Chat panel, dice notation and a Help tab inside the app.
+- A Help tab inside the app, and a Chat tab preview (sending messages comes in a later version).
 
 ### For the DM
 
 - Initiative tracker with rounds. Private combatants stay hidden from players.
-- Pull players to my view, or let them follow the DM's view.
+- Pull everyone to your view, and let spectators follow your camera.
 - Seats and spectators: invite links for players, read-only spectator links, role templates, and "View as" to preview what a seat or spectator sees.
-- Archive a seat you no longer need: its tokens stay on the board and are handed back to the DM.
+- Archive a seat you no longer need: its tokens stay on the board but no longer belong to that seat, and its history is kept.
 - Layers and hidden information: DM-only content is never sent to players.
 - Scenes, battlemaps calibrated to the grid, scene filters, image skyboxes and textures, and saved prefabs.
 - History panel with filters, undo of your own last action, and rollback to an earlier point.

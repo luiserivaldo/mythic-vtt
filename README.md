@@ -89,7 +89,7 @@ Mythic VTT is licensed under the [GNU Affero General Public License v3.0](LICENS
 
 Prefab library: DM/co-DM tools save entity configurations per campaign and place independent copies across scenes, including their referenced assets in campaign exports.
 
-Selected tokens have a Token panel for persistent reach/aura rings. Set each radius in scene units and choose its colour; rings follow the token in 2D and 3D. Editing requires token edit permission. Saves use schema version 7; earlier campaigns and sessions migrate without losing data. Matching hosts and clients use protocol version 8. Seat archiving preserves entities and login history while removing ownership; undo and history rollback restore entities without handing them back to archived seats.
+Selected tokens have a Token panel for persistent reach/aura rings. Set each radius in scene units and choose its colour; rings follow the token in 2D and 3D. Editing requires token edit permission. Saves use schema version 8; earlier campaigns and sessions migrate without losing data. Matching hosts and clients use protocol version 9. Seat archiving preserves entities and login history while removing ownership; undo and history rollback restore entities without handing them back to archived seats.
 
 New campaigns start with one blank active scene. The DM can browse scenes locally without moving players, and create DM-only scenes that players and spectators never receive. Only the DM activates a public scene for players. The last scene cannot be deleted; deleting the players' active scene leaves their board empty and blocks new joins until another public scene is activated.
 
