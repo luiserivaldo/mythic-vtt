@@ -106,12 +106,14 @@ export function createGameClient(options: GameClientOptions) {
     },
     /** Submit an action intent; resolves on the host's ack or reject. */
     submitIntent: (type: string, payload: unknown, sceneId?: string): Promise<IntentResult> =>
-      intents.submit(type, payload, sceneId),
+      store.getState().viewAs.kind !== 'host'
+        ? Promise.resolve({ ok: false, reason: 'forbidden', detail: 'Back to DM to make changes.' })
+        : intents.submit(type, payload, sceneId),
     join(fields: Omit<Extract<ClientMessage, { t: 'join' }>, 't'>): void {
-      conn.send({ t: 'join', ...fields });
+      if (store.getState().viewAs.kind === 'host') conn.send({ t: 'join', ...fields });
     },
     sendEphemeral(channel: string, data: unknown): void {
-      conn.send({ t: 'ephemeral', channel, data });
+      if (store.getState().viewAs.kind === 'host') conn.send({ t: 'ephemeral', channel, data });
     },
     onEphemeral(listener: (m: Ephemeral) => void): () => void {
       ephemeralListeners.add(listener);

@@ -95,4 +95,4 @@ New campaigns start with one blank active scene. The DM can browse scenes locall
 
 The top bar shows your current scene. DMs and co-DMs can click its name to open Scenes in the right dock; players see only their assigned scene name and receive no inactive scene list. Choose 2D or 3D without losing selection, the active tool or camera focus. Reset view frames the scene in either mode.
 
-Settings includes local Show height labels and Confirm before deleting preferences, alongside the dark/light theme. Height badge rendering is separate follow-up work. DMs/co-DMs can adjust measurement permission for the viewed scene; creation is marked "DM and Co-DM only". The host DM can download a campaign ZIP. Game log remains a disabled WIP entry.
+Settings includes local Show height labels and Confirm before deleting preferences, alongside the dark/light theme. Turning height labels off hides the 2D elevation badge text for that viewer only; the 3D drop line and ground shadow are unaffected. DMs/co-DMs can adjust measurement permission for the viewed scene; creation is marked "DM and Co-DM only". The host DM can download a campaign ZIP. Game log remains a disabled WIP entry.

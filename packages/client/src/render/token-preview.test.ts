@@ -32,9 +32,13 @@ describe('previewName (UI-TOKEN-01, TOK-04, D35)', () => {
   it('prints the stand-in, never the name, for a label this viewer may not read', () => {
     expect(previewName(subject({ labelVisibility: 'owner' }), player)).toBe(HIDDEN_TOKEN_NAME);
     expect(previewName(subject({ labelVisibility: 'dm' }), player)).toBe(HIDDEN_TOKEN_NAME);
-    expect(previewName(subject({ labelVisibility: 'owner' }), { kind: 'spectator' })).toBe(
+    expect(previewName(subject({ labelVisibility: 'dm' }), { kind: 'spectator' })).toBe(
       HIDDEN_TOKEN_NAME,
     );
+    // D35: the host blanks an owner name for a spectator unless it follows the owning seat.
+    expect(
+      previewName(subject({ name: '', labelVisibility: 'owner' }), { kind: 'spectator' }),
+    ).toBe(HIDDEN_TOKEN_NAME);
     // The owner of an owner-only label reads it.
     expect(previewName(subject({ labelVisibility: 'owner', owners: [seat.id] }), player)).toBe(
       'Goblin',

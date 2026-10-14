@@ -18,6 +18,7 @@ import { rulerStore } from '../tools/ruler-store.js';
 import { RulerPanel } from './RulerPanel.js';
 import { CreatePropPanel } from './RailPanels.js';
 import { InitiativeTools } from './InitiativeTools.js';
+import { seeSheet } from './sheet-panel.js';
 
 const TransformPanel3D = lazy(async () => {
   const module = await import('./TransformPanel3D.js');
@@ -84,6 +85,7 @@ export function ToolPanelDock({
   mode3d: boolean;
   container: HTMLElement | null;
 }) {
+  const preview = useClientStore((state) => state.viewAs.kind !== 'host');
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const collapsed = useStore(toolPanelLayoutStore, (state) => state.collapsed);
@@ -93,7 +95,7 @@ export function ToolPanelDock({
   const selected = useStore(selectionStore, (state) => state.ids);
   const target2d = useGizmoTarget();
   const target3d = useGizmoTarget3D();
-  const readOnly = isReadOnlyViewer({ isHost, seatId, campaign });
+  const readOnly = preview || isReadOnlyViewer({ isHost, seatId, campaign });
   const showTransform = !aoeActive && (mode3d ? target3d !== null : target2d !== null);
   const selectedEntity =
     scene && selected.length === 1 ? scene.entities[selected[0] ?? ''] : undefined;
@@ -150,6 +152,11 @@ export function ToolPanelDock({
       )}
       {showToken && (
         <PanelFrame id="token" label="Token" collapsed={collapsed.token}>
+          {/* UI-SHEET-01: See Sheet also lives in the token's right-click menu (UI-TOKEN-03); the
+              selected token's panel keeps the same shortcut. */}
+          <button type="button" onClick={seeSheet}>
+            See Sheet
+          </button>
           <TokenStatusPanel
             key={`status-${selectedEntity.id}`}
             campaign={campaign}

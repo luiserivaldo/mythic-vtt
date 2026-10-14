@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id, SceneBounds } from '../schema/index.js';
+import { AssetRef, Id, SceneBounds } from '../schema/index.js';
 import { defineAction, isCoDm, isHost } from './define.js';
 
 export const sceneUpdate = defineAction({
@@ -11,6 +11,8 @@ export const sceneUpdate = defineAction({
       background: z.string().min(1).max(64).optional(),
       // ENV-07: null clears the gradient back to a plain colour.
       zenith: z.string().min(1).max(64).nullable().optional(),
+      // ENV-07: an uploaded image used as the skybox; null clears it back to the colour/gradient.
+      skybox: AssetRef.nullable().optional(),
       // D37: shrinking never moves entities; they stay and can be dragged back in.
       bounds: SceneBounds.optional(),
     })
@@ -19,6 +21,7 @@ export const sceneUpdate = defineAction({
         p.name !== undefined ||
         p.background !== undefined ||
         p.zenith !== undefined ||
+        p.skybox !== undefined ||
         p.bounds !== undefined,
       {
         message: 'at least one field to update is required',
@@ -34,6 +37,8 @@ export const sceneUpdate = defineAction({
     if (a.payload.bounds !== undefined) scene.bounds = a.payload.bounds;
     if (a.payload.zenith === null) delete scene.environment.zenith;
     else if (a.payload.zenith !== undefined) scene.environment.zenith = a.payload.zenith;
+    if (a.payload.skybox === null) delete scene.environment.skybox;
+    else if (a.payload.skybox !== undefined) scene.environment.skybox = a.payload.skybox;
   },
   modExposed: false,
 });

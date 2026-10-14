@@ -11,7 +11,6 @@ export const DOCK_ICONS: Readonly<Record<string, string>> = {
   sheet: '📜',
   scenes: '🗺',
   layers: '📚',
-  map: '🧭',
   entities: '♟',
   prefabs: '🧰',
   seats: '👥',

@@ -153,6 +153,45 @@ describe('primitive shapes (ENV-02)', () => {
     expect(map(shaped('plane', { x: 5, y: 9, z: 5 }))?.shape?.height).toBeLessThan(0.1);
     expect(map(entity(30, 'props'))?.shape).toBeUndefined();
   });
+
+  it('carries an uploaded texture, and omits the key when there is none (ENV-05)', () => {
+    const texture = { source: 'local' as const, hash: 'a'.repeat(64), kind: 'image' as const };
+    const textured = Entity.parse({
+      ...shaped('box', { x: 2, y: 1, z: 2 }),
+      shape: { kind: 'box', color: '#aa5522', walkable: true, texture },
+    });
+    expect(map(textured)?.shape).toMatchObject({ texture });
+    expect(map(shaped('box', { x: 2, y: 1, z: 2 }))?.shape).not.toHaveProperty('texture');
+  });
+});
+
+describe('image skybox (ENV-07)', () => {
+  const asset = { source: 'local', hash: 'a'.repeat(64), kind: 'image' } as const;
+  const withSkybox = Scene.parse({
+    ...scene,
+    environment: { ...scene.environment, skybox: asset },
+  });
+
+  it('carries the scene skybox into the render scene', () => {
+    expect(mapScene(freshScene()).skybox).toBeUndefined();
+    expect(mapScene(withSkybox).skybox).toEqual(asset);
+  });
+
+  it('keeps the colour and gradient alongside the image for the fallback', () => {
+    const gradient = Scene.parse({
+      ...scene,
+      environment: { background: '#102030', zenith: '#6688aa', skybox: asset },
+    });
+    expect(mapScene(gradient)).toMatchObject({
+      background: '#102030',
+      zenith: '#6688aa',
+      skybox: asset,
+    });
+  });
+
+  function freshScene() {
+    return Scene.parse({ ...scene, environment: { background: '#102030' } });
+  }
 });
 
 describe('token yaw (M1-34)', () => {

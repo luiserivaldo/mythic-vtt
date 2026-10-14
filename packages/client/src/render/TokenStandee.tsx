@@ -32,6 +32,7 @@ export function TokenStandee({
   renderOrder,
   onClick,
   onDoubleClick,
+  onContextMenu,
 }: {
   entity: RenderEntity;
   color: string;
@@ -41,6 +42,8 @@ export function TokenStandee({
   onClick: (event: ThreeEvent<MouseEvent>) => void;
   /** CAM-06: the second click of a double-click focuses the camera on this token. */
   onDoubleClick: () => void;
+  /** UI-TOKEN-03: a right click opens the token's short menu (R3F's own context-menu event). */
+  onContextMenu: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const pivot = useRef<Group>(null);
   const [x, y, z] = entity.position;
@@ -64,6 +67,7 @@ export function TokenStandee({
           renderOrder={renderOrder}
           onClick={onClick}
           onDoubleClick={onDoubleClick}
+          onContextMenu={onContextMenu}
         >
           <cylinderGeometry args={[dims.baseRadius, dims.baseRadius, dims.baseThickness, 32]} />
           <meshStandardMaterial color={selected ? SELECTED : '#2b3643'} />
@@ -95,6 +99,7 @@ export function TokenStandee({
           renderOrder={renderOrder}
           onClick={onClick}
           onDoubleClick={onDoubleClick}
+          onContextMenu={onContextMenu}
         >
           <planeGeometry args={[dims.width, dims.height]} />
           <TokenMaterial entity={entity} color={color} depth />
