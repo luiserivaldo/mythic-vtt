@@ -154,6 +154,19 @@ function rate(
 }
 
 /**
+ * LAY-05: the frame that finishes a drawing. The spectator delivery bucket must never drop it — a
+ * short stroke may have sent nothing but its first sample, so losing the closing frame loses the
+ * whole drawing for that spectator. Erasing and clearing are as final as a finished stroke, and
+ * every drawing frame is already rate-limited per sender above.
+ */
+function isFinalDrawFrame(kind: DrawChannel, data: unknown): boolean {
+  if (kind !== 'stroke') return true;
+  return (
+    typeof data === 'object' && data !== null && (data as { phase?: unknown }).phase === 'finished'
+  );
+}
+
+/**
  * Host-side, non-durable ephemeral path. It owns no campaign state and never calls storage.
  * Sender identity is always replaced from the authenticated connection.
  */
@@ -196,7 +209,9 @@ export function createEphemeralRelay(
    * LAY-05: drawings are relayed live and are never campaign state, so the host remembers only
    * who drew each stroke — the minimum it needs to authorise erasing. It is bounded and in
    * memory only: a restart, an eviction or a `draw.clear` forgets the stroke, and an evicted
-   * stroke is nobody's to erase. Nothing here is persisted or logged.
+   * stroke is nobody's to erase. Nothing here is persisted or logged, so a client that joins late
+   * or reconnects sees no existing drawings — the geometry lives only on the clients that were
+   * there when it was drawn.
    */
   const drawings = new Map<string, Map<string, string>>();
 
@@ -334,11 +349,11 @@ export function createEphemeralRelay(
       // authorised here — the author for one stroke, the DM or a co-DM for all of them.
       const drawing = drawChannelOf(message.channel);
       const senderAudience = audienceFor(state, sender);
-      const drawingSceneId =
-        drawing === null
-          ? null
-          : applyDrawing(sender, senderAudience, message, state, senderActor, drawing);
-      if (drawing !== null && drawingSceneId === null) return;
+      if (
+        drawing !== null &&
+        applyDrawing(sender, senderAudience, message, state, senderActor, drawing) === null
+      )
+        return;
 
       const refs = entityReferences(message.data);
       if (refs === undefined) {
@@ -396,11 +411,14 @@ export function createEphemeralRelay(
       }
 
       const targets = Array.from(recipients);
-      // LAY-05: a drawing carries no entity to filter on, so the scene itself decides who sees it.
+      // PERM-03: a scene a target cannot see does not exist for them, so every channel that names
+      // a scene — drawings, ruler previews, drag previews — is relayed only to targets that can see
+      // it. One filter for all of them (via `visibleTo`), so the rule cannot drift per channel.
+      const sceneId = sceneIdOf(message.data);
       const sceneTargets =
-        drawingSceneId === null
+        sceneId === undefined
           ? targets
-          : targets.filter((target) => seesScene(state, target.audience, drawingSceneId));
+          : targets.filter((target) => seesScene(state, target.audience, sceneId));
       drop('hidden-scene', targets.length - sceneTargets.length);
 
       const visibleTargets = sceneTargets.filter((target) => {
@@ -420,7 +438,9 @@ export function createEphemeralRelay(
       // M4-02: a spectator watching through a seat has a seat audience but is still a spectator.
       const spectatorTargets = visibleTargets.filter(isSpectatorTarget);
       let sendToSpectators = true;
-      if (spectatorTargets.length > 0) {
+      // LAY-05: a drawing's closing frame is never coalesced away; see `isFinalDrawFrame`.
+      const finalDraw = drawing !== null && isFinalDrawFrame(drawing, message.data);
+      if (spectatorTargets.length > 0 && !finalDraw) {
         spectatorDelivery ??= new TokenBucket(spectatorDeliveryRate, now);
         sendToSpectators = spectatorDelivery.take(now);
         if (!sendToSpectators) drop('spectator-rate-limited', spectatorTargets.length);

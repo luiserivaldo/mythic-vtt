@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appendDrawPoint,
   DEFAULT_DRAW_COLOR,
   DEFAULT_DRAW_WIDTH,
   DRAW_CLEAR_CHANNEL,
+  DRAW_COORD_LIMIT,
   DRAW_ERASE_CHANNEL,
   DRAW_STROKE_CHANNEL,
+  MAX_DRAW_POINTS,
+  MAX_STROKE_SAMPLES,
+  simplifyDrawPoints,
 } from '@mythic/shared';
 import { audienceFor } from './audience.js';
 import { createEphemeralRelay, type EphemeralRecipient } from './ephemeral-relay.js';
@@ -418,24 +423,128 @@ describe('drawing relay (LAY-05)', () => {
     const host = fakeConnection(T.host, { isHost: true });
     const coDm = fakeConnection(T.carol);
     const player = fakeConnection(T.alice);
+    // A seat-less identity is a spectator: the same `visibleTo` path as a player, made explicit.
+    const spectator = fakeConnection(T.bob);
     const watcher = fakeConnection(T.host, { isHost: true });
     const relay = createEphemeralRelay(() => 1_000);
     const secret = strokeMessage(STROKE, { sceneId: T.newScene });
 
-    relay.relay(host, secret, state, recipients(state, [watcher, coDm, player]));
+    relay.relay(host, secret, state, recipients(state, [watcher, coDm, player, spectator]));
     expect(watcher.received).toHaveLength(1);
     expect(coDm.received).toHaveLength(1);
     expect(player.received).toEqual([]);
     expect(player.wire()).not.toContain(T.newScene);
     expect(player.wire()).not.toContain('SECRET-SCENE');
+    expect(spectator.received).toEqual([]);
+    expect(spectator.wire()).not.toContain(T.newScene);
 
     // A player may not draw on a scene they cannot see, even with the toggle on for it.
     relay.relay(player, secret, state, recipients(state, [watcher]));
     expect(watcher.received).toHaveLength(1);
     expect(relay.stats().dropped.forbidden).toBe(1);
-    expect(relay.stats().dropped['hidden-scene']).toBe(1);
+    // The host, the co-DM and a seat-less spectator all saw the count: only the co-DM could see it.
+    expect(relay.stats().dropped['hidden-scene']).toBe(2);
     // A scene-hidden target is counted once: a drawing carries no entity of its own.
     expect(relay.stats().dropped['hidden-entity']).toBe(0);
+    expect(spectator.received).toEqual([]);
+    expect(spectator.wire()).not.toContain(T.newScene);
+  });
+
+  it('relays a full-length stroke instead of dropping it as an oversized frame', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { draw: true };
+    const alice = fakeConnection(T.alice);
+    const watcher = fakeConnection(T.host, { isHost: true });
+    const relay = createEphemeralRelay(() => 1_000);
+
+    // The worst stroke a client can produce: a raw gesture that spans the whole drawing domain,
+    // corner to corner, put through the same quantise-and-simplify path `DrawTool` uses, at the
+    // wire cap. If this frame does not fit the relay's 4096-byte default, ordinary strokes are
+    // silently dropped again (MV-155).
+    let gesture: readonly { x: number; y: number; z: number }[] = [];
+    for (let index = 0; index < MAX_STROKE_SAMPLES * 2; index += 1)
+      gesture = appendDrawPoint(gesture, {
+        x: -DRAW_COORD_LIMIT + (index * (2 * DRAW_COORD_LIMIT)) / (MAX_STROKE_SAMPLES * 2),
+        y: -DRAW_COORD_LIMIT,
+        z: index % 2 === 0 ? -DRAW_COORD_LIMIT : DRAW_COORD_LIMIT,
+      });
+    expect(gesture).toHaveLength(MAX_STROKE_SAMPLES);
+    const points = simplifyDrawPoints(gesture);
+    expect(points).toHaveLength(MAX_DRAW_POINTS);
+
+    relay.relay(alice, strokeMessage(STROKE, { points }), state, recipients(state, [watcher]));
+    expect(relay.stats().dropped['payload-too-large']).toBe(0);
+    expect(relay.stats().relayed).toBe(1);
+    expect(watcher.received).toHaveLength(1);
+    expect(watcher.received[0]).toMatchObject({ t: 'ephemeral', from: T.alice });
+    expect(Buffer.byteLength(watcher.wire(), 'utf8')).toBeLessThan(4096);
+  });
+
+  it('never rate-drops a drawing’s closing frame for spectators (LAY-05)', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    scene.playerToggles = { draw: true };
+    const alice = fakeConnection(T.alice);
+    // An identity with no seat is a spectator audience (SES-11).
+    const spectator = fakeConnection(T.bob);
+    const targets = recipients(state, [spectator]);
+    const relay = createEphemeralRelay(() => 1_000, {
+      spectatorDeliveryRate: { ratePerSecond: 1, burst: 1 },
+    });
+
+    // The first live frame takes the only spectator delivery token.
+    relay.relay(alice, strokeMessage(STROKE, { phase: 'active' }), state, targets);
+    expect(spectator.received).toHaveLength(1);
+    // The closing frame is what makes the stroke stick: it must never be the one dropped, because
+    // a short stroke may have sent nothing else and the spectator would lose the drawing entirely.
+    relay.relay(alice, strokeMessage(STROKE), state, targets);
+    expect(spectator.received).toHaveLength(2);
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(0);
+    // Ordinary live frames are still coalesced for spectators.
+    relay.relay(alice, strokeMessage(OTHER_STROKE, { phase: 'active' }), state, targets);
+    expect(spectator.received).toHaveLength(2);
+    expect(relay.stats().dropped['spectator-rate-limited']).toBe(1);
+  });
+
+  it('never relays a ruler preview of a scene a target cannot see (PERM-03)', () => {
+    const state = fixtureCampaign();
+    const scene = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    if (!scene || !coDmSeat) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    state.scenes[T.newScene] = {
+      ...scene,
+      id: T.newScene,
+      name: 'SECRET-SCENE',
+      dmOnly: true,
+      playerToggles: { measure: true },
+    };
+    state.activeSceneId = T.scene;
+    const coDm = fakeConnection(T.carol);
+    const player = fakeConnection(T.alice);
+    const relay = createEphemeralRelay(() => 1_000);
+    const ruler = {
+      t: 'ephemeral' as const,
+      channel: 'ruler.preview',
+      data: {
+        sceneId: T.newScene,
+        points: [
+          { x: 1, y: 0, z: 1 },
+          { x: 2, y: 0, z: 1 },
+        ],
+        phase: 'active',
+      },
+    };
+
+    // The co-DM is exempt from the measure toggle, so only the scene filter can refuse this: one
+    // filter for every sceneId-bearing channel, drawings and rulers alike.
+    relay.relay(coDm, ruler, state, recipients(state, [player]));
+    expect(player.received).toEqual([]);
+    expect(player.wire()).not.toContain(T.newScene);
+    expect(relay.stats().dropped['hidden-scene']).toBe(1);
   });
 });
 

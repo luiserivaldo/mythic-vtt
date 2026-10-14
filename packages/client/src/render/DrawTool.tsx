@@ -6,6 +6,7 @@ import {
   DrawEraseData,
   DrawStrokeData,
   drawChannelOf,
+  simplifyDrawPoints,
   type Scene,
   type Vec3,
 } from '@mythic/shared';
@@ -120,7 +121,15 @@ export function DrawTool({
     if (readOnly) return;
     const el = gl.domElement;
     const raycaster = new Raycaster();
-    let active: { pointerId: number; strokeId: string; lastSentAt: number | null } | null = null;
+    // LAY-05: the gesture is sampled locally and may run past the wire cap; `samples` holds the raw
+    // samples and what is drawn or sent is their simplification, so a stroke drawn for a second
+    // still reaches every other client whole instead of being dropped as an oversized frame.
+    let active: {
+      pointerId: number;
+      strokeId: string;
+      lastSentAt: number | null;
+      samples: readonly Vec3[];
+    } | null = null;
     let eraserPointer: number | null = null;
 
     const armed = () => activeToolStore.getState().tool === 'draw';
@@ -216,6 +225,11 @@ export function DrawTool({
       strokes.upsert(stroke);
     };
 
+    /** Stores the gesture as it is drawn and sent: at most MAX_DRAW_POINTS samples, never more. */
+    const writeSamples = (samples: readonly Vec3[], phase: 'active' | 'finished') => {
+      write(simplifyDrawPoints(samples), phase);
+    };
+
     const releasePointer = (pointerId: number) => {
       pointerClaims.release(pointerId);
       if (el.hasPointerCapture(pointerId)) el.releasePointerCapture(pointerId);
@@ -224,10 +238,7 @@ export function DrawTool({
     const finish = () => {
       const current = active;
       if (!current) return;
-      const stroke = drawingStore
-        .getState()
-        .strokes.find((candidate) => candidate.strokeId === current.strokeId);
-      const points = stroke?.points ?? [];
+      const points = simplifyDrawPoints(current.samples);
       // A tap, or a stroke abandoned before it became a line, is not a drawing.
       if (points.length < 2) dropOwnStroke(current.strokeId, current.lastSentAt !== null);
       else {
@@ -267,11 +278,13 @@ export function DrawTool({
       }
       const point = pointAt(e);
       if (!point) return;
+      const samples = appendDrawPoint([], point);
+      if (samples.length === 0) return;
       e.stopPropagation();
       pointerClaims.claim(e.pointerId, 'draw');
       el.setPointerCapture(e.pointerId);
-      active = { pointerId: e.pointerId, strokeId: newId(), lastSentAt: null };
-      write([point], 'active');
+      active = { pointerId: e.pointerId, strokeId: newId(), lastSentAt: null, samples };
+      writeSamples(samples, 'active');
       publish('active', true);
     };
 
@@ -280,13 +293,11 @@ export function DrawTool({
       if (!current || e.pointerId !== current.pointerId) return;
       const point = pointAt(e);
       if (!point) return;
-      const stroke = drawingStore
-        .getState()
-        .strokes.find((candidate) => candidate.strokeId === current.strokeId);
-      const points = appendDrawPoint(stroke?.points ?? [], point);
+      const samples = appendDrawPoint(current.samples, point);
       // A repeated sample (a still pointer) changes nothing: no frame, no message.
-      if (stroke !== undefined && points === stroke.points) return;
-      write(points, 'active');
+      if (samples === current.samples) return;
+      current.samples = samples;
+      writeSamples(samples, 'active');
       publish('active', false);
     };
 
@@ -299,12 +310,8 @@ export function DrawTool({
       const current = active;
       if (!current || e.pointerId !== current.pointerId) return;
       const point = pointAt(e);
-      if (point) {
-        const stroke = drawingStore
-          .getState()
-          .strokes.find((candidate) => candidate.strokeId === current.strokeId);
-        write(appendDrawPoint(stroke?.points ?? [], point), 'active');
-      }
+      // The stroke ends where the pointer was actually let go, then goes out as one whole message.
+      if (point) current.samples = appendDrawPoint(current.samples, point);
       releasePointer(current.pointerId);
       finish();
     };
