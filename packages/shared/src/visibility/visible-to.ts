@@ -105,16 +105,6 @@ function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
   });
 }
 
-/**
- * PERM-03: may this audience see this scene at all? The one scene rule, read off `visibleTo`
- * instead of restated: the host and a co-DM seat see every scene, everyone else sees only the
- * active, not-DM-only one, and an unknown scene exists for nobody. A sceneId-bearing ephemeral
- * (a camera pose, a drawing) routes by this same filter.
- */
-export function seesScene(state: Campaign, audience: Audience, sceneId: string): boolean {
-  return visibleTo(audience, state).scenes[sceneId] !== undefined;
-}
-
 export function visibleTo(audience: Audience, state: Campaign): Campaign {
   if (audience.kind === 'host') return state;
   return memo(campaignCache, state, audienceKey(audience), () => {
@@ -157,4 +147,16 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
     }
     return view;
   });
+}
+
+/**
+ * PERM-03 / LAY-05: whether an audience may see a scene at all. `visibleTo` omits every scene a
+ * viewer cannot see — a player or spectator knows only the active, non-DM-only one, while the host
+ * and co-DM seats keep them all — so this is the one source of truth for "does this scene exist for
+ * them". The ephemeral relay uses it to keep a hidden scene's id and coordinates off the wire
+ * (M4-14 pings, and every other channel whose data names a scene) instead of copying the rule.
+ * A scene the campaign does not hold is never seen, by anyone.
+ */
+export function seesScene(state: Campaign, audience: Audience, sceneId: string): boolean {
+  return visibleTo(audience, state).scenes[sceneId] !== undefined;
 }

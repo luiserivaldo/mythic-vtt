@@ -17,8 +17,10 @@ import { selectionStore } from '../tools/selection-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
 import { PanZoomControls } from './PanZoomControls.js';
+import { PingTool } from './PingTool.js';
 import { RulerTool } from './RulerTool.js';
 import { ToolRail } from '../ui/ToolRail.js';
+import { PingButton } from '../ui/PingButton.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
@@ -153,6 +155,9 @@ function BoardScene({
         orbitRef={director.orbitRef}
         applyRef={director.applyRef}
       />
+      {/* LAY-05: alt-click pings. Mounted before the ruler and TokenDrag so its window-capture
+          handler can keep an Alt press for itself; a normal press it ignores entirely. */}
+      <PingTool readOnly={readOnly} />
       {/* M1-28: TokenDrag claims a press on any movable token without selecting it first, while
           empty board presses still reach the camera controls. */}
       {/* M1-21: mounted before TokenDrag so its window-capture listeners claim the press first. */}
@@ -221,14 +226,8 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
         {/* UI-TOOL-01..07: the rail lists every tool; one a seat may not use is disabled, not hidden. */}
         <ToolRail />
-        {mode3d && (
-          <>
-            <span className="ui-camera-hint">
-              3D mouse: left-drag empty board or middle-drag pan · right-drag orbit · wheel zoom ·
-              middle-click a selected token to lock its height
-            </span>
-          </>
-        )}
+        {/* LAY-05: the same ping as alt-click, from the centre of the view. */}
+        <PingButton />
       </div>
       <ToolPanelDock
         campaign={campaign}

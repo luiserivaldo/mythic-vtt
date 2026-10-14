@@ -87,6 +87,50 @@ describe('visibleTo', () => {
   });
 });
 
+describe('seesScene', () => {
+  const dmOnlyId = testId(20);
+  const inactiveId = testId(21);
+  const coDm: Audience = { kind: 'seat', seatId: IDS.coDm };
+
+  function withScenes(): Campaign {
+    const base = makeCampaign();
+    const scene = base.scenes[IDS.scene];
+    if (!scene) throw new Error('fixture incomplete');
+    return {
+      ...base,
+      scenes: {
+        ...base.scenes,
+        [dmOnlyId]: { ...scene, id: dmOnlyId, name: 'Prep', dmOnly: true },
+        [inactiveId]: { ...scene, id: inactiveId, name: 'Backstage' },
+      },
+    };
+  }
+
+  it('is false for a scene the campaign does not hold, for every audience', () => {
+    const s = withScenes();
+    for (const audience of [...Object.values(audiences), coDm, { kind: 'host' } as Audience]) {
+      expect(seesScene(s, audience, testId(30))).toBe(false);
+    }
+  });
+
+  it('lets the host and co-DM seats see every scene, DM-only and inactive included', () => {
+    const s = withScenes();
+    for (const sceneId of [IDS.scene, dmOnlyId, inactiveId]) {
+      expect(seesScene(s, { kind: 'host' }, sceneId)).toBe(true);
+      expect(seesScene(s, coDm, sceneId)).toBe(true);
+    }
+  });
+
+  it('limits players and spectators to the active, non-DM-only scene', () => {
+    const s = withScenes();
+    for (const audience of [audiences.owner, audiences.other, audiences.spectators] as Audience[]) {
+      expect(seesScene(s, audience, IDS.scene)).toBe(true);
+      expect(seesScene(s, audience, dmOnlyId)).toBe(false);
+      expect(seesScene(s, audience, inactiveId)).toBe(false);
+    }
+  });
+});
+
 describe('patchesFor (non-leak)', () => {
   const move = (layer: 'dm' | 'tokens') => (before: Campaign) =>
     produce(before, (d) => {

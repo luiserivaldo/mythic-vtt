@@ -7,6 +7,7 @@ import { ViewToggle } from '../render/ViewToggle.js';
 import { viewModeStore } from '../render/view-mode-store.js';
 import { dockStore } from './dock-store.js';
 import { IdentityStatus } from './IdentityStatus.js';
+import { SeatAvatars } from './SeatAvatars.js';
 import { isAdminRole, viewerRole } from './viewer.js';
 
 export function TopBar() {
@@ -46,6 +47,9 @@ export function TopBar() {
       >
         Reset view
       </button>
+      <ViewAsControl />
+      <SeatAvatars />
+      <IdentityStatus />
       {/* CAM-06: the DM takes everyone watching players to their own camera. */}
       {admin && (
         <button
@@ -68,8 +72,6 @@ export function TopBar() {
           Follow the DM camera
         </button>
       )}
-      <ViewAsControl />
-      <IdentityStatus />
     </header>
   );
 }

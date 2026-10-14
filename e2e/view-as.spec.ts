@@ -148,6 +148,16 @@ test('UX-14 replaces the DM view with live seat/spectator filtering and always p
     await spectator.waitFor('new audience', () =>
       JSON.stringify(spectator.state).includes('Alice updated UX14'),
     );
+    // MV-233: the preview matches what a real spectator page renders through the followed seat.
+    const watchContext = await browser.newContext();
+    try {
+      const watchPage = await watchContext.newPage();
+      await watchPage.goto(`${table.clientUrl}/#watch=${encodeURIComponent(token)}`);
+      await expect(watchPage.getByRole('status')).toHaveText('Connected to New campaign');
+      await expect(watchPage.getByTestId('token-label')).toHaveText(['Alice updated UX14']);
+    } finally {
+      await watchContext.close();
+    }
     await picker.selectOption(`seat:${coDmSeat}`);
     await expect
       .poll(async () => (await labels.allTextContents()).sort())

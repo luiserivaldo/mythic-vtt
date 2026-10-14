@@ -5,6 +5,8 @@ import {
   canUseSceneToggle,
   checkIntent,
   parseCameraPose,
+  parsePingPayload,
+  PING_CHANNEL,
   seatOf,
   seesScene,
   TOGGLE_FOR_CHANNEL,
@@ -45,6 +47,7 @@ export type EphemeralDropReason =
   | 'rate-limited'
   | 'spectator-rate-limited'
   | 'payload-too-large'
+  | 'invalid-payload'
   | 'invalid-entity-reference'
   | 'invalid-camera-pose'
   | 'forbidden'
@@ -140,6 +143,19 @@ function sceneIdOf(data: unknown): string | undefined {
   return typeof sceneId === 'string' ? sceneId : undefined;
 }
 
+/**
+ * PERM-03: does this audience see every scene a frame names? An empty set is vacuously true, so
+ * channels that carry no scene (cursors) are never filtered by scene.
+ */
+function seesEveryScene(
+  state: Campaign,
+  audience: Audience,
+  sceneIds: ReadonlySet<string>,
+): boolean {
+  for (const sceneId of sceneIds) if (!seesScene(state, audience, sceneId)) return false;
+  return true;
+}
+
 function rate(
   defaults: TokenBucketConfig,
   override?: Partial<TokenBucketConfig>,
@@ -187,6 +203,7 @@ export function createEphemeralRelay(
     'rate-limited': 0,
     'spectator-rate-limited': 0,
     'payload-too-large': 0,
+    'invalid-payload': 0,
     'invalid-entity-reference': 0,
     'invalid-camera-pose': 0,
     forbidden: 0,
@@ -247,6 +264,14 @@ export function createEphemeralRelay(
         return;
       }
 
+      // M4-14 / LAY-05: the `ping` channel is gated by a scene toggle, so the host — not only the
+      // client that draws the marker — owns its shape. A strict parse keeps an arbitrary (up to the
+      // payload cap) `data` blob, or a non-finite coordinate, from being fanned out to the table.
+      if (message.channel === PING_CHANNEL && parsePingPayload(message.data) === null) {
+        drop('invalid-payload');
+        return;
+      }
+
       const refs = entityReferences(message.data);
       if (refs === undefined) {
         drop('invalid-entity-reference');
@@ -272,6 +297,23 @@ export function createEphemeralRelay(
         return;
       }
 
+      // PERM-03 / M4-14: a channel whose data names a scene (a ping's `sceneId`, a ruler's, an
+      // entity reference's) may cross only between viewers who can see that scene. The toggle gate
+      // above decides *whether* a sender may use the channel; this decides *who* receives it, so a
+      // DM pinging, measuring or dragging on a DM-only or inactive scene never leaks its id or
+      // coordinates to players or spectators. A sender must see the scene too.
+      const scenesNamed = new Set<string>();
+      const namedSceneId = sceneIdOf(message.data);
+      if (namedSceneId !== undefined) scenesNamed.add(namedSceneId);
+      for (const ref of refs) scenesNamed.add(ref.sceneId);
+      // CAM-06: a pose names the scene it was taken in (the parsed `sceneId`, the same field read
+      // above), so it is filtered by this one scene rule like every other scene-bearing channel.
+      if (pose !== null) scenesNamed.add(pose.sceneId);
+      if (!seesEveryScene(state, senderAudience, scenesNamed)) {
+        drop('forbidden');
+        return;
+      }
+
       if (message.channel === 'token.drag-preview') {
         const check = checkIntent(state, senderActor, 'token.move', message.data);
         if (!check.ok) {
@@ -280,8 +322,12 @@ export function createEphemeralRelay(
         }
       }
 
-      // UI-JOIN-01: shared tool colours come from the validated connection profile, not a spoofed preview.
-      const coloredTool = message.channel === 'ruler.preview' || message.channel === 'cursor';
+      // UI-JOIN-01: shared tool colours come from the validated connection profile, not a spoofed
+      // preview. Pings carry the sender's colour too, so the marker is identifiable on every board.
+      const coloredTool =
+        message.channel === 'ruler.preview' ||
+        message.channel === 'cursor' ||
+        message.channel === PING_CHANNEL;
       const data =
         coloredTool &&
         sender.color !== undefined &&
@@ -304,16 +350,13 @@ export function createEphemeralRelay(
       }
 
       const targets = Array.from(recipients);
-      // CAM-06 / PERM-03: a pose names the scene it was taken in, so a target that cannot see that
-      // scene makes no sense of it and never receives it. `seesScene` is the campaign snapshot's own
-      // `visibleTo` rule, not a second copy of it.
-      const sceneVisible =
-        pose === null
-          ? targets
-          : targets.filter((target) => seesScene(state, target.audience, pose.sceneId));
-      drop('hidden-scene', targets.length - sceneVisible.length);
-
-      const visibleTargets = sceneVisible.filter((target) => {
+      // First by scene: a target that cannot see a scene the message names never learns the frame.
+      const sceneTargets = targets.filter((target) =>
+        seesEveryScene(state, target.audience, scenesNamed),
+      );
+      drop('hidden-scene', targets.length - sceneTargets.length);
+      // Then by entity, within the scenes they can see.
+      const visibleTargets = sceneTargets.filter((target) => {
         for (const ref of refs) {
           const entity = state.scenes[ref.sceneId]?.entities[ref.entityId];
           if (entity === undefined) return false;
@@ -323,7 +366,7 @@ export function createEphemeralRelay(
         }
         return true;
       });
-      drop('hidden-entity', sceneVisible.length - visibleTargets.length);
+      drop('hidden-entity', sceneTargets.length - visibleTargets.length);
 
       // CAM-06: an ordinary pose is the DM's own camera moving, not an instruction to anyone. Only
       // a spectator that chose to follow uses it, so it is never handed to a player — where the DM
