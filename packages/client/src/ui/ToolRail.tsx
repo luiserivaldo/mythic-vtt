@@ -17,12 +17,19 @@ const GLYPHS: Readonly<Record<string, string>> = {
   cursor: '↖',
   hand: '✥',
   ruler: '⟷',
+  pen: '✎',
   cube: '▣',
   list: '☰',
 };
 
 /** Hint shown beside the placeholder so nobody mistakes it for a working tool. */
 const WIP_NOTE = 'Work in progress';
+
+/** Tooltips that say what a tool does beyond its label. */
+const TOOL_TITLES: Readonly<Record<string, string>> = {
+  measure: 'Measure (R). Drag for a quick measure; click for waypoints; Esc clears',
+  draw: 'Draw. Drag to draw a freehand line; Esc leaves the tool',
+};
 
 /**
  * UI-TOOL-01..07: the vertical tool rail (Select, Pan, Measure, Create Prop, Initiative).
@@ -48,14 +55,19 @@ export function ToolRail() {
   // Enable Interaction is a per-seat switch; the host and seat-less viewers are never switched off.
   const interactionEnabled = isHost || seat === undefined || seat.interactionEnabled !== false;
 
-  // PERM-05: the scene's own measure toggle still applies to seats the registry would allow.
-  const measureReason = useMemo(() => {
+  // PERM-05: each scene's own toggles still apply to seats the registry would allow.
+  const sceneReasons = useMemo<Record<string, string | undefined>>(() => {
     const sceneId = viewed?.activeSceneId;
-    if (!viewed || !sceneId || isHost) return undefined;
+    if (!viewed || !sceneId || isHost) return {};
     const actor: Actor = seatId !== null ? { kind: 'seat', seatId } : { kind: 'seat' };
-    return canUseSceneToggle(viewed, actor, sceneId, 'measure')
-      ? undefined
-      : 'Measuring is disabled in this scene';
+    return {
+      measure: canUseSceneToggle(viewed, actor, sceneId, 'measure')
+        ? undefined
+        : 'Measuring is disabled in this scene',
+      draw: canUseSceneToggle(viewed, actor, sceneId, 'draw')
+        ? undefined
+        : 'Drawing is disabled in this scene',
+    };
   }, [viewed, isHost, seatId]);
 
   const states = useMemo(
@@ -65,11 +77,12 @@ export function ToolRail() {
         permissions,
         readOnly,
         interactionEnabled,
-        sceneReasons: { measure: measureReason },
+        sceneReasons,
       }),
-    [role, permissions, readOnly, interactionEnabled, measureReason],
+    [role, permissions, readOnly, interactionEnabled, sceneReasons],
   );
   const measureUsable = states.find((state) => state.id === 'measure')?.enabled === true;
+  const drawUsable = states.find((state) => state.id === 'draw')?.enabled === true;
   const activeId = measuring ? 'measure' : resolveActiveTool(states, requested);
 
   // A tool that stops being usable (interaction switched off, seat permissions changed) must not
@@ -78,6 +91,13 @@ export function ToolRail() {
   useEffect(() => {
     if (measuring && !measureUsable) activateMeasurement(null);
   }, [measuring, measureUsable]);
+
+  // PERM-05: turning a scene's Draw toggle off disarms the tool for a player, mid-stroke or not.
+  useEffect(() => {
+    if (!drawUsable && activeToolStore.getState().tool === 'draw') {
+      activeToolStore.getState().setTool(resolveActiveTool(states, 'select'));
+    }
+  }, [drawUsable, states]);
 
   const choose = (id: string) => {
     if (id === 'measure') {
@@ -112,11 +132,7 @@ export function ToolRail() {
         const pressed = activeId === tool.id;
         const hintId = `rail-reason-${tool.id}`;
         const hint = tool.reason ?? (tool.wip ? WIP_NOTE : undefined);
-        const title =
-          tool.reason ??
-          (tool.id === 'measure'
-            ? 'Measure (R). Drag for a quick measure; click for waypoints; Esc clears'
-            : tool.label);
+        const title = tool.reason ?? TOOL_TITLES[tool.id] ?? tool.label;
         return (
           <Fragment key={tool.id}>
             {tool.dividerBefore && <hr className="ui-rail-divider" />}

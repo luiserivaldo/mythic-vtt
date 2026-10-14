@@ -23,17 +23,18 @@ const by = (states: ReturnType<typeof railToolStates>, id: string) => {
 };
 
 describe('tool rail states', () => {
-  it('lists the five alpha tools in order, grouped with dividers, and nothing else', () => {
+  it('lists the six alpha tools in order, grouped with dividers, and nothing else', () => {
     const states = railToolStates({ ...base, role: 'host', permissions: null });
     expect(states.map((s) => s.id)).toEqual([
       'select',
       'pan',
       'measure',
+      'draw',
       'create-prop',
       'initiative',
     ]);
-    expect(states.map((s) => s.dividerBefore)).toEqual([false, false, true, true, true]);
-    for (const hidden of ['draw', 'pin', 'lighting', 'fog'])
+    expect(states.map((s) => s.dividerBefore)).toEqual([false, false, true, false, true, true]);
+    for (const hidden of ['pin', 'lighting', 'fog'])
       expect(states.some((s) => s.id === hidden)).toBe(false);
   });
 
@@ -67,7 +68,7 @@ describe('tool rail states', () => {
         permissions: perms({ edit: true }),
         interactionEnabled: false,
       });
-      expect(states).toHaveLength(5);
+      expect(states).toHaveLength(6);
       for (const state of states) {
         expect(state.enabled).toBe(false);
         expect(state.reason).toBe(INTERACTION_OFF_REASON);
@@ -78,7 +79,7 @@ describe('tool rail states', () => {
   it('lets a spectator pan but gives every other tool a spectator reason', () => {
     const states = railToolStates({ ...base, role: 'observer', permissions: null });
     expect(by(states, 'pan').enabled).toBe(true);
-    for (const id of ['select', 'measure', 'create-prop'])
+    for (const id of ['select', 'measure', 'draw', 'create-prop'])
       expect(by(states, id)).toMatchObject({ enabled: false, reason: SPECTATOR_REASON });
   });
 
@@ -90,9 +91,10 @@ describe('tool rail states', () => {
       readOnly: true,
     });
     expect(by(states, 'pan').enabled).toBe(true);
-    for (const id of ['select', 'measure', 'create-prop'])
+    for (const id of ['select', 'measure', 'draw', 'create-prop'])
       expect(by(states, id).enabled).toBe(false);
     expect(by(states, 'measure').reason).toBe(READ_ONLY_REASON);
+    expect(by(states, 'draw').reason).toBe(READ_ONLY_REASON);
     expect(by(states, 'initiative').enabled).toBe(true);
   });
 
@@ -107,6 +109,29 @@ describe('tool rail states', () => {
       enabled: false,
       reason: 'Measuring is disabled in this scene',
     });
+  });
+
+  it('disables Draw, with its own reason, when a seat may not view the board', () => {
+    const states = railToolStates({
+      ...base,
+      role: 'player',
+      permissions: perms({ view: false, move: true }),
+    });
+    expect(by(states, 'draw')).toMatchObject({ enabled: false, reason: 'Your seat cannot draw' });
+  });
+
+  it('lets the scene Draw toggle disable Draw, and leaves the host exempt', () => {
+    const reason = 'Drawing is disabled in this scene';
+    const player = railToolStates({
+      ...base,
+      role: 'player',
+      permissions: perms(),
+      sceneReasons: { draw: reason },
+    });
+    expect(by(player, 'draw')).toMatchObject({ enabled: false, reason });
+    // PERM-05: the host never sees a scene-level reason, so the toggle cannot lock them out.
+    const host = railToolStates({ ...base, role: 'host', permissions: null, sceneReasons: {} });
+    expect(by(host, 'draw').enabled).toBe(true);
   });
 
   it('always gives a disabled tool a reason', () => {
