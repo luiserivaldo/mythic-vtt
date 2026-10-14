@@ -200,3 +200,76 @@ test('the host gates a player ping on the scene pins toggle and rate-limits a fl
     await table.stop();
   }
 });
+
+test('a ping on a DM-only scene reaches the DM only, never a player or a spectator', async () => {
+  test.setTimeout(60_000);
+  const table = await startTable();
+  const publicScene = testUlid('SCENE', 3);
+  const prepScene = testUlid('SCENE', 4);
+  const seatId = testUlid('SEAT', 3);
+  const hostId = testUlid('HOST', 3);
+  const viewerId = testUlid('VIEWER', 3);
+  const clients: RawClient[] = [];
+  try {
+    const host = await RawClient.connect(table, {
+      name: 'leak-host',
+      identityId: hostId,
+      identitySecret: 'leak-host',
+      hostToken: table.hostToken,
+    });
+    clients.push(host);
+    await host.waitFor('snapshot', () => host.state !== undefined);
+    await ok(host.intent('scene.create', { sceneId: publicScene, name: 'Public' }));
+    await ok(host.intent('scene.create', { sceneId: prepScene, name: 'Prep', dmOnly: true }));
+    await ok(host.intent('scene.activate', { sceneId: publicScene }));
+    await ok(host.intent('seat.create', { seatId, label: 'Pinger' }));
+
+    const player = await RawClient.connect(table, { name: 'leak-player', ...PLAYER });
+    clients.push(player);
+    await player.waitFor('snapshot', () => player.state !== undefined);
+    player.join(seatId);
+    await player.waitFor('seat joined', () =>
+      JSON.stringify(player.state).includes(PLAYER.identityId),
+    );
+
+    // No seat joined: an unseated connection is the shared spectator audience.
+    const spectator = await RawClient.connect(table, {
+      name: 'leak-viewer',
+      identityId: viewerId,
+      identitySecret: 'leak-viewer',
+    });
+    clients.push(spectator);
+    await spectator.waitFor('snapshot', () => spectator.state !== undefined);
+
+    // PERM-03: the DM-only prep scene does not exist for a player or a spectator.
+    expect(JSON.stringify(player.state)).not.toContain(prepScene);
+    expect(JSON.stringify(spectator.state)).not.toContain(prepScene);
+
+    // The DM browses the prep scene (UX-04) and pings it; the relay gives the marker back to the DM.
+    host.ephemeral('ping', { sceneId: prepScene, x: 1, y: 0, z: 1 });
+    await host.waitFor(
+      'the prep ping relayed to the DM',
+      () => framesFrom(host.frames, hostId) === 1,
+    );
+
+    // A control ping on the public scene proves the pipe works. Frames arrive in order on one
+    // WebSocket, so once the public ping is seen the prep ping cannot still be in flight: the
+    // player and spectator have exactly one ping from the DM, and it is the public one.
+    host.ephemeral('ping', { sceneId: publicScene, x: 2, y: 0, z: 2 });
+    await player.waitFor(
+      'the public ping reached the player',
+      () => framesFrom(player.frames, hostId) === 1,
+    );
+    await spectator.waitFor(
+      'the public ping reached the spectator',
+      () => framesFrom(spectator.frames, hostId) === 1,
+    );
+    expect(framesFrom(player.frames, hostId)).toBe(1);
+    expect(framesFrom(spectator.frames, hostId)).toBe(1);
+    expect(player.frames.join('\n')).not.toContain(prepScene);
+    expect(spectator.frames.join('\n')).not.toContain(prepScene);
+  } finally {
+    await Promise.all(clients.map((client) => client.close()));
+    await table.stop();
+  }
+});

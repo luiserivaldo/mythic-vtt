@@ -34,14 +34,6 @@ const SCENE = testUlid('SCENE', 1);
 
 /** Default 40x30 scene: the board centres on cell (20, 15) at one cell per scene unit. */
 async function cellToPixel(page: Page) {
-  // r3f gives the canvas its real frame only after its first measure; measuring the browser's
-  // 300x150 default would put every cell in the wrong place, however often the click is retried.
-  await expect
-    .poll(async () => {
-      const box = await page.locator('canvas').boundingBox();
-      return box === null ? 0 : Math.min(box.width, box.height);
-    })
-    .toBeGreaterThan(200);
   const box = await page.locator('canvas').boundingBox();
   if (!box) throw new Error('no canvas box');
   const zoom = Math.min(box.width / 42, box.height / 32);

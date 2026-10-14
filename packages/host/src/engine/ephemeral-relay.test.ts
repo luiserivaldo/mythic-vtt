@@ -131,6 +131,52 @@ describe('ephemeral relay', () => {
     expect(watcher.received).toHaveLength(4);
   });
 
+  it('filters a ping by scene visibility per recipient: a hidden scene id and its coordinates never leak', () => {
+    const state = fixtureCampaign();
+    const coDmSeat = state.seats[T.coDm];
+    const active = state.scenes[T.scene];
+    if (!coDmSeat || !active) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    // A DM-only prep scene the DM is browsing (UX-04): it does not exist for players or spectators,
+    // even with its `pins` toggle open.
+    state.scenes[T.newScene] = {
+      ...active,
+      id: T.newScene,
+      name: 'Prep',
+      dmOnly: true,
+      playerToggles: { pins: true },
+    };
+
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const alice = fakeConnection(T.alice);
+    const spectator = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000);
+    const ping = (sceneId: string) => ({
+      t: 'ephemeral' as const,
+      channel: PING_CHANNEL,
+      data: { sceneId, x: 2.5, y: 0, z: 3.25 },
+    });
+
+    relay.relay(host, ping(T.newScene), state, recipients(state, [host, coDm, alice, spectator]));
+
+    // The DM and co-DM see the DM-only scene and get the marker; players and spectators get
+    // nothing at all — neither the hidden scene's id nor the pinged coordinates reach them.
+    expect(host.received).toHaveLength(1);
+    expect(coDm.received).toHaveLength(1);
+    expect(alice.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({ relayed: 2, dropped: { 'hidden-scene': 2 } });
+    const nonDmWire = alice.wire() + spectator.wire();
+    expect(nonDmWire).not.toContain(T.newScene);
+    expect(nonDmWire).not.toContain('3.25');
+
+    // A player cannot originate a ping naming a scene they cannot see, even with the toggle open.
+    relay.relay(alice, ping(T.newScene), state, recipients(state, [host]));
+    expect(host.received).toHaveLength(1);
+    expect(relay.stats().dropped.forbidden).toBe(1);
+  });
+
   it('rate-limits a ping flood per connection before relaying it', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];
