@@ -95,7 +95,7 @@ export const railTools = createRegistry<RailTool>([
     id: 'initiative',
     label: 'Initiative',
     icon: 'list',
-    group: 'planned',
+    group: 'encounter',
     allowed: everyone,
     panel: 'initiative',
   },

@@ -54,6 +54,40 @@ function fixture() {
 const spectator: Audience = { kind: 'spectators' };
 
 describe('history projection', () => {
+  it('projects public turn indices and omits a private active turn from history', () => {
+    const f = fixture();
+    f.apply('entity.create', {
+      sceneId: IDS.scene,
+      entity: makeEntity(IDS.other, {
+        name: 'Private combatant',
+        layer: 'dm',
+        token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+      }),
+    });
+    const order = [IDS.other, IDS.entity];
+    f.apply('initiative.set', {
+      sceneId: IDS.scene,
+      initiative: { round: 2, order, activeEntityId: IDS.entity },
+    });
+    f.apply('token.move', { sceneId: IDS.scene, entityId: IDS.entity, to: { x: 2, y: 0, z: 0 } });
+    const entry = f.log.at(-1);
+    if (!entry) throw new Error('missing log entry');
+    entry.envelope.turn = 2;
+    const page = (audience: Audience) =>
+      historyPage(f.state, f.log.length, f.log, audience, { limit: 1 });
+    expect(page({ kind: 'host' }).entries[0]).toMatchObject({ round: 2, turn: 2 });
+    expect(page(spectator).entries[0]).toMatchObject({ round: 2, turn: 1 });
+    expect(page({ kind: 'seat', seatId: IDS.owner }).entries[0]).toMatchObject({ turn: 1 });
+    expect(JSON.stringify(page(spectator))).not.toMatch(/Private combatant/);
+    f.apply('initiative.set', {
+      sceneId: IDS.scene,
+      initiative: { round: 2, order, activeEntityId: IDS.other },
+    });
+    f.apply('token.move', { sceneId: IDS.scene, entityId: IDS.entity, to: { x: 3, y: 0, z: 0 } });
+    expect(page({ kind: 'host' }).entries[0]).toMatchObject({ round: 2, turn: 1 });
+    expect(page(spectator).entries[0]).not.toHaveProperty('turn');
+    expect(page({ kind: 'seat', seatId: IDS.owner }).entries[0]).not.toHaveProperty('turn');
+  });
   it('browses diffs in reverse order with seat/entity filters and stable pagination', () => {
     const f = fixture();
     const page = historyPage(f.state, 2, f.log, spectator, { limit: 1 });

@@ -28,7 +28,7 @@ function projection(
   latestEntities: ReadonlyMap<string, Entity>,
   work?: { projectedEntities: number },
   includeSeats = false,
-): unknown {
+): { scenes: Campaign['scenes']; [key: string]: unknown } {
   const seat = audience.kind === 'seat' ? current.seats[audience.seatId] : undefined;
   const filtered = visibleTo(audience, { ...state, seats: current.seats });
   const scenes: Campaign['scenes'] = {};
@@ -204,6 +204,43 @@ function touchesEntity(paths: readonly Patch['path'][], id: string): boolean {
   );
 }
 
+/** HIST-05 / PERM-03: history must not expose the private roster's turn index. */
+function turnContext(
+  state: Campaign,
+  current: Campaign,
+  audience: Audience,
+  latestEntities: ReadonlyMap<string, Entity>,
+  envelope: LogEntry['envelope'],
+): { round?: number; turn?: number } {
+  if (envelope.round === undefined && envelope.turn === undefined) return {};
+  const payload = envelope.payload;
+  const sceneId =
+    typeof payload === 'object' &&
+    payload !== null &&
+    'sceneId' in payload &&
+    typeof payload.sceneId === 'string'
+      ? payload.sceneId
+      : (envelope.sceneId ?? state.activeSceneId);
+  const scene = sceneId ? state.scenes[sceneId] : undefined;
+  if (audience.kind === 'host' || !scene?.initiative)
+    return {
+      ...(envelope.round !== undefined ? { round: envelope.round } : {}),
+      ...(envelope.turn !== undefined ? { turn: envelope.turn } : {}),
+    };
+  // Project only the bounded roster, using current visibility as well as historical visibility.
+  const entities = Object.fromEntries(
+    scene.initiative.order.flatMap((id) => (scene.entities[id] ? [[id, scene.entities[id]]] : [])),
+  );
+  const view = projection(
+    { ...state, scenes: { [scene.id]: { ...scene, entities } } },
+    current,
+    audience,
+    latestEntities,
+  ).scenes[scene.id]?.initiative;
+  const turn = view?.activeEntityId ? view.order.indexOf(view.activeEntityId) + 1 : 0;
+  return view ? { round: view.round, ...(turn > 0 ? { turn } : {}) } : {};
+}
+
 export interface HistoryScan {
   page: HistoryPage;
   checkpoint: Campaign;
@@ -300,8 +337,7 @@ export function scanHistory(
             type: envelope.type,
             ts: envelope.ts,
             ...(envelope.actor.seatId ? { seatId: envelope.actor.seatId } : {}),
-            ...(envelope.round !== undefined ? { round: envelope.round } : {}),
-            ...(envelope.turn !== undefined ? { turn: envelope.turn } : {}),
+            ...turnContext(draft, current, audience, latestEntities, envelope),
             changes,
           });
       }

@@ -1,3 +1,4 @@
+import { Initiative } from './initiative.js';
 import { SceneOverlay } from './scene-overlay.js';
 import { z } from 'zod';
 import { AssetRef } from './asset.js';
@@ -76,6 +77,7 @@ export const Scene = z.object({
   entities: z.record(Id, Entity),
   overlay: SceneOverlay.optional(),
   playerToggles: ScenePlayerToggles.optional(),
+  initiative: Initiative.optional(),
   maxLastingAoEsPerPlayer: LastingAoELimit.optional(),
 });
 export type Scene = z.infer<typeof Scene>;

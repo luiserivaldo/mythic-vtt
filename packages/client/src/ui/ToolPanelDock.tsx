@@ -16,8 +16,9 @@ import { toolPanelLayoutStore, type ToolPanelId } from './tool-panel-layout.js';
 import { isReadOnlyViewer } from './viewer.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { RulerPanel } from './RulerPanel.js';
+import { CreatePropPanel } from './RailPanels.js';
+import { InitiativeTools } from './InitiativeTools.js';
 import { seeSheet } from './sheet-panel.js';
-import { CreatePropPanel, InitiativePanel } from './RailPanels.js';
 import { DrawPanel } from './DrawPanel.js';
 
 const TransformPanel3D = lazy(async () => {
@@ -109,7 +110,7 @@ export function ToolPanelDock({
   const showCreateProp = scene !== null && !measuring && activeTool === 'create-prop';
   const showDraw = scene !== null && !measuring && activeTool === 'draw';
   const showInitiative = !measuring && activeTool === 'initiative';
-  // Read-only viewers get no editing panels, only the Initiative placeholder.
+  // Read-only viewers get no editing panels, the read-only initiative tracker.
   if (!container) return null;
   if (
     (readOnly ||
@@ -121,7 +122,7 @@ export function ToolPanelDock({
     return createPortal(
       <aside className="ui-tool-dock" aria-label="Tool panels">
         <PanelFrame id="initiative" label="Initiative" collapsed={collapsed.initiative}>
-          <InitiativePanel />
+          <InitiativeTools />
         </PanelFrame>
       </aside>,
       container,
@@ -141,7 +142,7 @@ export function ToolPanelDock({
       )}
       {showInitiative && (
         <PanelFrame id="initiative" label="Initiative" collapsed={collapsed.initiative}>
-          <InitiativePanel />
+          <InitiativeTools />
         </PanelFrame>
       )}
       {showTransform && (

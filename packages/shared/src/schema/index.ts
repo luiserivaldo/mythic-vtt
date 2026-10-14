@@ -12,3 +12,4 @@ export * from './scene-overlay.js';
 export * from './prefab.js';
 
 export { blankScene } from './blank-scene.js';
+export * from './initiative.js';

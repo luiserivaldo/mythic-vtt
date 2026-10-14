@@ -73,6 +73,13 @@ export function patchesFor(
       key === 'entities' &&
       typeof entityId === 'string'
     ) {
+      // HIST-05 / PERM-03: roster and current turn depend on combatant visibility.
+      // An entity-only diff cannot remove or restore those references.
+      if (
+        before.scenes[sceneId]?.initiative?.order.includes(entityId) ||
+        after.scenes[sceneId]?.initiative?.order.includes(entityId)
+      )
+        return diffPatchesFor(audience, before, after);
       touched.set(`${sceneId}/${entityId}`, [sceneId, entityId]);
     } else {
       return diffPatchesFor(audience, before, after);

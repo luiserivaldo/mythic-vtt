@@ -8,6 +8,8 @@ import { activeToolStore } from '../tools/active-tool-store.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { activateMeasurement } from '../tools/measurement-tool.js';
 import { rulerStore } from '../tools/ruler-store.js';
+import { dockStore } from './dock-store.js';
+import { toolPanelLayoutStore } from './tool-panel-layout.js';
 import { railToolStates, resolveActiveTool } from './tool-rail.js';
 import { isReadOnlyViewer, viewerRole } from './viewer.js';
 
@@ -103,6 +105,10 @@ export function ToolRail() {
       return;
     }
     activateMeasurement(null);
+    if (id === 'initiative') {
+      toolPanelLayoutStore.getState().restore('initiative');
+      if (dockStore.getState().collapsed) dockStore.getState().toggleCollapsed();
+    }
     activeToolStore.getState().setTool(id);
   };
 
@@ -133,6 +139,7 @@ export function ToolRail() {
             <button
               type="button"
               className="ui-rail-tool"
+              id={`rail-tool-${tool.id}`}
               aria-pressed={pressed}
               aria-disabled={tool.enabled ? undefined : true}
               aria-describedby={hint ? hintId : undefined}

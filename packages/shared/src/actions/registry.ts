@@ -1,3 +1,5 @@
+import { initiativeSet } from './initiative.set.js';
+import { initiativeAdvance } from './initiative.advance.js';
 import { seatArchive } from './seat.archive.js';
 import { tokenSetQuickField } from './token.setQuickField.js';
 import { historyUndo } from './history.undo.js';
@@ -69,6 +71,8 @@ export const allActions: readonly AnyAction[] = [
   sceneDelete,
   tokenSetFlying,
   sceneSetPlayerToggles,
+  initiativeSet,
+  initiativeAdvance,
   historyUndo,
   tokenSetQuickField,
   historyRollback,

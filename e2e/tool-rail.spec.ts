@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid } from './harness.js';
 
 // UX-15 (UI-TOOL-01..07): the left tool rail lists Select, Pan, Measure, Draw, Create Prop and the
-// Initiative placeholder. A tool a seat may not use stays on the rail, disabled with a reason;
+// Initiative tracker. A tool a seat may not use stays on the rail, disabled with a reason;
 // switching a seat's Enable Interaction off disables every tool.
 // LAY-05 (M4-13) adds Draw, the slot UI-TOOL-06 reserved for a later milestone: the rail takes it
 // as one registry entry, and the never-hide rule holds for it exactly as for the alpha tools.
@@ -51,21 +51,12 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     // Pin, Lighting and Fog are still unimplemented (UI-TOOL-06), so they are not on the rail at all.
     for (const absent of ['Pin', 'Lighting', 'Fog']) await expect(rail(dm, absent)).toHaveCount(0);
 
-    // UI-TOOL-05: Initiative is a greyed, labelled placeholder. It reads as inactive but stays
-    // clickable, and using it opens a mock panel with nothing to operate.
-    const initiative = rail(dm, 'Initiative');
-    await expect(initiative).toContainText('WIP');
-    await expect(initiative).not.toHaveAttribute('aria-disabled', 'true');
-    await expect(initiative).toHaveCSS('color', 'rgb(186, 201, 216)');
-    await expect(initiative).toHaveCSS('border-style', 'dashed');
-    // Nothing is open until the entry is used.
-    await expect(dm.getByRole('complementary', { name: 'Tool panels' })).toHaveCount(0);
-    await initiative.click();
-    const mock = dm.getByRole('region', { name: 'Initiative' });
-    await expect(mock).toContainText('WIP');
-    await expect(mock).toContainText('coming soon');
-    // A mock panel: nothing in it can be operated.
-    await expect(mock.locator('button, input, select, textarea, form')).toHaveCount(0);
+    // Initiative opens the real tracker in the dock.
+    await expect(rail(dm, 'Initiative')).not.toContainText('WIP');
+    await rail(dm, 'Initiative').click();
+    await expect(dm.getByRole('region', { name: 'Rounds and initiative' })).toContainText(
+      'Round 1',
+    );
 
     // Pan is its own active tool; Measure arms the ruler and takes the rail over.
     await rail(dm, 'Pan').click();
@@ -142,8 +133,8 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     // The scene toggle is still on, so Draw comes back with the rest.
     await expect(rail(player, 'Draw')).not.toHaveAttribute('aria-disabled', 'true');
 
-    // UI-TOOL-05: a spectator may open the same placeholder, and it opens only when the entry is
-    // used — a read-only viewer still gets no editing panels of their own.
+    // A spectator may open the same tracker, and it opens only when the entry is used — a
+    // read-only viewer still gets no editing panels of their own.
     const spectatorContext = await browser.newContext();
     try {
       const spectator = await spectatorContext.newPage();
@@ -152,12 +143,12 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
       await spectator.getByRole('button', { name: 'Continue', exact: true }).click();
       await spectator.getByRole('button', { name: 'Join as spectator' }).click();
       await expect(spectator.getByRole('dialog')).toHaveCount(0);
-      await expect(spectator.getByRole('region', { name: 'Initiative' })).toHaveCount(0);
+      await expect(spectator.getByRole('region', { name: 'Rounds and initiative' })).toHaveCount(0);
       const watcherRail = rail(spectator, 'Initiative');
       await expect(watcherRail).not.toHaveAttribute('aria-disabled', 'true');
       await watcherRail.click();
-      await expect(spectator.getByRole('region', { name: 'Initiative' })).toContainText(
-        'coming soon',
+      await expect(spectator.getByRole('region', { name: 'Rounds and initiative' })).toContainText(
+        'Round 1',
       );
     } finally {
       await spectatorContext.close();

@@ -38,10 +38,10 @@ describe('tool rail states', () => {
       expect(states.some((s) => s.id === hidden)).toBe(false);
   });
 
-  it('enables everything for the host except nothing; Initiative is a WIP placeholder', () => {
+  it('enables every implemented tool for the host', () => {
     const states = railToolStates({ ...base, role: 'host', permissions: null });
     expect(states.every((s) => s.enabled)).toBe(true);
-    expect(by(states, 'initiative').wip).toBe(true);
+    expect(by(states, 'initiative').wip).toBe(false);
     expect(by(states, 'select').wip).toBe(false);
   });
 

@@ -18,7 +18,13 @@ export const entityDelete = defineAction({
   },
   reduce: (draft, a) => {
     const scene = draft.scenes[a.payload.sceneId];
-    if (scene) Reflect.deleteProperty(scene.entities, a.payload.entityId);
+    if (!scene) return;
+    Reflect.deleteProperty(scene.entities, a.payload.entityId);
+    if (scene.initiative) {
+      scene.initiative.order = scene.initiative.order.filter((id) => id !== a.payload.entityId);
+      if (scene.initiative.activeEntityId === a.payload.entityId)
+        scene.initiative.activeEntityId = null;
+    }
   },
   modExposed: false,
 });
