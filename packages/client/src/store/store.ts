@@ -97,10 +97,7 @@ function project(
   return {
     campaign: source ? visibleTo(audience, source) : null,
     isHost: false,
-    // UX-14: the preview acts as the audience it shows. A seat preview is that seat, and an M4-02
-    // spectator audience that follows a player seat resolves to that seat above, so its label and
-    // selection rules read exactly as the seat's do. A seat-less audience stays seat-less (PERM-03).
-    seatId: audience.kind === 'seat' ? audience.seatId : null,
+    seatId: viewAs.kind === 'seat' ? viewAs.seatId : null,
     viewAs,
   };
 }
