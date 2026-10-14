@@ -163,3 +163,15 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
     return view;
   });
 }
+
+/**
+ * PERM-03 / LAY-05: whether an audience may see a scene at all. `visibleTo` omits every scene a
+ * viewer cannot see — a player or spectator knows only the active, non-DM-only one, while the host
+ * and co-DM seats keep them all — so this is the one source of truth for "does this scene exist for
+ * them". The ephemeral relay uses it to keep a hidden scene's id and coordinates off the wire
+ * (M4-14 pings, and every other channel whose data names a scene) instead of copying the rule.
+ * A scene the campaign does not hold is never seen, by anyone.
+ */
+export function seesScene(state: Campaign, audience: Audience, sceneId: string): boolean {
+  return visibleTo(audience, state).scenes[sceneId] !== undefined;
+}

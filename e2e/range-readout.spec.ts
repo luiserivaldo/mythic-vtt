@@ -192,12 +192,16 @@ test('the selected token reads the range to a hovered token in 2D and 3D', async
   await expect(dm.getByTestId('range-readout')).toHaveCount(0);
 
   // MEAS-05 is a local readout: a viewer that cannot select sees none of it, and — unlike the
-  // shared M3-06 ruler — hovering broadcasts no ephemeral at all.
+  // shared M3-06 ruler — hovering broadcasts no ephemeral at all. CAM-06's camera link streams its
+  // own `camera.pose` frames (a heartbeat, plus every DM move), so this ignores that channel and
+  // checks that the readout adds no traffic of its own.
   await expect(viewer.page.getByTestId('range-readout')).toHaveCount(0);
-  const channels = frames.flatMap((raw) => {
-    const frame = JSON.parse(raw) as { channel?: unknown };
-    return typeof frame.channel === 'string' ? [frame.channel] : [];
-  });
+  const channels = frames
+    .flatMap((raw) => {
+      const frame = JSON.parse(raw) as { channel?: unknown };
+      return typeof frame.channel === 'string' ? [frame.channel] : [];
+    })
+    .filter((channel) => channel !== 'camera.pose');
   expect(channels).toEqual([]);
   expect(errors).toEqual([]);
 
