@@ -197,8 +197,8 @@ describe('aoe.persist', () => {
         if (seat) seat.permissions.view = false;
       },
       (state: ReturnType<typeof stateWithSource>) => {
-        const scene = state.scenes[IDS.scene];
-        if (scene) scene.playerToggles = { measure: false };
+        const seat = state.seats[IDS.owner];
+        if (seat) seat.tools = { measure: false, draw: false, pins: false };
       },
       (state: ReturnType<typeof stateWithSource>) => {
         const scene = state.scenes[IDS.scene];

@@ -95,15 +95,13 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     await expect(rail(player, 'Draw')).toHaveAttribute('aria-disabled', 'true');
     await expect(rail(player, 'Draw')).toHaveAttribute(
       'title',
-      'Drawing is disabled in this scene',
+      'The DM has turned off Draw for your seat',
     );
     await rail(player, 'Draw').click({ force: true });
     await expect(player.getByRole('region', { name: 'Draw tool' })).toHaveCount(0);
 
-    // PERM-05: the DM opens the scene's Draw toggle, and the player's tool becomes usable.
-    expect(
-      (await setup.intent('scene.setPlayerToggles', { sceneId, toggles: { draw: true } })).t,
-    ).toBe('ack');
+    // UI-SEAT-02: the DM turns Draw on for this seat, and the player's tool becomes usable.
+    expect((await setup.intent('seat.update', { seatId, tools: { draw: true } })).t).toBe('ack');
     await expect(rail(player, 'Draw')).not.toHaveAttribute('aria-disabled', 'true');
     await rail(player, 'Draw').click();
     await expect(rail(player, 'Draw')).toHaveAttribute('aria-pressed', 'true');
@@ -124,7 +122,7 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     }
     expect((await setup.intent('seat.update', { seatId, interactionEnabled: true })).t).toBe('ack');
     await expect(rail(player, 'Select')).not.toHaveAttribute('aria-disabled', 'true');
-    // The scene toggle is still on, so Draw comes back with the rest.
+    // The seat's Draw tool is still on, so Draw comes back with the rest.
     await expect(rail(player, 'Draw')).not.toHaveAttribute('aria-disabled', 'true');
 
     // A spectator may open the same tracker, and it opens only when the entry is used — a

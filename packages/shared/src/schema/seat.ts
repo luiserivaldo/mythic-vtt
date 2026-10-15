@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Id } from './ids.js';
-import { SeatPermissions } from './permissions.js';
+import { SeatPermissions, SeatTools } from './permissions.js';
 
 /** UX-44: content-addressed image (same sha256 key as `/assets/:hash` and the image limits). */
 export const ImageHash = z
@@ -21,6 +21,11 @@ export const Seat = z.object({
   identityId: Id.nullable(),
   role: z.enum(['player', 'codm']),
   permissions: SeatPermissions,
+  /**
+   * UI-SEAT-02 (UX-46, save v11): the board tools this seat may use; absent means the Player
+   * template's (`DEFAULT_SEAT_TOOLS`). Ignored for co-DM seats, which may use every tool.
+   */
+  tools: SeatTools.optional(),
   interactionEnabled: z.boolean().optional(),
   /** SES-03/05: retained for history; archived seats have no access or ownership. */
   archived: z.boolean().optional(),

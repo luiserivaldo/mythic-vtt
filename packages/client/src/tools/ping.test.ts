@@ -53,21 +53,21 @@ describe('ping point (LAY-05)', () => {
 });
 
 describe('who may ping (PERM-05)', () => {
-  it('follows the scene pins toggle: players need it open, host and co-DM are exempt', () => {
+  it("follows the seat's pins tool: players need it on, host and co-DM are exempt", () => {
     const campaign = makeCampaign();
-    const scene = campaign.scenes[IDS.scene];
-    if (!scene) throw new Error('fixture');
+    const owner = campaign.seats[IDS.owner];
+    if (!owner) throw new Error('fixture');
 
-    // `pins` is opt-in, so a scene that predates the toggles denies players.
-    expect(scene.playerToggles).toBeUndefined();
+    // `pins` is opt-in in the Player template, so a seat without stored tools may not ping.
+    expect(owner.tools).toBeUndefined();
     expect(canPing(campaign, { isHost: false, seatId: IDS.owner }, IDS.scene)).toBe(false);
     expect(canPing(campaign, { isHost: true, seatId: null }, IDS.scene)).toBe(true);
     expect(canPing(campaign, { isHost: false, seatId: IDS.coDm }, IDS.scene)).toBe(true);
 
-    scene.playerToggles = { pins: true };
+    owner.tools = { measure: true, draw: false, pins: true };
     expect(canPing(campaign, { isHost: false, seatId: IDS.owner }, IDS.scene)).toBe(true);
 
-    scene.playerToggles = { pins: false };
+    owner.tools = { measure: true, draw: false, pins: false };
     expect(canPing(campaign, { isHost: false, seatId: IDS.owner }, IDS.scene)).toBe(false);
     expect(canPing(campaign, { isHost: true, seatId: null }, IDS.scene)).toBe(true);
     expect(canPing(campaign, { isHost: false, seatId: IDS.coDm }, IDS.scene)).toBe(true);
@@ -75,9 +75,9 @@ describe('who may ping (PERM-05)', () => {
 
   it('denies a seat-less spectator, an unknown scene and a client with no campaign', () => {
     const campaign = makeCampaign();
-    const scene = campaign.scenes[IDS.scene];
-    if (!scene) throw new Error('fixture');
-    scene.playerToggles = { pins: true };
+    const owner = campaign.seats[IDS.owner];
+    if (!owner) throw new Error('fixture');
+    owner.tools = { measure: true, draw: false, pins: true };
     expect(canPing(campaign, { isHost: false, seatId: null }, IDS.scene)).toBe(false);
     expect(canPing(campaign, { isHost: false, seatId: IDS.owner }, IDS.other)).toBe(false);
     expect(canPing(campaign, { isHost: true, seatId: null }, IDS.other)).toBe(false);
@@ -85,12 +85,11 @@ describe('who may ping (PERM-05)', () => {
     expect(canPing(campaign, { isHost: true, seatId: null }, null)).toBe(false);
   });
 
-  it('still applies the seat-level Enable Interaction switch on top of an open toggle', () => {
+  it('still applies the seat-level Enable Interaction switch on top of the pins tool', () => {
     const campaign = makeCampaign();
-    const scene = campaign.scenes[IDS.scene];
     const owner = campaign.seats[IDS.owner];
-    if (!scene || !owner) throw new Error('fixture');
-    scene.playerToggles = { pins: true };
+    if (!owner) throw new Error('fixture');
+    owner.tools = { measure: true, draw: false, pins: true };
     owner.interactionEnabled = false;
     expect(canPing(campaign, { isHost: false, seatId: IDS.owner }, IDS.scene)).toBe(false);
     expect(canPing(campaign, { isHost: true, seatId: null }, IDS.scene)).toBe(true);

@@ -1,10 +1,10 @@
-import type { SeatPermissions } from '@mythic/shared';
+import type { SeatPermissions, SeatTool } from '@mythic/shared';
 import { railTools } from './registries.js';
 import type { ViewerRole } from './viewer.js';
 
 // UI-TOOL-07 (PERM-05): a tool a seat may not use is disabled with a reason, never hidden. The
-// registry says who may use a tool; this adds the seat's Enable Interaction switch and any
-// scene-level reason, and works out the wording. Nothing here is authority: the host re-checks
+// registry says who may use a tool; this adds the seat's Enable Interaction switch and the seat's
+// own tool permissions (UI-SEAT-02), and works out the wording. Nothing here is authority: the host re-checks
 // every intent.
 
 export interface RailToolState {
@@ -29,8 +29,8 @@ export interface RailInput {
   readOnly?: boolean;
   /** The viewer's seat has Enable Interaction on (always true for the host and seat-less viewers). */
   interactionEnabled: boolean;
-  /** Scene-level reasons by tool id, for tools the registry would otherwise allow. */
-  sceneReasons?: Readonly<Record<string, string | undefined>>;
+  /** Seat-tool reasons by tool id (UI-SEAT-02), for tools the registry would otherwise allow. */
+  toolReasons?: Readonly<Record<string, string | undefined>>;
 }
 
 const DENIED: Readonly<Record<string, string>> = {
@@ -43,6 +43,13 @@ const DENIED: Readonly<Record<string, string>> = {
 export const INTERACTION_OFF_REASON = 'Interaction is turned off for your seat';
 export const SPECTATOR_REASON = 'Spectators can only look around';
 export const READ_ONLY_REASON = 'Your seat is view-only';
+
+/** UI-TOOL-07 / UI-SEAT-02 (UX-46): why a seat tool is off. The DM sets it per seat in Seats. */
+export const SEAT_TOOL_OFF_REASON: Readonly<Record<SeatTool, string>> = {
+  measure: 'The DM has turned off Measure for your seat',
+  draw: 'The DM has turned off Draw for your seat',
+  pins: 'The DM has turned off Place pins for your seat',
+};
 
 /** Tools that act on the board; a read-only viewer keeps only Pan (and the placeholder). */
 const ACTS_ON_BOARD: ReadonlySet<string> = new Set(['select', 'measure', 'draw', 'create-prop']);
@@ -59,7 +66,7 @@ export function railToolStates(input: RailInput): RailToolState[] {
       reason = input.role === 'observer' ? SPECTATOR_REASON : READ_ONLY_REASON;
     else if (!tool.allowed(input.role, input.permissions))
       reason = input.role === 'observer' ? SPECTATOR_REASON : (DENIED[tool.id] ?? 'Not available');
-    else reason = input.sceneReasons?.[tool.id];
+    else reason = input.toolReasons?.[tool.id];
     return {
       id: tool.id,
       label: tool.label,

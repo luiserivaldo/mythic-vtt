@@ -18,7 +18,7 @@ import {
 
 // LAY-05 (M4-13): freehand drawings live on the effects layer. A drag draws a stroke, the stroke
 // reaches every other client live, its author may erase it and the DM may clear the scene. Whether
-// a player may draw at all is the scene's own Draw toggle (PERM-05); the host re-checks the
+// a player may draw at all is their seat's own Draw tool (UI-SEAT-02); the host re-checks the
 // author of every erase. Drawings are ephemeral: nothing here is an action and nothing is saved.
 
 const COLOUR = '#3b82f6';
@@ -98,8 +98,8 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
     await ok(setup.intent('scene.activate', { sceneId }));
     await ok(setup.intent('seat.create', { seatId, label: 'Drawer' }));
 
-    // A player joins the seat. Scenes default to drawing off for players, so the tool is on the
-    // rail but disabled, with the scene's own reason.
+    // A player joins the seat. The Player template has drawing off, so the tool is on the rail
+    // but disabled, with the seat's own reason (UI-TOOL-07).
     const player = await playerContext.newPage();
     player.on('pageerror', (error) => errors.push(error.message));
     const playerFrames = recordPageFrames(player);
@@ -109,12 +109,12 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
     const draw = player.getByRole('button', { name: 'Draw', exact: true });
     const panel = player.getByRole('region', { name: 'Draw tool' });
     await expect(draw).toHaveAttribute('aria-disabled', 'true');
-    await expect(draw).toHaveAttribute('title', 'Drawing is disabled in this scene');
+    await expect(draw).toHaveAttribute('title', 'The DM has turned off Draw for your seat');
     await draw.click({ force: true });
     await expect(panel).toHaveCount(0);
 
-    // PERM-05: the DM turns drawing on for the scene, and the player's tool becomes usable.
-    await ok(setup.intent('scene.setPlayerToggles', { sceneId, toggles: { draw: true } }));
+    // UI-SEAT-02: the DM turns drawing on for this seat, and the player's tool becomes usable.
+    await ok(setup.intent('seat.update', { seatId, tools: { draw: true } }));
     await expect(draw).not.toHaveAttribute('aria-disabled', 'true');
     await draw.click();
     await expect(draw).toHaveAttribute('aria-pressed', 'true');

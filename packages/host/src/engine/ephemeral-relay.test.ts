@@ -10,12 +10,21 @@ import {
   MAX_DRAW_POINTS,
   MAX_STROKE_SAMPLES,
   PING_CHANNEL,
-  PING_TOGGLE,
+  PING_TOOL,
+  resolveSeatTools,
   simplifyDrawPoints,
+  type Campaign,
+  type SeatTools,
 } from '@mythic/shared';
 import { audienceFor } from './audience.js';
 import { createEphemeralRelay, type EphemeralRecipient } from './ephemeral-relay.js';
 import { T, fakeConnection, fixtureCampaign, tid, type FakeConnection } from './testing.js';
+
+/** UI-SEAT-02 (UX-46): override board tools on every seat, as the DM does per seat. */
+function grantTools(state: Campaign, tools: Partial<SeatTools>): void {
+  for (const seat of Object.values(state.seats))
+    seat.tools = { ...resolveSeatTools(seat), ...tools };
+}
 
 function recipients(
   state: ReturnType<typeof fixtureCampaign>,
@@ -67,7 +76,7 @@ describe('ephemeral relay', () => {
       relay.relay(from, ruler, state, recipients(state, [watcher]));
     };
 
-    scene.playerToggles = { measure: false };
+    grantTools(state, { measure: false });
     send(alice);
     expect(watcher.received).toHaveLength(0);
     expect(relay.stats().dropped.forbidden).toBe(1);
@@ -75,7 +84,7 @@ describe('ephemeral relay', () => {
     send(coDm);
     expect(watcher.received).toHaveLength(2);
 
-    scene.playerToggles = { measure: true };
+    grantTools(state, { measure: true });
     send(alice);
     expect(watcher.received).toHaveLength(3);
     const seat = state.seats[T.seatA];
@@ -321,13 +330,13 @@ describe('ephemeral relay', () => {
       relay.relay(from, ping, state, recipients(state, [watcher]));
     };
 
-    // `pins` is opt-in by default, so a player's ping never leaves the host.
-    expect(PING_TOGGLE).toBe('pins');
+    // `pins` is opt-in by default (Player template), so a player's ping never leaves the host.
+    expect(PING_TOOL).toBe('pins');
     send(alice);
     expect(watcher.received).toHaveLength(0);
     expect(relay.stats().dropped.forbidden).toBe(1);
 
-    scene.playerToggles = { pins: true };
+    grantTools(state, { pins: true });
     send(alice);
     send(host);
     send(coDm);
@@ -373,8 +382,8 @@ describe('ephemeral relay', () => {
       id: T.newScene,
       name: 'Prep',
       dmOnly: true,
-      playerToggles: { pins: true },
     };
+    grantTools(state, { pins: true });
 
     const host = fakeConnection(T.host, { isHost: true });
     const coDm = fakeConnection(T.carol);
@@ -419,8 +428,8 @@ describe('ephemeral relay', () => {
       ...active,
       id: T.newScene,
       name: 'Prepared',
-      playerToggles: { pins: true },
     };
+    grantTools(state, { pins: true });
 
     const host = fakeConnection(T.host, { isHost: true });
     const coDm = fakeConnection(T.carol);
@@ -461,7 +470,7 @@ describe('ephemeral relay', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];
     if (!scene) throw new Error('fixture incomplete');
-    scene.playerToggles = { pins: true };
+    grantTools(state, { pins: true });
     const alice = fakeConnection(T.alice);
     const watcher = fakeConnection(T.bob);
     // A frozen clock: the bucket never refills, so exactly `burst` pings get through.
@@ -481,7 +490,7 @@ describe('ephemeral relay', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];
     if (!scene) throw new Error('fixture incomplete');
-    scene.playerToggles = { pins: true };
+    grantTools(state, { pins: true });
     const alice = { ...fakeConnection(T.alice), color: '#ab1234' };
     const watcher = fakeConnection(T.bob);
     const relay = createEphemeralRelay(() => 1_000);
@@ -665,7 +674,7 @@ describe('drawing relay (LAY-05)', () => {
     };
   }
 
-  it('gates live drawing on the scene toggle, with the host and co-DM exempt', () => {
+  it('gates live drawing on the seat Draw tool, with the host and co-DM exempt', () => {
     const state = fixtureCampaign();
     const coDmSeat = state.seats[T.coDm];
     if (!coDmSeat) throw new Error('fixture incomplete');
@@ -693,7 +702,7 @@ describe('drawing relay (LAY-05)', () => {
 
     const scene = state.scenes[T.scene];
     if (!scene) throw new Error('fixture incomplete');
-    scene.playerToggles = { draw: true };
+    grantTools(state, { draw: true });
     relay.relay(alice, strokeMessage(tid(22)), state, targets);
     expect(watcher.received).toHaveLength(3);
     expect(watcher.received.at(-1)).toMatchObject({ from: T.alice });
@@ -703,7 +712,7 @@ describe('drawing relay (LAY-05)', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];
     if (!scene) throw new Error('fixture incomplete');
-    scene.playerToggles = { draw: true };
+    grantTools(state, { draw: true });
     const alice = fakeConnection(T.alice);
     const host = fakeConnection(T.host, { isHost: true });
     const watcher = fakeConnection(T.host, { isHost: true });
@@ -723,7 +732,7 @@ describe('drawing relay (LAY-05)', () => {
       relay.relay(alice, bad, state, targets);
       relay.relay(host, bad, state, targets);
     }
-    // The host is exempt from the scene toggle, but an unknown scene is refused by the gate itself.
+    // The host is exempt from seat tools, but an unknown scene is refused by the gate itself.
     relay.relay(host, strokeMessage(STROKE, { sceneId: T.newScene }), state, targets);
     expect(watcher.received).toEqual([]);
     expect(relay.stats().dropped).toMatchObject({ 'invalid-drawing': 16, forbidden: 1 });
@@ -737,7 +746,7 @@ describe('drawing relay (LAY-05)', () => {
     if (!scene || !coDmSeat || !seatB) throw new Error('fixture incomplete');
     coDmSeat.identityId = T.carol;
     seatB.identityId = T.bob;
-    scene.playerToggles = { draw: true };
+    grantTools(state, { draw: true });
     const alice = fakeConnection(T.alice);
     const bob = fakeConnection(T.bob);
     const host = fakeConnection(T.host, { isHost: true });
@@ -788,7 +797,7 @@ describe('drawing relay (LAY-05)', () => {
     const coDmSeat = state.seats[T.coDm];
     if (!scene || !coDmSeat) throw new Error('fixture incomplete');
     coDmSeat.identityId = T.carol;
-    scene.playerToggles = { draw: true };
+    grantTools(state, { draw: true });
     const alice = fakeConnection(T.alice);
     const host = fakeConnection(T.host, { isHost: true });
     const coDm = fakeConnection(T.carol);
@@ -833,7 +842,7 @@ describe('drawing relay (LAY-05)', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];
     if (!scene) throw new Error('fixture incomplete');
-    scene.playerToggles = { draw: true };
+    grantTools(state, { draw: true });
     const alice = fakeConnection(T.alice);
     const host = fakeConnection(T.host, { isHost: true });
     const watcher = fakeConnection(T.host, { isHost: true });
@@ -921,7 +930,7 @@ describe('drawing relay (LAY-05)', () => {
     const alice = fakeConnection(T.alice);
     const scene = state.scenes[T.scene];
     if (!scene) throw new Error('fixture incomplete');
-    scene.playerToggles = { draw: true };
+    grantTools(state, { draw: true });
     const watcher = fakeConnection(T.host, { isHost: true });
     const targets = recipients(state, [watcher]);
     // A stroke frame above the smallest cap: it passes authorisation, then fails the size check.
@@ -944,7 +953,7 @@ describe('drawing relay (LAY-05)', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];
     if (!scene) throw new Error('fixture incomplete');
-    scene.playerToggles = { draw: true };
+    grantTools(state, { draw: true });
     const alice = fakeConnection(T.alice);
     const spectator = fakeConnection(T.bob);
     const relay = createEphemeralRelay(() => 1_000, {
@@ -967,8 +976,8 @@ describe('drawing relay (LAY-05)', () => {
       id: T.newScene,
       name: 'SECRET-SCENE',
       dmOnly: true,
-      playerToggles: { draw: true },
     };
+    grantTools(state, { draw: true });
     state.activeSceneId = T.scene;
 
     const host = fakeConnection(T.host, { isHost: true });
@@ -1005,7 +1014,7 @@ describe('drawing relay (LAY-05)', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];
     if (!scene) throw new Error('fixture incomplete');
-    scene.playerToggles = { draw: true };
+    grantTools(state, { draw: true });
     const alice = fakeConnection(T.alice);
     const watcher = fakeConnection(T.host, { isHost: true });
     const relay = createEphemeralRelay(() => 1_000);
@@ -1037,7 +1046,7 @@ describe('drawing relay (LAY-05)', () => {
     const state = fixtureCampaign();
     const scene = state.scenes[T.scene];
     if (!scene) throw new Error('fixture incomplete');
-    scene.playerToggles = { draw: true };
+    grantTools(state, { draw: true });
     const alice = fakeConnection(T.alice);
     // An identity with no seat is a spectator audience (SES-11).
     const spectator = fakeConnection(T.bob);
@@ -1071,8 +1080,8 @@ describe('drawing relay (LAY-05)', () => {
       id: T.newScene,
       name: 'SECRET-SCENE',
       dmOnly: true,
-      playerToggles: { measure: true },
     };
+    grantTools(state, { measure: true });
     state.activeSceneId = T.scene;
     const coDm = fakeConnection(T.carol);
     const player = fakeConnection(T.alice);
@@ -1103,8 +1112,8 @@ it('shares the validated profile colour for rulers, cursors and pings instead of
   const state = fixtureCampaign();
   const scene = state.scenes[T.scene];
   if (!scene) throw new Error('fixture incomplete');
-  // LAY-05: a player may ping only where the DM opened the scene's pins toggle.
-  scene.playerToggles = { pins: true };
+  // LAY-05: a player may ping only when the DM gave their seat the pins tool.
+  grantTools(state, { pins: true });
   const alice = { ...fakeConnection(T.alice), color: '#ab1234' };
   const host = fakeConnection(T.host, { isHost: true });
   const relay = createEphemeralRelay(() => 1000);

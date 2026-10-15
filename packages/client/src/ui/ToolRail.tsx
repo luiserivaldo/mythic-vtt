@@ -52,7 +52,7 @@ export function ToolRail() {
     if (measuring && !measureUsable) activateMeasurement(null);
   }, [measuring, measureUsable]);
 
-  // PERM-05: turning a scene's Draw toggle off disarms the tool for a player, mid-stroke or not.
+  // UI-SEAT-02: turning a seat's Draw tool off disarms the tool for a player, mid-stroke or not.
   useEffect(() => {
     if (!drawUsable && activeToolStore.getState().tool === 'draw') {
       activeToolStore.getState().setTool(resolveActiveTool(states, 'select'));

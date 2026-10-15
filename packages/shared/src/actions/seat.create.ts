@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id, SeatIcon, SeatPermissions } from '../schema/index.js';
+import { Id, SeatIcon, SeatPermissions, SeatTools } from '../schema/index.js';
 import { defineAction, isHost } from './define.js';
 
 const DEFAULT_PERMISSIONS = { view: true, move: true, edit: false, delete: false } as const;
@@ -13,6 +13,8 @@ export const seatCreate = defineAction({
     role: z.enum(['player', 'codm']).optional(),
     permissions: SeatPermissions.strict().optional(),
     icon: SeatIcon.optional(),
+    /** UI-SEAT-02 (UX-46): the template's tools; absent means the Player template's. */
+    tools: SeatTools.optional(),
   }),
   permission: (state, actor, p) => isHost(actor) && !(p.seatId in state.seats),
   reduce: (draft, a) => {
@@ -25,6 +27,7 @@ export const seatCreate = defineAction({
       interactionEnabled: true,
       permissions: { ...(a.payload.permissions ?? DEFAULT_PERMISSIONS) },
       ...(a.payload.icon !== undefined ? { icon: a.payload.icon } : {}),
+      ...(a.payload.tools !== undefined ? { tools: { ...a.payload.tools } } : {}),
     };
   },
   modExposed: false,

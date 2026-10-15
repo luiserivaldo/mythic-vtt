@@ -1,6 +1,6 @@
 import { CURRENT_SCHEMA_VERSION } from '@mythic/shared';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -74,7 +74,7 @@ describe('golden save v1 through the shared migrate hook', () => {
       await store.close();
     }
   });
-  it.each(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10'])(
+  it.each(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10', 'v11'])(
     'loads and saves %s through the lasting-AoE, archive and initiative migration chain',
     async (version) => {
       const store = new LocalCampaignStore(await copyFixture(version), storeMigrate);
@@ -103,7 +103,15 @@ describe('golden save v1 through the shared migrate hook', () => {
         } else {
           expect(loaded.campaign.icon).toBeUndefined();
         }
+        // UX-46: every seat has tools after load. Older saves had no scene toggles, so each seat
+        // gets the 0.0.1 defaults; the v11 fixture keeps its own per-seat override.
+        expect(loaded.campaign.seats['01J8Z0000000000000000SEAT2']?.tools).toEqual(
+          since(11)
+            ? { measure: false, draw: true, pins: true }
+            : { measure: true, draw: false, pins: false },
+        );
         for (const scene of loaded.scenes) {
+          expect(scene).not.toHaveProperty('playerToggles');
           expect(scene.maxLastingAoEsPerPlayer).toBe(1);
           if (since(6)) {
             expect(Object.values(scene.entities).some((entity) => entity.lastingAoE)).toBe(true);
@@ -140,6 +148,35 @@ describe('golden save v1 through the shared migrate hook', () => {
       }
     },
   );
+  it('UX-46: a 0.0.1 (v8) save with scene toggles keeps each seat effective permissions', async () => {
+    const root = await copyFixture('v8');
+    const scenePath = join(
+      root,
+      'campaigns',
+      campaignId,
+      'scenes',
+      '01J8Z0000000000000000SCN01.json',
+    );
+    const scene = JSON.parse(await readFile(scenePath, 'utf8')) as Record<string, unknown>;
+    await writeFile(
+      scenePath,
+      JSON.stringify({ ...scene, playerToggles: { measure: false, draw: true } }),
+    );
+    const store = new LocalCampaignStore(root, storeMigrate);
+    try {
+      const loaded = await store.load(campaignId);
+      for (const seat of Object.values(loaded.campaign.seats))
+        expect(seat.tools).toEqual({ measure: false, draw: true, pins: false });
+      expect(loaded.scenes[0]).not.toHaveProperty('playerToggles');
+      // Saved back as v11, the fold is not repeated and nothing changes on reload.
+      for (const s of loaded.scenes) await store.saveScene(campaignId, s);
+      await store.saveCampaign(campaignId, loaded.campaign);
+      expect(await store.load(campaignId)).toEqual(loaded);
+      expect(await readFile(scenePath, 'utf8')).not.toContain('playerToggles');
+    } finally {
+      await store.close();
+    }
+  });
   it('still rejects a newer schemaVersion as unsupported', async () => {
     const root = await copyFixture();
     const path = join(root, 'campaigns', campaignId);

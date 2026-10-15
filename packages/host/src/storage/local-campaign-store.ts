@@ -5,7 +5,13 @@ import { mkdir, open, opendir, readFile, readdir, stat, rm } from 'node:fs/promi
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { campaignThumbnail, Id, Scene } from '@mythic/shared';
+import {
+  campaignThumbnail,
+  foldLegacyPlayerToggles,
+  Id,
+  Scene,
+  SEAT_TOOLS_SINCE_VERSION,
+} from '@mythic/shared';
 import type { Readable } from 'node:stream';
 import {
   exportCampaign,
@@ -208,7 +214,8 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
   }
   async load(campaignId: Id): Promise<LoadedCampaign> {
     const folder = this.folder(campaignId);
-    const campaign = await this.read(join(folder, 'campaign.json'), 'campaign', CampaignFile);
+    const campaignPath = join(folder, 'campaign.json');
+    const loaded = await this.read(campaignPath, 'campaign', CampaignFile);
     const scenes: Scene[] = [];
     let names: string[];
     try {
@@ -217,9 +224,28 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') names = [];
       else throw error;
     }
-    for (const name of names.filter((n) => n.endsWith('.json')).sort())
-      scenes.push(await this.read(join(folder, 'scenes', name), 'scene', Scene));
+    // UX-46 (save v11): scene files are read unparsed first, so a pre-v11 save's scene player
+    // toggles can still be folded into its seats before the v11 Scene schema drops them.
+    const rawScenes: unknown[] = [];
+    for (const name of names.filter((n) => n.endsWith('.json')).sort()) {
+      const path = join(folder, 'scenes', name);
+      const raw = await this.read(path, 'scene', z.unknown());
+      const scene = Scene.safeParse(raw);
+      if (!scene.success)
+        throw new StorageDataError(`Invalid scene: ${String(scene.error)}`, 'corrupt');
+      rawScenes.push(raw);
+      scenes.push(scene.data);
+    }
+    const campaign =
+      (await this.diskVersion(campaignPath)) < SEAT_TOOLS_SINCE_VERSION
+        ? CampaignFile.parse(foldLegacyPlayerToggles(loaded, rawScenes))
+        : loaded;
     return { campaign, scenes };
+  }
+  private async diskVersion(path: string): Promise<number> {
+    const disk = Disk.safeParse(JSON.parse(await readFile(path, 'utf8')) as unknown);
+    if (!disk.success) throw new StorageDataError(`Invalid envelope: ${path}`, 'corrupt');
+    return disk.data.schemaVersion;
   }
   async saveCampaign(campaignId: Id, campaign: CampaignFile): Promise<void> {
     safeId(campaignId);

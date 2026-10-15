@@ -64,29 +64,17 @@ test('viewer settings persist locally, DM permissions work, and export downloads
     await expect(player.getByRole('button', { name: 'Export campaign', exact: true })).toHaveCount(
       0,
     );
-    await expect(dm.getByLabel('Players may create')).toBeDisabled();
-    await expect(dm.getByText('DM and Co-DM only', { exact: true })).toBeVisible();
+    // UI-SET-01 (UX-46, MV-251): no table-wide player toggles remain; they live per seat.
+    for (const label of [/players may/i, 'Players may measure', 'Players may create'])
+      await expect(dm.getByLabel(label)).toHaveCount(0);
+    await expect(
+      dm.getByText('Player permissions are set per seat in the Seats tab.', { exact: true }),
+    ).toBeVisible();
     await dm.getByLabel('Show height labels', { exact: true }).uncheck();
     await dm.getByLabel('Confirm before deleting', { exact: true }).uncheck();
     await dm.getByRole('radio', { name: 'Light', exact: true }).check();
     await expect(player.getByLabel('Show height labels', { exact: true })).toBeChecked();
     await expect(player.getByLabel('Confirm before deleting', { exact: true })).toBeChecked();
-    await dm.getByLabel('Players may measure').uncheck();
-    await expect
-      .poll(
-        () =>
-          (setup?.state as { scenes?: Record<string, { playerToggles?: { measure?: boolean } }> })
-            .scenes?.[sceneId]?.playerToggles?.measure,
-      )
-      .toBe(false);
-    await dm.getByLabel('Players may measure').check();
-    await expect
-      .poll(
-        () =>
-          (setup?.state as { scenes?: Record<string, { playerToggles?: { measure?: boolean } }> })
-            .scenes?.[sceneId]?.playerToggles?.measure,
-      )
-      .toBe(true);
     const downloadPromise = dm.waitForEvent('download');
     await dm.getByRole('button', { name: 'Export campaign', exact: true }).click();
     const download = await downloadPromise;

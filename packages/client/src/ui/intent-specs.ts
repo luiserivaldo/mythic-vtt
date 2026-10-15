@@ -1,4 +1,4 @@
-import type { AssetRef, LayerId, Seat } from '@mythic/shared';
+import type { AssetRef, LayerId, Seat, SeatTool, SeatTools } from '@mythic/shared';
 
 /** One intent to submit through the client queue; the UI never builds state itself. */
 export interface IntentSpec {
@@ -57,6 +57,7 @@ export const seatCreateIntent = (
   label: string,
   role: 'player' | 'codm',
   permissions?: Seat['permissions'],
+  tools?: SeatTools,
 ): IntentSpec => ({
   type: 'seat.create',
   payload: {
@@ -64,6 +65,7 @@ export const seatCreateIntent = (
     label: label.trim(),
     role,
     ...(permissions ? { permissions } : {}),
+    ...(tools ? { tools } : {}),
   },
 });
 
@@ -89,6 +91,12 @@ export const seatPermissionIntent = (
 ): IntentSpec => ({
   type: 'permission.update',
   payload: { target: 'seat', seatId, permissions: { [permission]: allowed } },
+});
+
+/** UI-SEAT-02 (UX-46): override one board tool for one seat. */
+export const seatToolIntent = (seatId: string, tool: SeatTool, allowed: boolean): IntentSpec => ({
+  type: 'seat.update',
+  payload: { seatId, tools: { [tool]: allowed } },
 });
 
 /** ENV-07: horizon/plain colour plus optional gradient top (null clears it). */

@@ -5,6 +5,7 @@ import {
   archiveImpact,
   newSeatFields,
   SEAT_TOGGLES,
+  SEAT_TOOL_TOGGLES,
   seatRows,
   seatTemplateOptions,
 } from './seat-panel.js';
@@ -121,9 +122,27 @@ describe('seat rows (UI-SEAT-01)', () => {
 });
 
 describe('add a seat from a template', () => {
-  it('offers the existing role presets as templates (MV-262 hook)', () => {
+  it('offers the permission templates, each saying what a new seat starts with (UX-46)', () => {
     expect(seatTemplateOptions().map((t) => t.id)).toEqual(SEAT_TEMPLATES.map((t) => t.id));
     expect(seatTemplateOptions().map((t) => t.label)).toContain('Co-DM');
+    const description = (id: string) => seatTemplateOptions().find((t) => t.id === id)?.description;
+    expect(description('player')).toMatch(/Starts with: Measure\.$/);
+    expect(description('spectator')).toMatch(/Starts with: no board tools\.$/);
+    expect(description('codm')).toMatch(/Starts with: every tool\.$/);
+  });
+
+  it("shows each seat's own tools, with the Player default when none are stored (UX-46)", () => {
+    expect(SEAT_TOOL_TOGGLES.map((t) => t.label)).toEqual(['Measure', 'Draw', 'Place pins']);
+    const campaign = table();
+    const seat = campaign.seats[A];
+    if (!seat) throw new Error('fixture');
+    expect(seatRows(campaign, null).find((r) => r.id === A)?.tools).toEqual({
+      measure: true,
+      draw: false,
+      pins: false,
+    });
+    seat.tools = { measure: false, draw: true, pins: true };
+    expect(seatRows(campaign, null).find((r) => r.id === A)?.tools).toEqual(seat.tools);
   });
 
   it("uses the template's role and default permissions, and its label when no name is typed", () => {
@@ -131,13 +150,20 @@ describe('add a seat from a template', () => {
       label: 'Player',
       role: 'player',
       permissions: { view: true, move: true, edit: false, delete: false },
+      tools: { measure: true, draw: false, pins: false },
     });
     expect(newSeatFields('codm', ' Lieutenant ')).toEqual({
       label: 'Lieutenant',
       role: 'codm',
       permissions: { view: true, move: true, edit: true, delete: true },
+      tools: { measure: true, draw: true, pins: true },
     });
     expect(newSeatFields('spectator', 'Watcher')?.permissions.move).toBe(false);
+    expect(newSeatFields('spectator', 'Watcher')?.tools).toEqual({
+      measure: false,
+      draw: false,
+      pins: false,
+    });
   });
 
   it('refuses names the seat.create schema would reject', () => {
@@ -148,7 +174,9 @@ describe('add a seat from a template', () => {
     const fields = newSeatFields('player', '');
     if (!fields) throw new Error('expected fields');
     fields.permissions.edit = true;
+    fields.tools.draw = true;
     expect(SEAT_TEMPLATES.find((t) => t.id === 'player')?.permissions.edit).toBe(false);
+    expect(SEAT_TEMPLATES.find((t) => t.id === 'player')?.tools.draw).toBe(false);
   });
 });
 
