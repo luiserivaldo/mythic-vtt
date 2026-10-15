@@ -184,6 +184,10 @@ export function TransformGizmo3D() {
     const onDown = (e: PointerEvent) => {
       swallowClick = false;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // F07: TokenDrag claims a press on another token's body in the window capture phase, before
+      // this listener runs. Starting a handle drag too would commit a second, unrelated
+      // entity.update for the selected entity from the same gesture (MV-268).
+      if (pointerClaims.isClaimed(e.pointerId)) return;
       const { target: t, draft: d, kinds: ks } = latest.current;
       if (!t || !d || ks.length === 0) return;
       const camera = getState().camera as PerspectiveCamera;
