@@ -323,12 +323,13 @@ describe('tokenContextMenu (UI-TOKEN-03, PERM-02, LAY-07)', () => {
     ).toEqual([]);
   });
 
-  it('offers the four curated items, in order, with Add Condition greyed and WIP', () => {
+  it('offers the five curated items, in order, with Add Condition greyed and WIP', () => {
     const items = tokenContextMenu(input());
     expect(items.map((i) => i.id)).toEqual([
       'see-sheet',
       'add-condition',
       'change-layer',
+      'ping',
       'token-options',
     ]);
     for (const item of items) expect(item.label).toBe(TOKEN_CONTEXT_LABELS[item.id]);
@@ -368,7 +369,7 @@ describe('tokenContextMenu (UI-TOKEN-03, PERM-02, LAY-07)', () => {
       actor: seatActor(OWNER),
       viewer: viewerOf(viewerSeat),
     });
-    expect(items.map((i) => i.id)).toEqual(['see-sheet', 'add-condition', 'token-options']);
+    expect(items.map((i) => i.id)).toEqual(['see-sheet', 'add-condition', 'ping', 'token-options']);
   });
 
   it('offers nothing for a token the viewer may not select, a locked layer included', () => {

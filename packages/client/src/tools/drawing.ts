@@ -127,6 +127,22 @@ export function erasableStrokes(
 }
 
 /**
+ * UX-40 (playtest F20): the drawing Undo takes back - the viewer's own newest finished stroke on
+ * this scene. A stroke still being drawn is never undone from under the pointer, and another
+ * author's drawing is never touched, the DM's included (the DM erases those with the eraser).
+ */
+export function lastOwnStroke(
+  strokes: readonly DrawStroke[],
+  sceneId: string | null,
+  viewerIdentityId: string,
+): DrawStroke | null {
+  const own = sceneStrokes(strokes, sceneId).filter(
+    (stroke) => stroke.from === viewerIdentityId && stroke.phase === 'finished',
+  );
+  return own.at(-1) ?? null;
+}
+
+/**
  * A pointer hit on the board as a drawing sample: clamped to the canvas (D37, like every other
  * position) but deliberately never snapped to the grid — a freehand line follows the pointer.
  * A non-finite hit resolves to null so a broken strip is never built.

@@ -6,6 +6,7 @@ import {
   drawPoint3d,
   drawPointOnBoard,
   erasableStrokes,
+  lastOwnStroke,
   ribbonGeometry,
   sceneStrokes,
   shouldSendStroke,
@@ -238,5 +239,20 @@ describe('drawing points on the board', () => {
 
   it('refuses a non-finite 3D sample rather than drawing a broken strip', () => {
     expect(drawPoint3d({ x: Number.NaN, y: 0, z: 0 }, scene)).toBeNull();
+  });
+});
+
+describe('drawing undo (UX-40)', () => {
+  it("takes back only the viewer's own newest finished stroke of the scene", () => {
+    const older = stroke({ strokeId: 'A'.repeat(26), at: 1 });
+    const newer = stroke({ strokeId: 'B'.repeat(26), at: 3 });
+    const theirs = stroke({ strokeId: 'C'.repeat(26), from: 'them', at: 5 });
+    const live = stroke({ strokeId: 'D'.repeat(26), at: 6, phase: 'active' });
+    const elsewhere = stroke({ strokeId: 'E'.repeat(26), sceneId: 'other', at: 7 });
+    const all = [older, newer, theirs, live, elsewhere];
+    expect(lastOwnStroke(all, 'scene', 'me')).toBe(newer);
+    expect(lastOwnStroke([older, theirs], 'scene', 'me')).toBe(older);
+    expect(lastOwnStroke([theirs], 'scene', 'me')).toBeNull();
+    expect(lastOwnStroke(all, null, 'me')).toBeNull();
   });
 });

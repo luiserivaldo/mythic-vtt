@@ -18,6 +18,7 @@ import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { activeToolStore } from '../tools/active-tool-store.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
+import { undoOwnStroke } from '../tools/draw-undo.js';
 import { drawingStore } from '../tools/drawing-store.js';
 import {
   drawPoint3d,
@@ -332,6 +333,27 @@ export function DrawTool({
       cancel();
     };
 
+    // UX-40: while the Draw tool is armed, Ctrl/Cmd+Z takes back the viewer's own newest drawing.
+    // Capture, so the history undo (a bubble listener) does not also revert a token action; with no
+    // drawing left the key falls through to it.
+    const onUndoKey = (e: KeyboardEvent) => {
+      if (
+        e.key.toLowerCase() !== 'z' ||
+        !(e.ctrlKey || e.metaKey) ||
+        e.shiftKey ||
+        e.altKey ||
+        e.repeat ||
+        !armed() ||
+        active ||
+        isTypingTarget(e.target)
+      )
+        return;
+      const { scene: sc, ephemeral: eph } = latest.current;
+      if (!undoOwnStroke(eph, sc?.id ?? null)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
     const onKey = (e: KeyboardEvent) => {
       if (!armed() || isTypingTarget(e.target) || e.key !== 'Escape') return;
       if (active) {
@@ -357,6 +379,7 @@ export function DrawTool({
     el.addEventListener('pointermove', onMove);
     window.addEventListener('contextmenu', onContextMenu, true);
     window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onUndoKey, true);
     return () => {
       if (active) releasePointer(active.pointerId);
       if (eraserPointer !== null) releasePointer(eraserPointer);
@@ -368,9 +391,10 @@ export function DrawTool({
       el.removeEventListener('pointermove', onMove);
       window.removeEventListener('contextmenu', onContextMenu, true);
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onUndoKey, true);
     };
   }, [gl, getState, readOnly]);
 
   if (!scene) return null;
-  return <DrawingLayer strokes={strokes} sceneId={sceneId} />;
+  return <DrawingLayer strokes={strokes} sceneId={sceneId} mode={mode} />;
 }

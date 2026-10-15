@@ -21,7 +21,7 @@ import { PingTool } from './PingTool.js';
 import { RulerTool } from './RulerTool.js';
 import { DrawTool } from './DrawTool.js';
 import { ToolRail } from '../ui/ToolRail.js';
-import { PingButton } from '../ui/PingButton.js';
+import { BoardContextMenu } from '../ui/BoardContextMenu.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
@@ -230,9 +230,9 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
       <div role="toolbar" aria-label="Board controls" className="ui-toolbar ui-board-controls">
         {/* UI-TOOL-01..07: the rail lists every tool; one a seat may not use is disabled, not hidden. */}
         <ToolRail />
-        {/* LAY-05: the same ping as alt-click, from the centre of the view. */}
-        <PingButton />
       </div>
+      {/* UX-40: right-click on empty board; Ping is offered here and on a token's menu. */}
+      <BoardContextMenu />
       <ToolPanelDock
         campaign={campaign}
         scene={source}

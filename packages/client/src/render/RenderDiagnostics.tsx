@@ -30,6 +30,16 @@ export function RenderDiagnostics() {
         lines: gl.info.render.lines,
         points: gl.info.render.points,
       }),
+      /** Depth-test flag and render order of every mesh with this name (layering e2e). */
+      getMeshLayering: (name: string) => {
+        const found: { depthTest: boolean; renderOrder: number }[] = [];
+        scene.traverse((object) => {
+          const material = (object as { material?: { depthTest?: boolean } }).material;
+          if (object.name === name && material?.depthTest !== undefined)
+            found.push({ depthTest: material.depthTest, renderOrder: object.renderOrder });
+        });
+        return found;
+      },
       getObjectCount: (name: string) => {
         let count = 0;
         scene.traverse((object) => {

@@ -50,6 +50,8 @@ export function createRegistry<T extends RegistryEntry>(entries: readonly T[] = 
 const admin: Allowed = (role) => role === 'host' || role === 'codm';
 const host: Allowed = (role) => role === 'host';
 const everyone: Allowed = () => true;
+/** UX-40: a tab kept in the registry but offered to nobody (hidden in the alpha). */
+const hiddenInAlpha: Allowed = () => false;
 const canMove: Allowed = (role, permissions) =>
   admin(role, permissions) || permissions?.move === true;
 const canEdit: Allowed = (role, permissions) =>
@@ -133,7 +135,8 @@ export const dockTabs = createRegistry<DockTab>([
     label: 'Prefabs',
     icon: 'prefabs',
     group: 'world',
-    allowed: admin,
+    // UX-40: hidden until better 3D modelling tools exist; the panel code stays.
+    allowed: hiddenInAlpha,
     panel: 'prefabs',
   },
   {

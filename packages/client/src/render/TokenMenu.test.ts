@@ -41,7 +41,12 @@ vi.mock('@react-three/drei', async () => {
 });
 vi.mock('../store/react.js', () => ({
   useClientStore: (select: (state: unknown) => unknown) =>
-    select({ campaign: mock.campaign, isHost: mock.isHost, seatId: mock.seatId }),
+    select({
+      campaign: mock.campaign,
+      isHost: mock.isHost,
+      seatId: mock.seatId,
+      viewAs: { kind: 'host' },
+    }),
 }));
 vi.mock('../ui/ViewerPreferencesProvider.js', () => ({
   useViewerPreferences: () => ({
@@ -286,7 +291,13 @@ describe('the right-click menu (UI-TOKEN-03)', () => {
     const panel = contextMenu();
     expect(panel).not.toBeNull();
     const items = [...(panel?.querySelectorAll('li > button') ?? [])].map((b) => b.textContent);
-    expect(items).toEqual(['See Sheet', 'Add Condition WIP', 'Change Layer', 'Token Options']);
+    expect(items).toEqual([
+      'See Sheet',
+      'Add Condition WIP',
+      'Change Layer',
+      'Ping',
+      'Token Options',
+    ]);
     const condition = [...(panel?.querySelectorAll<HTMLButtonElement>('li > button') ?? [])].find(
       (b) => b.textContent.includes('Add Condition'),
     );

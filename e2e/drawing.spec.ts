@@ -6,6 +6,7 @@ import {
   DRAW_WIDTH_MAX,
 } from '../packages/shared/src/index.js';
 import {
+  openClient,
   RawClient,
   recordPageFrames,
   settledCameraPose,
@@ -22,7 +23,10 @@ import {
 const COLOUR = '#3b82f6';
 
 interface RenderDiagnostics {
-  __mythicRender?: { getObjectCount(name: string): number };
+  __mythicRender?: {
+    getObjectCount(name: string): number;
+    getMeshLayering(name: string): { depthTest: boolean; renderOrder: number }[];
+  };
 }
 
 /** How many drawing strips this client has rendered, or -1 before the diagnostics mount. */
@@ -249,6 +253,156 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
   } finally {
     await dmContext.close();
     await playerContext.close();
+    await table.stop();
+  }
+});
+
+/** The RGB of one page pixel, read back from a screenshot (the canvas itself is not readable). */
+async function pixelAt(page: Page, x: number, y: number): Promise<[number, number, number]> {
+  const png = (await page.screenshot()).toString('base64');
+  // A string expression: the e2e project has no DOM typings, and this runs in the page.
+  const rgb = await page.evaluate<number[]>(`(async () => {
+    const image = new Image();
+    image.src = 'data:image/png;base64,${png}';
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    return Array.from(context.getImageData(${String(Math.round(x))}, ${String(Math.round(y))}, 1, 1).data);
+  })()`);
+  return [rgb[0] ?? 0, rgb[1] ?? 0, rgb[2] ?? 0];
+}
+
+async function layering(page: Page) {
+  return page.evaluate(
+    () =>
+      (globalThis as unknown as RenderDiagnostics).__mythicRender?.getMeshLayering(
+        'drawing-stroke',
+      ) ?? [],
+  );
+}
+
+// UX-40 (playtest F19, F20): in 2D a drawing is the top layer over a tall prop; it can be taken
+// back with Undo (button and Ctrl+Z) and removed with the eraser, and both reach other clients.
+test('a drawing sits over a tall prop in 2D, and can be undone and erased', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const table = await startTable();
+  const dmContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  let spectatorContext: Awaited<ReturnType<typeof openClient>>['context'] | undefined;
+  try {
+    const dm = await dmContext.newPage();
+    const errors: string[] = [];
+    dm.on('pageerror', (error) => errors.push(error.message));
+    await dm.goto(`${table.clientUrl}/#host=${table.hostToken}`);
+    await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
+    const identity = await dm.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('mythic.identity.v1') ?? '{}') as {
+          identityId: string;
+          identitySecret: string;
+        },
+    );
+    const setup = await RawClient.connect(table, { name: 'layer host', ...identity });
+    await setup.waitFor('snapshot', () => setup.state !== undefined);
+    const sceneId = testUlid('SCENE', 83);
+    await ok(setup.intent('scene.create', { sceneId, name: 'Layer scene' }));
+    await ok(setup.intent('scene.activate', { sceneId }));
+    // A tall red pillar in the middle of the board: its top stands well above the ground samples.
+    await ok(
+      setup.intent('entity.create', {
+        sceneId,
+        entity: {
+          id: testUlid('PROP', 83),
+          name: 'Tall pillar',
+          layer: 'props',
+          owners: [],
+          transform: {
+            position: { x: 20, y: 0, z: 15 },
+            rotation: { x: 0, y: 0, z: 0, w: 1 },
+            scale: { x: 4, y: 4, z: 4 },
+          },
+          shape: { kind: 'cylinder', color: '#ff0000', walkable: true },
+        },
+      }),
+    );
+
+    const spectator = await openClient(browser, table, 'viewer');
+    spectatorContext = spectator.context;
+    spectator.page.on('pageerror', (error) => errors.push(error.message));
+    await expect.poll(() => strips(spectator.page), { timeout: 20_000 }).toBe(0);
+    await expect.poll(() => strips(dm), { timeout: 20_000 }).toBe(0);
+
+    await dm.getByRole('button', { name: 'Draw', exact: true }).click();
+    const panel = dm.getByRole('region', { name: 'Draw tool' });
+    await panel.getByRole('button', { name: `Draw in ${COLOUR}` }).click();
+    await panel.getByLabel('Stroke width').press('End');
+
+    const at = await cellToPixel(dm);
+    const draw = async (fromX: number, toX: number, z: number) => {
+      const start = at(fromX, z);
+      const end = at(toX, z);
+      await dm.mouse.move(start.x, start.y);
+      await dm.mouse.down();
+      await dm.mouse.move(end.x, end.y, { steps: 6 });
+      await dm.mouse.up();
+    };
+
+    // F19: a line drawn across the pillar is the top layer in 2D - the pixel on the pillar is the
+    // stroke's blue, not the pillar's red - and the strip opts out of depth testing.
+    await draw(17.5, 22.5, 15);
+    await expect.poll(() => strips(dm), { timeout: 10_000 }).toBe(1);
+    await expect.poll(() => strips(spectator.page), { timeout: 10_000 }).toBe(1);
+    expect(await layering(dm)).toEqual([{ depthTest: false, renderOrder: 30 }]);
+    const centre = at(20, 15);
+    await expect
+      .poll(
+        async () => {
+          const [r, , b] = await pixelAt(dm, centre.x, centre.y);
+          return b - r;
+        },
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(80);
+
+    // In 3D the strip depth-tests again, so a real object in front still hides it.
+    await dm.getByRole('button', { name: '3D view' }).click();
+    await expect
+      .poll(async () => (await layering(dm))[0]?.depthTest, { timeout: 10_000 })
+      .toBe(true);
+    await dm.getByRole('button', { name: '2D view' }).click();
+    await expect
+      .poll(async () => (await layering(dm))[0]?.depthTest, { timeout: 10_000 })
+      .toBe(false);
+
+    // F20, undo: Ctrl+Z while the Draw tool is armed takes back the newest own drawing, for all.
+    await draw(17.5, 22.5, 12);
+    await expect.poll(() => strips(dm), { timeout: 10_000 }).toBe(2);
+    await expect.poll(() => strips(spectator.page), { timeout: 10_000 }).toBe(2);
+    await dm.keyboard.press('Control+z');
+    await expect.poll(() => strips(dm), { timeout: 10_000 }).toBe(1);
+    await expect.poll(() => strips(spectator.page), { timeout: 10_000 }).toBe(1);
+    // The panel's Undo button does the same and reaches the end of the list.
+    await panel.getByRole('button', { name: 'Undo drawing' }).click();
+    await expect.poll(() => strips(dm), { timeout: 10_000 }).toBe(0);
+    await expect.poll(() => strips(spectator.page), { timeout: 10_000 }).toBe(0);
+
+    // F20, erase: the eraser removes one drawing and leaves the others.
+    await draw(17.5, 22.5, 12);
+    await draw(17.5, 22.5, 18);
+    await expect.poll(() => strips(dm), { timeout: 10_000 }).toBe(2);
+    await panel.getByRole('button', { name: 'Eraser' }).click();
+    const target = at(20, 12);
+    await dm.mouse.click(target.x, target.y);
+    await expect.poll(() => strips(dm), { timeout: 10_000 }).toBe(1);
+    await expect.poll(() => strips(spectator.page), { timeout: 10_000 }).toBe(1);
+
+    expect(errors).toEqual([]);
+    await setup.close();
+  } finally {
+    await spectatorContext?.close();
+    await dmContext.close();
     await table.stop();
   }
 });
