@@ -6,15 +6,18 @@ import { SubmitContext } from '../ui/submit.js';
 import { commitTransform } from '../tools/gizmo-commit.js';
 import { gizmoStore } from '../tools/gizmo-store.js';
 import {
+  applyAxisMove,
   applyMove,
   applyRotate,
   applyScale,
   draftFromEntity,
   entityScale,
   entityExtents,
-  handleLayout,
   hitHandle,
+  layoutForDraft,
   HANDLE_HIT_PX,
+  MOVE_PAD_PX,
+  SCALE_SQUARE_PX,
   snapFootprint,
   type GizmoDraft,
   type HandleKind,
@@ -22,13 +25,20 @@ import {
 } from '../tools/transform-gizmo.js';
 import { useGizmoTarget } from '../tools/use-gizmo-target.js';
 import { screenToWorld, type View2D } from './camera-2d.js';
-import { GIZMO_MOVE_COLOR, GIZMO_ROTATE_COLOR, GIZMO_SCALE_COLOR } from './canvas-style.js';
+import {
+  GIZMO_EDGE_COLOR,
+  GIZMO_NEUTRAL_COLOR,
+  GIZMO_RENDER_ORDER,
+  GIZMO_X_COLOR,
+  GIZMO_Y_COLOR,
+  GIZMO_Z_COLOR,
+} from './canvas-style.js';
+import { AxisArrow, AxisRing, MovePad, ScaleSquare } from './GizmoParts.js';
 import { pointerClaims } from './pointer-claims.js';
 import { assetUrl } from '../assets/asset-url.js';
 import { mapTextureAspect, useMapTexture } from './use-texture.js';
 
 const SQUARE = new Float32Array([-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5]);
-const COLOR = GIZMO_MOVE_COLOR;
 
 interface Drag {
   kind: HandleKind;
@@ -39,9 +49,10 @@ interface Drag {
 }
 
 /**
- * ENV-03 (2D): move / rotate / scale handles on the XZ plane for the one selected entity the
- * viewer may transform. Handles are drawn at a constant pixel size; hit-testing and snapping
- * live in tools/transform-gizmo.ts. The drag is preview-only until release, which sends a
+ * ENV-03 (2D), UI-TOKEN-07: X/Z move arrows, a Y rotate ring and corner scale squares on the
+ * XZ plane for the one selected entity the viewer may transform; non-token entities also get a
+ * centre move pad (tokens drag by their body). Handles are drawn at a constant pixel size;
+ * hit-testing and snapping live in tools/transform-gizmo.ts. The drag is preview-only until release, which sends a
  * single entity.update (D34); nothing is broadcast while dragging (M1-07).
  */
 export function TransformGizmo() {
@@ -134,10 +145,7 @@ export function TransformGizmo() {
       const { target: t, draft: d } = latest.current;
       if (!t || !d) return;
       const zoom = view().zoom;
-      const extents = entityExtents(t.entity, latest.current.imageAspect);
-      const baseScale = entityScale(t.entity) || 1;
-      const half = (Math.max(extents.width, extents.depth) * d.scale) / baseScale / 2;
-      const layout = handleLayout({ x: d.x, z: d.z }, d.yaw, half, 1 / zoom);
+      const layout = layoutForDraft(t.entity, d, 1 / zoom, latest.current.imageAspect);
       const point = toWorld(e);
       const kind = hitHandle(point, layout, HANDLE_HIT_PX / zoom);
       if (!kind) return;
@@ -165,16 +173,20 @@ export function TransformGizmo() {
       const start = drag.startDraft;
       const center = { x: start.x, z: start.z };
       let next: GizmoDraft;
-      if (drag.kind === 'move') {
+      if (drag.kind === 'move' || drag.kind === 'move-x' || drag.kind === 'move-z') {
         const extents = entityExtents(t.entity, latest.current.imageAspect);
-        const moved = applyMove({
+        const args = {
           start: center,
           pointerStart: drag.pointerStart,
           pointer,
           grid: t.scene.grid,
           footprint: snapFootprint(extents),
           y: t.entity.transform.position.y,
-        });
+        };
+        const moved =
+          drag.kind === 'move'
+            ? applyMove(args)
+            : applyAxisMove({ ...args, axis: drag.kind === 'move-x' ? 'x' : 'z' });
         next = { ...start, x: moved.x, z: moved.z };
       } else if (drag.kind === 'rotate') {
         next = {
@@ -274,55 +286,69 @@ export function TransformGizmo() {
   const ratio = draft.scale / baseScale;
   const width = extents.width * ratio;
   const depth = extents.depth * ratio;
-  const half = Math.max(width, depth) / 2;
-  const layout = handleLayout({ x: draft.x, z: draft.z }, draft.yaw, half, wpp);
+  const layout = layoutForDraft(entity, draft, wpp, imageAspect);
   const y = entity.transform.position.y + 0.05;
   const noRaycast = () => null;
+  // F08: while dragging, a translucent footprint at the draft size previews the result live
+  // (map images already resize themselves from the same preview).
+  const showFill = live !== null && !(entity.layer === 'map' && entity.image);
 
   return (
-    <group position={[0, y, 0]} renderOrder={1000}>
-      <group
-        position={[draft.x, 0, draft.z]}
-        rotation={[0, draft.yaw, 0]}
-        scale={[width, 1, depth]}
-      >
-        <lineLoop raycast={noRaycast} renderOrder={1000}>
+    <group name="transform-gizmo-2d" position={[draft.x, y, draft.z]}>
+      <group rotation={[0, draft.yaw, 0]} scale={[width, 1, depth]}>
+        {showFill && (
+          <mesh
+            rotation={[-Math.PI / 2, 0, 0]}
+            renderOrder={GIZMO_RENDER_ORDER - 1}
+            raycast={noRaycast}
+          >
+            <planeGeometry args={[1, 1]} />
+            <meshBasicMaterial
+              color={GIZMO_NEUTRAL_COLOR}
+              transparent
+              opacity={0.35}
+              depthTest={false}
+              depthWrite={false}
+            />
+          </mesh>
+        )}
+        <lineLoop raycast={noRaycast} renderOrder={GIZMO_RENDER_ORDER}>
           <bufferGeometry>
             <bufferAttribute attach="attributes-position" args={[SQUARE, 3]} />
           </bufferGeometry>
-          <lineBasicMaterial color={COLOR} depthTest={false} />
+          <lineBasicMaterial
+            color={live ? GIZMO_NEUTRAL_COLOR : GIZMO_EDGE_COLOR}
+            transparent
+            depthTest={false}
+            depthWrite={false}
+          />
         </lineLoop>
       </group>
-      <mesh
-        position={[layout.move.x, 0, layout.move.z]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        scale={wpp}
-        renderOrder={1001}
-        raycast={noRaycast}
-      >
-        <circleGeometry args={[5, 20]} />
-        <meshBasicMaterial color={COLOR} depthTest={false} transparent opacity={0.9} />
-      </mesh>
-      <mesh
-        position={[layout.rotate.x, 0, layout.rotate.z]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        scale={wpp}
-        renderOrder={1001}
-        raycast={noRaycast}
-      >
-        <circleGeometry args={[7, 24]} />
-        <meshBasicMaterial color={GIZMO_ROTATE_COLOR} depthTest={false} />
-      </mesh>
-      <mesh
-        position={[layout.scale.x, 0, layout.scale.z]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        scale={wpp}
-        renderOrder={1001}
-        raycast={noRaycast}
-      >
-        <planeGeometry args={[12, 12]} />
-        <meshBasicMaterial color={GIZMO_SCALE_COLOR} depthTest={false} />
-      </mesh>
+      <AxisRing axis="y" radius={layout.ringRadius} px={wpp} color={GIZMO_Y_COLOR} />
+      <AxisArrow
+        axis="x"
+        start={layout.moveX.from.x - draft.x}
+        end={layout.moveX.to.x - draft.x}
+        px={wpp}
+        color={GIZMO_X_COLOR}
+      />
+      <AxisArrow
+        axis="z"
+        start={layout.moveZ.from.z - draft.z}
+        end={layout.moveZ.to.z - draft.z}
+        px={wpp}
+        color={GIZMO_Z_COLOR}
+      />
+      {layout.corners.map((c, i) => (
+        <ScaleSquare
+          key={i}
+          position={[c.x - draft.x, 0, c.z - draft.z]}
+          yaw={draft.yaw}
+          sizePx={SCALE_SQUARE_PX}
+          px={wpp}
+        />
+      ))}
+      {layout.move && <MovePad radiusPx={MOVE_PAD_PX} px={wpp} />}
     </group>
   );
 }

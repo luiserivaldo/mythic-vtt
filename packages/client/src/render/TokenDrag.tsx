@@ -327,7 +327,9 @@ export function TokenDrag({ readOnly = false }: { readOnly?: boolean }) {
       const pos = entity.transform.position;
       const ground = groundPoint(r, pos.y, sc, entity);
       if (!ground) return;
-      if (m === '2d') {
+      // Only the selected token shows handles; another token's body never yields to them (F07).
+      const ids = selectionStore.getState().ids;
+      if (m === '2d' && ids.length === 1 && ids[0] === entity.id) {
         const cam = getState().camera as OrthographicCamera;
         if (pressOnGizmoHandle(entity, ground, cam.zoom)) return;
       }

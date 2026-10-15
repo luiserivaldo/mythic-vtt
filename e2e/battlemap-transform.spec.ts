@@ -92,12 +92,13 @@ test('DM selects, moves and resizes a rectangular battlemap using its real bound
     await page.mouse.move(center.x + 2 * zoom, center.y, { steps: 6 });
     await page.mouse.up();
     await expect.poll(() => position()?.position.x).toBeCloseTo(22);
-    // Gizmo bounds use the texture's 2:1 aspect: width 8 cells, half extent 4.
+    // Gizmo bounds use the texture's 2:1 aspect: 8 x 4 cells, so a scale square sits on the
+    // footprint corner at (+4, +2) cells (UI-TOKEN-07).
     const moved = at(22, 15);
-    const offset = 4 * zoom + 14;
-    await page.mouse.move(moved.x + offset, moved.y + offset);
+    const corner = { x: 4 * zoom, y: 2 * zoom };
+    await page.mouse.move(moved.x + corner.x, moved.y + corner.y);
     await page.mouse.down();
-    await page.mouse.move(moved.x + offset * 1.5, moved.y + offset * 1.5, { steps: 6 });
+    await page.mouse.move(moved.x + corner.x * 1.5, moved.y + corner.y * 1.5, { steps: 6 });
     await page.mouse.up();
     await expect.poll(() => position()?.scale.x).toBeCloseTo(6);
     await expect(panel.getByLabel('Scale', { exact: true })).toHaveValue('6');

@@ -37,15 +37,13 @@ export interface GizmoDraft {
   scale: number;
 }
 
-export type HandleKind = 'move' | 'rotate' | 'scale';
+export type HandleKind = 'move' | 'move-x' | 'move-z' | 'rotate' | 'scale';
 
 export const ROTATION_STEP_DEG = 15;
 export const MIN_SCALE = 0.1;
 export const MAX_SCALE = 100;
 export const MAX_COORD_CELLS = 1_000_000;
-export const HANDLE_HIT_PX = 12;
-export const ROTATE_OFFSET_PX = 22;
-export const SCALE_OFFSET_PX = 14;
+export const HANDLE_HIT_PX = 10;
 
 const EPS = 1e-9;
 
@@ -141,45 +139,114 @@ export function sameTransform(a: Transform, b: Transform): boolean {
 
 // ---- Handles ---------------------------------------------------------------------------------
 
+/**
+ * UI-TOKEN-07 pixel sizes. The rotate ring circles the footprint, the axis arrows start just
+ * outside the ring and the scale squares sit on the footprint corners, so no handle covers the
+ * middle of the entity, where presses belong to picking and token drag (F07).
+ */
+export const RING_GAP_PX = 14;
+export const ARROW_START_PX = 6;
+export const ARROW_LENGTH_PX = 38;
+export const SCALE_SQUARE_PX = 9;
+export const MOVE_PAD_PX = 9;
+
 export interface HandleLayout {
-  move: Xz;
-  rotate: Xz;
-  scale: Xz;
+  center: Xz;
+  /** Free XZ move pad at the centre; only non-token entities get one (tokens drag by the body). */
+  move: Xz | null;
+  /** Arrow segments along the world axes (Unity "global"): X red, Z blue. */
+  moveX: { from: Xz; to: Xz };
+  moveZ: { from: Xz; to: Xz };
+  /** Rotate ring radius (yaw about Y, green). */
+  ringRadius: number;
+  /** Uniform scale squares on the four footprint corners, turned with the entity's yaw. */
+  corners: readonly Xz[];
 }
 
 /** `worldPerPx` keeps handle offsets a constant screen size at any zoom. */
-export function handleLayout(
-  center: Xz,
-  yaw: number,
-  halfExtent: number,
-  worldPerPx: number,
-): HandleLayout {
-  const reach = halfExtent + ROTATE_OFFSET_PX * worldPerPx;
-  const corner = halfExtent + SCALE_OFFSET_PX * worldPerPx;
+export function handleLayout(args: {
+  center: Xz;
+  yaw: number;
+  halfWidth: number;
+  halfDepth: number;
+  worldPerPx: number;
+  freeMove: boolean;
+}): HandleLayout {
+  const { center, yaw, halfWidth, halfDepth, worldPerPx: wpp } = args;
+  const ringRadius = Math.hypot(halfWidth, halfDepth) + RING_GAP_PX * wpp;
+  const start = ringRadius + ARROW_START_PX * wpp;
+  const end = start + ARROW_LENGTH_PX * wpp;
+  // The drawn outline's rotation (three.js yaw about +Y): x' = x cos + z sin, z' = z cos - x sin.
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const corners = [
+    [1, 1],
+    [-1, 1],
+    [-1, -1],
+    [1, -1],
+  ].map(([sx = 0, sz = 0]) => {
+    const lx = sx * halfWidth;
+    const lz = sz * halfDepth;
+    return { x: center.x + lx * cos + lz * sin, z: center.z - lx * sin + lz * cos };
+  });
   return {
-    move: center,
-    // Direction at `yaw` in the world XZ plane (x' = cos, z' = -sin; see primitives.ts `rotate`).
-    rotate: { x: center.x + Math.cos(yaw) * reach, z: center.z - Math.sin(yaw) * reach },
-    scale: { x: center.x + corner, z: center.z + corner },
+    center,
+    move: args.freeMove ? center : null,
+    moveX: { from: { x: center.x + start, z: center.z }, to: { x: center.x + end, z: center.z } },
+    moveZ: { from: { x: center.x, z: center.z + start }, to: { x: center.x, z: center.z + end } },
+    ringRadius,
+    corners,
   };
 }
 
-const HANDLE_PRIORITY: readonly HandleKind[] = ['rotate', 'scale', 'move'];
+/** The layout drawn and hit-tested for `entity` at `draft` (the live preview while dragging). */
+export function layoutForDraft(
+  entity: Entity,
+  draft: GizmoDraft,
+  worldPerPx: number,
+  imageAspect = 1,
+): HandleLayout {
+  const extents = entityExtents(entity, imageAspect);
+  const ratio = draft.scale / (entityScale(entity) || 1);
+  return handleLayout({
+    center: { x: draft.x, z: draft.z },
+    yaw: draft.yaw,
+    halfWidth: (extents.width * ratio) / 2,
+    halfDepth: (extents.depth * ratio) / 2,
+    worldPerPx,
+    freeMove: !entity.token,
+  });
+}
+
+function distanceToSegment(p: Xz, a: Xz, b: Xz): number {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const lengthSq = dx * dx + dz * dz;
+  const t =
+    lengthSq < EPS ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / lengthSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.z - (a.z + t * dz));
+}
 
 /**
- * Which handle a press lands on. The nearest within the hit radius wins; on a tie the outer
- * handles beat `move`, which sits on top of the entity and would otherwise swallow them.
+ * Which handle a press lands on. The nearest within the hit radius wins; on a tie the earlier
+ * kind wins (scale squares, then arrows, then the ring, then the centre pad).
  */
 export function hitHandle(
   point: Xz,
   layout: HandleLayout,
   hitRadiusWorld: number,
 ): HandleKind | null {
+  const fromCenter = Math.hypot(point.x - layout.center.x, point.z - layout.center.z);
+  const candidates: [HandleKind, number][] = [
+    ['scale', Math.min(...layout.corners.map((c) => Math.hypot(point.x - c.x, point.z - c.z)))],
+    ['move-x', distanceToSegment(point, layout.moveX.from, layout.moveX.to)],
+    ['move-z', distanceToSegment(point, layout.moveZ.from, layout.moveZ.to)],
+    ['rotate', Math.abs(fromCenter - layout.ringRadius)],
+  ];
+  if (layout.move) candidates.push(['move', fromCenter]);
   let best: HandleKind | null = null;
   let bestDistance = Infinity;
-  for (const kind of HANDLE_PRIORITY) {
-    const handle = layout[kind];
-    const distance = Math.hypot(point.x - handle.x, point.z - handle.z);
+  for (const [kind, distance] of candidates) {
     if (distance <= hitRadiusWorld && distance < bestDistance - EPS) {
       best = kind;
       bestDistance = distance;
@@ -206,6 +273,12 @@ export function applyMove(args: {
   };
   const snapped = snapPosition(raw, args.grid, args.footprint);
   return { x: snapped.x, z: snapped.z };
+}
+
+/** UI-TOKEN-07 axis arrow: the usual snapped move, keeping the other coordinate unchanged. */
+export function applyAxisMove(args: Parameters<typeof applyMove>[0] & { axis: 'x' | 'z' }): Xz {
+  const moved = applyMove(args);
+  return args.axis === 'x' ? { x: moved.x, z: args.start.z } : { x: args.start.x, z: moved.z };
 }
 
 /** Pointer angle about `center` in the same sense as yaw. */

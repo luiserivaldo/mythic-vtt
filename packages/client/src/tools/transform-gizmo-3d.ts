@@ -23,7 +23,8 @@ export interface QuatLike extends Vec3Like {
   w: number;
 }
 
-export type Gizmo3DHandle = 'move-xz' | 'move-y' | 'rotate-x' | 'rotate-y' | 'rotate-z';
+export type Gizmo3DHandle =
+  'move-xz' | 'move-x' | 'move-y' | 'move-z' | 'rotate-x' | 'rotate-y' | 'rotate-z';
 export type RotationAxis = 'x' | 'y' | 'z';
 
 export const ROTATION_STEP = Math.PI / 12;
@@ -178,40 +179,103 @@ export function worldPerPixelAt(
   return (2 * Math.max(distance, 0) * Math.tan((fovDegrees * Math.PI) / 360)) / viewportHeightPx;
 }
 
-/** World-space handle anchors around `center`; `reach` is the world length of HANDLE_LENGTH_PX. */
-export function handleAnchors(
+/**
+ * UI-TOKEN-07 proportions, in units of `reach` (HANDLE_LENGTH_PX). Arrows start away from the
+ * centre so the entity's middle stays free for picking (F07); rings sit between.
+ */
+export const ARROW_START = 0.3;
+export const ARROW_END = 1.15;
+export const RING_RADIUS = 0.8;
+const RING_SEGMENTS = 48;
+
+export interface HandleShape {
+  kind: Gizmo3DHandle;
+  /** One point (the centre pad), an open polyline (arrow) or a closed loop (ring). */
+  points: Vec3Like[];
+  closed: boolean;
+}
+
+/** Arrows first, then rings, then the pad: on a tie the earlier shape wins the press. */
+const SHAPE_ORDER: readonly Gizmo3DHandle[] = [
+  'move-x',
+  'move-y',
+  'move-z',
+  'rotate-x',
+  'rotate-y',
+  'rotate-z',
+  'move-xz',
+];
+
+/** World-space handle shapes around `center`; `reach` is the world length of HANDLE_LENGTH_PX. */
+export function handleShapes(
   center: Vec3Like,
   reach: number,
   kinds: readonly Gizmo3DHandle[],
-): { kind: Gizmo3DHandle; position: Vec3Like }[] {
-  const at = (dx: number, dy: number, dz: number): Vec3Like => ({
-    x: center.x + dx * reach,
-    y: center.y + dy * reach,
-    z: center.z + dz * reach,
+): HandleShape[] {
+  const at = (v: Vec3Like, s: number): Vec3Like => ({
+    x: center.x + v.x * s * reach,
+    y: center.y + v.y * s * reach,
+    z: center.z + v.z * s * reach,
   });
-  const all: Record<Gizmo3DHandle, Vec3Like> = {
-    'move-xz': center,
-    'move-y': at(0, 1, 0),
-    // Each rotate handle lies in the plane it turns the entity through.
-    'rotate-x': at(0, 0, 1),
-    'rotate-y': at(-1, 0, 0),
-    'rotate-z': at(1, 0, 0),
+  const arrow = (axis: RotationAxis): Vec3Like[] => [
+    at(axisVector(axis), ARROW_START),
+    at(axisVector(axis), ARROW_END),
+  ];
+  const ring = (axis: RotationAxis): Vec3Like[] =>
+    Array.from({ length: RING_SEGMENTS }, (_, i) => {
+      const a = (i / RING_SEGMENTS) * Math.PI * 2;
+      const u = Math.cos(a);
+      const v = Math.sin(a);
+      const local =
+        axis === 'x'
+          ? { x: 0, y: u, z: v }
+          : axis === 'y'
+            ? { x: u, y: 0, z: v }
+            : { x: u, y: v, z: 0 };
+      return at(local, RING_RADIUS);
+    });
+  const build = (kind: Gizmo3DHandle): HandleShape => {
+    if (kind === 'move-xz') return { kind, points: [center], closed: false };
+    const axis = kind.slice(-1) as RotationAxis;
+    return kind.startsWith('rotate')
+      ? { kind, points: ring(axis), closed: true }
+      : { kind, points: arrow(axis), closed: false };
   };
-  return kinds.map((kind) => ({ kind, position: all[kind] }));
+  return SHAPE_ORDER.filter((k) => kinds.includes(k)).map(build);
 }
 
-/** Nearest handle within `radiusPx` of the pointer; null when the press misses every handle. */
-export function hitScreenHandle(
-  pointer: { x: number; y: number },
-  handles: readonly { kind: Gizmo3DHandle; px: { x: number; y: number } }[],
+type Px = { x: number; y: number };
+
+function pxToSegment(p: Px, a: Px, b: Px): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSq = dx * dx + dy * dy;
+  const t =
+    lengthSq < EPS ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** Nearest projected shape within `radiusPx` of the pointer; null when the press misses all. */
+export function hitScreenShape(
+  pointer: Px,
+  shapes: readonly { kind: Gizmo3DHandle; px: readonly Px[]; closed: boolean }[],
   radiusPx: number,
 ): Gizmo3DHandle | null {
   let best: Gizmo3DHandle | null = null;
   let bestDistance = Infinity;
-  for (const h of handles) {
-    const d = Math.hypot(pointer.x - h.px.x, pointer.y - h.px.y);
-    if (d <= radiusPx && d < bestDistance) {
-      best = h.kind;
+  for (const s of shapes) {
+    let d = Infinity;
+    const n = s.px.length;
+    const first = s.px[0];
+    if (n === 1 && first) d = Math.hypot(pointer.x - first.x, pointer.y - first.y);
+    const segments = s.closed ? n : n - 1;
+    for (let i = 0; i < segments; i++) {
+      const a = s.px[i];
+      const b = s.px[(i + 1) % n];
+      if (a && b) d = Math.min(d, pxToSegment(pointer, a, b));
+    }
+    if (d <= radiusPx && d < bestDistance - EPS) {
+      best = s.kind;
       bestDistance = d;
     }
   }
@@ -219,7 +283,7 @@ export function hitScreenHandle(
 }
 
 export function handlesFor(kind: 'prop' | 'token'): readonly Gizmo3DHandle[] {
-  return kind === 'token' ? ['move-y'] : ['move-xz', 'move-y', 'rotate-x', 'rotate-y', 'rotate-z'];
+  return kind === 'token' ? ['move-y'] : SHAPE_ORDER;
 }
 
 /** M1-47: footprint for the 3D gizmo's XZ move, using the same aspect as the 2D gizmo. */

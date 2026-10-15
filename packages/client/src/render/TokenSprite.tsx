@@ -10,7 +10,12 @@ import { useViewerPreferences } from '../ui/ViewerPreferencesProvider.js';
 import { elevationBadgeText } from './elevation-badge.js';
 import type { RenderEntity } from './scene-model.js';
 import { labelVisible } from './token-labels.js';
-import { LABEL_BACKGROUND_COLOR, LABEL_TEXT_COLOR, SELECTION_COLOR } from './canvas-style.js';
+import {
+  GIZMO_RENDER_ORDER,
+  LABEL_BACKGROUND_COLOR,
+  LABEL_TEXT_COLOR,
+  SELECTION_COLOR,
+} from './canvas-style.js';
 
 /** Host origin for assets. '' = same origin (dev server proxies `/assets` to the host). */
 const ASSET_BASE_URL = '';
@@ -83,10 +88,13 @@ export function SelectionRing({ size }: { size: number }) {
   const half = size / 2;
   return (
     // Not pickable: it must never intercept clicks meant for the token mesh.
-    <mesh raycast={() => null} position={[0, 0, 0.001]}>
+    // F08: transparent with a high order, so it draws after the (transparent) grid lines instead
+    // of under them; on a whole-cell token its edge sits exactly on a grid line.
+    <mesh raycast={() => null} position={[0, 0, 0.001]} renderOrder={GIZMO_RENDER_ORDER - 2}>
       <ringGeometry args={[half * 0.94, half, 4, 1, Math.PI / 4, Math.PI * 2]} />
       <meshBasicMaterial
         color={SELECTION_COLOR}
+        transparent
         side={DoubleSide}
         depthTest={false}
         depthWrite={false}
