@@ -9,6 +9,7 @@ import { mapTextureAspect, useMapTexture } from './use-texture.js';
 import { gizmoStore } from '../tools/gizmo-store.js';
 import type { RenderEntity } from './scene-model.js';
 import { SELECTION_COLOR } from './canvas-style.js';
+import { layerShade } from './layer-visibility.js';
 
 /** Host origin for assets. '' = same origin (dev server proxies `/assets` to the host). */
 const ASSET_BASE_URL = '';
@@ -73,7 +74,10 @@ export function MapImageMesh({
       <planeGeometry args={[scale * aspect, scale]} />
       <meshBasicMaterial
         key={entry.status === 'ready' ? 'textured' : 'flat'}
-        color={entry.status === 'ready' ? '#ffffff' : selected ? SELECTION_COLOR : '#51637a'}
+        color={layerShade(
+          entry.status === 'ready' ? '#ffffff' : selected ? SELECTION_COLOR : '#51637a',
+          entity.dimmed,
+        )}
         {...(entry.status === 'ready' ? { map: entry.texture } : {})}
         side={DoubleSide}
         depthTest={false}

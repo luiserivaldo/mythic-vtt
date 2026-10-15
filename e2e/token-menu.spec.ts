@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openClient, RawClient, recordPageFrames, startTable, testUlid } from './harness.js';
+import {
+  openClient,
+  RawClient,
+  recordPageFrames,
+  setActiveLayer,
+  startTable,
+  testUlid,
+} from './harness.js';
 
 // UX-20 (UI-TOKEN-02, UI-TOKEN-03): the full token menu opens from the gear or a double-click, near
 // the token, with the fields a viewer may not edit disabled; the right-click menu sits to the right
@@ -208,6 +215,8 @@ test('the full menu near the token, and the curated right-click menu', async ({ 
     await expect(submenu.getByRole('menuitem', { name: 'Tokens', exact: true })).toHaveCount(0);
     await submenu.getByRole('menuitem', { name: 'Effects', exact: true }).click();
     await expect.poll(() => entity(OGRE)?.layer).toBe('effects');
+    // MV-244: the moved token is only picked again once Effects is the active layer.
+    await setActiveLayer(page, 'Effects');
 
     // Token Options hands over to the full menu; only one menu shows at a time.
     await rightClickCell(page, 21.5, 12.5);

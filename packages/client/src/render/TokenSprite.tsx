@@ -11,6 +11,7 @@ import { useViewerPreferences } from '../ui/ViewerPreferencesProvider.js';
 import { badgeElevation, elevationBadgeText } from './elevation-badge.js';
 import type { RenderEntity } from './scene-model.js';
 import { labelVisible } from './token-labels.js';
+import { layerShade } from './layer-visibility.js';
 import {
   GIZMO_RENDER_ORDER,
   LABEL_BACKGROUND_COLOR,
@@ -74,7 +75,7 @@ export function TokenMaterial({
   return (
     <meshBasicMaterial
       key={map ? 'textured' : 'flat'}
-      color={map ? '#ffffff' : color}
+      color={layerShade(map ? '#ffffff' : color, entity.dimmed)}
       {...(map ? { map } : {})}
       transparent={map !== null}
       side={DoubleSide}

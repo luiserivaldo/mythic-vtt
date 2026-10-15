@@ -1,4 +1,5 @@
 import { DoubleSide } from 'three';
+import { layerShade } from './layer-visibility.js';
 import type { RenderEntity } from './scene-model.js';
 
 /** MEAS-07: faint, non-pickable rings at the token's feet in both views. */
@@ -15,7 +16,7 @@ export function TokenRings({ entity }: { entity: RenderEntity }) {
         >
           <ringGeometry args={[Math.max(0, ring.radius - 0.025), ring.radius + 0.025, 96]} />
           <meshBasicMaterial
-            color={ring.color}
+            color={layerShade(ring.color, entity.dimmed)}
             transparent
             opacity={0.8}
             depthWrite={false}

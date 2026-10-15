@@ -1,5 +1,6 @@
-import type { Entity, Scene, Seat } from '@mythic/shared';
+import type { Entity, LayerId, Scene, Seat } from '@mythic/shared';
 import { RENDER_LAYERS, renderLayer } from '../render/scene-model.js';
+import { isOffFocus } from '../render/layer-visibility.js';
 
 export interface PickHit {
   id: string;
@@ -40,15 +41,20 @@ export function canSelect(entity: Entity, scene: Scene, actor: SelectionActor): 
   );
 }
 
-/** Overlay order takes precedence over ray distance; distance breaks ties within a layer. */
+/**
+ * Overlay order takes precedence over ray distance; distance breaks ties within a layer.
+ * UI-LAY-01 (MV-244): with a focused layer, objects on any other layer are skipped, so a click
+ * passes through them to what lies beneath on the active layer. The map layer is never skipped.
+ */
 export function pickEntity(
   hits: readonly PickHit[],
   scene: Scene,
   actor: SelectionActor,
+  focus: LayerId | null = null,
 ): string | null {
   const eligible = hits.filter(({ id }) => {
     const entity = scene.entities[id];
-    return entity && canSelect(entity, scene, actor);
+    return entity && !isOffFocus(entity.layer, focus) && canSelect(entity, scene, actor);
   });
   eligible.sort((a, b) => {
     const aEntity = scene.entities[a.id];

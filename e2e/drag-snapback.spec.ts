@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, seedProfile, startTable, testUlid, type Table } from './harness.js';
+import {
+  RawClient,
+  seedProfile,
+  setActiveLayer,
+  startTable,
+  testUlid,
+  type Table,
+} from './harness.js';
 
 let table: Table | undefined;
 
@@ -31,6 +38,8 @@ const cases = [
   { size: 1, elevation: 0, layer: 'tokens', owned: false, at: { x: 37.5, z: 25.5 } },
   { size: 4, elevation: 0, layer: 'tokens', owned: true, at: { x: 36, z: 24 } },
 ] as const;
+
+const LAYER_LABELS = { tokens: 'Tokens', props: 'Props', map: 'Map', dm: 'DM only' } as const;
 
 test('DM link drags every token size, elevation, layer, ownership and edge spawn', async ({
   browser,
@@ -121,6 +130,8 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
     const start = screen(from.x, from.z);
     // MV-239: a selected token shows the Transform chip (the panel starts tucked).
     const chip = page.getByRole('button', { name: 'Restore Transform panel' });
+    // MV-244: each token is picked while its own layer is the active one.
+    await setActiveLayer(page, LAYER_LABELS[entry.layer]);
     await expect(async () => {
       await page.mouse.click(start.x, start.y);
       await expect(chip).toBeVisible({ timeout: 1000 });

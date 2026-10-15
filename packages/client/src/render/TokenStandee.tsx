@@ -16,6 +16,7 @@ import {
   badgeAnchor3d,
 } from './token-standee.js';
 import { SELECTION_COLOR } from './canvas-style.js';
+import { layerShade } from './layer-visibility.js';
 
 const SELECTED = SELECTION_COLOR;
 const FLYING_COLOR = '#7dd3fc';
@@ -75,7 +76,9 @@ export function TokenStandee({
           onContextMenu={onContextMenu}
         >
           <cylinderGeometry args={[dims.baseRadius, dims.baseRadius, dims.baseThickness, 32]} />
-          <meshStandardMaterial color={selected ? SELECTED : '#2b3643'} />
+          <meshStandardMaterial
+            color={layerShade(selected ? SELECTED : '#2b3643', entity.dimmed)}
+          />
         </mesh>
         {/* Not pickable: it must never intercept clicks meant for the token. */}
         <mesh raycast={() => null} position={[...facingMarkerPosition(entity.sizeCells)]}>

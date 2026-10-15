@@ -19,7 +19,7 @@ import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-mode
 import type { RenderGrid } from './grid-model.js';
 import { AoEVolume } from './AoEVolume.js';
 import { useUiStore } from '../ui/ui-store.js';
-import { visibleEntities } from './layer-visibility.js';
+import { focusedLayer, visibleEntities } from './layer-visibility.js';
 import type { ElevatedGridSurface } from './elevated-grid.js';
 
 const Lighting3D = lazy(async () => {
@@ -64,10 +64,13 @@ export function PickableEntities({
   const selected = useStore(selectionStore, (state) => state.ids);
   const hiddenLayers = useUiStore((state) => state.hiddenLayers);
   const actor = selectionActor(isHost, seatId, seats);
+  // MV-244: objects off the active layer are shaded and skipped by picking (host and co-DM only).
+  const activeLayer = useUiStore((state) => state.activeLayer);
+  const focus = focusedLayer(actor, activeLayer);
   // UI-LAY-01: entities on a hidden layer are not mounted, so they are not drawn or picked.
   const visible = useMemo(
-    () => visibleEntities(rendered, scene, hiddenLayers),
-    [rendered, scene, hiddenLayers],
+    () => visibleEntities(rendered, scene, hiddenLayers, focus),
+    [rendered, scene, hiddenLayers, focus],
   );
   const visibleScene = useMemo(
     () => (rendered ? { ...rendered, entities: visible } : null),
@@ -101,7 +104,7 @@ export function PickableEntities({
     if (!scene) return;
     event.stopPropagation();
     const hits = event.intersections.map(({ object, distance }) => ({ id: object.name, distance }));
-    const id = pickEntity(hits, scene, actor);
+    const id = pickEntity(hits, scene, actor, focus);
     selectionStore.getState().pick(scene.id, id, event.shiftKey || event.ctrlKey || event.metaKey);
   }
 
@@ -118,11 +121,11 @@ export function PickableEntities({
 
   /**
    * UI-TOKEN-02/03: both token menus are offered only for a token this viewer may select, so a
-   * spectator or an entity on a locked layer opens nothing (PERM-01/02).
+   * spectator, an entity on a locked layer or one off the active layer (MV-244) opens nothing.
    */
   function menuToken(entity: RenderEntity): string | null {
     const source = scene?.entities[entity.id];
-    if (!source?.token || !scene || !canSelect(source, scene, actor)) return null;
+    if (!source?.token || !scene || entity.dimmed || !canSelect(source, scene, actor)) return null;
     return entity.id;
   }
 
@@ -140,7 +143,7 @@ export function PickableEntities({
   function onContextMenu(event: ThreeEvent<MouseEvent>) {
     if (!scene) return;
     const hits = event.intersections.map(({ object, distance }) => ({ id: object.name, distance }));
-    const id = pickEntity(hits, scene, actor);
+    const id = pickEntity(hits, scene, actor, focus);
     const entity = id === null ? undefined : scene.entities[id];
     if (id === null || !(entity?.token ?? entity?.shape) || !canSelect(entity, scene, actor))
       return;
@@ -175,6 +178,7 @@ export function PickableEntities({
                     walkables={walkables}
                     mode={mode}
                     renderOrder={order + 1}
+                    dimmed={entity.dimmed}
                   />
                   <mesh
                     name={entity.id}

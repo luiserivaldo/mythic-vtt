@@ -30,6 +30,8 @@ export interface RenderEntity {
   position: readonly [number, number, number];
   sizeCells: number;
   secret: boolean;
+  /** UI-LAY-01 (MV-244): set by the view filter on objects off the viewer's active layer. */
+  dimmed?: boolean;
   rings?: { radius: number; color: string }[];
   aoe?: Volume | undefined;
   /** Present only for primitive entities (ENV-02). */
