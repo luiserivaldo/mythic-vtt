@@ -7,6 +7,7 @@ import { ViewToggle } from '../render/ViewToggle.js';
 import { viewModeStore } from '../render/view-mode-store.js';
 import { dockStore } from './dock-store.js';
 import { IdentityStatus } from './IdentityStatus.js';
+import { InviteButton } from './InvitePopover.js';
 import { SeatAvatars } from './SeatAvatars.js';
 import { isAdminRole, viewerRole } from './viewer.js';
 
@@ -50,6 +51,7 @@ export function TopBar() {
       <ViewAsControl />
       <SeatAvatars />
       <IdentityStatus />
+      <InviteButton />
       {/* CAM-06: the DM takes everyone watching players to their own camera. */}
       {admin && (
         <button
