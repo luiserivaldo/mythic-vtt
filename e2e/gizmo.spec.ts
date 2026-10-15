@@ -95,13 +95,16 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   });
 
   const panel = page.getByRole('region', { name: /Transform/ });
-  await expect(panel).toHaveCount(0);
+  // MV-239: selecting shows the Transform chip, not the open panel, so it does not cover the board.
+  const chip = page.getByRole('button', { name: 'Restore Transform panel' });
+  await expect(chip).toHaveCount(0);
   const start = at(2.5, 3.5);
   // The view frames the canvas once the orthographic camera mounts, so retry the click until then.
   await expect(async () => {
     await page.mouse.click(start.x, start.y);
-    await expect(panel).toBeVisible({ timeout: 1000 });
+    await expect(chip).toBeVisible({ timeout: 1000 });
   }).toPass();
+  await expect(panel).toHaveCount(0);
 
   const labelBefore = await page.getByTestId('token-label').boundingBox();
 
@@ -120,7 +123,7 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   await expect.poll(() => position()?.x, { timeout: 10_000 }).toBeCloseTo(4.5);
   expect(position()?.z).toBeCloseTo(3.5);
   // The token is still selected (the drag's click was swallowed) and the gizmo follows it.
-  await expect(panel).toBeVisible();
+  await expect(chip).toBeVisible();
 
   // UI-TOKEN-07 handles (px from the token centre, 1-cell token): the Y ring circles the
   // footprint 14 px outside its corners; the X/Z arrows run from 6 to 44 px outside the ring.
@@ -166,7 +169,6 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   await expect.poll(() => entityState()?.token?.sizeCells, { timeout: 10_000 }).toBe(2);
   expect(entityState()?.transform.scale).toEqual({ x: 1, y: 1, z: 1 });
   expect(position()).toMatchObject({ x: 6.5, z: 4.5 });
-  await expect(panel.getByLabel('Size (cells)')).toHaveValue('2');
   const resized = entityState;
 
   // Dragging empty board still pans (the label moves on screen).
@@ -177,6 +179,11 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   await page.mouse.up();
   const labelAfterPan = await page.getByTestId('token-label').boundingBox();
   expect(labelAfterPan?.x).toBeGreaterThan((labelBefore?.x ?? 0) + 2 * zoom);
+
+  // The chip opens the panel, which reads the gizmo's commits.
+  await chip.click();
+  await expect(panel).toBeVisible();
+  await expect(panel.getByLabel('Size (cells)')).toHaveValue('2');
 
   // Typed values: invalid input is rejected locally, valid input is one commit.
   const unitsPerCell = (reader.state as Snapshot).scenes[scene]?.grid.unitsPerCell ?? 1;

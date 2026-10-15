@@ -11,7 +11,7 @@ test.afterAll(async () => {
   await table.stop();
 });
 
-test('tool panels share an ordered dock and active tools collapse to restore buttons', async ({
+test('selection panels stack beside the token and tool panels collapse to restore buttons', async ({
   browser,
 }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -26,8 +26,15 @@ test('tool panels share an ordered dock and active tools collapse to restore but
   await page.getByLabel('Token name').fill('Dock token');
   await page.getByRole('button', { name: 'Create token' }).click();
 
-  const dock = page.getByRole('complementary', { name: 'Tool panels' });
+  // MV-239 / UI-TOKEN-02: the selected token's panels open beside it, over the board. Transform
+  // and Token both start as chips (owner ruling): selecting covers nothing.
+  const dock = page.getByRole('complementary', { name: 'Selection panels' });
   const panels = dock.locator('[data-tool-panel]');
+  await expect(dock.getByRole('button', { name: 'Restore Transform panel' })).toBeVisible();
+  await expect(dock.getByRole('button', { name: 'Restore Token panel' })).toBeVisible();
+  await expect(panels).toHaveCount(0);
+  // The chip is how the user calls up the Transform tool.
+  await dock.getByRole('button', { name: 'Restore Transform panel' }).click();
   await expect(panels).toHaveCount(1);
   await expect(panels.nth(0)).toHaveAttribute('data-tool-panel', 'transform');
   await dock.getByRole('button', { name: 'Restore Token panel' }).click();

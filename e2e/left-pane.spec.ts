@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test';
 import { startTable, type Table } from './harness.js';
 
 interface PanelRegions {
-  __mythicPanelRegions?: { set(id: string, region: 'left-pane' | 'right-dock'): void };
+  __mythicPanelRegions?: {
+    set(id: string, region: 'left-pane' | 'beside-rail' | 'beside-token'): void;
+  };
 }
 
 let table: Table | undefined;

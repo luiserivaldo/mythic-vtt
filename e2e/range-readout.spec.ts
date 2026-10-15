@@ -148,7 +148,10 @@ test('the selected token reads the range to a hovered token in 2D and 3D', async
   await expect(dm.getByTestId('range-readout')).toHaveCount(0);
 
   await dm.mouse.click(aria.x, aria.y);
-  await expect(dm.getByRole('region', { name: 'Transform: Aria' })).toBeVisible();
+  // MV-239: Transform starts as its chip, so the open panel never covers the hovered token.
+  const chip = dm.getByRole('button', { name: 'Restore Transform panel' });
+  await expect(chip).toBeVisible();
+  await expect(dm.getByRole('region', { name: 'Transform: Aria' })).toHaveCount(0);
 
   // 2D: H 6 cells (30 ft), no vertical leg.
   await dm.mouse.move(ogre.x, ogre.y);
@@ -170,12 +173,12 @@ test('the selected token reads the range to a hovered token in 2D and 3D', async
   await dm.mouse.move(ogre.x, ogre.y);
   await expect(dm.getByTestId('range-readout')).toHaveText('H 30 ft · V 0 ft · T 30 ft');
   await dm.keyboard.press('Escape');
-  await expect(dm.getByRole('region', { name: 'Transform: Aria' })).toHaveCount(0);
+  await expect(chip).toHaveCount(0);
   await expect(dm.getByTestId('range-readout')).toHaveCount(0);
 
   // 3D: the same readout through the standee, projected through the live pose.
   await dm.mouse.click(aria.x, aria.y);
-  await expect(dm.getByRole('region', { name: 'Transform: Aria' })).toBeVisible();
+  await expect(chip).toBeVisible();
   await dm.getByRole('button', { name: '3D view' }).click();
   await expect(dm.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await dm.getByRole('button', { name: 'Reset view' }).click();

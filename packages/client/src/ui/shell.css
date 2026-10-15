@@ -200,14 +200,16 @@ main > p {
   box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
 }
 
-/* M1-37: tool panels share one scrollable dock in Entity, Transform, AoE order. */
-.ui-tool-dock {
+/* M1-37 / MV-239: the selected entity's panels stack in Transform, AoE, Token order beside it,
+   over the board (UI-TOKEN-02). BesideToken sets left and top from the token's screen position. */
+.ui-beside-token {
   position: absolute;
-  top: 3.25rem;
-  right: 0.5rem;
-  bottom: 0.5rem;
+  top: 0.5rem;
+  left: 0.5rem;
   z-index: 2;
-  width: min(22rem, calc(100% - 1rem));
+  width: max-content;
+  max-width: min(20rem, calc(100% - 1rem));
+  max-height: calc(100% - 1rem);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -227,6 +229,10 @@ main > p {
   border: 1px solid var(--ui-border);
   border-radius: 6px;
   box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+}
+.ui-beside-token > .ui-tool-panel {
+  width: 20rem;
+  max-width: 100%;
 }
 .ui-tool-panel-head {
   position: sticky;
@@ -532,13 +538,7 @@ main .ui-danger-button:not(:disabled) {
     display: inline-block;
     width: 48%;
   }
-  .ui-tool-dock {
-    top: auto;
-    left: 0.5rem;
-    max-height: 62%;
-    width: calc(100% - 1rem);
-  }
-  .ui-tool-dock .ui-overlay {
+  .ui-beside-token .ui-overlay {
     width: 100%;
   }
 }
@@ -1104,15 +1104,6 @@ main .ui-danger-button:not(:disabled) {
   margin: 0.1rem 0 0;
   color: var(--ui-muted);
   font-size: 0.85rem;
-}
-.ui-app .ui-tool-dock {
-  position: static;
-  width: 100%;
-  max-height: none;
-  overflow: visible;
-}
-.ui-context-panel-slot {
-  margin-top: 0.75rem;
 }
 .ui-shell-error {
   position: fixed;

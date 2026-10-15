@@ -1,4 +1,4 @@
-import { lazy, Suspense, useId, type Ref } from 'react';
+import { lazy, Suspense, useId } from 'react';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { ChatPanel } from './ChatPanel.js';
@@ -26,16 +26,15 @@ export type DockTheme = 'dark' | 'light';
 interface Props {
   theme: DockTheme;
   onThemeChange: (theme: DockTheme) => void;
-  /** Where the board's selection-driven tool panels (Transform, AoE, Token, Ruler) portal in. */
-  contextPanelRef: Ref<HTMLDivElement>;
 }
 
 /**
  * UI-DOCK-01: an icon tab strip with a collapse button. Collapsed, the strip becomes an icon
  * column and the board widens. Only the active tab's content is mounted, and a tab the viewer
  * may not use is never offered or rendered (registry predicate; the host re-checks every intent).
+ * The dock holds tabs only: no tool or token panel renders in it (UIUX.md principle 3, MV-239).
  */
-export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
+export function RightDock({ theme, onThemeChange }: Props) {
   const preview = useClientStore((s) => s.viewAs.kind !== 'host');
   const campaign = useClientStore((s) => s.campaign);
   const viewed = useViewedCampaign();
@@ -161,7 +160,6 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
             </fieldset>
           </div>
         )}
-        <div className="ui-context-panel-slot" ref={contextPanelRef} />
       </div>
     </aside>
   );

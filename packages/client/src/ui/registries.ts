@@ -24,11 +24,12 @@ export interface TokenQuickField extends RegistryEntry {
 }
 
 /**
- * UI-SHELL-05: the shell regions a tool panel can open in. `left-pane` sits beside the rail
- * (principle 3); `right-dock` is the dock's context slot under the active tab. `beside-rail`
- * floats over the board directly beside the tool's rail button (UI-MEAS-01, MV-265).
+ * UI-SHELL-05: the shell regions a tool panel can open in (principle 3). `left-pane` sits beside
+ * the rail; `beside-rail` floats over the board beside the tool's rail button; `beside-token`
+ * floats next to the selected entity (UI-TOKEN-02). The right dock holds tabs only (MV-239), so
+ * it is deliberately not a region.
  */
-export type PanelRegion = 'left-pane' | 'right-dock' | 'beside-rail';
+export type PanelRegion = 'left-pane' | 'beside-rail' | 'beside-token';
 
 /** A tool panel (rail tool options or a selection-driven panel) and the region it opens in. */
 export interface ToolPanel extends RegistryEntry {
@@ -173,7 +174,9 @@ export const dockTabs = createRegistry<DockTab>([
 
 // Who sees a panel is decided where it renders (selection, the active rail tool, read-only seats)
 // and the host re-checks every intent, so the predicate here only places it. Moving a panel to
-// another region is a one-word change to `region` (MV-254, MV-255).
+// another region is a one-word change to `region` (MV-254, MV-255). No panel opens in the right
+// dock (MV-239): selection panels open beside the token, rail panels beside their button or in
+// the left pane.
 export const toolPanels = createRegistry<ToolPanel>([
   {
     id: 'transform',
@@ -181,7 +184,7 @@ export const toolPanels = createRegistry<ToolPanel>([
     icon: 'move',
     group: 'selection',
     allowed: everyone,
-    region: 'right-dock',
+    region: 'beside-token',
   },
   {
     id: 'aoe',
@@ -189,7 +192,7 @@ export const toolPanels = createRegistry<ToolPanel>([
     icon: 'aoe',
     group: 'selection',
     allowed: everyone,
-    region: 'right-dock',
+    region: 'beside-token',
   },
   {
     id: 'token',
@@ -197,7 +200,7 @@ export const toolPanels = createRegistry<ToolPanel>([
     icon: 'token',
     group: 'selection',
     allowed: everyone,
-    region: 'right-dock',
+    region: 'beside-token',
   },
   {
     id: 'ruler',
@@ -214,7 +217,9 @@ export const toolPanels = createRegistry<ToolPanel>([
     icon: 'pen',
     group: 'rail',
     allowed: everyone,
-    region: 'right-dock',
+    // MV-265 / UI-SHELL-05: quick tooling beside the rail, in the left pane so the panel never
+    // covers the board being drawn on (MV-239 removed the dock slot).
+    region: 'left-pane',
   },
   {
     id: 'create-prop',
@@ -222,7 +227,8 @@ export const toolPanels = createRegistry<ToolPanel>([
     icon: 'cube',
     group: 'rail',
     allowed: everyone,
-    region: 'right-dock',
+    // C17 / UX-39: Create Prop options live in the left pane (MV-239 removed the dock slot).
+    region: 'left-pane',
   },
   {
     id: 'initiative',

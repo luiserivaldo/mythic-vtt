@@ -28,7 +28,7 @@ declare global {
     };
     /** Development-only panel routing for the UI-SHELL-05 left pane e2e. */
     __mythicPanelRegions?: {
-      set(id: string, region: 'left-pane' | 'right-dock'): void;
+      set(id: string, region: 'left-pane' | 'beside-rail' | 'beside-token'): void;
     };
     /** Development/test-only render counters for performance assertions. */
     __mythicRender?: {

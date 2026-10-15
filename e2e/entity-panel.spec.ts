@@ -74,6 +74,9 @@ test('the host creates a scene, a token and a box from the Entities panel and se
     'aria-pressed',
     'true',
   );
+  // MV-239: the selected token shows its Transform chip; the chip opens the panel.
+  await expect(page.getByLabel('X (ft)')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Restore Transform panel' }).click();
   await expect(page.getByLabel('X (ft)')).toBeVisible();
 
   const propName = page.getByLabel('Prop name');

@@ -66,11 +66,12 @@ test('DM selects, moves and resizes a rectangular battlemap using its real bound
       y: box.y + box.height / 2 + (z - 15) * zoom,
     });
     const panel = page.getByRole('region', { name: 'Transform: Wide map' });
+    const chip = page.getByRole('button', { name: 'Restore Transform panel' });
     // Select at the wide edge: outside a square placeholder, inside the loaded image.
     await expect(async () => {
       const point = at(23, 15);
       await page.mouse.click(point.x, point.y);
-      await expect(panel).toBeVisible({ timeout: 1000 });
+      await expect(chip).toBeVisible({ timeout: 1000 });
     }).toPass();
     const position = () =>
       (
@@ -101,6 +102,8 @@ test('DM selects, moves and resizes a rectangular battlemap using its real bound
     await page.mouse.move(moved.x + corner.x * 1.5, moved.y + corner.y * 1.5, { steps: 6 });
     await page.mouse.up();
     await expect.poll(() => position()?.scale.x).toBeCloseTo(6);
+    // MV-239: Transform starts as its chip; open it to type values.
+    await chip.click();
     await expect(panel.getByLabel('Scale', { exact: true })).toHaveValue('6');
     await panel.getByLabel('Scale', { exact: true }).fill('3');
     await panel.getByRole('button', { name: 'Apply', exact: true }).click();

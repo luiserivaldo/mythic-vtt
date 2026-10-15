@@ -71,8 +71,10 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
 }) => {
   test.setTimeout(120_000);
   const table = await startTable();
-  const dmContext = await browser.newContext();
-  const playerContext = await browser.newContext();
+  // MV-239: the Draw panel opens in the left pane, which narrows the board; a wider window keeps
+  // the strokes below clear of the floating rail.
+  const dmContext = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const playerContext = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   try {
     const dm = await dmContext.newPage();
     const errors: string[] = [];
@@ -289,7 +291,7 @@ async function layering(page: Page) {
 test('a drawing sits over a tall prop in 2D, and can be undone and erased', async ({ browser }) => {
   test.setTimeout(120_000);
   const table = await startTable();
-  const dmContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const dmContext = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   let spectatorContext: Awaited<ReturnType<typeof openClient>>['context'] | undefined;
   try {
     const dm = await dmContext.newPage();

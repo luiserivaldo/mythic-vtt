@@ -207,13 +207,15 @@ test('the ruler measures in scene units and a second client sees it with the sen
     'true',
   );
 
-  // A short token click while idle exits the tool, then the normal selection click opens Transform.
+  // A short token click while idle exits the tool, then the normal selection click selects it
+  // (MV-239: shown by the Transform chip; the panel starts tucked).
   await dm.mouse.click(tokenAt.x, tokenAt.y);
   await expect(dm.getByRole('button', { name: 'Measure', exact: true })).toHaveAttribute(
     'aria-pressed',
     'false',
   );
-  await expect(dm.getByRole('region', { name: 'Transform: Ruler target' })).toBeVisible();
+  const chip = dm.getByRole('button', { name: 'Restore Transform panel' });
+  await expect(chip).toBeVisible();
 
   // A finished ruler consumes the first Escape and broadcasts its cancel. The selected token
   // remains until a second Escape reaches BoardCanvas. Broadcast was turned off above.
@@ -230,9 +232,9 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await dm.keyboard.press('Escape');
   await expect(dm.getByTestId('ruler-total')).toHaveCount(0);
   await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
-  await expect(dm.getByRole('region', { name: 'Transform: Ruler target' })).toBeVisible();
+  await expect(chip).toBeVisible();
   await dm.keyboard.press('Escape');
-  await expect(dm.getByRole('region', { name: 'Transform: Ruler target' })).toHaveCount(0);
+  await expect(chip).toHaveCount(0);
 
   expect(errors).toEqual([]);
   await setup.close();
