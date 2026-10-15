@@ -11,6 +11,8 @@ export const BASE_DIAMETER_FRACTION = 0.95;
 export const BASE_THICKNESS = 0.06;
 /** Gap between the standee top and its HTML label anchor, in world units. */
 export const LABEL_GAP = 0.2;
+/** Extra clearance of the elevation badge over the label, in cells. */
+export const BADGE_GAP = 0.3;
 
 export interface StandeeDims {
   /** Image quad width. */
@@ -51,6 +53,12 @@ export function billboardYaw(
 export function labelAnchor3d(sizeCells: number | undefined): readonly [number, number, number] {
   const { height, baseThickness } = standeeDimensions(sizeCells);
   return [0, baseThickness + height + LABEL_GAP, 0];
+}
+
+/** UI-TOKEN-05: the elevation badge rides one line above the name label in 3D. */
+export function badgeAnchor3d(sizeCells: number | undefined): readonly [number, number, number] {
+  const [x, y, z] = labelAnchor3d(sizeCells);
+  return [x, y + BADGE_GAP, z];
 }
 
 /**

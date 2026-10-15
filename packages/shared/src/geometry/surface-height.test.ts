@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   dropElevation,
+  heightAboveGround,
   surfaceHeightAt,
   walkableFromEntity,
   type WalkableSurface,
@@ -203,5 +204,27 @@ describe('properties', () => {
         },
       ),
     );
+  });
+});
+
+describe('heightAboveGround', () => {
+  const platform: WalkableSurface = {
+    kind: 'box',
+    position: { x: 0, y: 0, z: 0 },
+    scale: { x: 4, y: 2, z: 4 },
+  };
+  it('is 0 on a platform and the full height on bare ground', () => {
+    expect(heightAboveGround({ x: 0, y: 2, z: 0 }, [platform])).toBe(0);
+    expect(heightAboveGround({ x: 10, y: 0, z: 0 }, [platform])).toBe(0);
+    expect(heightAboveGround({ x: 10, y: 3, z: 0 }, [platform])).toBe(3);
+  });
+  it('measures a flying token to the platform beneath it', () => {
+    expect(heightAboveGround({ x: 0, y: 3.5, z: 0 }, [platform])).toBeCloseTo(1.5);
+  });
+  it('ignores a platform overhead and keeps a below-ground token negative', () => {
+    expect(
+      heightAboveGround({ x: 0, y: 1, z: 0 }, [{ ...platform, position: { x: 0, y: 3, z: 0 } }]),
+    ).toBe(1);
+    expect(heightAboveGround({ x: 0, y: -2, z: 0 }, [])).toBe(-2);
   });
 });

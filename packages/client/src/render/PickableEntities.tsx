@@ -133,7 +133,8 @@ export function PickableEntities({
   }
 
   /**
-   * UI-TOKEN-03: a right click on a token opens the short menu to its right. Which token is under
+   * UI-TOKEN-03: a right click on a token opens the short menu to its right; on a prop (MV-243) it opens the
+   * collidable toggle. Which token is under
    * the pointer is resolved through `pickEntity`, exactly like a left click.
    */
   function onContextMenu(event: ThreeEvent<MouseEvent>) {
@@ -141,7 +142,8 @@ export function PickableEntities({
     const hits = event.intersections.map(({ object, distance }) => ({ id: object.name, distance }));
     const id = pickEntity(hits, scene, actor);
     const entity = id === null ? undefined : scene.entities[id];
-    if (id === null || !entity?.token || !canSelect(entity, scene, actor)) return;
+    if (id === null || !(entity?.token ?? entity?.shape) || !canSelect(entity, scene, actor))
+      return;
     event.stopPropagation();
     event.nativeEvent.preventDefault();
     selectionStore.getState().pick(scene.id, id, false);
@@ -216,6 +218,7 @@ export function PickableEntities({
                     selected={selected.includes(entity.id)}
                     renderOrder={order}
                     onClick={onClick}
+                    onContextMenu={onContextMenu}
                   />
                   {mode === '3d' && grid && entity.shape.walkable && entity.shape.showGridOnTop && (
                     <Suspense fallback={null}>
@@ -243,6 +246,7 @@ export function PickableEntities({
                       openMenuOnDoubleClick(entity);
                     }}
                     onContextMenu={onContextMenu}
+                    walkables={walkables}
                   />
                 </Suspense>
               ) : (
@@ -275,7 +279,7 @@ export function PickableEntities({
                     {/* Anchors are authored in the token's ground plane; the frame keeps them there. */}
                     <group rotation={TOKEN_GROUND_FRAME}>
                       <TokenLabel entity={entity} actor={actor} />
-                      <ElevationBadge entity={entity} actor={actor} />
+                      <ElevationBadge entity={entity} actor={actor} walkables={walkables} />
                       <TokenStatusMarkers
                         entity={entity}
                         actor={actor}

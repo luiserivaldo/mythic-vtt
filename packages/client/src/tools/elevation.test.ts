@@ -3,6 +3,7 @@ import {
   elevationFromUnits,
   elevationStep,
   formatElevation,
+  formatWorldPosition,
   formatUnits,
   nextElevation,
 } from './elevation.js';
@@ -50,5 +51,12 @@ describe('elevation maths (D25)', () => {
     expect(formatElevation(1e-9, snap)).toBeNull();
     expect(formatElevation(1, { unitsPerCell: 1, unitLabel: '' })).toBe('+1');
     expect(formatUnits(-0.0000001, 5)).toBe('0');
+  });
+});
+
+describe('formatWorldPosition', () => {
+  it('shows the true XYZ in scene units', () => {
+    const grid = { unitsPerCell: 5, unitLabel: 'ft' };
+    expect(formatWorldPosition({ x: 2, y: 1, z: -3 }, grid)).toBe('X 10 · Y 5 · Z -15 ft');
   });
 });

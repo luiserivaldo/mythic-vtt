@@ -12,16 +12,17 @@ import {
 import { useStore } from 'zustand';
 import { UploadError, uploadFailureMessage, type ImageUploader } from '../assets/image-upload.js';
 import { useClientStore } from '../store/react.js';
-import { nextElevation, formatUnits } from '../tools/elevation.js';
+import { nextElevation, formatUnits, formatWorldPosition } from '../tools/elevation.js';
 import { selectionActor, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { defaultUploader } from '../ui/default-uploader.js';
 import { isValidEntityName, LAYER_LABELS } from '../ui/entity-panel.js';
 import { seeSheet } from '../ui/sheet-panel.js';
 import { usePingReason } from '../ui/ping-reason.js';
-import { useSubmit } from '../ui/submit.js';
+import { useSubmit, type SendIntent } from '../ui/submit.js';
 import { pingStore } from '../tools/ping-store.js';
 import { tokenMenuStore } from '../ui/token-menu-store.js';
+import { COLLIDABLE_LABEL, propCollidableIntent, propCollidableModel } from '../ui/prop-menu.js';
 import {
   TOKEN_CONTEXT_LABELS,
   TOKEN_MENU_LABELS,
@@ -154,7 +155,19 @@ export function TokenMenus({
           confirmBeforeDeleting={preferences.confirmBeforeDeleting}
         />
       )}
-      {contextEntity && contextShown && (
+      {contextEntity && contextShown && contextEntity.shape && (
+        <PropContextMenu
+          key={contextEntity.id}
+          campaign={campaign}
+          scene={scene}
+          entity={contextEntity}
+          rendered={contextShown}
+          mode={mode}
+          actor={actor}
+          viewer={viewer}
+        />
+      )}
+      {contextEntity && contextShown && !contextEntity.shape && (
         <TokenContextMenu
           key={contextEntity.id}
           campaign={campaign}
@@ -321,6 +334,15 @@ function FullTokenMenu({
             ✕
           </button>
         </header>
+        {mode === '3d' && (
+          // MV-243: the badge is relative to the ground; the true transform lives here.
+          <div data-testid="token-menu-xyz">
+            {formatWorldPosition(
+              { x: rendered.position[0], y: rendered.position[1], z: rendered.position[2] },
+              grid,
+            )}
+          </div>
+        )}
 
         <form style={rowStyle} onSubmit={rename}>
           <label>
@@ -644,6 +666,74 @@ function TokenContextMenu({ campaign, scene, entity, rendered, mode, actor, view
             {body(item.id)}
           </li>
         ))}
+      </ul>
+    </Html>
+  );
+}
+
+/**
+ * MV-243: the collidable switch for one prop. Exported as the hook for object-edit mode
+ * (MV-255/MV-264), which shows the same control next to the rest of a prop's properties. `send`
+ * comes from the caller: this renders inside drei's <Html>, a separate React root with no context.
+ */
+export function CollidableToggle({
+  campaign,
+  scene,
+  entity,
+  actor,
+  send,
+}: Pick<MenuProps, 'campaign' | 'scene' | 'entity' | 'actor'> & { send: SendIntent }) {
+  const model = propCollidableModel(campaign, scene.id, entity, actor);
+  const shape = entity.shape;
+  if (!model || !shape) return null;
+  return (
+    <label title={model.reason ?? undefined}>
+      <input
+        type="checkbox"
+        role="menuitemcheckbox"
+        checked={model.checked}
+        disabled={!model.enabled}
+        onChange={(e) => {
+          void send(propCollidableIntent(scene.id, entity.id, shape, e.target.checked));
+        }}
+      />{' '}
+      {COLLIDABLE_LABEL}
+    </label>
+  );
+}
+
+/** MV-243: the right-click menu of a prop, to the right of it. It only identifies and sets ground. */
+function PropContextMenu({ campaign, scene, entity, rendered, mode, actor }: MenuProps) {
+  const { send } = useSubmit();
+  const anchor = tokenMenuAnchor(mode, rendered.position, rendered.sizeCells);
+  return (
+    <Html
+      center={false}
+      position={[...anchor]}
+      zIndexRange={[10, 0]}
+      style={{ transform: 'translate(6px, -50%)', pointerEvents: 'none' }}
+    >
+      <ul
+        data-testid="prop-context-menu"
+        role="menu"
+        aria-label="Prop actions"
+        style={panelStyle}
+        onPointerDownCapture={stopBoardPress}
+        onPointerUpCapture={stopBoardPress}
+        onClick={stopBoardPress}
+        onDoubleClickCapture={stopBoardPress}
+        onContextMenuCapture={stopBoardPress}
+      >
+        <li role="none">{entity.name}</li>
+        <li role="none">
+          <CollidableToggle
+            campaign={campaign}
+            scene={scene}
+            entity={entity}
+            actor={actor}
+            send={send}
+          />
+        </li>
       </ul>
     </Html>
   );

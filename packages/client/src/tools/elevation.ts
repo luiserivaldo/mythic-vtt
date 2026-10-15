@@ -59,3 +59,13 @@ export function formatElevation(
   const label = grid.unitLabel.trim();
   return `${Number(text) > 0 ? '+' : ''}${text}${label ? ` ${label}` : ''}`;
 }
+
+/** MV-243: the token's true world position for the 3D detail, in scene units: 'X 10 · Y 5 · Z -15 ft'. */
+export function formatWorldPosition(
+  position: { x: number; y: number; z: number },
+  grid: Pick<Grid, 'unitsPerCell' | 'unitLabel'>,
+): string {
+  const axis = (name: string, cells: number) => `${name} ${formatUnits(cells, grid.unitsPerCell)}`;
+  const label = grid.unitLabel.trim();
+  return `${[axis('X', position.x), axis('Y', position.y), axis('Z', position.z)].join(' · ')}${label ? ` ${label}` : ''}`;
+}

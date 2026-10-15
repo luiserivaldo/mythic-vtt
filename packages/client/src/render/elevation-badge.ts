@@ -1,8 +1,20 @@
-import type { Grid } from '@mythic/shared';
+import { heightAboveGround, type Grid, type WalkableSurface } from '@mythic/shared';
 import { formatElevation } from '../tools/elevation.js';
 
 /**
- * UI-TOKEN-05: the 2D elevation badge text, or null when there is no badge to draw. The "Show
+ * UI-TOKEN-05 / MV-243: the badge reads relative to the highest walkable ground under the token,
+ * not the plane, so a token on a platform reads 0 and a flyer reads its height above what is below.
+ */
+export function badgeElevation(
+  position: readonly [number, number, number],
+  walkables: readonly WalkableSurface[],
+): number {
+  const [x, y, z] = position;
+  return heightAboveGround({ x, y, z }, walkables);
+}
+
+/**
+ * UI-TOKEN-05: the elevation badge text, or null when there is no badge to draw. The "Show
  * height labels" viewer setting is per viewer and removes the whole badge text, so the setting is
  * checked first. The 3D drop line and ground shadow are drawn by `DropLines` and are unaffected.
  */

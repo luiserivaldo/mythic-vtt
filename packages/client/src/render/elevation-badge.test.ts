@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { elevationBadgeText } from './elevation-badge.js';
+import { badgeElevation, elevationBadgeText } from './elevation-badge.js';
 
 // UI-TOKEN-05: the 2D elevation badge text. The "Show height labels" viewer setting hides the
 // text; the 3D drop line and shadow are drawn elsewhere (DropLines) and are never affected.
@@ -37,5 +37,18 @@ describe('elevationBadgeText (UI-TOKEN-05)', () => {
   it('omits the unit label when the scene has none, or only blank space', () => {
     expect(elevationBadgeText(1, { unitsPerCell: 1, unitLabel: '' }, false, true)).toBe('+1');
     expect(elevationBadgeText(1, { unitsPerCell: 1, unitLabel: '   ' }, false, true)).toBe('+1');
+  });
+});
+
+describe('badgeElevation (MV-243)', () => {
+  const platform = {
+    kind: 'box' as const,
+    position: { x: 0, y: 0, z: 0 },
+    scale: { x: 4, y: 2, z: 4 },
+  };
+  it('reads 0 on a platform, relative height when flying over it, plane height on bare ground', () => {
+    expect(badgeElevation([0, 2, 0], [platform])).toBe(0);
+    expect(badgeElevation([0, 3, 0], [platform])).toBe(1);
+    expect(badgeElevation([9, 3, 9], [platform])).toBe(3);
   });
 });

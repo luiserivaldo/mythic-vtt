@@ -294,7 +294,8 @@ export function PropForm({
   const [sx, setSx] = useState('1');
   const [sy, setSy] = useState('1');
   const [sz, setSz] = useState('1');
-  const [walkable, setWalkable] = useState(false);
+  // MV-243: props are collidable (walkable) by default so tokens cannot clip through them.
+  const [walkable, setWalkable] = useState(true);
   const [layer, setLayer] = useCreateLayer(activeLayer, isHost, 'props');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -439,7 +440,7 @@ export function PropForm({
             setWalkable(e.target.checked);
           }}
         />{' '}
-        Walkable
+        Collidable (walkable)
       </label>
       <LayerSelect value={layer} layers={entityCreateLayers(isHost)} onChange={setLayer} />
       <button className="ui-primary-action" type="submit" disabled={busy || !valid}>

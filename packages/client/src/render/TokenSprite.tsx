@@ -1,3 +1,4 @@
+import type { WalkableSurface } from '@mythic/shared';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { Html } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
@@ -7,7 +8,7 @@ import { assetUrl } from '../assets/asset-url.js';
 import { createTextureCache } from '../assets/texture-cache.js';
 import type { SelectionActor } from '../tools/selection.js';
 import { useViewerPreferences } from '../ui/ViewerPreferencesProvider.js';
-import { elevationBadgeText } from './elevation-badge.js';
+import { badgeElevation, elevationBadgeText } from './elevation-badge.js';
 import type { RenderEntity } from './scene-model.js';
 import { labelVisible } from './token-labels.js';
 import { LABEL_BACKGROUND_COLOR, LABEL_TEXT_COLOR, SELECTION_COLOR } from './canvas-style.js';
@@ -148,12 +149,24 @@ export function TokenLabel({
 }
 
 /**
- * TOK-03 / UI-TOKEN-05: 2D elevation badge ("+10 ft") as an HTML overlay, never world-space text.
+ * TOK-03 / UI-TOKEN-05: elevation badge ("+10 ft", relative to the ground under the token) as an HTML overlay, never world-space text.
  * Shown only above ground and only where the viewer could see the token's label rules (same
  * visibility check, ignoring the name and label mode). The per-viewer "Show height labels" setting
  * removes the badge text; the 3D drop line and shadow are unaffected.
  */
-export function ElevationBadge({ entity, actor }: { entity: RenderEntity; actor: SelectionActor }) {
+export function ElevationBadge({
+  entity,
+  actor,
+  walkables,
+  anchor,
+}: {
+  entity: RenderEntity;
+  actor: SelectionActor;
+  /** The ground the token may stand on: the badge reads relative to it (MV-243). */
+  walkables: readonly WalkableSurface[];
+  /** Defaults to just above the 2D token disc; the 3D standee passes a point above its label. */
+  anchor?: readonly [number, number, number];
+}) {
   const token = entity.token;
   const campaign = useViewedCampaign();
   const { preferences } = useViewerPreferences();
@@ -171,7 +184,7 @@ export function ElevationBadge({ entity, actor }: { entity: RenderEntity; actor:
   );
   const text = visible
     ? elevationBadgeText(
-        entity.position[1],
+        badgeElevation(entity.position, walkables),
         grid,
         token.flying === true,
         preferences.showHeightLabels,
@@ -181,7 +194,7 @@ export function ElevationBadge({ entity, actor }: { entity: RenderEntity; actor:
   return (
     <Html
       center
-      position={[0, entity.sizeCells / 2 + 0.2, 0]}
+      position={anchor ? [...anchor] : [0, entity.sizeCells / 2 + 0.2, 0]}
       zIndexRange={[5, 0]}
       style={{ pointerEvents: 'none' }}
     >
