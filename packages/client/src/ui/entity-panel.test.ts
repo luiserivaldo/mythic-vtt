@@ -16,10 +16,13 @@ import {
   isValidPropSize,
   layerForCreate,
   localImageAsset,
+  nextPropName,
   ownerOptions,
   placementPosition,
   SPAWN_STEPS,
   propCreateIntent,
+  PROP_FORM_DEFAULTS,
+  propViewPosition,
   selectAllState,
   tokenCreateIntent,
   TOKEN_FORM_DEFAULTS,
@@ -148,6 +151,59 @@ describe('entity panel intents', () => {
         entity: { shape: { kind, walkable: true }, transform: { position: { y: 0 } } },
       });
     }
+  });
+
+  it('places a prop on the cell centre under the view centre, else the map centre (MV-266)', () => {
+    const map = { bounds: { width: 20, height: 10 } };
+    expect(propViewPosition(map, { x: 7.2, z: 3.9 })).toEqual({ x: 7.5, y: 0, z: 3.5 });
+    expect(propViewPosition(map, { x: 0, z: 0 })).toEqual({ x: 0.5, y: 0, z: 0.5 });
+    // A centre on the far edge stays in the last cell.
+    expect(propViewPosition(map, { x: 20, z: 10 })).toEqual({ x: 19.5, y: 0, z: 9.5 });
+    // Off the map, or unknown: the map centre.
+    expect(propViewPosition(map, { x: -1, z: 4 })).toEqual({ x: 10.5, y: 0, z: 5.5 });
+    expect(propViewPosition(map, { x: 4, z: 12 })).toEqual({ x: 10.5, y: 0, z: 5.5 });
+    expect(propViewPosition(map, null)).toEqual({ x: 10.5, y: 0, z: 5.5 });
+    expect(propViewPosition({ bounds: { width: 5, height: 5 } }, null)).toEqual({
+      x: 2.5,
+      y: 0,
+      z: 2.5,
+    });
+  });
+
+  it('the Create Prop defaults land where they are placed and the host accepts them (UI-TOOL-04)', () => {
+    expect(PROP_FORM_DEFAULTS).toEqual({
+      kind: 'box',
+      color: '#808080',
+      size: { x: 1, y: 1, z: 1 },
+      walkable: true,
+      layer: 'props',
+    });
+    const spec = propCreateIntent(scene, {
+      sceneId: S,
+      entityId: tid(36),
+      name: 'Prop 1',
+      ...PROP_FORM_DEFAULTS,
+      position: propViewPosition(scene, { x: 3.2, z: 4.7 }),
+    });
+    expect(canPerform(state, host, spec.type, spec.payload)).toBe(true);
+    expect(spec.payload).toMatchObject({
+      entity: {
+        layer: 'props',
+        transform: { position: { x: 3.5, y: 0, z: 4.5 }, scale: { x: 1, y: 1, z: 1 } },
+        shape: { kind: 'box', color: '#808080', walkable: true },
+      },
+    });
+  });
+
+  it('names props sequentially, one past the highest "Prop N" (UI-TOOL-04)', () => {
+    const named = (...names: string[]): Pick<Scene, 'entities'> => ({
+      entities: Object.fromEntries(
+        names.map((name, i) => [String(i), { name } as Scene['entities'][string]]),
+      ),
+    });
+    expect(nextPropName(named())).toBe('Prop 1');
+    expect(nextPropName(named('Prop 1', 'Crate'))).toBe('Prop 2');
+    expect(nextPropName(named('Prop 3', 'Prop 1', 'Prop 7x', 'My Prop 9'))).toBe('Prop 4');
   });
 
   it('carries an uploaded texture, and omits the key when there is none (ENV-05)', () => {

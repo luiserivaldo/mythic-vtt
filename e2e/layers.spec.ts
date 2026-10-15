@@ -74,13 +74,10 @@ test('the Layers tab lists draw order, one active layer, and hides the DM row fr
     await lockProps.click();
     await expect(lockProps).toBeChecked();
 
-    // Creation defaults to the active layer, for tokens and props alike.
+    // Token creation defaults to the active layer (Create Prop always starts on Props, UX-39).
     await dm.getByRole('tab', { name: 'Entities', exact: true }).click();
     await expect(
       dm.getByRole('form', { name: 'Create token' }).getByRole('combobox', { name: /^Layer/ }),
-    ).toHaveValue('props');
-    await expect(
-      dm.getByRole('form', { name: 'Create prop' }).getByRole('combobox', { name: /^Layer/ }),
     ).toHaveValue('props');
 
     // A player never gets the Layers tab, so the DM row never reaches them.

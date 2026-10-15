@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { createProp } from './create-prop.js';
 
 // M4-32 (ENV-05): a prop takes an uploaded image texture. The image tiles once per cell over the
-// 2D footprint and the 3D mesh, and the DM can replace or clear it from the Entities panel.
+// 2D footprint and the 3D mesh, and the DM sets, replaces or clears it from the Entities panel
+// (Create Prop has no texture field in the alpha, UX-39).
 //
 // This spec starts its own host with the built client (MYTHIC_CLIENT_DIR) instead of the usual Vite
 // dev server: the dev proxy rewrites the Host header for /assets, so a browser upload there is
@@ -106,17 +108,20 @@ test('a prop carries an uploaded texture in 2D and 3D and the DM can replace or 
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
 
   await page.getByRole('tab', { name: 'Entities', exact: true }).click();
-  const propForm = page.getByRole('form', { name: 'Create prop' });
-  await propForm.getByLabel('Prop name').fill('Stone platform');
-  await propForm.getByLabel('Width (cells)').fill('2');
-  await propForm.getByLabel('Depth (cells)').fill('3');
-  await propForm.getByLabel('Walkable').check();
-  await propForm
-    .locator('.ui-file-input')
-    .setInputFiles({ name: 'stone.png', mimeType: 'image/png', buffer: PNG });
-  await expect(propForm.getByText('stone.png')).toBeVisible();
-  // The solid colour is the fallback, so it is disabled while a texture is chosen.
-  await expect(propForm.getByLabel('Prop colour')).toBeDisabled();
+  const propForm = await createProp(page, {
+    name: 'Stone platform',
+    width: 2,
+    depth: 3,
+    walkable: true,
+  });
+  await expect(propForm.locator('input[type="file"]')).toHaveCount(0);
+  const list = page.getByRole('list', { name: 'Entities in this scene' });
+  await expect(list.getByRole('button', { name: 'Stone platform', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  const row = page.getByRole('group', { name: /^Texture for Stone platform/ });
+  await expect(row.locator('.ui-file-button')).toHaveText('Set texture');
 
   // The upload is stored content-addressed, then the renderer fetches it for the prop.
   const uploaded = page.waitForResponse(
@@ -125,15 +130,12 @@ test('a prop carries an uploaded texture in 2D and 3D and the DM can replace or 
   const fetched = page.waitForResponse(
     (r) => HASH_URL.test(new URL(r.url()).pathname) && r.status() === 200,
   );
-  await propForm.getByRole('button', { name: 'Create prop' }).click();
+  await row
+    .locator('input[type="file"]')
+    .setInputFiles({ name: 'stone.png', mimeType: 'image/png', buffer: PNG });
   expect((await uploaded).status()).toBe(201);
   expect((await fetched).status()).toBe(200);
-
-  const list = page.getByRole('list', { name: 'Entities in this scene' });
-  await expect(list.getByRole('button', { name: 'Stone platform', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(row.locator('.ui-file-button')).toHaveText('Replace texture');
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
 
@@ -147,7 +149,6 @@ test('a prop carries an uploaded texture in 2D and 3D and the DM can replace or 
   await expect(threeD).toHaveAttribute('aria-pressed', 'false');
 
   // The selected prop's row clears its texture, then takes another image.
-  const row = page.getByRole('group', { name: /^Texture for Stone platform/ });
   await expect(row).toBeVisible();
   await expect(row.locator('.ui-file-button')).toHaveText('Replace texture');
   await page.getByRole('button', { name: 'Remove texture from Stone platform' }).click();

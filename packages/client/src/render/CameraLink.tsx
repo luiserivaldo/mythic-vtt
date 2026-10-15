@@ -25,6 +25,7 @@ import {
 } from './camera-link.js';
 import { lerpView2D } from './focus.js';
 import { lerpOrbit, tweenProgress, TWEEN_MS } from './view-transition.js';
+import { viewCentreStore } from './view-centre-store.js';
 import { viewModeStore, type ViewMode } from './view-mode-store.js';
 
 /** A pull in flight between the pose it started from and the one it adopts, per camera mode. */
@@ -121,6 +122,23 @@ export function CameraLink({
     }
     return poseFromOrbit(orbitRef.current);
   };
+  const readPoseRef = useRef(readPose);
+  readPoseRef.current = readPose;
+
+  // UI-TOOL-04 (MV-266): the middle of the view for chrome outside the canvas — the 2D camera's
+  // centre or the 3D orbit target, both on the ground.
+  useEffect(() => {
+    const read = () => {
+      const pose = readPoseRef.current();
+      return pose.mode === '2d'
+        ? { x: pose.centerX, z: pose.centerZ }
+        : { x: pose.targetX, z: pose.targetZ };
+    };
+    viewCentreStore.setState({ read });
+    return () => {
+      if (viewCentreStore.getState().read === read) viewCentreStore.setState({ read: null });
+    };
+  }, []);
 
   const publish = (pull: boolean): void => {
     const { ephemeral: api, sceneId: poseSceneId } = latest.current;

@@ -71,6 +71,7 @@ describe('board-input', () => {
 
   it('a left drag on empty board is a marquee with Select and a pan with Pan', () => {
     expect(emptyBoardLeftDrag('select')).toBe('marquee');
+    expect(emptyBoardLeftDrag('create-prop')).toBe('marquee');
     expect(emptyBoardLeftDrag('pan')).toBe('pan');
     expect(emptyBoardLeftDrag('measure')).toBeNull();
     expect(emptyBoardLeftDrag('draw')).toBeNull();

@@ -86,6 +86,8 @@ test('the DM selects, re-layers, centres on and deletes entities from the Entiti
     const list = dm.getByRole('list', { name: 'Entities in this scene' });
     const bulk = dm.getByRole('toolbar', { name: 'Selected entities' });
     await expect(list.getByRole('listitem')).toHaveCount(3);
+    // UX-39: props are created from the rail's Create Prop tool, not from this tab.
+    await expect(dm.getByRole('form', { name: 'Create prop' })).toHaveCount(0);
     await expect(bulk.getByRole('button', { name: /^Lock/ })).toBeDisabled();
     await expect(bulk.getByRole('button', { name: 'Delete selected' })).toBeDisabled();
 

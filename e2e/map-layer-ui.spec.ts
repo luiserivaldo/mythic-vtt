@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid, type Table } from './harness.js';
+import { createProp } from './create-prop.js';
 
 let table: Table | undefined;
 const HOST = { identityId: testUlid('HOST', 43), identitySecret: 'map-layer-host-secret' };
@@ -68,10 +69,7 @@ test('the map layer is explained, selectable for fixed objects, and shown on bat
   await expect(page.getByRole('form', { name: 'Create token' }).getByLabel('Layer')).toContainText(
     'Map',
   );
-  const propForm = page.getByRole('form', { name: 'Create prop' });
-  await propForm.getByLabel('Layer').selectOption('map');
-  await propForm.getByLabel('Prop name').fill('Fixed wall');
-  await propForm.getByRole('button', { name: 'Create prop' }).click();
+  await createProp(page, { name: 'Fixed wall', layer: 'map' });
   const entityList = page.getByRole('list', { name: 'Entities in this scene' });
   const fixedWall = entityList.getByRole('listitem').filter({ hasText: 'Fixed wall' });
   await expect(fixedWall.getByText('Map', { exact: true })).toBeVisible();

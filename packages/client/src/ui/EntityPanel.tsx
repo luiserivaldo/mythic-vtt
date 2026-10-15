@@ -21,20 +21,16 @@ import {
   entityRows,
   isValidColour,
   isValidEntityName,
-  isValidPropSize,
   LABEL_VISIBILITIES,
   LAYER_LABELS,
   layerForCreate,
   localImageAsset,
   ownerOptions,
-  PRIMITIVE_KINDS,
-  propCreateIntent,
   selectAllState,
   TOKEN_FORM_DEFAULTS,
   tokenCreateIntent,
   TOKEN_SIZE_NAMES,
   type LabelVisibility,
-  type PrimitiveKind,
   type TokenSizeName,
 } from './entity-panel.js';
 import { newId } from './ids.js';
@@ -45,7 +41,7 @@ import { useSubmit, type SendIntent } from './submit.js';
 import { tokenMenuStore } from './token-menu-store.js';
 import { useUiStore } from './ui-store.js';
 
-function LayerSelect({
+export function LayerSelect({
   value,
   layers,
   onChange,
@@ -75,7 +71,7 @@ function LayerSelect({
 }
 
 /**
- * UI-ENT-01 / UI-LAY-01: Add Token and Add Prop default to the viewer's active layer, and follow it
+ * UI-ENT-01 / UI-LAY-01: Add Token defaults to the viewer's active layer, and follow it
  * when it changes while the form stays mounted; the picker still overrides it per entity.
  */
 function useCreateLayer(
@@ -268,183 +264,6 @@ function TokenForm({
         disabled={busy || !isValidEntityName(name)}
       >
         Create token
-      </button>
-    </form>
-  );
-}
-
-export function PropForm({
-  scene,
-  isHost,
-  activeLayer,
-  send,
-  uploader = defaultUploader,
-  onError,
-}: {
-  scene: Scene;
-  isHost: boolean;
-  activeLayer: LayerId;
-  send: SendIntent;
-  uploader?: ImageUploader;
-  onError: (message: string | null) => void;
-}) {
-  const [name, setName] = useState('');
-  const [kind, setKind] = useState<PrimitiveKind>('box');
-  const [color, setColor] = useState('#8a6d3b');
-  const [sx, setSx] = useState('1');
-  const [sy, setSy] = useState('1');
-  const [sz, setSz] = useState('1');
-  // MV-243: props are collidable (walkable) by default so tokens cannot clip through them.
-  const [walkable, setWalkable] = useState(true);
-  const [layer, setLayer] = useCreateLayer(activeLayer, isHost, 'props');
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const textureInputRef = useRef<HTMLInputElement>(null);
-  const textureInputId = useId();
-  const size = { x: Number(sx), y: Number(sy), z: Number(sz) };
-  const valid =
-    isValidEntityName(name) &&
-    isValidColour(color) &&
-    isValidPropSize(size.x) &&
-    isValidPropSize(size.y) &&
-    isValidPropSize(size.z);
-
-  async function submit() {
-    setBusy(true);
-    onError(null);
-    try {
-      const entityId = newId();
-      const uploaded = file ? await uploader(file) : null;
-      const ok = await send(
-        propCreateIntent(scene, {
-          sceneId: scene.id,
-          entityId,
-          name,
-          kind,
-          color,
-          size,
-          walkable,
-          layer,
-          // ENV-05: the texture tiles once per cell; the colour stays as the fallback.
-          ...(uploaded ? { texture: localImageAsset(uploaded.hash, name.trim()) } : {}),
-        }),
-      );
-      if (ok) {
-        setName('');
-        setFile(null);
-        // Clear the input too, so re-picking the same file still fires a change event.
-        if (textureInputRef.current) textureInputRef.current.value = '';
-        selectionStore.getState().pick(scene.id, entityId, false);
-        nameInputRef.current?.focus();
-      }
-    } catch (e) {
-      onError(
-        e instanceof UploadError ? uploadFailureMessage(e) : 'The upload failed unexpectedly.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const dim = (label: string, value: string, set: (v: string) => void) => (
-    <label>
-      {label}{' '}
-      <input
-        type="number"
-        min="0.1"
-        step="any"
-        value={value}
-        onChange={(e) => {
-          set(e.target.value);
-        }}
-      />
-    </label>
-  );
-
-  return (
-    <form
-      className="ui-row ui-create-form"
-      aria-label="Create prop"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void submit();
-      }}
-    >
-      <label>
-        Prop name{' '}
-        <input
-          ref={nameInputRef}
-          type="text"
-          value={name}
-          maxLength={120}
-          onChange={(e) => {
-            setName(e.target.value);
-          }}
-        />
-      </label>
-      <label>
-        Shape{' '}
-        <select
-          value={kind}
-          onChange={(e) => {
-            const next = PRIMITIVE_KINDS.find((k) => k === e.target.value);
-            if (next) setKind(next);
-          }}
-        >
-          {PRIMITIVE_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {capitalise(k)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Prop colour{' '}
-        <input
-          type="color"
-          value={isValidColour(color) ? color : '#000000'}
-          disabled={file !== null}
-          onChange={(e) => {
-            setColor(e.target.value);
-          }}
-        />
-      </label>
-      {/* ENV-05: an uploaded image tiles over the prop; without one the colour above is drawn. */}
-      <div className="ui-file-field" role="group" aria-labelledby={`${textureInputId}-title`}>
-        <span id={`${textureInputId}-title`}>Texture image (optional, tiles once per cell)</span>
-        <input
-          id={textureInputId}
-          ref={textureInputRef}
-          className="ui-file-input"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          aria-labelledby={`${textureInputId}-title ${textureInputId}-button`}
-          onChange={(e) => {
-            setFile(e.target.files?.[0] ?? null);
-          }}
-        />
-        <label id={`${textureInputId}-button`} className="ui-file-button" htmlFor={textureInputId}>
-          Choose file
-        </label>
-        <span className="ui-file-name">{file?.name ?? 'No file chosen'}</span>
-      </div>
-      {dim('Width (cells)', sx, setSx)}
-      {dim('Height (cells)', sy, setSy)}
-      {dim('Depth (cells)', sz, setSz)}
-      <label>
-        <input
-          type="checkbox"
-          checked={walkable}
-          onChange={(e) => {
-            setWalkable(e.target.checked);
-          }}
-        />{' '}
-        Collidable (walkable)
-      </label>
-      <LayerSelect value={layer} layers={entityCreateLayers(isHost)} onChange={setLayer} />
-      <button className="ui-primary-action" type="submit" disabled={busy || !valid}>
-        Create prop
       </button>
     </form>
   );
@@ -797,14 +616,6 @@ export function EntityPanel({
         activeLayer={activeLayer}
         uploader={uploader}
         send={send}
-        onError={setError}
-      />
-      <PropForm
-        scene={scene}
-        isHost={isHost}
-        activeLayer={activeLayer}
-        send={send}
-        uploader={uploader}
         onError={setError}
       />
       <h3>In {scene.name}</h3>
