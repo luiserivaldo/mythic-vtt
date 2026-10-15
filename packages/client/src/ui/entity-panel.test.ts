@@ -2,7 +2,10 @@ import { canPerform, type Campaign, type Scene } from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
 import { makeCampaign, tid } from '../testing.js';
 import {
+  bulkDeleteIntents,
+  bulkMoveIntents,
   entityDeleteIntent,
+  entityFocusPoint,
   entityCreateLayers,
   entityRenameIntent,
   entityShowGridOnTopIntent,
@@ -17,6 +20,7 @@ import {
   placementPosition,
   SPAWN_STEPS,
   propCreateIntent,
+  selectAllState,
   tokenCreateIntent,
   TOKEN_FORM_DEFAULTS,
   TOKEN_SIZE_NAMES,
@@ -370,5 +374,67 @@ describe('entityTextureIntent (ENV-05)', () => {
     };
     const spec = entityTextureIntent(S, tid(36), shape, texture);
     expect(canPerform(withEntity, host, spec.type, spec.payload)).toBe(true);
+  });
+});
+
+describe('entities tab mass control (UI-ENT-01..02)', () => {
+  const base = sceneOf(world());
+  const token = (id: string, layer: 'tokens' | 'props' | 'map', name: string) =>
+    (
+      tokenCreateIntent(base, { ...draft, entityId: id, name, layer }).payload as {
+        entity: Scene['entities'][string];
+      }
+    ).entity;
+  const A = tid(40);
+  const B = tid(41);
+  const C = tid(42);
+  const scene: Scene = {
+    ...base,
+    entities: {
+      [A]: token(A, 'tokens', 'Ann'),
+      [B]: token(B, 'props', 'Bo'),
+      [C]: token(C, 'map', 'Cy'),
+    },
+  };
+  const state: Campaign = { ...world(), scenes: { [S]: scene } };
+
+  it('bulk delete is one accepted entity.delete per entity, no batch action', () => {
+    const specs = bulkDeleteIntents(S, [A, B]);
+    expect(specs.map((s) => s.type)).toEqual(['entity.delete', 'entity.delete']);
+    for (const spec of specs) expect(canPerform(state, host, spec.type, spec.payload)).toBe(true);
+  });
+
+  it('bulk move skips entities already on the target and missing ones', () => {
+    const specs = bulkMoveIntents(scene, [A, B, tid(99)], 'tokens');
+    expect(specs).toEqual([
+      {
+        type: 'entity.setLayer',
+        payload: { sceneId: S, entityId: B, layer: 'tokens' },
+        sceneId: S,
+      },
+    ]);
+    for (const spec of specs) expect(canPerform(state, host, spec.type, spec.payload)).toBe(true);
+  });
+
+  it('bulk move sends nothing to or from a locked layer (LAY-06)', () => {
+    const locked: Scene = { ...scene, layers: { props: { locked: true } } };
+    expect(bulkMoveIntents(locked, [A, C], 'props')).toEqual([]);
+    expect(bulkMoveIntents(locked, [A, B, C], 'effects').map((s) => s.payload)).toEqual([
+      { sceneId: S, entityId: A, layer: 'effects' },
+      { sceneId: S, entityId: C, layer: 'effects' },
+    ]);
+  });
+
+  it('select all reads none, some or all of the selectable rows', () => {
+    expect(selectAllState([A, B], [])).toBe('none');
+    expect(selectAllState([A, B], [B, tid(99)])).toBe('some');
+    expect(selectAllState([A, B], [B, A])).toBe('all');
+    expect(selectAllState([], [])).toBe('none');
+  });
+
+  it('centres on the entity base position, including its height (CAM-06)', () => {
+    const lifted = { ...token(A, 'tokens', 'Ann') };
+    lifted.transform = { ...lifted.transform, position: { x: 3, y: 2, z: 7 } };
+    expect(entityFocusPoint(lifted)).toEqual({ x: 3, y: 2, z: 7 });
   });
 });

@@ -11,7 +11,7 @@ import {
 import { SIZE_CELLS } from '../render/token-footprint.js';
 import { DEFAULT_TOKEN_COLOR as DEFAULT_BOARD_TOKEN_COLOR } from '../render/canvas-style.js';
 import { LAYER_ORDER } from './layer-panel.js';
-import type { IntentSpec } from './intent-specs.js';
+import { entityMoveLayerIntent, type IntentSpec } from './intent-specs.js';
 
 export type TokenSizeName = keyof typeof SIZE_CELLS;
 export const TOKEN_SIZE_NAMES = Object.keys(SIZE_CELLS) as TokenSizeName[];
@@ -271,6 +271,45 @@ export const entityDeleteIntent = (sceneId: string, entityId: string): IntentSpe
   type: 'entity.delete',
   payload: { sceneId, entityId },
   sceneId,
+});
+
+/** UI-ENT-01: one entity.delete per entity (there is no batch action; each is its own undo step). */
+export const bulkDeleteIntents = (sceneId: string, ids: readonly string[]): IntentSpec[] =>
+  ids.map((id) => entityDeleteIntent(sceneId, id));
+
+/**
+ * UI-ENT-01: one entity.setLayer per entity that would actually change. Entities already on the
+ * target, gone from the scene, or on either side of a locked layer are skipped rather than sent
+ * for the host to refuse (LAY-06).
+ */
+export function bulkMoveIntents(
+  scene: Scene,
+  ids: readonly string[],
+  layer: LayerId,
+): IntentSpec[] {
+  if (scene.layers[layer]?.locked) return [];
+  return ids.flatMap((id) => {
+    const entity = scene.entities[id];
+    if (!entity || entity.layer === layer || scene.layers[entity.layer]?.locked) return [];
+    return [entityMoveLayerIntent(scene.id, id, layer)];
+  });
+}
+
+export type SelectAllState = 'none' | 'some' | 'all';
+
+/** The "Select all" checkbox: checked, indeterminate or clear, over the rows that can be selected. */
+export function selectAllState(
+  selectable: readonly string[],
+  selected: readonly string[],
+): SelectAllState {
+  const count = selectable.filter((id) => selected.includes(id)).length;
+  if (count === 0) return 'none';
+  return count === selectable.length ? 'all' : 'some';
+}
+
+/** UI-ENT-02: the world point the camera centres on — the entity's own base (CAM-06). */
+export const entityFocusPoint = (entity: Entity): { x: number; y: number; z: number } => ({
+  ...entity.transform.position,
 });
 
 export interface EntityRow {

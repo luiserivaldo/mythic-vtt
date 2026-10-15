@@ -1,16 +1,20 @@
 import type { Campaign, Entity, LayerId, Scene } from '@mythic/shared';
 import { useViewerPreferences } from './ViewerPreferencesProvider.js';
-import { useId, useMemo, useRef, useState, type SyntheticEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { useStore } from 'zustand';
 import { UploadError, uploadFailureMessage, type ImageUploader } from '../assets/image-upload.js';
+import { focusStore } from '../render/focus-store.js';
+import { canSelect, selectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { useClientStore } from '../store/react.js';
 import { defaultUploader } from './default-uploader.js';
 import {
+  bulkDeleteIntents,
+  bulkMoveIntents,
   capitalise,
   DEFAULT_TOKEN_COLOR,
-  entityDeleteIntent,
   entityCreateLayers,
+  entityFocusPoint,
   entityRenameIntent,
   entityShowGridOnTopIntent,
   entityTextureIntent,
@@ -25,6 +29,7 @@ import {
   ownerOptions,
   PRIMITIVE_KINDS,
   propCreateIntent,
+  selectAllState,
   TOKEN_FORM_DEFAULTS,
   tokenCreateIntent,
   TOKEN_SIZE_NAMES,
@@ -33,10 +38,11 @@ import {
   type TokenSizeName,
 } from './entity-panel.js';
 import { newId } from './ids.js';
-import { entityMoveLayerIntent } from './intent-specs.js';
-import { moveTargets } from './layer-panel.js';
+import type { IntentSpec } from './intent-specs.js';
+import { LAYER_ORDER } from './layer-panel.js';
 import { NameForm } from './NameForm.js';
 import { useSubmit, type SendIntent } from './submit.js';
+import { tokenMenuStore } from './token-menu-store.js';
 import { useUiStore } from './ui-store.js';
 
 function LayerSelect({
@@ -68,6 +74,25 @@ function LayerSelect({
   );
 }
 
+/**
+ * UI-ENT-01 / UI-LAY-01: Add Token and Add Prop default to the viewer's active layer, and follow it
+ * when it changes while the form stays mounted; the picker still overrides it per entity.
+ */
+function useCreateLayer(
+  activeLayer: LayerId,
+  isHost: boolean,
+  fallback: LayerId,
+): [LayerId, (layer: LayerId) => void] {
+  const pick = (active: LayerId) => layerForCreate(active, entityCreateLayers(isHost), fallback);
+  const [layer, setLayer] = useState<LayerId>(() => pick(activeLayer));
+  const [followed, setFollowed] = useState(activeLayer);
+  if (followed !== activeLayer) {
+    setFollowed(activeLayer);
+    setLayer(pick(activeLayer));
+  }
+  return [layer, setLayer];
+}
+
 function TokenForm({
   campaign,
   scene,
@@ -87,9 +112,7 @@ function TokenForm({
 }) {
   const [name, setName] = useState<string>(TOKEN_FORM_DEFAULTS.name);
   const [size, setSize] = useState<TokenSizeName>(TOKEN_FORM_DEFAULTS.size);
-  const [layer, setLayer] = useState<LayerId>(() =>
-    layerForCreate(activeLayer, entityCreateLayers(isHost), TOKEN_FORM_DEFAULTS.layer),
-  );
+  const [layer, setLayer] = useCreateLayer(activeLayer, isHost, TOKEN_FORM_DEFAULTS.layer);
   const [labels, setLabels] = useState<LabelVisibility>(TOKEN_FORM_DEFAULTS.labelVisibility);
   const [owner, setOwner] = useState<string>(TOKEN_FORM_DEFAULTS.ownerId);
   const [file, setFile] = useState<File | null>(null);
@@ -272,9 +295,7 @@ export function PropForm({
   const [sy, setSy] = useState('1');
   const [sz, setSz] = useState('1');
   const [walkable, setWalkable] = useState(false);
-  const [layer, setLayer] = useState<LayerId>(() =>
-    layerForCreate(activeLayer, entityCreateLayers(isHost), 'props'),
-  );
+  const [layer, setLayer] = useCreateLayer(activeLayer, isHost, 'props');
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -428,27 +449,35 @@ export function PropForm({
   );
 }
 
+const NO_IDS: readonly string[] = [];
+
 function EntityRowView({
   campaign,
   scene,
   entityId,
+  selectable,
+  editing,
   send,
   uploader,
   onError,
+  onDelete,
 }: {
   campaign: Campaign;
   scene: Scene;
   entityId: string;
+  /** PERM-01/02: the board would drop it from the selection (a locked layer), so no row actions. */
+  selectable: boolean;
+  /** Only the sole selected row expands its editor; a bulk selection stays one line per row. */
+  editing: boolean;
   send: SendIntent;
   uploader: ImageUploader;
   onError: (message: string | null) => void;
+  onDelete: (ids: string[]) => void;
 }) {
   const selected = useStore(
     selectionStore,
     (s) => s.sceneId === scene.id && s.ids.includes(entityId),
   );
-  const [confirming, setConfirming] = useState(false);
-  const { preferences } = useViewerPreferences();
   const [textureBusy, setTextureBusy] = useState(false);
   const textureInputId = useId();
   const entity = scene.entities[entityId];
@@ -457,9 +486,9 @@ function EntityRowView({
     [campaign, scene, entityId],
   );
   if (!entity || !row) return null;
-  const targets = moveTargets(scene, entity);
   const shape = entity.shape;
   const entityName = entity.name;
+  const blocked = selectable ? undefined : `${row.layerLabel} is locked`;
 
   /** ENV-05: upload an image and store it as the prop's texture (entity.update replaces the shape). */
   async function setTexture(current: NonNullable<Entity['shape']>, file: File) {
@@ -485,23 +514,83 @@ function EntityRowView({
     }
   }
 
+  /** UI-ENT-02 / CAM-06: a local camera move, never an action and never sent. */
+  const centre = () => {
+    const at = entityFocusPoint(entity);
+    focusStore.getState().request(at.x, at.y, at.z);
+  };
+
+  /** UI-ENT-02: a token opens its full menu (UI-TOKEN-02); anything else opens the row editor. */
+  const openMenu = () => {
+    selectionStore.getState().pick(scene.id, entityId, false);
+    if (entity.token) tokenMenuStore.getState().open(entityId);
+  };
+
   return (
     <li className="ui-entity" data-selected={selected}>
-      <div className="ui-row">
+      <div className="ui-entity-row">
+        <input
+          type="checkbox"
+          aria-label={`Select ${row.name}`}
+          title={blocked}
+          checked={selected}
+          disabled={!selectable}
+          onChange={() => {
+            selectionStore.getState().pick(scene.id, entityId, true);
+          }}
+        />
         <button
           type="button"
+          className="ui-entity-name"
           aria-pressed={selected}
+          title="Double-click to centre the view"
           onClick={() => {
             selectionStore.getState().pick(scene.id, entityId, false);
           }}
+          onDoubleClick={centre}
         >
           {row.name}
         </button>
-        <span className="ui-badge">{row.kind}</span>
-        <span className="ui-badge">{row.layerLabel}</span>
-        {row.owners && <span className="ui-badge">Owner: {row.owners}</span>}
+        <span className="ui-entity-actions">
+          <button
+            type="button"
+            className="ui-icon-button"
+            aria-label={`Open menu for ${row.name}`}
+            title={blocked ?? (entity.token ? 'Token menu' : 'Edit')}
+            disabled={!selectable}
+            onClick={openMenu}
+          >
+            ⋯
+          </button>
+          <button
+            type="button"
+            className="ui-icon-button"
+            aria-label={`Centre view on ${row.name}`}
+            title="Centre view"
+            onClick={centre}
+          >
+            ⌖
+          </button>
+          <button
+            type="button"
+            className="ui-icon-button ui-danger-button"
+            aria-label={`Delete ${row.name}`}
+            title={blocked ?? 'Delete'}
+            disabled={!selectable}
+            onClick={() => {
+              onDelete([entityId]);
+            }}
+          >
+            🗑
+          </button>
+        </span>
+        <span className="ui-entity-badges">
+          <span className="ui-badge">{row.kind}</span>
+          <span className="ui-badge">{row.layerLabel}</span>
+          {row.owners && <span className="ui-badge">Owner: {row.owners}</span>}
+        </span>
       </div>
-      {selected && (
+      {selected && editing && (
         <div className="ui-row">
           <NameForm
             key={`${entityId}:${entity.name}`}
@@ -511,24 +600,6 @@ function EntityRowView({
             validate={(t) => isValidEntityName(t) && t.trim() !== entity.name}
             onSubmit={(t) => send(entityRenameIntent(scene.id, entityId, t))}
           />
-          <label>
-            Move {entity.name} to{' '}
-            <select
-              value=""
-              onChange={(e) => {
-                const target = targets.find((t) => t.layer === e.target.value);
-                if (target) void send(entityMoveLayerIntent(scene.id, entityId, target.layer));
-              }}
-            >
-              <option value="">Choose a layer</option>
-              {targets.map((t) => (
-                <option key={t.layer} value={t.layer} disabled={t.disabledReason !== null}>
-                  {t.label}
-                  {t.disabledReason ? ` (${t.disabledReason})` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
           {entity.shape?.walkable && (
             <label>
               <input
@@ -581,49 +652,61 @@ function EntityRowView({
               )}
             </div>
           )}
-          {confirming ? (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  void send(entityDeleteIntent(scene.id, entityId)).then((ok) => {
-                    if (ok) selectionStore.getState().clear();
-                    setConfirming(false);
-                  });
-                }}
-              >
-                Confirm delete {entity.name}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirming(false);
-                }}
-              >
-                Keep
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                if (preferences.confirmBeforeDeleting) setConfirming(true);
-                else
-                  void send(entityDeleteIntent(scene.id, entityId)).then((ok) => {
-                    if (ok) selectionStore.getState().clear();
-                  });
-              }}
-            >
-              Delete {entity.name}
-            </button>
-          )}
         </div>
       )}
     </li>
   );
 }
 
-/** TOK-01, ENV-02: DM creates tokens and props, then selects, renames, re-layers or deletes them. */
+/**
+ * UI-ENT-03 / DESIGN §12.5: the delete confirmation. Keep takes focus so Enter never deletes by
+ * accident; Escape keeps too.
+ */
+function DeleteConfirm({
+  label,
+  busy,
+  onConfirm,
+  onKeep,
+}: {
+  label: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onKeep: () => void;
+}) {
+  const keepRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    keepRef.current?.focus();
+  }, [label]);
+  return (
+    <section
+      className="ui-confirm"
+      role="alertdialog"
+      aria-labelledby="ui-entity-delete-h"
+      aria-describedby="ui-entity-delete-d"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onKeep();
+      }}
+    >
+      <h3 id="ui-entity-delete-h">Delete {label}?</h3>
+      <p id="ui-entity-delete-d">
+        Everyone at the table loses it. You can turn this prompt off in Settings.
+      </p>
+      <div className="ui-row">
+        <button type="button" className="ui-danger-button" disabled={busy} onClick={onConfirm}>
+          Confirm delete {label}
+        </button>
+        <button ref={keepRef} type="button" onClick={onKeep}>
+          Keep
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * TOK-01, ENV-02, UI-ENT-01..03: the DM creates tokens and props on the active layer, and selects,
+ * re-layers or deletes them in bulk. Bulk changes are one action per entity through the pipeline.
+ */
 export function EntityPanel({
   campaign,
   uploader = defaultUploader,
@@ -632,11 +715,35 @@ export function EntityPanel({
   uploader?: ImageUploader;
 }) {
   const isHost = useClientStore((s) => s.isHost);
+  const seatId = useClientStore((s) => s.seatId);
   const activeLayer = useUiStore((s) => s.activeLayer);
+  const { preferences } = useViewerPreferences();
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState(false);
   const { send, error: submitError } = useSubmit();
   const scene = campaign.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;
   const rows = useMemo(() => (scene ? entityRows(campaign, scene) : []), [campaign, scene]);
+  // PERM-01/02: exactly the rows the board would keep selected (validSelection uses canSelect).
+  const selectableIds = useMemo(() => {
+    if (!scene) return [];
+    const actor = selectionActor(isHost, seatId, campaign.seats);
+    return rows
+      .filter((r) => {
+        const entity = scene.entities[r.id];
+        return entity !== undefined && canSelect(entity, scene, actor);
+      })
+      .map((r) => r.id);
+  }, [rows, scene, isHost, seatId, campaign.seats]);
+  const selectedIds = useStore(selectionStore, (s) =>
+    scene && s.sceneId === scene.id ? s.ids : NO_IDS,
+  );
+  const selected = selectableIds.filter((id) => selectedIds.includes(id));
+  const allState = selectAllState(selectableIds, selectedIds);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = allState === 'some';
+  }, [allState]);
 
   if (!scene) {
     return (
@@ -646,6 +753,39 @@ export function EntityPanel({
       </section>
     );
   }
+  const sceneId = scene.id;
+
+  /** Sends each intent in turn; one refusal does not stop the rest. */
+  async function sendAll(specs: readonly IntentSpec[]): Promise<void> {
+    setBusy(true);
+    setError(null);
+    let failed = 0;
+    try {
+      for (const spec of specs) if (!(await send(spec))) failed += 1;
+    } finally {
+      setBusy(false);
+    }
+    if (failed > 0 && specs.length > 1)
+      setError(`The host did not accept ${String(failed)} of ${String(specs.length)} changes.`);
+  }
+
+  const deleteNow = (ids: string[]) => {
+    void sendAll(bulkDeleteIntents(sceneId, ids)).then(() => {
+      setPendingDelete(null);
+    });
+  };
+  /** UI-ENT-03: confirm first unless this viewer turned "Confirm before deleting" off. */
+  const requestDelete = (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (preferences.confirmBeforeDeleting) setPendingDelete(ids);
+    else deleteNow(ids);
+  };
+  const pendingLabel =
+    pendingDelete?.length === 1
+      ? (scene.entities[pendingDelete[0] ?? '']?.name ?? '1 entity')
+      : `${String(pendingDelete?.length ?? 0)} entities`;
+  const moveLayers = LAYER_ORDER.filter((l) => entityCreateLayers(isHost).includes(l));
+
   return (
     <section aria-labelledby="ui-entities-h" className="ui-panel">
       <h2 id="ui-entities-h">Entities</h2>
@@ -667,7 +807,73 @@ export function EntityPanel({
         onError={setError}
       />
       <h3>In {scene.name}</h3>
-      {rows.length === 0 && <p>Nothing here yet.</p>}
+      {rows.length === 0 ? (
+        <p>Nothing here yet.</p>
+      ) : (
+        <div className="ui-entity-bulk" role="toolbar" aria-label="Selected entities">
+          <label>
+            <input
+              ref={selectAllRef}
+              type="checkbox"
+              checked={allState === 'all'}
+              disabled={selectableIds.length === 0}
+              onChange={() => {
+                selectionStore
+                  .getState()
+                  .reconcile(sceneId, allState === 'all' ? [] : selectableIds);
+              }}
+            />{' '}
+            Select all
+          </label>
+          <span className="ui-entity-count" aria-live="polite">
+            {selected.length} selected
+          </span>
+          <select
+            aria-label="Move selected to layer"
+            value=""
+            disabled={busy || selected.length === 0}
+            onChange={(e) => {
+              const layer = moveLayers.find((l) => l === e.target.value);
+              if (layer) void sendAll(bulkMoveIntents(scene, selected, layer));
+            }}
+          >
+            <option value="">Move to layer…</option>
+            {moveLayers.map((l) => (
+              <option key={l} value={l} disabled={scene.layers[l]?.locked === true}>
+                {LAYER_LABELS[l]}
+                {scene.layers[l]?.locked ? ' (locked)' : ''}
+              </option>
+            ))}
+          </select>
+          {/* UI-ENT-01: the state has no per-entity lock yet (only layer locks), so this is an
+              honest WIP placeholder (UIUX §1.7) until that contract exists. */}
+          <button type="button" disabled title="Locking single entities is not available yet">
+            Lock <span className="ui-badge">WIP</span>
+          </button>
+          <button
+            type="button"
+            className="ui-danger-button"
+            disabled={busy || selected.length === 0}
+            onClick={() => {
+              requestDelete(selected);
+            }}
+          >
+            Delete selected
+          </button>
+        </div>
+      )}
+      {pendingDelete && (
+        <DeleteConfirm
+          label={pendingLabel}
+          busy={busy}
+          onConfirm={() => {
+            deleteNow(pendingDelete);
+          }}
+          onKeep={() => {
+            setPendingDelete(null);
+          }}
+        />
+      )}
       <ul className="ui-list" aria-label="Entities in this scene">
         {rows.map((row) => (
           <EntityRowView
@@ -675,9 +881,12 @@ export function EntityPanel({
             campaign={campaign}
             scene={scene}
             entityId={row.id}
+            selectable={selectableIds.includes(row.id)}
+            editing={selected.length === 1}
             send={send}
             uploader={uploader}
             onError={setError}
+            onDelete={requestDelete}
           />
         ))}
       </ul>
