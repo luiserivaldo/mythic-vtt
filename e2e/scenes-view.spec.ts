@@ -63,6 +63,7 @@ test('the DM creates scenes in folders, sizes the canvas and sets the active sce
     // The view expands from the scene header; scene filters and the Browse list are gone.
     await dm.getByRole('button', { name: 'Scene picker', exact: true }).click();
     await expect(dm.getByRole('heading', { name: 'Scenes', exact: true })).toBeVisible();
+    await expect(dm.getByRole('region', { name: 'Scene cards', exact: true })).toBeVisible();
     await expect(dm.getByLabel('Tint', { exact: true })).toHaveCount(0);
     await expect(dm.getByLabel('Darkness', { exact: true })).toHaveCount(0);
     await expect(dm.getByRole('button', { name: 'Browse' })).toHaveCount(0);

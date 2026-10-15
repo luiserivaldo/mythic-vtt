@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Campaign, Scene } from '@mythic/shared';
 import { useStore } from 'zustand';
 import { useClientStore } from '../store/react.js';
@@ -21,7 +21,6 @@ import { useSubmit } from './submit.js';
  * flagged on the card and never activatable.
  */
 export function ScenesView({ campaign }: { campaign: Campaign }) {
-  const headingId = useId();
   const isHost = useClientStore((s) => s.isHost);
   const { send, error } = useSubmit();
   const viewedId = useViewedCampaign()?.activeSceneId ?? null;
@@ -117,8 +116,9 @@ export function ScenesView({ campaign }: { campaign: Campaign }) {
   };
 
   return (
-    <section aria-labelledby={headingId} className="ui-panel ui-scenes-view">
-      <h2 id={headingId}>Scenes</h2>
+    // Named apart from the dock's Scenes tab panel, which hosts this view too.
+    <section aria-label="Scene cards" className="ui-panel ui-scenes-view">
+      <h2>Scenes</h2>
       {viewingOther && (
         <p className="ui-row">
           <span>
