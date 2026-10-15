@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SEAT_TEMPLATES, type Campaign } from '@mythic/shared';
+import type { Campaign, SeatTemplateId } from '@mythic/shared';
 import { newId } from './ids.js';
 import {
   seatAssignIntent,
@@ -8,16 +8,18 @@ import {
   seatReleaseIntent,
   seatRoleIntent,
 } from './intent-specs.js';
-import { NameForm } from './NameForm.js';
 import { SeatInvites } from './SeatInvites.js';
 import type { JoinUrl } from './share-panel.js';
 import {
+  archiveImpact,
   connectedIdentityRows,
   isValidIdentityId,
-  isValidLabel,
-  PERMISSION_KEYS,
+  newSeatFields,
   rosterOptions,
+  SEAT_TOGGLES,
   seatRows,
+  seatTemplateOptions,
+  type SeatRow,
 } from './seat-panel.js';
 import { useSubmit } from './submit.js';
 import { useClientStore } from '../store/react.js';
@@ -25,7 +27,13 @@ import { useClientStore } from '../store/react.js';
 interface Props {
   campaign: Campaign;
   presence:
-    readonly { seatId: string; connected: boolean; displayName?: string | undefined }[] | null;
+    | readonly {
+        seatId: string;
+        connected: boolean;
+        displayName?: string | undefined;
+        color?: string | undefined;
+      }[]
+    | null;
   /** M1-11: connected identities without a seat (host only), offered as a dropdown. */
   unseated?: readonly { identityId: string; displayName: string }[] | undefined;
   /** SES-04: the host's player join URLs; the first one carries the per-seat invite links. */
@@ -39,10 +47,14 @@ export function SeatPanel({ campaign, presence, unseated, joinUrls }: Props) {
   const { send, error } = useSubmit();
   const [archiveId, setArchiveId] = useState<string | null>(null);
   const [identity, setIdentity] = useState<Record<string, string>>({});
+  const templates = seatTemplateOptions();
+  const [templateId, setTemplateId] = useState<SeatTemplateId>('player');
+  const [newName, setNewName] = useState('');
+  const impact = archiveId === null ? null : archiveImpact(campaign, archiveId);
   const spectators = useClientStore((s) => s.presence?.spectators ?? 0);
   return (
     <section aria-labelledby="ui-seats-h" className="ui-panel">
-      <h2 id="ui-seats-h">Participants and permissions</h2>
+      <h2 id="ui-seats-h">Seats</h2>
       <h3>Connected identities</h3>
       {connected.length === 0 ? (
         <p>No players or spectators are connected.</p>
@@ -59,30 +71,21 @@ export function SeatPanel({ campaign, presence, unseated, joinUrls }: Props) {
       )}
       {/* UI-JOIN-01: spectators are counted, never listed or named. */}
       <p aria-label="Spectators">Spectators watching: {spectators}</p>
-      {archiveId !== null && campaign.seats[archiveId] && (
+      {impact !== null && archiveId !== null && (
         <section role="dialog" aria-modal="true" aria-labelledby="archive-title">
-          <h3 id="archive-title">Archive {campaign.seats[archiveId].label}?</h3>
+          <h3 id="archive-title">Archive {impact.label}?</h3>
           <p>
             This seat can no longer be joined. Its tokens become unassigned; nothing is deleted.
           </p>
           <ul>
             <li>
-              {campaign.seats[archiveId].identityId
+              {impact.loginBound
                 ? 'The bound login loses access to this seat.'
                 : 'No login is bound to this seat.'}
             </li>
-            {Object.values(campaign.scenes).flatMap((scene) =>
-              Object.values(scene.entities)
-                .filter((entity) => entity.owners.includes(archiveId))
-                .map((entity) => (
-                  <li key={`${scene.id}/${entity.id}`}>
-                    {entity.name || 'Unnamed entity'} in {scene.name}
-                    {entity.token?.characterInstanceId
-                      ? ' (character link retained, ownership becomes unassigned)'
-                      : ''}
-                  </li>
-                )),
-            )}
+            {impact.entities.map((entity) => (
+              <li key={entity.key}>{entity.text}</li>
+            ))}
           </ul>
           <button
             type="button"
@@ -116,160 +119,210 @@ export function SeatPanel({ campaign, presence, unseated, joinUrls }: Props) {
           </ul>
         </details>
       )}
-      <h3>Participants</h3>
-      <ul className="ui-list" aria-label="Participants">
-        {rows.map((row) => {
-          const typed = identity[row.id] ?? '';
-          return (
-            <li key={row.id} aria-label={`${row.label} participant`}>
-              <div className="ui-row">
-                <strong>{row.label}</strong>
-                <span className="ui-badge">
-                  {row.occupied ? (row.connected ? 'Online' : 'Offline') : 'Empty'}
-                </span>
-                {row.occupantName !== undefined && <span>{row.occupantName}</span>}
-                <label>
-                  Access role{' '}
-                  <select
-                    value={row.role}
-                    onChange={(e) => {
-                      void send(
-                        seatRoleIntent(row.id, e.target.value === 'codm' ? 'codm' : 'player'),
-                      );
-                    }}
-                  >
-                    <option value="player">Player</option>
-                    <option value="codm">Co-DM</option>
-                  </select>
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={row.interactionEnabled}
-                    onChange={(e) => {
-                      void send({
-                        type: 'seat.update',
-                        payload: { seatId: row.id, interactionEnabled: e.target.checked },
-                      });
-                    }}
-                  />{' '}
-                  Enable Interaction
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setArchiveId(row.id);
-                  }}
-                >
-                  Archive participant
-                </button>
-                {row.occupied && (
+      <h3>Seats</h3>
+      {rows.length === 0 ? (
+        <p>No seats yet. Add one below.</p>
+      ) : (
+        <ul className="ui-list ui-seat-list" aria-label="Seats">
+          {rows.map((row) => (
+            <li key={row.id} aria-label={`${row.label} seat`}>
+              {/* UI-SEAT-01: expanding a seat opens that seat's own settings. */}
+              <details>
+                <summary className="ui-row">
+                  <SeatBadgeView row={row} />
+                  <strong>{row.label}</strong>
+                  <span className="ui-badge">{row.roleLabel}</span>
+                  <span className="ui-badge">
+                    {row.occupied ? (row.connected ? 'Online' : 'Offline') : 'Empty'}
+                  </span>
+                  {row.occupantName !== undefined && <span>{row.occupantName}</span>}
+                </summary>
+                <div role="group" aria-label={`Settings for ${row.label}`} className="ui-panel">
+                  <label>
+                    Access role{' '}
+                    <select
+                      value={row.role}
+                      onChange={(e) => {
+                        void send(
+                          seatRoleIntent(row.id, e.target.value === 'codm' ? 'codm' : 'player'),
+                        );
+                      }}
+                    >
+                      <option value="player">Player</option>
+                      <option value="codm">Co-DM</option>
+                    </select>
+                  </label>
+                  {/* UI-SEAT-02: per-seat toggles; no lasting-AoE toggle. UI-SEAT-05 below. */}
+                  <fieldset>
+                    <legend>Permissions for {row.label}</legend>
+                    {SEAT_TOGGLES.map((toggle) => (
+                      <label key={toggle.key}>
+                        <input
+                          type="checkbox"
+                          checked={row.permissions[toggle.key]}
+                          onChange={(e) => {
+                            void send(seatPermissionIntent(row.id, toggle.key, e.target.checked));
+                          }}
+                        />{' '}
+                        {toggle.label}
+                      </label>
+                    ))}
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={row.interactionEnabled}
+                        onChange={(e) => {
+                          void send({
+                            type: 'seat.update',
+                            payload: { seatId: row.id, interactionEnabled: e.target.checked },
+                          });
+                        }}
+                      />{' '}
+                      Enable Interaction
+                    </label>
+                  </fieldset>
+                  {row.occupied ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void send(seatReleaseIntent(row.id));
+                      }}
+                    >
+                      Release seat
+                    </button>
+                  ) : (
+                    <form
+                      className="ui-row"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void send(seatAssignIntent(row.id, identity[row.id] ?? ''));
+                      }}
+                    >
+                      {roster.length > 0 && (
+                        <label>
+                          <span className="ui-visually-hidden">
+                            Connected participant for {row.label}
+                          </span>
+                          <select
+                            value={
+                              isValidIdentityId(identity[row.id] ?? '') ? identity[row.id] : ''
+                            }
+                            onChange={(e) => {
+                              setIdentity({ ...identity, [row.id]: e.target.value });
+                            }}
+                          >
+                            <option value="">Connected participant...</option>
+                            {roster.map((o) => (
+                              <option key={o.identityId} value={o.identityId}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      <label>
+                        <span className="ui-visually-hidden">
+                          Participant identity id for {row.label}
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="Participant identity id"
+                          value={identity[row.id] ?? ''}
+                          onChange={(e) => {
+                            setIdentity({ ...identity, [row.id]: e.target.value });
+                          }}
+                        />
+                      </label>
+                      <button type="submit" disabled={!isValidIdentityId(identity[row.id] ?? '')}>
+                        Assign
+                      </button>
+                    </form>
+                  )}
+                  {/* UI-SEAT-03: archive, never delete; the warning lists what is affected. */}
                   <button
                     type="button"
                     onClick={() => {
-                      void send(seatReleaseIntent(row.id));
+                      setArchiveId(row.id);
                     }}
                   >
-                    Release participant
+                    Archive seat
                   </button>
-                )}
-              </div>
-              {!row.occupied && (
-                <form
-                  className="ui-row"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void send(seatAssignIntent(row.id, typed));
-                  }}
-                >
-                  {roster.length > 0 && (
-                    <label>
-                      <span className="ui-visually-hidden">
-                        Connected participant for {row.label}
-                      </span>
-                      <select
-                        value={isValidIdentityId(typed) ? typed : ''}
-                        onChange={(e) => {
-                          setIdentity({ ...identity, [row.id]: e.target.value });
-                        }}
-                      >
-                        <option value="">Connected participant...</option>
-                        {roster.map((o) => (
-                          <option key={o.identityId} value={o.identityId}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  <label>
-                    <span className="ui-visually-hidden">
-                      Participant identity id for {row.label}
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Participant identity id"
-                      value={typed}
-                      onChange={(e) => {
-                        setIdentity({ ...identity, [row.id]: e.target.value });
-                      }}
-                    />
-                  </label>
-                  <button type="submit" disabled={!isValidIdentityId(typed)}>
-                    Assign
-                  </button>
-                </form>
-              )}
-              <fieldset>
-                <legend>Permissions for {row.label}</legend>
-                {PERMISSION_KEYS.map((key) => (
-                  <label key={key}>
-                    <input
-                      type="checkbox"
-                      checked={row.permissions[key]}
-                      onChange={(e) => {
-                        void send(seatPermissionIntent(row.id, key, e.target.checked));
-                      }}
-                    />{' '}
-                    {key}
-                  </label>
-                ))}
-              </fieldset>
+                </div>
+              </details>
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ul>
+      )}
+      {/* UI-SEAT-04 (M4-05): copy a seat's invite link. */}
       <SeatInvites
         seats={rows.map((row) => ({ id: row.id, label: row.label }))}
         playerUrl={joinUrls[0]?.url}
       />
-      <fieldset>
-        <legend>Add a participant template</legend>
+      <form
+        aria-label="Add a seat"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fields = newSeatFields(templateId, newName);
+          if (!fields) return;
+          void send(seatCreateIntent(newId(), fields.label, fields.role, fields.permissions)).then(
+            (ok) => {
+              if (ok) setNewName('');
+            },
+          );
+        }}
+      >
+        <h3>Add a seat</h3>
         <div className="ui-row">
-          {SEAT_TEMPLATES.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              title={template.description}
-              onClick={() => {
-                void send(
-                  seatCreateIntent(newId(), template.label, template.role, template.permissions),
-                );
+          <label>
+            Seat template{' '}
+            <select
+              value={templateId}
+              onChange={(e) => {
+                const picked = templates.find((t) => t.id === e.target.value);
+                if (picked) setTemplateId(picked.id);
               }}
             >
-              Add {template.label}
-            </button>
-          ))}
+              {templates.map((template) => (
+                <option key={template.id} value={template.id} title={template.description}>
+                  {template.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Seat name{' '}
+            <input
+              type="text"
+              placeholder={templates.find((t) => t.id === templateId)?.label}
+              value={newName}
+              maxLength={120}
+              onChange={(e) => {
+                setNewName(e.target.value);
+              }}
+            />
+          </label>
+          <button type="submit" disabled={newSeatFields(templateId, newName) === null}>
+            Add seat
+          </button>
         </div>
-        <p>Templates are presets. You can adjust access and permissions after adding one.</p>
-      </fieldset>
-      <NameForm
-        label="Custom participant name"
-        submitLabel="Add custom participant"
-        validate={isValidLabel}
-        onSubmit={(t) => send(seatCreateIntent(newId(), t, 'player'))}
-      />
+        <p>A template sets the seat's starting permissions. Adjust each seat after adding it.</p>
+      </form>
       {error && <p role="alert">{error}</p>}
     </section>
+  );
+}
+
+function SeatBadgeView({ row }: { row: SeatRow }) {
+  return row.badge.kind === 'image' ? (
+    <img className="ui-seat-avatar-badge" src={row.badge.src} alt="" />
+  ) : (
+    <span
+      className="ui-seat-avatar-badge"
+      aria-hidden="true"
+      style={{ background: row.color }}
+      data-kind={row.badge.kind}
+    >
+      {row.badge.text}
+    </span>
   );
 }

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { encodeQrCode } from '../packages/client/src/net/qr.js';
-import { openClient, startTable, type Table, claimSeat } from './harness.js';
+import { addSeat, openClient, startTable, type Table, claimSeat } from './harness.js';
 
 /**
  * SES-09: an identity can leave the file system entirely and travel as a QR code. The reader is
@@ -89,9 +89,7 @@ test('shows the stored identity as a QR code and transfers it to another browser
   const dm = await dmContext.newPage();
   await dm.goto(`${running.clientUrl.replace(/\/$/, '')}/#host=${running.hostToken}`);
   await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
-  await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
-  await dm.getByPlaceholder('Custom participant name').fill('Wizard');
-  await dm.getByRole('button', { name: 'Add custom participant' }).click();
+  await addSeat(dm, 'Player', 'Wizard');
 
   const source = await openClient(browser, running, 'source', { joinScreen: true });
   await claimSeat(source.page, 'Wizard', 'Alice');

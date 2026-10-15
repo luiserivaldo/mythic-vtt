@@ -8,6 +8,7 @@ import {
   type Client,
   type Reply,
   type Table,
+  addSeat,
   claimSeat,
 } from './harness.js';
 
@@ -126,10 +127,7 @@ async function moveCamera(page: Page, wheel: number, drag: number): Promise<void
 
 /** The DM adds one free player seat, so a player client can join it by name. */
 async function addPlayerSeat(dm: Page, label: string): Promise<void> {
-  await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
-  await dm.getByPlaceholder('Custom participant name').fill(label);
-  await dm.getByRole('button', { name: 'Add custom participant' }).click();
-  await expect(dm.getByText(label, { exact: true }).first()).toBeVisible();
+  await addSeat(dm, 'Player', label);
 }
 
 /** A first-time visitor claims `seat` on the join screen under `name`. */

@@ -1,7 +1,32 @@
-import { Id, type Campaign, type Seat } from '@mythic/shared';
+import { Id, SEAT_TEMPLATES, type Campaign, type Seat, type SeatTemplateId } from '@mythic/shared';
+import { avatarHue, initialsOf, joinImageUrl } from './join-screen.js';
 
 export const PERMISSION_KEYS = ['view', 'move', 'edit', 'delete'] as const;
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
+
+/**
+ * UI-SEAT-02: the per-seat toggles the Seats tab offers, in order. There is deliberately no
+ * lasting-AoE toggle (the cap stays a scene setting), and `view` is not offered: a seat that cannot
+ * view is not a seat.
+ */
+export const SEAT_TOGGLES: readonly { key: Exclude<PermissionKey, 'view'>; label: string }[] = [
+  { key: 'move', label: 'Move own tokens' },
+  { key: 'edit', label: 'Edit' },
+  { key: 'delete', label: 'Delete' },
+];
+
+/** UI-SEAT-01: the seat's badge: its DM-chosen icon, or initials of its name (UX-44). */
+export type SeatBadge =
+  | { kind: 'glyph'; text: string }
+  | { kind: 'image'; src: string }
+  | { kind: 'initials'; text: string };
+
+type PresenceEntry = {
+  seatId: string;
+  connected: boolean;
+  displayName?: string | undefined;
+  color?: string | undefined;
+};
 
 export interface SeatRow {
   id: string;
@@ -15,15 +40,21 @@ export interface SeatRow {
   /** SES-07: the name the seated identity connected with, when the host has told us. */
   occupantName: string | undefined;
   permissions: Record<PermissionKey, boolean>;
+  badge: SeatBadge;
+  /** The occupant's player colour from presence, else a stable hue from the seat name. */
+  color: string;
 }
 
-export function seatRows(
-  campaign: Campaign,
-  presence:
-    readonly { seatId: string; connected: boolean; displayName?: string | undefined }[] | null,
-): SeatRow[] {
+function badgeOf(seat: Seat): SeatBadge {
+  if (seat.icon?.kind === 'glyph') return { kind: 'glyph', text: seat.icon.value };
+  if (seat.icon?.kind === 'image') return { kind: 'image', src: joinImageUrl(seat.icon.hash) };
+  return { kind: 'initials', text: initialsOf(seat.label) };
+}
+
+export function seatRows(campaign: Campaign, presence: readonly PresenceEntry[] | null): SeatRow[] {
   const online = new Set((presence ?? []).filter((p) => p.connected).map((p) => p.seatId));
   const names = new Map((presence ?? []).map((p) => [p.seatId, p.displayName]));
+  const colors = new Map((presence ?? []).map((p) => [p.seatId, p.color]));
   return Object.values(campaign.seats)
     .filter((seat) => !seat.archived)
     .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id))
@@ -48,7 +79,66 @@ export function seatRows(
         edit: seat.permissions.edit,
         delete: seat.permissions.delete,
       },
+      badge: badgeOf(seat),
+      color: colors.get(seat.id) ?? `hsl(${String(avatarHue(seat.label))} 55% 38%)`,
     }));
+}
+
+export interface SeatTemplateOption {
+  id: SeatTemplateId;
+  label: string;
+  description: string;
+}
+
+/**
+ * UI-SEAT-01: the "Add seat" dropdown. Today the options are the built-in role presets with their
+ * current defaults. MV-262 (UX-46) replaces this one function with the campaign's permission
+ * templates; the panel only reads `id`, `label` and `description` and resolves the id with
+ * `newSeatIntentPayload`.
+ */
+export function seatTemplateOptions(): SeatTemplateOption[] {
+  return SEAT_TEMPLATES.map(({ id, label, description }) => ({ id, label, description }));
+}
+
+/** The `seat.create` fields for a template: an empty name falls back to the template's label. */
+export function newSeatFields(
+  templateId: SeatTemplateId,
+  typedName: string,
+): { label: string; role: Seat['role']; permissions: Seat['permissions'] } | null {
+  const template = SEAT_TEMPLATES.find((t) => t.id === templateId);
+  if (!template) return null;
+  const label = typedName.trim() === '' ? template.label : typedName.trim();
+  if (!isValidLabel(label)) return null;
+  return { label, role: template.role, permissions: { ...template.permissions } };
+}
+
+export interface ArchiveImpact {
+  label: string;
+  loginBound: boolean;
+  /** Entities whose ownership becomes unassigned, one line each. */
+  entities: { key: string; text: string }[];
+}
+
+/** UI-SEAT-03 (UX-03): what archiving a seat affects, listed in the warning before it happens. */
+export function archiveImpact(campaign: Campaign, seatId: string): ArchiveImpact | null {
+  const seat = campaign.seats[seatId];
+  if (!seat || seat.archived) return null;
+  return {
+    label: seat.label,
+    loginBound: seat.identityId !== null,
+    entities: Object.values(campaign.scenes).flatMap((scene) =>
+      Object.values(scene.entities)
+        .filter((entity) => entity.owners.includes(seatId))
+        .map((entity) => ({
+          key: `${scene.id}/${entity.id}`,
+          text:
+            `${entity.name || 'Unnamed entity'} in ${scene.name}` +
+            (entity.token?.characterInstanceId
+              ? ' (character link retained, ownership becomes unassigned)'
+              : ''),
+        })),
+    ),
+  };
 }
 
 /** Seat labels are required and trimmed by the action schema; mirror it so the button can disable. */

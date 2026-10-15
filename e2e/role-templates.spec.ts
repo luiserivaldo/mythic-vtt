@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  addSeat,
   RawClient,
   recordPageFrames,
   startTable,
@@ -27,22 +28,23 @@ test('the DM adds role templates and the spectator preset receives a read-only p
   dm.on('pageerror', (error) => errors.push(error.message));
   await dm.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
-  await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
-
   for (const label of ['DM / Admin', 'Co-DM', 'Player', 'Spectator']) {
-    await dm.getByRole('button', { name: `Add ${label}` }).click();
-    await expect(
-      dm.getByRole('listitem', { name: `${label} participant`, exact: true }),
-    ).toHaveCount(1);
+    await addSeat(dm, label);
+    await expect(dm.getByRole('listitem', { name: `${label} seat`, exact: true })).toHaveCount(1);
   }
   const spectatorRow = dm.getByRole('listitem', {
-    name: 'Spectator participant',
+    name: 'Spectator seat',
     exact: true,
   });
+  await expect(spectatorRow).toContainText('Spectator');
+  // UI-SEAT-01: expanding the seat opens its own settings.
+  await spectatorRow.locator('summary').click();
   await expect(spectatorRow.getByLabel('Access role')).toHaveValue('player');
-  await expect(spectatorRow.getByRole('checkbox', { name: 'view' })).toBeChecked();
-  for (const permission of ['move', 'edit', 'delete'])
-    await expect(spectatorRow.getByRole('checkbox', { name: permission })).not.toBeChecked();
+  for (const permission of ['Move own tokens', 'Edit', 'Delete'])
+    await expect(
+      spectatorRow.getByRole('checkbox', { name: permission, exact: true }),
+    ).not.toBeChecked();
+  await expect(spectatorRow.getByRole('checkbox', { name: 'Enable Interaction' })).toBeChecked();
 
   const hostIdentity = await dm.evaluate(
     () =>

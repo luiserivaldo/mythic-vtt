@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, startTable, testUlid, type Table, claimSeat } from './harness.js';
+import { addSeat, RawClient, startTable, testUlid, type Table, claimSeat } from './harness.js';
 
 // UX-34 / UI-SHEET-01: the Sheet tab is a placeholder labelled `WIP`, and "See Sheet" on a token
 // selects it. No sheet data exists yet (CHAR-01), so nothing but text is rendered.
@@ -77,8 +77,7 @@ test('the Sheet tab is a WIP placeholder and See Sheet on a token selects it', a
   await expect(sheet).toContainText('WIP');
 
   // A player is offered the same placeholder tab, and the panel carries no table data for them.
-  await page.getByRole('tab', { name: 'Participants', exact: true }).click();
-  await page.getByRole('button', { name: 'Add Player' }).click();
+  await addSeat(page, 'Player');
   const playerContext = await browser.newContext();
   const player = await playerContext.newPage();
   player.on('pageerror', (error) => errors.push(error.message));

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openClient, startTable, type Table, claimSeat } from './harness.js';
+import { addSeat, openClient, startTable, type Table, claimSeat } from './harness.js';
 
 let table: Table | undefined;
 test.beforeAll(async () => {
@@ -17,9 +17,7 @@ test('identity backup transfers an occupied seat to another browser without uplo
   const dm = await dmContext.newPage();
   await dm.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
-  await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
-  await dm.getByPlaceholder('Custom participant name').fill('Wizard');
-  await dm.getByRole('button', { name: 'Add custom participant' }).click();
+  await addSeat(dm, 'Player', 'Wizard');
   const first = await openClient(browser, table, 'original', { joinScreen: true });
   await claimSeat(first.page, 'Wizard', 'Alice');
   await expect(first.page.getByRole('dialog')).toHaveCount(0);

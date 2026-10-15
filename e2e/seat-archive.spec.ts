@@ -78,8 +78,10 @@ test('archive hands back entities and immediately removes co-DM access without l
     expect(inviteResponse.status).toBe(200);
     const { token: inviteToken } = (await inviteResponse.json()) as { token: string };
     guest.frames.length = 0;
-    await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
-    const participant = dm.getByRole('listitem', { name: 'Retiring co-DM participant' });
+    await dm.getByRole('tab', { name: 'Seats', exact: true }).click();
+    const participant = dm.getByRole('listitem', { name: 'Retiring co-DM seat' });
+    // UI-SEAT-01: the seat's settings open when the seat is expanded.
+    await participant.locator('summary').click();
     const interaction = participant.getByRole('checkbox', { name: 'Enable Interaction' });
     await expect(interaction).toBeChecked();
     await interaction.click();
@@ -89,8 +91,8 @@ test('archive hands back entities and immediately removes co-DM access without l
       () => (host.state as Campaign).seats[seatId]?.interactionEnabled === false,
     );
     await dm
-      .getByRole('listitem', { name: 'Retiring co-DM participant' })
-      .getByRole('button', { name: 'Archive participant' })
+      .getByRole('listitem', { name: 'Retiring co-DM seat' })
+      .getByRole('button', { name: 'Archive seat' })
       .click();
     const warning = dm.getByRole('dialog', { name: 'Archive Retiring co-DM?' });
     await expect(warning).toContainText('Retained token');
