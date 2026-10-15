@@ -2,9 +2,12 @@ import { Campaign, type Entity, type Grid } from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
 import { makeCampaign, tid } from '../testing.js';
 import {
-  handleAnchors,
+  ARROW_END,
+  ARROW_START,
+  RING_RADIUS,
+  handleShapes,
   handlesFor,
-  hitScreenHandle,
+  hitScreenShape,
   worldPerPixelAt,
   intersectRayPlane,
   multiplyQuaternions,
@@ -165,20 +168,50 @@ describe('3D handle layout and hit-testing', () => {
     expect(worldPerPixelAt(10, 45, 0)).toBe(0);
   });
 
-  it('gives tokens elevation only and props every handle', () => {
+  it('gives tokens elevation only and props arrows, rings and the pad (UI-TOKEN-07)', () => {
     expect(handlesFor('token')).toEqual(['move-y']);
-    expect(handlesFor('prop')).toHaveLength(5);
-    const anchors = handleAnchors({ x: 1, y: 2, z: 3 }, 2, handlesFor('prop'));
-    expect(anchors.find((a) => a.kind === 'move-y')?.position).toEqual({ x: 1, y: 4, z: 3 });
+    expect(handlesFor('prop')).toHaveLength(7);
+    const shapes = handleShapes({ x: 1, y: 2, z: 3 }, 2, handlesFor('prop'));
+    const arrowY = shapes.find((s) => s.kind === 'move-y');
+    expect(arrowY?.closed).toBe(false);
+    expect(arrowY?.points.at(-1)).toEqual({ x: 1, y: 2 + 2 * ARROW_END, z: 3 });
+    // Arrows start away from the centre so the middle stays free for picking (F07).
+    expect(arrowY?.points[0]?.y).toBeCloseTo(2 + 2 * ARROW_START);
+    const ringX = shapes.find((s) => s.kind === 'rotate-x');
+    expect(ringX?.closed).toBe(true);
+    for (const p of ringX?.points ?? []) {
+      expect(p.x).toBe(1);
+      expect(Math.hypot(p.y - 2, p.z - 3)).toBeCloseTo(2 * RING_RADIUS);
+    }
   });
 
-  it('picks the nearest handle within the radius', () => {
-    const handles = [
-      { kind: 'move-xz' as const, px: { x: 100, y: 100 } },
-      { kind: 'move-y' as const, px: { x: 100, y: 40 } },
+  it('picks the nearest shape within the radius; arrows win ties over rings', () => {
+    const shapes = [
+      {
+        kind: 'move-x' as const,
+        closed: false,
+        px: [
+          { x: 120, y: 100 },
+          { x: 180, y: 100 },
+        ],
+      },
+      {
+        kind: 'rotate-y' as const,
+        closed: true,
+        px: [
+          { x: 150, y: 100 },
+          { x: 100, y: 150 },
+          { x: 50, y: 100 },
+          { x: 100, y: 50 },
+        ],
+      },
+      { kind: 'move-xz' as const, closed: false, px: [{ x: 100, y: 100 }] },
     ];
-    expect(hitScreenHandle({ x: 103, y: 98 }, handles, 14)).toBe('move-xz');
-    expect(hitScreenHandle({ x: 100, y: 50 }, handles, 14)).toBe('move-y');
-    expect(hitScreenHandle({ x: 300, y: 300 }, handles, 14)).toBeNull();
+    expect(hitScreenShape({ x: 170, y: 104 }, shapes, 14)).toBe('move-x');
+    expect(hitScreenShape({ x: 150, y: 100 }, shapes, 14)).toBe('move-x');
+    expect(hitScreenShape({ x: 75, y: 125 }, shapes, 14)).toBe('rotate-y');
+    expect(hitScreenShape({ x: 52, y: 101 }, shapes, 14)).toBe('rotate-y');
+    expect(hitScreenShape({ x: 103, y: 98 }, shapes, 14)).toBe('move-xz');
+    expect(hitScreenShape({ x: 300, y: 300 }, shapes, 14)).toBeNull();
   });
 });

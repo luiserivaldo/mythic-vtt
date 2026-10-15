@@ -6,16 +6,24 @@ import { useStore } from 'zustand';
 import { SubmitContext } from '../ui/submit.js';
 import { commitTransform } from '../tools/gizmo-commit.js';
 import { gizmoStore } from '../tools/gizmo-store.js';
-import { applyMove, type GizmoDraft } from '../tools/transform-gizmo.js';
+import {
+  applyAxisMove,
+  applyMove,
+  MOVE_PAD_PX,
+  type GizmoDraft,
+} from '../tools/transform-gizmo.js';
 import {
   axisVector,
   draft3dFromEntity,
   gizmo3dMoveFootprint,
-  handleAnchors,
+  handleShapes,
   handlesFor,
-  hitScreenHandle,
+  hitScreenShape,
+  ARROW_END,
+  ARROW_START,
   HANDLE_HIT_PX_3D,
   HANDLE_LENGTH_PX,
+  RING_RADIUS,
   intersectRayPlane,
   projectRayToAxis,
   rotateDraft,
@@ -27,21 +35,24 @@ import {
   type Vec3Like,
 } from '../tools/transform-gizmo-3d.js';
 import { useGizmoTarget3D } from '../tools/use-gizmo-target-3d.js';
-import { GIZMO_MOVE_COLOR, GIZMO_ROTATE_COLOR, GIZMO_SCALE_COLOR } from './canvas-style.js';
+import { GIZMO_X_COLOR, GIZMO_Y_COLOR, GIZMO_Z_COLOR } from './canvas-style.js';
+import { AxisArrow, AxisRing, MovePad } from './GizmoParts.js';
 import { pointerClaims } from './pointer-claims.js';
 import { assetUrl } from '../assets/asset-url.js';
 import { mapTextureAspect, useMapTexture } from './use-texture.js';
 
-const COLORS: Record<Gizmo3DHandle, string> = {
-  'move-xz': GIZMO_MOVE_COLOR,
-  'move-y': GIZMO_SCALE_COLOR,
-  'rotate-x': '#b91c1c',
-  'rotate-y': '#6d28d9',
-  'rotate-z': GIZMO_ROTATE_COLOR,
+const AXIS_COLOR: Record<RotationAxis, string> = {
+  x: GIZMO_X_COLOR,
+  y: GIZMO_Y_COLOR,
+  z: GIZMO_Z_COLOR,
 };
-/** Handle blob radius in unit-reach space (HANDLE_LENGTH_PX = 1). */
-const BLOB = 7 / HANDLE_LENGTH_PX;
-const noRaycast = () => null;
+/** Children are laid out in unit-reach space: 1 = HANDLE_LENGTH_PX screen pixels. */
+const PX = 1 / HANDLE_LENGTH_PX;
+const MOVE_AXIS: Partial<Record<Gizmo3DHandle, RotationAxis>> = {
+  'move-x': 'x',
+  'move-y': 'y',
+  'move-z': 'z',
+};
 const ROTATE_AXIS: Partial<Record<Gizmo3DHandle, RotationAxis>> = {
   'rotate-x': 'x',
   'rotate-y': 'y',
@@ -59,8 +70,8 @@ interface Drag {
 }
 
 /**
- * ENV-03/ENV-04 (3D): vertical (Y) move, ground-plane (XZ) move and 3-axis rotation handles
- * for the selected prop/primitive; tokens get the vertical handle only. Handles are constant
+ * ENV-03/ENV-04 (3D), UI-TOKEN-07: X/Y/Z move arrows, a ground-plane (XZ) move pad and X/Y/Z
+ * rotation rings for the selected prop/primitive; tokens get the Y arrow only. Handles are constant
  * screen size. The drag previews locally and sends ONE entity.update on release (D34); a
  * reject reverts. Snapping follows the scene grid (D25); Shift drags free.
  */
@@ -160,8 +171,9 @@ export function TransformGizmo3D() {
     ): { t: number; point: Vec3Like } | null => {
       const ray = rayAt(e);
       const c = centerOf(d);
-      if (kind === 'move-y') {
-        const t = projectRayToAxis(ray.origin, ray.direction, c, axisVector('y'));
+      const moveAxis = MOVE_AXIS[kind];
+      if (moveAxis) {
+        const t = projectRayToAxis(ray.origin, ray.direction, c, axisVector(moveAxis));
         return t === null ? null : { t, point: c };
       }
       const axis = ROTATE_AXIS[kind];
@@ -180,14 +192,15 @@ export function TransformGizmo3D() {
       const distance = camera.position.distanceTo(new Vector3(c.x, c.y, c.z));
       const reach = worldPerPixelAt(distance, camera.fov, r.height) * HANDLE_LENGTH_PX;
       camera.updateMatrixWorld();
-      const handles = handleAnchors(c, reach, ks).map((h) => {
-        const p = new Vector3(h.position.x, h.position.y, h.position.z).project(camera);
-        return {
-          kind: h.kind,
-          px: { x: ((p.x + 1) / 2) * r.width, y: ((1 - p.y) / 2) * r.height },
-        };
-      });
-      const kind = hitScreenHandle(
+      const handles = handleShapes(c, reach, ks).map((h) => ({
+        kind: h.kind,
+        closed: h.closed,
+        px: h.points.map((point) => {
+          const p = new Vector3(point.x, point.y, point.z).project(camera);
+          return { x: ((p.x + 1) / 2) * r.width, y: ((1 - p.y) / 2) * r.height };
+        }),
+      }));
+      const kind = hitScreenShape(
         { x: e.clientX - r.left, y: e.clientY - r.top },
         handles,
         HANDLE_HIT_PX_3D,
@@ -228,6 +241,19 @@ export function TransformGizmo3D() {
       let next: GizmoDraft;
       if (drag.kind === 'move-y') {
         next = { ...start, y: snapLinear((start.y ?? 0) + now.t - drag.startT, snap) };
+      } else if (drag.kind === 'move-x' || drag.kind === 'move-z') {
+        const axis = drag.kind === 'move-x' ? 'x' : 'z';
+        const delta = now.t - drag.startT;
+        const moved = applyAxisMove({
+          axis,
+          start: { x: start.x, z: start.z },
+          pointerStart: { x: 0, z: 0 },
+          pointer: axis === 'x' ? { x: delta, z: 0 } : { x: 0, z: delta },
+          grid: snap ? t.scene.grid : { ...t.scene.grid, snap: false },
+          footprint: gizmo3dMoveFootprint(t.entity, latest.current.imageAspect),
+          y: start.y ?? 0,
+        });
+        next = { ...start, x: moved.x, z: moved.z };
       } else if (drag.kind === 'move-xz') {
         const moved = applyMove({
           start: { x: start.x, z: start.z },
@@ -322,42 +348,33 @@ export function TransformGizmo3D() {
 
   if (!target || !entity || !draft) return null;
 
-  const anchors = handleAnchors({ x: 0, y: 0, z: 0 }, 1, kinds);
   return (
-    <group
-      ref={groupRef}
-      name="transform-gizmo-3d"
-      position={[draft.x, draft.y ?? 0, draft.z]}
-      renderOrder={1000}
-    >
-      {anchors.map(({ kind, position }) => (
-        <group key={kind}>
-          {kind !== 'move-xz' && (
-            <lineSegments raycast={noRaycast} renderOrder={1000}>
-              <bufferGeometry>
-                <bufferAttribute
-                  attach="attributes-position"
-                  args={[new Float32Array([0, 0, 0, position.x, position.y, position.z]), 3]}
-                />
-              </bufferGeometry>
-              <lineBasicMaterial color={COLORS[kind]} depthTest={false} />
-            </lineSegments>
-          )}
-          <mesh
-            position={[position.x, position.y, position.z]}
-            scale={kind === 'move-xz' ? BLOB * 1.3 : BLOB}
-            renderOrder={1001}
-            raycast={noRaycast}
-          >
-            {kind.startsWith('rotate') ? (
-              <octahedronGeometry args={[1]} />
-            ) : (
-              <sphereGeometry args={[1, 12, 8]} />
-            )}
-            <meshBasicMaterial color={COLORS[kind]} depthTest={false} transparent opacity={0.95} />
-          </mesh>
-        </group>
-      ))}
+    <group ref={groupRef} name="transform-gizmo-3d" position={[draft.x, draft.y ?? 0, draft.z]}>
+      {kinds.map((kind) => {
+        if (kind === 'move-xz') return <MovePad key={kind} radiusPx={MOVE_PAD_PX} px={PX} />;
+        const moveAxis = MOVE_AXIS[kind];
+        if (moveAxis)
+          return (
+            <AxisArrow
+              key={kind}
+              axis={moveAxis}
+              start={ARROW_START}
+              end={ARROW_END}
+              px={PX}
+              color={AXIS_COLOR[moveAxis]}
+            />
+          );
+        const ringAxis = ROTATE_AXIS[kind];
+        return ringAxis ? (
+          <AxisRing
+            key={kind}
+            axis={ringAxis}
+            radius={RING_RADIUS}
+            px={PX}
+            color={AXIS_COLOR[ringAxis]}
+          />
+        ) : null;
+      })}
     </group>
   );
 }

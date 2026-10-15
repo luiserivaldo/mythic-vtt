@@ -5,6 +5,7 @@ import { makeCampaign, tid } from '../testing.js';
 import { commitTransform, type Submit } from './gizmo-commit.js';
 import { gizmoStore } from './gizmo-store.js';
 import {
+  applyAxisMove,
   applyMove,
   applyRotate,
   applyScale,
@@ -22,6 +23,7 @@ import {
   resolveGizmoTarget,
   sameTransform,
   snapFootprint,
+  type Xz,
 } from './transform-gizmo.js';
 import { gizmo3dMoveFootprint } from './transform-gizmo-3d.js';
 
@@ -136,20 +138,82 @@ describe('scale', () => {
   });
 });
 
-describe('handles', () => {
-  const layout = handleLayout({ x: 0, z: 0 }, 0, 0.5, 1 / 48);
-  it('hits the nearest handle within the radius and prefers outer handles over move', () => {
-    expect(hitHandle(layout.move, layout, 0.2)).toBe('move');
-    expect(hitHandle(layout.rotate, layout, 0.2)).toBe('rotate');
-    expect(hitHandle(layout.scale, layout, 0.2)).toBe('scale');
-    expect(hitHandle({ x: -3, z: -3 }, layout, 0.2)).toBeNull();
-    const overlapped = { move: { x: 0, z: 0 }, rotate: { x: 0, z: 0 }, scale: { x: 9, z: 9 } };
-    expect(hitHandle({ x: 0, z: 0 }, overlapped, 0.2)).toBe('rotate');
+describe('handles (UI-TOKEN-07)', () => {
+  const wpp = 1 / 48;
+  const hit = 10 * wpp;
+  const base = { center: { x: 0, z: 0 }, yaw: 0, halfWidth: 0.5, halfDepth: 0.5, worldPerPx: wpp };
+  const token = handleLayout({ ...base, freeMove: false });
+  const prop = handleLayout({ ...base, freeMove: true });
+
+  it('hits arrows, ring and corner squares, and leaves the token body free', () => {
+    const mid = (s: { from: Xz; to: Xz }) => ({
+      x: (s.from.x + s.to.x) / 2,
+      z: (s.from.z + s.to.z) / 2,
+    });
+    expect(hitHandle(mid(token.moveX), token, hit)).toBe('move-x');
+    expect(hitHandle(mid(token.moveZ), token, hit)).toBe('move-z');
+    expect(hitHandle({ x: -token.ringRadius, z: 0 }, token, hit)).toBe('rotate');
+    expect(hitHandle({ x: 0, z: -token.ringRadius }, token, hit)).toBe('rotate');
+    expect(hitHandle({ x: -0.5, z: 0.5 }, token, hit)).toBe('scale');
+    // F07: no handle on the middle of the token; presses there are token drag or picking.
+    expect(hitHandle({ x: 0, z: 0 }, token, hit)).toBeNull();
+    expect(hitHandle({ x: 0.2, z: -0.1 }, token, hit)).toBeNull();
+    expect(hitHandle({ x: -3, z: -3 }, token, hit)).toBeNull();
   });
-  it('places the rotate handle along the yaw direction', () => {
-    const l = handleLayout({ x: 1, z: 1 }, Math.PI / 2, 0.5, 0);
-    expect(l.rotate.x).toBeCloseTo(1);
-    expect(l.rotate.z).toBeCloseTo(0.5);
+
+  it('keeps the corner squares off the body of a small footprint', () => {
+    // A Tiny token at about 28 px per cell: its corners would sit within the hit radius of
+    // the middle, so a press on the body would grab a scale square instead of dragging.
+    const small = 1 / 28;
+    const tiny = handleLayout({
+      ...base,
+      halfWidth: 0.25,
+      halfDepth: 0.25,
+      worldPerPx: small,
+      freeMove: false,
+    });
+    for (const c of tiny.corners) {
+      expect(Math.hypot(c.x, c.z)).toBeCloseTo(20 * small);
+    }
+    expect(tiny.ringRadius).toBeCloseTo((20 + 14) * small);
+    expect(hitHandle({ x: 0, z: 0 }, tiny, 10 * small)).toBeNull();
+    expect(hitHandle({ x: 0.1, z: -0.1 }, tiny, 10 * small)).toBeNull();
+    // Large enough footprints keep their squares exactly on the corners.
+    expect(token.corners[0]?.x).toBeCloseTo(0.5);
+    expect(token.corners[0]?.z).toBeCloseTo(0.5);
+  });
+
+  it('gives non-token entities a centre move pad', () => {
+    expect(token.move).toBeNull();
+    expect(hitHandle({ x: 0, z: 0 }, prop, hit)).toBe('move');
+  });
+
+  it('starts the arrows outside the ring and keeps them along the world axes', () => {
+    expect(token.moveX.from.x).toBeGreaterThan(token.ringRadius);
+    expect(token.moveX.from.z).toBe(0);
+    expect(token.moveZ.to.z).toBeGreaterThan(token.moveZ.from.z);
+    expect(token.ringRadius).toBeCloseTo(Math.hypot(0.5, 0.5) + 14 * wpp);
+  });
+
+  it('turns the corner squares with the yaw', () => {
+    const l = handleLayout({
+      ...base,
+      halfWidth: 1,
+      halfDepth: 0.5,
+      yaw: Math.PI / 2,
+      freeMove: false,
+    });
+    // three.js yaw +90 deg maps local +X onto world -Z and local +Z onto world +X.
+    const first = l.corners[0];
+    expect(first?.x).toBeCloseTo(0.5);
+    expect(first?.z).toBeCloseTo(-1);
+  });
+
+  it('moves along one axis only', () => {
+    const g = grid({ snap: false });
+    const args = { start: { x: 1, z: 1 }, pointerStart: { x: 0, z: 0 }, pointer: { x: 2, z: 3 } };
+    expect(applyAxisMove({ ...args, grid: g, footprint: 1, axis: 'x' })).toEqual({ x: 3, z: 1 });
+    expect(applyAxisMove({ ...args, grid: g, footprint: 1, axis: 'z' })).toEqual({ x: 1, z: 4 });
   });
 });
 

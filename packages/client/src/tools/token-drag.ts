@@ -1,6 +1,5 @@
-import { entityExtents, handleLayout, hitHandle, HANDLE_HIT_PX } from './transform-gizmo.js';
+import { draftFromEntity, hitHandle, layoutForDraft, HANDLE_HIT_PX } from './transform-gizmo.js';
 import {
-  yawFromQuaternion,
   canPerform,
   clampToBounds,
   moveElevation,
@@ -289,22 +288,15 @@ export function shouldSendPreview(lastAt: number | null, now: number, force: boo
 }
 
 /**
- * True when a press lands on a 2D gizmo rotate/scale handle, which keeps that press (M1-20). The
- * gizmo's move handle sits on the token body, where a drag is token drag (`token.move`).
+ * True when a press lands on a 2D gizmo handle of the selected token, which keeps that press
+ * (M1-20, UI-TOKEN-07). Tokens get no centre handle: a drag on the body is token drag. Another
+ * token's body always wins over the selected token's handles (F07).
  */
 export function pressOnGizmoHandle(
   entity: Entity,
   point: { x: number; z: number },
   zoom: number,
 ): boolean {
-  const extents = entityExtents(entity);
-  const half = Math.max(extents.width, extents.depth) / 2;
-  const layout = handleLayout(
-    { x: entity.transform.position.x, z: entity.transform.position.z },
-    yawFromQuaternion(entity.transform.rotation),
-    half,
-    1 / zoom,
-  );
-  const kind = hitHandle(point, layout, HANDLE_HIT_PX / zoom);
-  return kind === 'rotate' || kind === 'scale';
+  const layout = layoutForDraft(entity, draftFromEntity(entity), 1 / zoom);
+  return hitHandle(point, layout, HANDLE_HIT_PX / zoom) !== null;
 }

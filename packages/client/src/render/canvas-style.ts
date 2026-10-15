@@ -17,9 +17,19 @@ export const PING_FALLBACK_COLOR = '#a21caf';
 export const AOE_HIGHLIGHT_COLOR = '#9a3412';
 export const GHOST_COLOR = '#6d28d9';
 export const DEFAULT_TOKEN_COLOR = '#0e7490';
-export const GIZMO_MOVE_COLOR = '#7c2d12';
-export const GIZMO_SCALE_COLOR = '#166534';
-export const GIZMO_ROTATE_COLOR = '#075985';
+/** UI-TOKEN-07: Unity/Blender axis colours (X red, Y green, Z blue) for arrows and rings. */
+export const GIZMO_X_COLOR = '#dc2626';
+export const GIZMO_Y_COLOR = '#16a34a';
+export const GIZMO_Z_COLOR = '#2563eb';
+/** Neutral handles: uniform scale squares, the free-move pad and the footprint outline. */
+export const GIZMO_NEUTRAL_COLOR = '#f8fafc';
+export const GIZMO_EDGE_COLOR = '#0f172a';
+/**
+ * Above every board layer and the grid (F08). Gizmo materials are all `transparent`, so they
+ * draw in the same pass as the grid lines and this order decides; an opaque handle would draw
+ * before the transparent grid and the grid lines would flicker across it.
+ */
+export const GIZMO_RENDER_ORDER = 10_000;
 
 function parseHex(color: string): [number, number, number] | null {
   const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(color);

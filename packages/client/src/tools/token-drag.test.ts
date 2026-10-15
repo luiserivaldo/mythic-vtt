@@ -348,11 +348,25 @@ describe('gestures', () => {
     expect(shouldSendPreview(0, 60, false)).toBe(true);
     expect(shouldSendPreview(0, 1, true)).toBe(true);
   });
-  it('leaves rotate and scale handles to the gizmo but not the body', () => {
+  it('leaves the ring, arrows and squares to the gizmo but not the body', () => {
     const e = scene().entities[E] as Entity;
     const c = e.transform.position;
     expect(pressOnGizmoHandle(e, { x: c.x, z: c.z }, 48)).toBe(false);
-    const { rotate } = handleLayout({ x: c.x, z: c.z }, 0, 0.5, 1 / 48);
-    expect(pressOnGizmoHandle(e, rotate, 48)).toBe(true);
+    const layout = handleLayout({
+      center: { x: c.x, z: c.z },
+      yaw: 0,
+      halfWidth: 0.5,
+      halfDepth: 0.5,
+      worldPerPx: 1 / 48,
+      freeMove: false,
+    });
+    expect(pressOnGizmoHandle(e, { x: c.x - layout.ringRadius, z: c.z }, 48)).toBe(true);
+    expect(pressOnGizmoHandle(e, layout.moveX.to, 48)).toBe(true);
+  });
+
+  it('leaves the body of a Tiny token to token drag at low zoom', () => {
+    const tiny = entity({ token: { sizeCells: 0.5, heightCells: 1, labelVisibility: 'all' } });
+    const c = tiny.transform.position;
+    expect(pressOnGizmoHandle(tiny, { x: c.x, z: c.z }, 28)).toBe(false);
   });
 });
