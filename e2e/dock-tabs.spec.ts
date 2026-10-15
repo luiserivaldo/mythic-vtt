@@ -12,7 +12,7 @@ test.afterAll(async () => {
 });
 
 const PLAYER_TABS = ['Chat', 'Sheet', 'Help', 'Settings'];
-const DM_ONLY_TABS = ['Scenes', 'Layers', 'Entities', 'Prefabs', 'Participants', 'Invite'];
+const DM_ONLY_TABS = ['Scenes', 'Layers', 'Entities', 'Participants', 'Invite'];
 
 test('players get four tabs, never render DM tabs, and the DM sees them all', async ({
   browser,
@@ -25,10 +25,12 @@ test('players get four tabs, never render DM tabs, and the DM sees them all', as
   await dm.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
   await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
 
-  // The DM sees every tab and the dock opens on Chat.
+  // The DM sees every tab and the dock opens on Chat. UX-40: Prefabs is hidden in the alpha.
   const dmTabs = dm.getByRole('tablist', { name: 'Dock tabs' });
   for (const name of [...PLAYER_TABS, ...DM_ONLY_TABS])
     await expect(dmTabs.getByRole('tab', { name, exact: true })).toBeVisible();
+  await expect(dmTabs.getByRole('tab', { name: 'Prefabs', exact: true })).toHaveCount(0);
+  await expect(dm.getByRole('button', { name: 'Ping', exact: true })).toHaveCount(0);
   await expect(dmTabs.getByRole('tab', { name: 'Chat', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',

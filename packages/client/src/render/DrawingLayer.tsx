@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, Uint16BufferAttribute } from 'three';
 import { ribbonGeometry, sceneStrokes, type DrawStroke } from '../tools/drawing.js';
+import type { ViewMode } from './view-mode-store.js';
 
 // LAY-05: the effects layer's freehand drawings. A stroke is a real ribbon of scene units, so it
 // keeps its thickness at any zoom and looks the same in 2D and in 3D.
@@ -10,7 +11,16 @@ export const DRAWING_RENDER_ORDER = 30;
 /** Every strip carries this name; the eraser finds the stroke it hits through `userData`. */
 export const DRAWING_OBJECT_NAME = 'drawing-stroke';
 
-function StrokeStrip({ stroke }: { stroke: DrawStroke }) {
+/**
+ * UX-40 (playtest F19): in 2D a drawing is the top layer for everyone, so it ignores the depth of
+ * the props and tokens that stand over its ground-level samples. In 3D it keeps depth testing, so
+ * a line on a wall or a floor is hidden by whatever really stands in front of it.
+ */
+export function drawingDepthTest(mode: ViewMode): boolean {
+  return mode === '3d';
+}
+
+function StrokeStrip({ stroke, mode }: { stroke: DrawStroke; mode: ViewMode }) {
   const geometry = useMemo(() => {
     const ribbon = ribbonGeometry(stroke.points, stroke.width);
     if (!ribbon) return null;
@@ -35,6 +45,7 @@ function StrokeStrip({ stroke }: { stroke: DrawStroke }) {
         transparent
         opacity={0.9}
         depthWrite={false}
+        depthTest={drawingDepthTest(mode)}
       />
     </mesh>
   );
@@ -49,15 +60,17 @@ function StrokeStrip({ stroke }: { stroke: DrawStroke }) {
 export function DrawingLayer({
   strokes,
   sceneId,
+  mode = '2d',
 }: {
   strokes: readonly DrawStroke[];
   sceneId: string | null;
+  mode?: ViewMode;
 }) {
   const visible = useMemo(() => sceneStrokes(strokes, sceneId), [strokes, sceneId]);
   return (
     <group name="drawings">
       {visible.map((stroke) => (
-        <StrokeStrip key={stroke.strokeId} stroke={stroke} />
+        <StrokeStrip key={stroke.strokeId} stroke={stroke} mode={mode} />
       ))}
     </group>
   );

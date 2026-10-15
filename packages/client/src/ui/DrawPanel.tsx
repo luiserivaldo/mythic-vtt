@@ -8,6 +8,7 @@ import {
 import { useContext } from 'react';
 import { useStore } from 'zustand';
 import { useClientStore } from '../store/react.js';
+import { undoOwnStroke } from '../tools/draw-undo.js';
 import { drawingStore } from '../tools/drawing-store.js';
 import { EphemeralContext } from './ephemeral-context.js';
 import { isAdminRole, viewerRole } from './viewer.js';
@@ -68,6 +69,15 @@ export function DrawPanel({ scene }: { scene: Scene }) {
           }}
         />
       </label>
+      <button
+        type="button"
+        title="Take back your newest drawing (Ctrl+Z while drawing)"
+        onClick={() => {
+          undoOwnStroke(ephemeral, scene.id);
+        }}
+      >
+        Undo drawing
+      </button>
       <button
         type="button"
         aria-pressed={erase}

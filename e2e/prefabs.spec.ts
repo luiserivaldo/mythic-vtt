@@ -8,7 +8,9 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await table.stop();
 });
-test('DM saves a private library and places independent configured copies across scenes', async ({
+// UX-40: the Prefabs tab is hidden in the alpha (dock-tab registry predicate), so this flow has no
+// entry point until better 3D modelling tools return it. Re-enable by removing `.skip`.
+test.skip('DM saves a private library and places independent configured copies across scenes', async ({
   browser,
 }) => {
   const identity = { identityId: testUlid('HOST', 1), identitySecret: 'prefab-host' };
@@ -147,6 +149,7 @@ test('co-DM never receives or instantiates a prefab whose source view is denied'
     name: 'DM',
     identityId: testUlid('HOST', 1),
     identitySecret: 'prefab-host',
+    hostToken: table.hostToken,
   });
   const sceneId = testUlid('SCENE', 3),
     entityId = testUlid('PROP', 3),

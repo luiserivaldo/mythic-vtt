@@ -48,6 +48,7 @@ export const TOKEN_CONTEXT_IDS = [
   'see-sheet',
   'add-condition',
   'change-layer',
+  'ping',
   'token-options',
 ] as const;
 export type TokenContextActionId = (typeof TOKEN_CONTEXT_IDS)[number];
@@ -56,6 +57,8 @@ export const TOKEN_CONTEXT_LABELS: Readonly<Record<TokenContextActionId, string>
   'see-sheet': 'See Sheet',
   'add-condition': 'Add Condition',
   'change-layer': 'Change Layer',
+  // UX-40: ping moved off the rail; the menu button is gated by the scene's pins toggle (PERM-05).
+  ping: 'Ping',
   'token-options': 'Token Options',
 };
 
@@ -258,6 +261,13 @@ export function tokenContextMenu(input: TokenMenuInput): TokenContextItem[] {
       reason: anyLayer ? null : NO_LAYER_REASON,
     });
   }
+  items.push({
+    id: 'ping',
+    label: TOKEN_CONTEXT_LABELS.ping,
+    enabled: true,
+    wip: false,
+    reason: null,
+  });
   items.push({
     id: 'token-options',
     label: TOKEN_CONTEXT_LABELS['token-options'],

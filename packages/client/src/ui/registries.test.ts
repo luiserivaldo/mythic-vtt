@@ -60,6 +60,9 @@ describe('UI-SHELL-03 registries', () => {
       ['help', 'help'],
       ['settings', 'settings'],
     ]);
+    // UX-40: the Prefabs tab stays registered but is offered to nobody in the alpha.
+    expect(dockTabs.allowed('host', null).some(({ id }) => id === 'prefabs')).toBe(false);
+    expect(dockTabs.allowed('codm', null).some(({ id }) => id === 'prefabs')).toBe(false);
     expect(tokenQuickFields.all().map(({ id }) => id)).toEqual(['hp', 'ac', 'speed']);
     expect(tokenQuickFields.allowed('player', { ...permissions, view: false })).toEqual([]);
     const firstTab = dockTabs.get('scenes');

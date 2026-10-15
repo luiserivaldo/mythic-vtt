@@ -1,8 +1,8 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { openClient, RawClient, startTable, testUlid, type Reply } from './harness.js';
 
-// LAY-05: an Alt-click, or the board's Ping button, drops a short animated marker for everyone at
-// the table. A ping is an ephemeral message — it never enters campaign state or the action log —
+// LAY-05 / UX-40: an Alt-click, or Ping in the right-click menu of an empty board spot or a token,
+// drops a short animated marker for everyone at the table. There is no Ping rail button. A ping is an ephemeral message — it never enters campaign state or the action log —
 // and the host re-checks the scene's `pins` toggle and its rate limits. Marker names are read from
 // the development-only render hook, the same one the other render specs use.
 
@@ -48,6 +48,17 @@ async function boardReady(page: Page): Promise<void> {
     .toBeGreaterThan(200);
 }
 
+/** A scene cell in page pixels on the default board (the board centres on cell 20, 15). */
+async function cellToPixel(page: Page, x: number, z: number) {
+  const box = await page.locator('canvas').boundingBox();
+  if (!box) throw new Error('no canvas box');
+  const zoom = Math.min(box.width / 42, box.height / 32);
+  return {
+    x: box.x + box.width / 2 + (x - 20) * zoom,
+    y: box.y + box.height / 2 + (z - 15) * zoom,
+  };
+}
+
 /** The board's centre in page pixels: a ping lands wherever the ray reaches the ground plane. */
 async function boardCentre(page: Page) {
   const box = await page.locator('canvas').boundingBox();
@@ -55,7 +66,7 @@ async function boardCentre(page: Page) {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
-test('an Alt-click and the Ping button mark the board for everyone, then expire', async ({
+test('an Alt-click and the right-click menus mark the board for everyone, then expire', async ({
   browser,
 }) => {
   test.setTimeout(120_000);
@@ -68,6 +79,23 @@ test('an Alt-click and the Ping button mark the board for everyone, then expire'
     await setup.waitFor('snapshot', () => setup.state !== undefined);
     await ok(setup.intent('scene.create', { sceneId, name: 'Ping scene' }));
     await ok(setup.intent('scene.activate', { sceneId }));
+    await ok(
+      setup.intent('entity.create', {
+        sceneId,
+        entity: {
+          id: testUlid('TOKEN', 1),
+          layer: 'tokens',
+          name: 'Pinged token',
+          owners: [],
+          transform: {
+            position: { x: 12.5, y: 0, z: 12.5 },
+            rotation: { x: 0, y: 0, z: 0, w: 1 },
+            scale: { x: 1, y: 1, z: 1 },
+          },
+          token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' },
+        },
+      }),
+    );
 
     dmContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     await dmContext.addInitScript((identity) => {
@@ -88,11 +116,9 @@ test('an Alt-click and the Ping button mark the board for everyone, then expire'
     await expect(spectator.page.getByLabel('Current scene')).toHaveText('Ping scene');
     await boardReady(spectator.page);
 
-    const pingButton = dm.getByRole('button', { name: 'Ping', exact: true });
-    // The DM's board is loaded once the control is offered (the host is exempt from the toggle).
-    await expect(pingButton).not.toHaveAttribute('aria-disabled', 'true');
-    const spectatorButton = spectator.page.getByRole('button', { name: 'Ping', exact: true });
-    await expect(spectatorButton).toHaveAttribute('aria-disabled', 'true');
+    // UX-40: Ping left the rail for the right-click menus.
+    await expect(dm.getByRole('button', { name: 'Ping', exact: true })).toHaveCount(0);
+    await expect(spectator.page.getByRole('button', { name: 'Ping', exact: true })).toHaveCount(0);
 
     const sceneBefore = JSON.stringify((setup.state as HostMirror).scenes?.[sceneId]);
 
@@ -126,10 +152,44 @@ test('an Alt-click and the Ping button mark the board for everyone, then expire'
     await dm.waitForTimeout(700);
     expect(await pingCount(dm)).toBe(0);
 
-    // The board's Ping button is the same ping, taken from the centre of the view.
-    await pingButton.click();
+    await expect.poll(async () => pingCount(dm)).toBe(0);
+
+    // Right-click on empty board: the menu offers Ping, which marks the spot for everyone.
+    const board = dm.getByTestId('board-context-menu');
+    await expect(async () => {
+      await dm.mouse.click(centre.x, centre.y, { button: 'right' });
+      await expect(board).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 15_000 });
+    await board.getByRole('menuitem', { name: 'Ping', exact: true }).click();
+    await expect(board).toHaveCount(0);
     await expect.poll(async () => pingCount(dm)).toBeGreaterThan(0);
     await expect.poll(async () => pingCount(spectator.page)).toBeGreaterThan(0);
+    await expect.poll(async () => pingCount(dm)).toBe(0);
+    await expect.poll(async () => pingCount(spectator.page)).toBe(0);
+
+    // Right-click on a token: its menu carries Ping too, and the marker lands under the token.
+    const tokenAt = await cellToPixel(dm, 12.5, 12.5);
+    const tokenMenu = dm.getByTestId('token-context-menu');
+    await expect(async () => {
+      await dm.mouse.click(tokenAt.x, tokenAt.y, { button: 'right' });
+      await expect(tokenMenu).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 15_000 });
+    // A token click opens the token's menu, not the board's.
+    await expect(board).toHaveCount(0);
+    await tokenMenu.getByRole('menuitem', { name: 'Ping', exact: true }).click();
+    await expect.poll(async () => pingCount(dm)).toBeGreaterThan(0);
+    await expect.poll(async () => pingCount(spectator.page)).toBeGreaterThan(0);
+    await expect.poll(async () => pingCount(dm)).toBe(0);
+
+    // A spectator may not ping (PERM-05): the board menu shows Ping disabled, with the reason.
+    const spectatorBoard = spectator.page.getByTestId('board-context-menu');
+    await spectator.page.mouse.click(spectatorCentre.x, spectatorCentre.y, { button: 'right' });
+    const spectatorPing = spectatorBoard.getByRole('menuitem', { name: 'Ping', exact: true });
+    await expect(spectatorPing).toHaveAttribute('aria-disabled', 'true');
+    await spectatorPing.click({ force: true });
+    await spectator.page.waitForTimeout(500);
+    expect(await pingCount(spectator.page)).toBe(0);
+    expect(await pingCount(dm)).toBe(0);
 
     expect(errors).toEqual([]);
   } finally {

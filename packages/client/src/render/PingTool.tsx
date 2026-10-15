@@ -20,8 +20,7 @@ import { PING_FALLBACK_COLOR } from './canvas-style.js';
 import { pointerClaims } from './pointer-claims.js';
 
 /**
- * LAY-05: ephemeral ping markers. Alt+left-clicking the board (or the board's Ping button, which
- * pings the centre of the view) drops a short animated marker at that spot for everyone at the
+ * LAY-05: ephemeral ping markers. Alt+left-clicking the board (or Ping in the right-click menus) drops a short animated marker at that spot for everyone at the
  * table. Nothing here is an action: the mark is relayed as an ephemeral message, and every client
  * draws its own copy from the ground point in the payload. The host enforces the scene's `pins`
  * toggle (PERM-05) and the ephemeral rate limits; this file only decides what to offer and draw.
@@ -173,7 +172,7 @@ export function PingTool({ readOnly = false }: { readOnly?: boolean }) {
       return hit ? pingPoint(hit, source) : null;
     };
 
-    const pingAt = (ndc: Vector2) => {
+    const pingAt = (ndc: Vector2, ground?: { x: number; z: number }) => {
       const {
         scene: source,
         ephemeral: eph,
@@ -183,7 +182,7 @@ export function PingTool({ readOnly = false }: { readOnly?: boolean }) {
       } = latest.current;
       if (!source || !eph) return;
       if (!canPing(state, { isHost: host, seatId: seat }, source.id)) return;
-      const point = pointAt(ndc);
+      const point = ground ? pingPoint(ground, source) : pointAt(ndc);
       if (!point) return;
       const color = eph.color?.();
       pingStore.getState().add({
@@ -227,11 +226,13 @@ export function PingTool({ readOnly = false }: { readOnly?: boolean }) {
       e.stopImmediatePropagation();
     };
 
-    // The board's Ping button pings the centre of the view, in 2D and in 3D (store subscription, so
-    // the button needs no access to the camera).
+    // UX-40: the board and token right-click menus ask for a ping through the store, so they need
+    // no access to the camera: a pointer position (ndc) or a token's ground point.
     const unsubscribe = pingStore.subscribe((state, previous) => {
-      if (state.centreRequests === previous.centreRequests) return;
-      pingAt(new Vector2(0, 0));
+      const request = state.request;
+      if (state.requests === previous.requests || !request) return;
+      if (request.kind === 'ndc') pingAt(new Vector2(request.x, request.y));
+      else pingAt(new Vector2(0, 0), { x: request.x, z: request.z });
     });
 
     // Window capture, like the ruler: the press must be claimed before the camera and token tools.

@@ -50,13 +50,14 @@ describe('ping markers (LAY-05)', () => {
     expect(markers[0]?.point.x).toBe(5);
   });
 
-  it('counts centre requests for the board button without touching the markers', () => {
+  it('counts menu ping requests without touching the markers', () => {
     const store = pingStore;
     store.getState().add(ping('alice', 1_000));
     const markers = store.getState().markers;
-    store.getState().requestCentre();
-    store.getState().requestCentre();
-    expect(store.getState().centreRequests).toBe(2);
+    store.getState().requestAt({ kind: 'ndc', x: 0, y: 0 });
+    store.getState().requestAt({ kind: 'point', x: 3, z: 4 });
+    expect(store.getState().requests).toBe(2);
+    expect(store.getState().request).toEqual({ kind: 'point', x: 3, z: 4 });
     expect(store.getState().markers).toBe(markers);
   });
 });

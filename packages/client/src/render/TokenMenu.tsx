@@ -18,7 +18,9 @@ import { selectionStore } from '../tools/selection-store.js';
 import { defaultUploader } from '../ui/default-uploader.js';
 import { isValidEntityName, LAYER_LABELS } from '../ui/entity-panel.js';
 import { seeSheet } from '../ui/sheet-panel.js';
+import { usePingReason } from '../ui/ping-reason.js';
 import { useSubmit } from '../ui/submit.js';
+import { pingStore } from '../tools/ping-store.js';
 import { tokenMenuStore } from '../ui/token-menu-store.js';
 import {
   TOKEN_CONTEXT_LABELS,
@@ -504,6 +506,7 @@ function FullTokenMenu({
 /** UI-TOKEN-03: the short curated list, to the right of the token. */
 function TokenContextMenu({ campaign, scene, entity, rendered, mode, actor, viewer }: MenuProps) {
   const { send } = useSubmit();
+  const pingReason = usePingReason();
   const [layersOpen, setLayersOpen] = useState(false);
   const items = useMemo(
     () => tokenContextMenu({ campaign, scene, entity, actor, viewer }),
@@ -580,6 +583,27 @@ function TokenContextMenu({ campaign, scene, entity, rendered, mode, actor, view
               </ul>
             )}
           </>
+        );
+      case 'ping':
+        // UX-40: pings the token's spot on the ground; disabled with the reason when pinging is off.
+        return (
+          <button
+            type="button"
+            role="menuitem"
+            aria-disabled={pingReason === undefined ? undefined : true}
+            title={pingReason}
+            onClick={() => {
+              if (pingReason !== undefined) return;
+              tokenMenuStore.getState().close();
+              pingStore.getState().requestAt({
+                kind: 'point',
+                x: entity.transform.position.x,
+                z: entity.transform.position.z,
+              });
+            }}
+          >
+            {TOKEN_CONTEXT_LABELS.ping}
+          </button>
         );
       case 'token-options':
         return (
