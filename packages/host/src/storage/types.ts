@@ -23,7 +23,16 @@ export const LogEntry = z.object({
 });
 export type LogEntry = { envelope: ActionEnvelope; inversePatches: Patch[] };
 export type LoadedCampaign = { campaign: CampaignFile; scenes: Scene[] };
-export type CampaignMeta = { id: string; name: string; schemaVersion: number; updatedAt: number };
+export type CampaignMeta = {
+  id: string;
+  name: string;
+  schemaVersion: number;
+  updatedAt: number;
+  /** UX-05: start of the newest session (ms); absent if the campaign was never opened. */
+  lastPlayedAt?: number;
+  /** UX-05: the list thumbnail, an image hash linked to this campaign. */
+  thumbnail?: string;
+};
 export const AssetMeta = z.object({
   mime: z.string().min(1),
   size: z.number().int().nonnegative(),

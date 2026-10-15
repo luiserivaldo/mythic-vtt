@@ -60,7 +60,7 @@ One data directory can hold any number of campaigns. Each has its own seats, sce
 
 - `--list-campaigns` prints what is in the data directory and exits.
 - `--campaign <name|id>` opens a campaign by name, id or unique id prefix. `--new-campaign "Name"` creates one and opens it.
-- With neither flag, a terminal gets a numbered picker when there is more than one campaign. Without a terminal (a service, a script), the most recently saved campaign opens, as before.
+- With neither flag, a terminal gets a numbered picker when there is more than one campaign. Without a terminal (a service, a script), the most recently played campaign opens (the most recently saved one if none has been played). The list shows each campaign's last played time and whether it has a thumbnail.
 
 Existing single-campaign data directories work unchanged: nothing is rewritten, and the campaign is picked up automatically.
 

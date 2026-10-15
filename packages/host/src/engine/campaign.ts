@@ -52,7 +52,7 @@ const describe = (campaigns: readonly CampaignMeta[]): string =>
 /**
  * HOST-03: turns the start-up selection into an existing campaign id or a name to create.
  * Without an explicit selection: the only campaign, else `choose` (the interactive picker), else
- * the most recently updated one, which is what a single-campaign host always did.
+ * the first in list order: the most recently played (UX-05), then the most recently saved.
  */
 export async function selectCampaign(
   store: Pick<CampaignStore, 'list'>,
