@@ -142,10 +142,14 @@ export function AoEToolPanel({
       )}
       {active && (
         <>
-          <button type="button" disabled={busy || !canPersist} onClick={() => void persist()}>
+          <button
+            type="button"
+            disabled={busy || !canPersist}
+            title="Keeps your measured template until it is deleted"
+            onClick={() => void persist()}
+          >
             Place AoE
           </button>
-          <p>Place AoE keeps your measured template until it is deleted.</p>
           {!unified && (
             <label>
               Shape{' '}
@@ -164,6 +168,8 @@ export function AoEToolPanel({
               </select>
             </label>
           )}
+          {/* UI-MEAS-04: the drag sizes and aims the shape; this field follows the drag live and
+              is only a shortcut to edit the current size, never a limit. No aim control. */}
           <label>
             Size ({unit}){' '}
             <input
@@ -174,18 +180,6 @@ export function AoEToolPanel({
               value={sceneUnitReadout(draft.size, grid)}
               onChange={(e) => {
                 update('size', e.target.value);
-              }}
-            />
-          </label>
-          <label>
-            Rotation (deg){' '}
-            <input
-              aria-label="AoE rotation"
-              type="number"
-              step="1"
-              value={degreesReadout(draft.degrees)}
-              onChange={(e) => {
-                update('degrees', e.target.value);
               }}
             />
           </label>
@@ -202,9 +196,9 @@ export function AoEToolPanel({
               }}
             />
           </label>
-          <p>
-            Click to place; drag to aim. Right-click your AoE to remove it. Elevation defaults to
-            the surface below.
+          <p className="ui-measure-hint">
+            A click places the current size; a new one replaces your last. Right-click your AoE to
+            remove it.
           </p>
         </>
       )}

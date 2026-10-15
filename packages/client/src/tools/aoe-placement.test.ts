@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import fc from 'fast-check';
 import { canPerform, snapToGrid, type Campaign, type Scene } from '@mythic/shared';
 import {
   aoePlacePayload,
   aoeUpdatePayload,
   degreesReadout,
+  dragSize,
+  MAX_AOE_SIZE_CELLS,
   placeDraft,
   sceneUnitReadout,
   type AoEDraft,
@@ -132,5 +135,36 @@ describe('AoE panel readout', () => {
     expect(degreesReadout(22.75)).toBe(22.8);
     expect(degreesReadout(22.749)).toBe(22.7);
     expect(Object.is(degreesReadout(-0.04), 0)).toBe(true);
+  });
+});
+
+// UI-MEAS-04 / Q28: the drag, not a fixed input, decides how big a shape is.
+describe('drag sizing', () => {
+  it('uses the drag distance as radius or length, and twice it as a centred cube side', () => {
+    expect(dragSize('sphere', 3, false)).toBe(3);
+    expect(dragSize('cylinder', 3, false)).toBe(3);
+    expect(dragSize('cone', 6, false)).toBe(6);
+    expect(dragSize('cube', 2, false)).toBe(4);
+  });
+  it('rounds to whole cells, never below one, when snapping', () => {
+    expect(dragSize('sphere', 2.4, true)).toBe(2);
+    expect(dragSize('cone', 0.2, true)).toBe(1);
+    expect(dragSize('cube', 1.3, true)).toBe(3);
+  });
+  it('always yields a size the host accepts', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...(['sphere', 'cylinder', 'cone', 'cube', 'line'] as const)),
+        fc.double(),
+        fc.boolean(),
+        (kind, distance, snap) => {
+          const size = dragSize(kind, distance, snap);
+          expect(size).toBeGreaterThan(0);
+          expect(size).toBeLessThanOrEqual(MAX_AOE_SIZE_CELLS);
+          expect(Number.isFinite(size)).toBe(true);
+          if (snap) expect(Number.isInteger(size)).toBe(true);
+        },
+      ),
+    );
   });
 });

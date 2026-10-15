@@ -89,6 +89,8 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   await page.getByRole('button', { name: 'Measure', exact: true }).click();
   await page.getByLabel('Measurement mode').selectOption('3d');
   await page.getByLabel('Ruler fade').selectOption('linger');
+  // UI-MEAS-01: the panel floats beside the rail; tuck it away to measure under it.
+  await page.getByRole('button', { name: 'Close Measure panel' }).click();
   // The platform spawns at scene centre. Project known world points through the live pose so this
   // regression remains about surface measurement rather than one particular camera framing.
   await page.mouse.move(ground.x, ground.y);

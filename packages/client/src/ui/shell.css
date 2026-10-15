@@ -1348,3 +1348,79 @@ main .ui-danger-button:not(:disabled) {
   border-radius: 4px;
   color: var(--ui-muted);
 }
+/* UI-MEAS-02: the Measure panel's shape group reads as a row of toggle buttons. */
+.ui-measure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.4rem 0.5rem;
+}
+.ui-measure-shapes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ui-measure-shapes legend {
+  margin-bottom: 0.25rem;
+  padding: 0;
+}
+.ui-measure-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.ui-measure-more summary {
+  cursor: pointer;
+  color: var(--ui-muted);
+}
+.ui-measure-shapes label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ui-measure-shapes label:has(input:checked) {
+  border-color: var(--ui-accent);
+  background: var(--ui-bg-raised);
+}
+.ui-measure-shapes label:has(input:disabled) {
+  color: var(--ui-muted);
+  cursor: not-allowed;
+}
+.ui-measure-hint {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
+/* UI-MEAS-01: a tool panel beside its rail button floats over the board instead of narrowing it. */
+.ui-rail-popover {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: min(16rem, calc(100% - 1rem));
+  box-sizing: border-box;
+  overflow-y: auto;
+  border-radius: 6px;
+}
+.ui-rail-popover .ui-tool-peek {
+  align-self: flex-start;
+}
+/* Nested overlays (the AoE and Affected sections) flow inside the floating frame. */
+.ui-rail-popover .ui-panel {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}

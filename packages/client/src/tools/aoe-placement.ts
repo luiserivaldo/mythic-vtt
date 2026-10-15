@@ -127,10 +127,32 @@ export function aoeUpdatePayload(
   };
 }
 
+/** The largest size `validAoEDraft` accepts, in cells. */
+export const MAX_AOE_SIZE_CELLS = 100;
+
+/**
+ * UI-MEAS-04 / Q28: every shape is sized by dragging. `distance` is how far the pointer is from
+ * the origin, in cells. Spheres, cylinders and cones measure their radius or length along the
+ * drag; a cube is centred on its origin, so the drag reaches its edge and the side is twice that.
+ * With snapping on, the size rounds to whole cells (never below one); off, it stays exact. The
+ * result is clamped to what the host accepts.
+ */
+export function dragSize(kind: AoEKind, distance: number, snap: boolean): number {
+  const raw = Number.isFinite(distance) ? Math.abs(distance) * (kind === 'cube' ? 2 : 1) : 0;
+  const sized = snap ? Math.max(1, Math.round(raw)) : Math.max(0.01, raw);
+  return Math.min(MAX_AOE_SIZE_CELLS, sized);
+}
+
+/** Whether the size is a radius, a length or a side, for the live readout (UI-MEAS-04). */
+export function sizeNoun(kind: AoEKind): 'radius' | 'length' | 'side' {
+  if (kind === 'cube') return 'side';
+  return kind === 'cone' || kind === 'line' ? 'length' : 'radius';
+}
+
 export function validAoEDraft(draft: AoEDraft, grid: Grid): boolean {
   return (
     draft.size > 0 &&
-    draft.size <= 100 &&
+    draft.size <= MAX_AOE_SIZE_CELLS &&
     Number.isFinite(draft.size) &&
     Number.isFinite(draft.degrees) &&
     Number.isFinite(draft.x) &&

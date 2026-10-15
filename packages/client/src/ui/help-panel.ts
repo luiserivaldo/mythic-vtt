@@ -72,13 +72,13 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
         input: 'Any measurement',
         action: "Reads in the scene's units — feet in this alpha.",
       },
-      // UI-MEAS-02: the Ruler panel's checkbox draws the drag's distance (TokenDrag renders
+      // UI-MEAS-02: the Measure panel's checkbox draws the drag's distance (TokenDrag renders
       // dragRulerPaths for the local drag and for every remote preview). UI-TOKEN-06 / UX-21: with
       // it on, a right click during the drag commits a checkpoint and the total measures on from it.
       {
         input: 'Always measure token movement',
         action:
-          'Switched on in the Ruler panel, it draws the distance while a token is dragged, and a right click during the drag drops a checkpoint to measure on from.',
+          'Switched on in the Measure panel, it draws the distance while a token is dragged, and a right click during the drag drops a checkpoint to measure on from.',
       },
     ],
   },

@@ -21,6 +21,7 @@ import { InitiativeTools } from './InitiativeTools.js';
 import { seeSheet } from './sheet-panel.js';
 import { DrawPanel } from './DrawPanel.js';
 import { LeftPane } from './LeftPane.js';
+import { RailPopover } from './RailPopover.js';
 import { leftPaneStore, panelRegion } from './left-pane.js';
 import { toolPanels, type PanelRegion } from './registries.js';
 
@@ -32,6 +33,9 @@ const TransformPanel = lazy(async () => {
   const module = await import('./TransformPanel.js');
   return { default: module.TransformPanel };
 });
+
+/** The rail tool a panel belongs to, where the ids differ (the Measure tool's panel is `ruler`). */
+const RAIL_ANCHORS: Partial<Record<ToolPanelId, string>> = { ruler: 'measure' };
 
 function PanelFrame({
   id,
@@ -118,7 +122,6 @@ export function ToolPanelDock({
   const showCreateProp = scene !== null && !measuring && activeTool === 'create-prop';
   const showDraw = scene !== null && !measuring && activeTool === 'draw';
   const showInitiative = !measuring && activeTool === 'initiative';
-  if (!container) return null;
   const panels: { id: ToolPanelId; node: ReactNode }[] = [];
   const add = (id: ToolPanelId, node: ReactNode) => {
     panels.push({ id, node });
@@ -194,9 +197,24 @@ export function ToolPanelDock({
       ));
   const right = frames('right-dock');
   const left = frames('left-pane');
+  // UI-MEAS-01: one floating panel per beside-the-rail entry, each anchored to its own button.
+  const beside = panels
+    .filter((panel) => panelRegion(panel.id) === 'beside-rail')
+    .map(({ id, node }) => {
+      const label = toolPanels.get(id)?.label ?? id;
+      return (
+        <RailPopover key={id} anchorId={`rail-tool-${RAIL_ANCHORS[id] ?? id}`} label={label}>
+          <PanelFrame id={id} label={label} collapsed={collapsed[id]}>
+            {node}
+          </PanelFrame>
+        </RailPopover>
+      );
+    });
   return (
     <>
+      {beside}
       {right.length > 0 &&
+        container &&
         createPortal(
           <aside className="ui-tool-dock" aria-label="Tool panels">
             {right}

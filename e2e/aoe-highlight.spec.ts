@@ -75,11 +75,13 @@ test('the DM link shows live AoE affected tokens in 2D and 3D', async ({ browser
       ).t,
     ).toBe('ack');
 
-    // M3-15: AoE controls and affected-token readouts live in the unified Ruler panel.
+    // M3-15 / UI-MEAS-06: AoE controls and affected-token readouts live in the Measure panel,
+    // beside the rail.
     await page.getByRole('button', { name: 'Measure', exact: true }).click();
-    await page.getByText('Measurement shapes', { exact: true }).click();
-    await page.getByLabel('Measurement shape', { exact: true }).selectOption('sphere');
-    const panel = page.getByRole('region', { name: 'Affected tokens' });
+    await page.getByRole('radio', { name: 'Circle', exact: true }).check();
+    const panel = page
+      .getByRole('complementary', { name: 'Measure', exact: true })
+      .getByRole('region', { name: 'Affected tokens' });
     await expect(panel.getByText('Inside hero')).toBeVisible();
     await expect(panel.getByText('Outside hero')).toHaveCount(0);
     await expect(panel).toContainText('1 token');
