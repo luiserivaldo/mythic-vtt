@@ -449,6 +449,70 @@ main [tabindex]:focus-visible {
   border-left: 3px solid var(--ui-accent);
   padding-left: 0.4rem;
 }
+/* UI-ENT-01..03: checkbox, name, row actions; badges wrap under the name. */
+.ui-entity-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+main .ui-entity-name {
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-entity-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+.ui-entity-badges {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+main .ui-icon-button {
+  min-width: 2rem;
+  padding: 0.2rem 0.35rem;
+  line-height: 1;
+}
+main .ui-danger-button:not(:disabled) {
+  color: var(--ui-danger);
+  border-color: var(--ui-danger);
+}
+.ui-entity-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--ui-bg-raised);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+}
+.ui-entity-count {
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
+.ui-confirm {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--ui-bg-raised);
+  border: 1px solid var(--ui-danger);
+  border-radius: 4px;
+}
+.ui-confirm h3 {
+  margin-top: 0;
+  color: var(--ui-fg);
+}
+.ui-confirm p {
+  margin: 0 0 0.5rem;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
 
 /* Phone width: the drawer is a bottom sheet leaving the board's top visible. */
 @media (max-width: 40rem) {
