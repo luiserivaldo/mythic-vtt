@@ -98,7 +98,10 @@ export interface ArchiveHost {
 }
 
 const LABEL = /^[a-zA-Z0-9_-]+$/;
-const FIXED_MTIME = new Date('1980-01-01T00:00:00Z');
+// fflate encodes mtime with local-time getters, so build the DOS epoch from local fields; a UTC
+// instant falls on 1979-12-31 west of UTC and fflate rejects it. Built per call so a changed TZ
+// is honoured.
+const fixedMtime = (): Date => new Date(1980, 0, 1);
 
 function collectAssetHashes(value: unknown, into: Set<string>): void {
   if (Array.isArray(value)) for (const item of value) collectAssetHashes(item, into);
@@ -153,7 +156,7 @@ export function exportCampaign(
   };
   const newEntry = (name: string, store: boolean): ZipDeflate | ZipPassThrough => {
     const file = store ? new ZipPassThrough(name) : new ZipDeflate(name, { level: 6 });
-    file.mtime = FIXED_MTIME;
+    file.mtime = fixedMtime();
     return file;
   };
   const addBytes = async (name: string, data: Uint8Array, store = false): Promise<void> => {
