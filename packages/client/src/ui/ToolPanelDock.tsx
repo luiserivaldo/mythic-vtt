@@ -22,6 +22,7 @@ import { seeSheet } from './sheet-panel.js';
 import { DrawPanel } from './DrawPanel.js';
 import { LeftPane } from './LeftPane.js';
 import { RailPopover } from './RailPopover.js';
+import { BesideToken } from './BesideToken.js';
 import { leftPaneStore, panelRegion } from './left-pane.js';
 import { toolPanels, type PanelRegion } from './registries.js';
 
@@ -83,19 +84,18 @@ function PanelFrame({
 
 /**
  * M1-37: one ordered stack per region prevents the tool panels overlapping. UI-SHELL-05: each
- * panel opens in the region its `toolPanels` entry names (the right dock's context slot, or the
- * left pane beside the rail).
+ * panel opens in the region its `toolPanels` entry names: the left pane, beside the active tool's
+ * rail button, or beside the selected token (UI-TOKEN-02). None opens in the right dock, which
+ * holds tabs only (MV-239).
  */
 export function ToolPanelDock({
   campaign,
   scene,
   mode3d,
-  container,
 }: {
   campaign: Campaign | null;
   scene: Scene | null;
   mode3d: boolean;
-  container: HTMLElement | null;
 }) {
   const preview = useClientStore((state) => state.viewAs.kind !== 'host');
   const isHost = useClientStore((state) => state.isHost);
@@ -195,7 +195,7 @@ export function ToolPanelDock({
           {node}
         </PanelFrame>
       ));
-  const right = frames('right-dock');
+  const besideToken = frames('beside-token');
   const left = frames('left-pane');
   // UI-MEAS-01: one floating panel per beside-the-rail entry, each anchored to its own button.
   const beside = panels
@@ -212,15 +212,8 @@ export function ToolPanelDock({
     });
   return (
     <>
+      {besideToken.length > 0 && <BesideToken>{besideToken}</BesideToken>}
       {beside}
-      {right.length > 0 &&
-        container &&
-        createPortal(
-          <aside className="ui-tool-dock" aria-label="Tool panels">
-            {right}
-          </aside>,
-          container,
-        )}
       {left.length > 0 && leftContainer && createPortal(<LeftPane>{left}</LeftPane>, leftContainer)}
     </>
   );

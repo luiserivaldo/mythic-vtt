@@ -119,10 +119,11 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
     expect(created.t, `${name} create: ${created.reason ?? ''}`).toBe('ack');
     await expect(page.getByTestId('token-label').filter({ hasText: name })).toBeVisible();
     const start = screen(from.x, from.z);
-    const panel = page.getByRole('region', { name: `Transform: ${name}` });
+    // MV-239: a selected token shows the Transform chip (the panel starts tucked).
+    const chip = page.getByRole('button', { name: 'Restore Transform panel' });
     await expect(async () => {
       await page.mouse.click(start.x, start.y);
-      await expect(panel).toBeVisible({ timeout: 1000 });
+      await expect(chip).toBeVisible({ timeout: 1000 });
     }).toPass();
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();

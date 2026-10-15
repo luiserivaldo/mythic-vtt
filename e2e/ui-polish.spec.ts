@@ -40,7 +40,7 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
   // Opening a dock tab keeps the board width.
   const openBox = await board.boundingBox();
   expect(openBox).toEqual(closedBox);
-  const dock = page.getByRole('complementary', { name: 'Tool panels' });
+  const dock = page.getByRole('complementary', { name: 'Selection panels' });
 
   await page.getByLabel('Token name').fill('Goblin');
   await page.getByLabel('Colour (no image)').fill('#cc3322');
@@ -53,14 +53,22 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
   const z = page.getByLabel('Z (ft)');
   // Default scene: 40 x 30 cells, 5 ft per cell. A medium token snaps to the cell centre at
   // (20.5, 15.5) cells, then the second spawn steps one cell diagonally.
+  // MV-239: each selection starts with Transform as its chip; the chip opens it.
+  const chip = page.getByRole('button', { name: 'Restore Transform panel' });
   await list.getByRole('button', { name: 'Goblin', exact: true }).click();
+  await chip.click();
   await expect(x).toHaveValue('102.5');
   await expect(z).toHaveValue('77.5');
   const selectedBoard = await board.boundingBox();
   const selectedPanels = await dock.boundingBox();
   if (!selectedBoard || !selectedPanels) throw new Error('Selected token panels must be visible');
-  expect(selectedPanels.x).toBeGreaterThanOrEqual(selectedBoard.x + selectedBoard.width);
+  // MV-239 / UI-TOKEN-02: the selected token's panels open beside it, on the board, not in the dock.
+  expect(selectedPanels.x).toBeGreaterThanOrEqual(selectedBoard.x);
+  expect(selectedPanels.x + selectedPanels.width).toBeLessThanOrEqual(
+    selectedBoard.x + selectedBoard.width,
+  );
   await list.getByRole('button', { name: 'Crate', exact: true }).click();
+  await chip.click();
   await expect(x).toHaveValue('107.5');
   await expect(z).toHaveValue('82.5');
 
@@ -72,8 +80,7 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
   await page.waitForTimeout(500);
   await page.screenshot({ path: testInfo.outputPath('drawer-1280.png') });
 
-  const selectedDock = await dock.boundingBox();
-  expect(selectedDock?.x).toBeGreaterThan(600);
+  await expect(dock).toBeVisible();
   expect(errors).toEqual([]);
   await context.close();
 });

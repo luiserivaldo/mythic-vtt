@@ -12,6 +12,7 @@ import { PickableEntities } from './PickableEntities.js';
 import { RangeReadout } from './RangeReadout.js';
 import { TokenPreviewCard } from './TokenPreviewCard.js';
 import { TokenMenus } from './TokenMenu.js';
+import { SelectionAnchor } from './SelectionAnchor.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { GridLines } from './GridLines.js';
 import { activeRenderGrid, type RenderGrid } from './grid-model.js';
@@ -173,6 +174,8 @@ function BoardScene({
       <TokenPreviewCard scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       {/* UI-TOKEN-02/03: the full menu (gear or double-click) and the right-click menu. */}
       <TokenMenus scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
+      {/* UI-TOKEN-02 (MV-239): where the selected entity is on screen, for its panels. */}
+      <SelectionAnchor rendered={shown} mode={mode3d ? '3d' : '2d'} />
       {mode3d && <OcclusionFade rendered={shown} />}
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       {/* M1-20 / M2-08: 2D handles, or the 3D gizmo; both are off while the AoE tool is active. */}
@@ -191,7 +194,7 @@ function BoardScene({
 }
 
 /** Single on-demand Three scene for the active host-filtered Scene. */
-export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | null }) {
+export function BoardCanvas() {
   const viewMode = useViewMode();
   const mode3d = viewMode === '3d';
   const resetToken = useStore(viewModeStore, (state) => state.resetToken);
@@ -231,12 +234,7 @@ export function BoardCanvas({ panelContainer }: { panelContainer: HTMLElement | 
       </div>
       {/* UX-40: right-click on empty board; Ping is offered here and on a token's menu. */}
       <BoardContextMenu />
-      <ToolPanelDock
-        campaign={campaign}
-        scene={source}
-        mode3d={mode3d}
-        container={panelContainer}
-      />
+      <ToolPanelDock campaign={campaign} scene={source} mode3d={mode3d} />
       <Canvas
         frameloop="demand"
         shadows={false}

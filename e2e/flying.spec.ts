@@ -134,10 +134,12 @@ test('elevated tokens keep their height; flying locks it; a spectator cannot tog
   };
 
   const panel = page.getByRole('region', { name: 'Transform: Harpy' });
+  // MV-239: a selected token shows the Transform chip (the panel starts tucked).
+  const chip = page.getByRole('button', { name: 'Restore Transform panel' });
   const start = screen(2.5, 3.5);
   await expect(async () => {
     await page.mouse.click(start.x, start.y);
-    await expect(panel).toBeVisible({ timeout: 1000 });
+    await expect(chip).toBeVisible({ timeout: 1000 });
   }).toPass();
 
   // 1. Moving over bare ground keeps the height (it used to fall to the ground).
@@ -156,6 +158,7 @@ test('elevated tokens keep their height; flying locks it; a spectator cannot tog
   await page.mouse.click(onDais.x, onDais.y, { button: 'middle' });
   await expect.poll(() => entity()?.token?.flying, { timeout: 10_000 }).toBe(true);
   await expect(page.getByTestId('elevation-badge')).toContainText('Flying');
+  await chip.click();
   await expect(panel.getByRole('checkbox', { name: 'Flying' })).toBeChecked();
 
   // 4. A flying token ignores the platform and keeps its height when moved off and back on.

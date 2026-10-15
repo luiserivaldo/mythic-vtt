@@ -41,6 +41,8 @@ test('selecting a prop in 3D mounts the gizmo without errors and a typed value c
 
   await page.getByRole('button', { name: '3D view' }).click();
   const panel = page.getByRole('region', { name: /Transform: Crate/ });
+  // MV-239: Transform starts as its chip; the chip opens it.
+  await page.getByRole('button', { name: 'Restore Transform panel' }).click();
   await expect(panel).toBeVisible();
   await expect(panel.getByLabel(/^Y /)).toBeVisible();
   await page.waitForTimeout(500);

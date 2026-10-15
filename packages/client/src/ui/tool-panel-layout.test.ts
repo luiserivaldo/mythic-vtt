@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { selectionStore } from '../tools/selection-store.js';
 import { TOOL_PANEL_ORDER, toolPanelLayoutStore } from './tool-panel-layout.js';
 
 describe('tool panel layout', () => {
@@ -52,5 +53,23 @@ describe('tool panel layout', () => {
       'create-prop': false,
       initiative: false,
     });
+  });
+
+  it('starts Transform and Token as their chips (MV-239)', () => {
+    const initial = toolPanelLayoutStore.getInitialState().collapsed;
+    expect(initial.transform).toBe(true);
+    expect(initial.token).toBe(true);
+  });
+
+  it('tucks Transform again when the selection changes, and only then', () => {
+    selectionStore.getState().pick('scene-1', 'a', false);
+    toolPanelLayoutStore.getState().restore('transform');
+    toolPanelLayoutStore.getState().restore('token');
+    selectionStore.getState().pick('scene-1', 'a', false);
+    expect(toolPanelLayoutStore.getState().collapsed.transform).toBe(false);
+    selectionStore.getState().pick('scene-1', 'b', false);
+    expect(toolPanelLayoutStore.getState().collapsed.transform).toBe(true);
+    expect(toolPanelLayoutStore.getState().collapsed.token).toBe(false);
+    selectionStore.getState().clear();
   });
 });

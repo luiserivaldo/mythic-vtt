@@ -26,11 +26,6 @@ export function App() {
   const campaign = useClientStore((s) => s.campaign);
   const fatalError = useClientStore((s) => s.fatalError);
   const [theme, setTheme] = useState<Theme>(initialTheme);
-  const [panelContainer, setPanelContainer] = useState<HTMLDivElement | null>(null);
-  const panelRef = useCallback((node: HTMLDivElement | null) => {
-    setPanelContainer(node);
-  }, []);
-
   const leftPaneRef = useCallback((node: HTMLDivElement | null) => {
     leftPaneStore.getState().setContainer(node);
   }, []);
@@ -60,8 +55,8 @@ export function App() {
       <div className="ui-app-body">
         {/* UI-SHELL-05: the left pane portals in here; empty, the slot takes no width. */}
         <div className="ui-left-pane-slot" ref={leftPaneRef} />
-        <BoardCanvas panelContainer={panelContainer} />
-        <RightDock theme={theme} onThemeChange={changeTheme} contextPanelRef={panelRef} />
+        <BoardCanvas />
+        <RightDock theme={theme} onThemeChange={changeTheme} />
       </div>
       <JoinScreen />
     </main>

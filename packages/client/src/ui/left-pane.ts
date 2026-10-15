@@ -28,9 +28,12 @@ export const leftPaneStore = createStore<LeftPaneState>()((set) => ({
 
 const devOverrides = new Map<string, PanelRegion>();
 
-/** The region a tool panel opens in; an unregistered panel stays in the right dock. */
+/**
+ * The region a tool panel opens in. An unregistered panel opens in the left pane: no panel ever
+ * opens in the right dock, which holds tabs only (MV-239).
+ */
 export function panelRegion(id: string): PanelRegion {
-  return devOverrides.get(id) ?? toolPanels.get(id)?.region ?? 'right-dock';
+  return devOverrides.get(id) ?? toolPanels.get(id)?.region ?? 'left-pane';
 }
 
 // Development builds let Playwright route a panel to another region, so the left pane's hosting

@@ -82,10 +82,14 @@ test('host sets elevation through the panel and sees the badge in scene units', 
   };
 
   const panel = page.getByRole('region', { name: /Transform/ });
+  // MV-239: a selected token shows the Transform chip; the chip opens the panel.
+  const chip = page.getByRole('button', { name: 'Restore Transform panel' });
   await expect(async () => {
     await page.mouse.click(click.x, click.y);
-    await expect(panel).toBeVisible({ timeout: 1000 });
+    await expect(chip).toBeVisible({ timeout: 1000 });
   }).toPass();
+  await chip.click();
+  await expect(panel).toBeVisible();
 
   const badge = page.getByTestId('elevation-badge');
   await expect(badge).toHaveCount(0);
