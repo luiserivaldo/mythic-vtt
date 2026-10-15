@@ -17,6 +17,7 @@ import { isReadOnlyViewer } from './viewer.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { RulerPanel } from './RulerPanel.js';
 import { CreatePropPanel } from './RailPanels.js';
+import { CameraJoystickPanel } from './CameraJoystickPanel.js';
 import { InitiativeTools } from './InitiativeTools.js';
 import { seeSheet } from './sheet-panel.js';
 import { DrawPanel } from './DrawPanel.js';
@@ -122,6 +123,9 @@ export function ToolPanelDock({
   const showCreateProp = scene !== null && !measuring && activeTool === 'create-prop';
   const showDraw = scene !== null && !measuring && activeTool === 'draw';
   const showInitiative = !measuring && activeTool === 'initiative';
+  // UI-CAM-01: in 3D only, the Pan tool's panel holds the camera joystick. It moves this viewer's
+  // own camera, so read-only viewers get it too; 2D Pan has no panel.
+  const showCamera = scene !== null && mode3d && !measuring && activeTool === 'pan';
   const panels: { id: ToolPanelId; node: ReactNode }[] = [];
   const add = (id: ToolPanelId, node: ReactNode) => {
     panels.push({ id, node });
@@ -132,6 +136,7 @@ export function ToolPanelDock({
     if (showDraw) add('draw', <DrawPanel scene={scene} />);
   }
   if (showInitiative) add('initiative', <InitiativeTools />);
+  if (showCamera) add('camera', <CameraJoystickPanel />);
   if (!readOnly) {
     if (showTransform)
       add(

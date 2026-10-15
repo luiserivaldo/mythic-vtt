@@ -13,6 +13,7 @@ describe('tool panel layout', () => {
         draw: false,
         'create-prop': false,
         initiative: false,
+        camera: true,
       },
     });
   });
@@ -26,6 +27,7 @@ describe('tool panel layout', () => {
       'draw',
       'create-prop',
       'initiative',
+      'camera',
     ]);
   });
 
@@ -40,6 +42,7 @@ describe('tool panel layout', () => {
       draw: false,
       'create-prop': false,
       initiative: false,
+      camera: true,
     });
 
     toolPanelLayoutStore.getState().restore('transform');
@@ -52,6 +55,7 @@ describe('tool panel layout', () => {
       draw: false,
       'create-prop': false,
       initiative: false,
+      camera: true,
     });
   });
 
@@ -59,6 +63,8 @@ describe('tool panel layout', () => {
     const initial = toolPanelLayoutStore.getInitialState().collapsed;
     expect(initial.transform).toBe(true);
     expect(initial.token).toBe(true);
+    // UI-CAM-01: the Pan tool's camera panel starts as its expandable bar.
+    expect(initial.camera).toBe(true);
   });
 
   it('tucks Transform again when the selection changes, and only then', () => {
