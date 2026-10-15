@@ -17,6 +17,7 @@ import { selectionActor, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { defaultUploader } from '../ui/default-uploader.js';
 import { isValidEntityName, LAYER_LABELS } from '../ui/entity-panel.js';
+import { STATUS_ICON_GLYPHS, statusIconLabel } from './status-markers.js';
 import { seeSheet } from '../ui/sheet-panel.js';
 import { usePingReason } from '../ui/ping-reason.js';
 import { useSubmit, type SendIntent } from '../ui/submit.js';
@@ -26,6 +27,8 @@ import { COLLIDABLE_LABEL, propCollidableIntent, propCollidableModel } from '../
 import {
   TOKEN_CONTEXT_LABELS,
   TOKEN_MENU_LABELS,
+  tokenConditionIntent,
+  tokenConditionTargets,
   tokenContextMenu,
   tokenDeleteIntent,
   tokenFlyingIntent,
@@ -530,6 +533,7 @@ function TokenContextMenu({ campaign, scene, entity, rendered, mode, actor, view
   const { send } = useSubmit();
   const pingReason = usePingReason();
   const [layersOpen, setLayersOpen] = useState(false);
+  const [conditionsOpen, setConditionsOpen] = useState(false);
   const items = useMemo(
     () => tokenContextMenu({ campaign, scene, entity, actor, viewer }),
     [campaign, scene, entity, actor, viewer],
@@ -538,12 +542,13 @@ function TokenContextMenu({ campaign, scene, entity, rendered, mode, actor, view
     () => tokenLayerTargets({ campaign, scene, entity, actor, viewer }),
     [campaign, scene, entity, actor, viewer],
   );
+  const conditions = useMemo(() => tokenConditionTargets(entity), [entity]);
   const anchor = tokenMenuAnchor(mode, rendered.position, rendered.sizeCells);
   if (items.length === 0) return null;
 
   /**
-   * Every curated item, handled exhaustively: a WIP placeholder has no behaviour (UIUX §1.7) and
-   * Change Layer is the submenu below, so neither is wired to a plain command.
+   * Every curated item, handled exhaustively: Add Condition and Change Layer are submenus, so
+   * neither is wired to a plain command.
    */
   const body = (id: (typeof items)[number]['id']) => {
     switch (id) {
@@ -563,10 +568,40 @@ function TokenContextMenu({ campaign, scene, entity, rendered, mode, actor, view
         );
       case 'add-condition':
         return (
-          <button type="button" role="menuitem" disabled aria-disabled="true">
-            {TOKEN_CONTEXT_LABELS['add-condition']}
-            <span className="ui-badge"> WIP</span>
-          </button>
+          <>
+            <button
+              type="button"
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={conditionsOpen}
+              disabled={!items.find((item) => item.id === id)?.enabled}
+              onClick={() => {
+                setConditionsOpen((open) => !open);
+              }}
+            >
+              {TOKEN_CONTEXT_LABELS['add-condition']}
+            </button>
+            {conditionsOpen && (
+              <ul role="menu" aria-label={TOKEN_CONTEXT_LABELS['add-condition']} style={listStyle}>
+                {conditions.map((target) => (
+                  <li key={target.icon} role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={!target.enabled}
+                      title={target.reason ?? undefined}
+                      onClick={() => {
+                        tokenMenuStore.getState().close();
+                        void send(tokenConditionIntent(scene.id, entity, target.icon));
+                      }}
+                    >
+                      {STATUS_ICON_GLYPHS[target.icon]} {statusIconLabel(target.icon)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         );
       case 'change-layer':
         return (

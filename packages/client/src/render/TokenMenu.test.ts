@@ -12,7 +12,7 @@ import type { RenderScene } from './scene-model.js';
 import { TokenMenus } from './TokenMenu.js';
 
 // UI-TOKEN-02 / UI-TOKEN-03 in the DOM: a move-only owner gets the controls they hold and the rest
-// disabled with a reason, the right-click menu is curated (Add Condition is greyed and WIP), and a
+// disabled with a reason, the right-click menu is curated (Add Condition opens the condition picker), and a
 // name the viewer may not read never reaches the menu's own markup (D35, PERM-03).
 
 interface MockState {
@@ -284,25 +284,50 @@ describe('the full token menu (UI-TOKEN-02)', () => {
 });
 
 describe('the right-click menu (UI-TOKEN-03)', () => {
-  it('curates the list, greys Add Condition out and keeps it non-interactive', () => {
+  it('curates the list and greys Add Condition, with a reason, for a seat that cannot edit', () => {
+    renderMenus();
+    selectToken();
+    openContext();
+    const items = [...(contextMenu()?.querySelectorAll<HTMLElement>('li') ?? [])];
+    expect(items.map((li) => li.textContent)).toEqual([
+      'See Sheet',
+      'Add Condition',
+      'Change Layer',
+      'Ping',
+      'Token Options',
+    ]);
+    const condition = items[1];
+    expect(condition?.querySelector('button')?.disabled).toBe(true);
+    expect(condition?.title).not.toBe('');
+  });
+
+  it('opens the condition picker from Add Condition and sends the marker', () => {
+    mock.isHost = true;
+    mock.seatId = null;
     renderMenus();
     selectToken();
     openContext();
     const panel = contextMenu();
     expect(panel).not.toBeNull();
-    const items = [...(panel?.querySelectorAll('li > button') ?? [])].map((b) => b.textContent);
-    expect(items).toEqual([
+    const buttons = () => [...(panel?.querySelectorAll<HTMLButtonElement>('li > button') ?? [])];
+    expect(buttons().map((b) => b.textContent)).toEqual([
       'See Sheet',
-      'Add Condition WIP',
+      'Add Condition',
       'Change Layer',
       'Ping',
       'Token Options',
     ]);
-    const condition = [...(panel?.querySelectorAll<HTMLButtonElement>('li > button') ?? [])].find(
-      (b) => b.textContent.includes('Add Condition'),
+    const condition = buttons().find((b) => b.textContent === 'Add Condition');
+    expect(condition?.disabled).toBe(false);
+    click(condition);
+    const options = [...(panel?.querySelectorAll<HTMLButtonElement>('ul ul button') ?? [])];
+    expect(options.length).toBeGreaterThan(0);
+    click(options[0]);
+    expect(submit).toHaveBeenCalledWith(
+      'token.setStatusMarkers',
+      expect.objectContaining({ sceneId: SCENE, entityId: TOKEN }),
+      SCENE,
     );
-    expect(condition?.disabled).toBe(true);
-    expect(condition?.getAttribute('aria-disabled')).toBe('true');
   });
 
   it('opens the layer submenu with the locked layer disabled, then sends the move', () => {

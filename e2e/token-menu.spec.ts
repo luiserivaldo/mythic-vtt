@@ -23,7 +23,7 @@ interface Snapshot {
           name: string;
           layer: string;
           transform: { position: { x: number; y: number; z: number } };
-          token?: { flying?: boolean };
+          token?: { flying?: boolean; statusMarkers?: unknown[] };
         }
       >;
     }
@@ -200,12 +200,24 @@ test('the full menu near the token, and the curated right-click menu', async ({ 
     if (!actionsBox) throw new Error('no context menu box');
     expect(actionsBox.x).toBeGreaterThan(at(21.5, 12.5).x);
 
-    // Add Condition is the honest WIP placeholder: greyed, labelled and not interactive (UIUX §1.7).
-    // Its accessible name carries the WIP label, so the lookup is a substring match.
-    const condition = actions.getByRole('menuitem', { name: 'Add Condition' });
-    await expect(condition).toBeDisabled();
-    await expect(condition).toContainText('WIP');
+    // Add Condition opens the icon picker (TOK-06): the pick reaches the host and the marker
+    // appears on the token's strip, then that icon is greyed as already held.
+    const condition = actions.getByRole('menuitem', { name: 'Add Condition', exact: true });
+    await expect(condition).toBeEnabled();
     await expect(actions.getByRole('menuitem', { name: 'See Sheet', exact: true })).toBeEnabled();
+    await condition.click();
+    const conditions = actions.getByRole('menu', { name: 'Add Condition' });
+    await expect(conditions).toBeVisible();
+    await conditions.getByRole('menuitem', { name: /Stunned$/ }).click();
+    await expect(actions).toHaveCount(0);
+    await expect
+      .poll(() => entity(OGRE)?.token?.statusMarkers)
+      .toEqual([{ kind: 'icon', icon: 'stunned' }]);
+    await expect(page.getByTestId('status-marker')).toHaveText(['✦']);
+    await rightClickCell(page, 21.5, 12.5);
+    await actions.getByRole('menuitem', { name: 'Add Condition', exact: true }).click();
+    await expect(conditions.getByRole('menuitem', { name: /Stunned$/ })).toBeDisabled();
+    await expect(conditions.getByRole('menuitem', { name: /Prone$/ })).toBeEnabled();
 
     // Change Layer opens a submenu and moves the token (LAY-07).
     await actions.getByRole('menuitem', { name: 'Change Layer', exact: true }).click();
