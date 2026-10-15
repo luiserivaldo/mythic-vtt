@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PROTOCOL_VERSION } from '../packages/protocol/src/version.js';
-import type { Browser, BrowserContext, Page } from '@playwright/test';
+import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STARTUP_TIMEOUT_MS = 20_000;
@@ -263,6 +263,21 @@ export async function claimSeat(page: Page, seat: string, name: string): Promise
   await page.getByRole('button', { name: `Claim ${seat}`, exact: true }).click();
   await page.getByLabel('Display name').fill(name);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
+}
+
+/**
+ * UI-SEAT-01: the DM opens the Seats tab and adds a seat from the template dropdown. With no
+ * `name` the seat takes the template's label (e.g. "Player").
+ */
+export async function addSeat(page: Page, template: string, name = ''): Promise<void> {
+  await page.getByRole('tab', { name: 'Seats', exact: true }).click();
+  const form = page.getByRole('form', { name: 'Add a seat' });
+  await form.getByLabel('Seat template').selectOption({ label: template });
+  await form.getByLabel('Seat name').fill(name);
+  await form.getByRole('button', { name: 'Add seat' }).click();
+  await expect(
+    page.getByRole('listitem', { name: `${name || template} seat`, exact: true }).first(),
+  ).toBeVisible();
 }
 
 /** Starts a table and opens a DM context plus `playerCount` player contexts. */

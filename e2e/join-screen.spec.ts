@@ -113,7 +113,7 @@ test('claim, temporary player, spectator and an already-claimed seat, with no pr
   await dm.goto(table.clientUrl);
   await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
   await expect(dm.getByRole('dialog')).toHaveCount(0);
-  await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
+  await dm.getByRole('tab', { name: 'Seats', exact: true }).click();
   await expect(dm.getByLabel('Spectators')).toHaveText('Spectators watching: 0');
 
   // The link immediately shows the DM, the campaign and the seats, before any socket opens.
@@ -164,7 +164,7 @@ test('claim, temporary player, spectator and an already-claimed seat, with no pr
   await expect(zara.page.getByRole('dialog')).toHaveCount(0);
   await expect(zara.page.getByLabel('Current identity')).toContainText('Zara the Bold');
   await expect(zara.page.getByLabel('Current identity')).toContainText('Wizard');
-  await expect(dm.getByRole('listitem', { name: 'Wizard participant' })).toContainText('Online');
+  await expect(dm.getByRole('listitem', { name: 'Wizard seat' })).toContainText('Online');
 
   // A seat already claimed: the late claim is refused in plain words, and the list then shows the
   // seat as claimed without naming who holds it.

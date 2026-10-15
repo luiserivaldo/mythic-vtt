@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openClient, recordPageFrames, startTable, claimSeat } from './harness.js';
+import {
+  addSeat as addTemplateSeat,
+  openClient,
+  recordPageFrames,
+  startTable,
+  claimSeat,
+} from './harness.js';
 
 // HOST-04: the DM builds and edits scenes with the host running and no players connected, then
 // starts the session from that state.
@@ -7,10 +13,7 @@ import { openClient, recordPageFrames, startTable, claimSeat } from './harness.j
 const sceneRow = (page: Page, name: string) => page.getByRole('listitem').filter({ hasText: name });
 
 async function addSeat(page: Page, label: string): Promise<void> {
-  await page.getByRole('tab', { name: 'Participants', exact: true }).click();
-  await page.getByLabel('Custom participant name').fill(label);
-  await page.getByRole('button', { name: 'Add custom participant' }).click();
-  await expect(page.getByRole('listitem', { name: `${label} participant` })).toBeVisible();
+  await addTemplateSeat(page, 'Player', label);
 }
 
 async function createToken(page: Page, name: string): Promise<void> {

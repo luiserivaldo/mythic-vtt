@@ -119,7 +119,7 @@ test('at phone width the board still fills the window and the dock overlays the 
   const before = await board.boundingBox();
   expect(Math.round((before?.y ?? 0) + (before?.height ?? 0))).toBe(844);
 
-  await page.getByRole('tab', { name: 'Participants', exact: true }).click();
+  await page.getByRole('tab', { name: 'Seats', exact: true }).click();
   const drawer = page.locator('.ui-right-dock');
   await expect(drawer).toBeVisible();
   expect(await board.boundingBox()).toEqual(before);

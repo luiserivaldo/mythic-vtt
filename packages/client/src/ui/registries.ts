@@ -154,7 +154,7 @@ export const dockTabs = createRegistry<DockTab>([
   },
   {
     id: 'seats',
-    label: 'Participants',
+    label: 'Seats', // UI-SEAT-01
     icon: 'seats',
     group: 'table',
     allowed: host,

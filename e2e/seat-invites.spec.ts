@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, recordPageFrames, startTable, testUlid, type Reply } from './harness.js';
+import {
+  addSeat,
+  RawClient,
+  recordPageFrames,
+  startTable,
+  testUlid,
+  type Reply,
+} from './harness.js';
 
 const ok = async (promise: Promise<Reply>) => {
   expect(await promise).toMatchObject({ t: 'ack' });
@@ -137,8 +144,7 @@ test('the DM copies a seat invite link, a second browser takes the seat with it,
     const dm = await dmContext.newPage();
     await dm.goto(`${table.clientUrl.replace(/\/$/, '')}/#host=${table.hostToken}`);
     await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
-    await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
-    await dm.getByRole('button', { name: 'Add Player' }).click();
+    await addSeat(dm, 'Player');
     const row = dm.getByRole('listitem', { name: 'Invite link for Player', exact: true });
     await expect(row).toContainText('No link');
 
@@ -158,10 +164,10 @@ test('the DM copies a seat invite link, a second browser takes the seat with it,
     const frames = recordPageFrames(guest);
     await guest.goto(`${table.clientUrl.replace(/\/$/, '')}/${hash}`);
     await expect(guest.getByRole('status')).toHaveText('Connected to New campaign');
-    await expect(
-      dm.getByRole('listitem', { name: 'Player participant', exact: true }),
-    ).toContainText('Online');
-    await expect(guest.getByRole('tab', { name: 'Participants', exact: true })).toHaveCount(0);
+    await expect(dm.getByRole('listitem', { name: 'Player seat', exact: true })).toContainText(
+      'Online',
+    );
+    await expect(guest.getByRole('tab', { name: 'Seats', exact: true })).toHaveCount(0);
     expect(frames.join('\n')).not.toContain(hash.slice(hash.indexOf('.') + 1));
 
     // Regenerating asks first: dismissing the warning leaves the link alone.

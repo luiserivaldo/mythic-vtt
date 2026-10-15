@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  addSeat,
   RawClient,
   recordPageFrames,
   startTable,
@@ -19,7 +20,7 @@ test.afterAll(async () => {
 });
 
 const PLAYER_TABS = ['Chat', 'Sheet', 'Help', 'Settings'];
-const DM_ONLY_TABS = ['Scenes', 'Layers', 'Entities', 'Participants', 'Invite'];
+const DM_ONLY_TABS = ['Scenes', 'Layers', 'Entities', 'Seats', 'Invite'];
 
 test('players get four tabs, never render DM tabs, and the DM sees them all', async ({
   browser,
@@ -75,8 +76,7 @@ test('players get four tabs, never render DM tabs, and the DM sees them all', as
       })
     ).t,
   ).toBe('ack');
-  await dm.getByRole('tab', { name: 'Participants', exact: true }).click();
-  await dm.getByRole('button', { name: 'Add Spectator' }).click();
+  await addSeat(dm, 'Spectator');
 
   const guestContext = await browser.newContext();
   const guest = await guestContext.newPage();
