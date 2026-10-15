@@ -1,6 +1,8 @@
 import type { Campaign } from '@mythic/shared';
 import { layerLockIntent, entityMoveLayerIntent } from './intent-specs.js';
 import { layerRows, moveTargets } from './layer-panel.js';
+import { selectionStore } from '../tools/selection-store.js';
+import { isOffFocus } from '../render/layer-visibility.js';
 import { useSubmit } from './submit.js';
 import { useUiStore } from './ui-store.js';
 import type { ViewerRole } from './viewer.js';
@@ -34,6 +36,12 @@ export function LayerPanel({ campaign, role }: { campaign: Campaign; role: Viewe
               title={`Draw new entities on ${row.label}`}
               onClick={() => {
                 setActiveLayer(row.layer);
+                // MV-244: objects on an inactive layer cannot stay selected on the board.
+                const selection = selectionStore.getState();
+                selection.reconcile(
+                  selection.sceneId,
+                  selection.ids.filter((id) => !isOffFocus(scene.entities[id]?.layer, row.layer)),
+                );
               }}
             >
               <strong>{row.label}</strong>

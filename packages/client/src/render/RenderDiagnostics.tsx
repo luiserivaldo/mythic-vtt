@@ -40,6 +40,17 @@ export function RenderDiagnostics() {
         });
         return found;
       },
+      /** Material colour of every mesh with this name, as `#rrggbb` (inactive-layer shade e2e). */
+      getMeshColors: (name: string) => {
+        const colors: string[] = [];
+        scene.traverse((object) => {
+          const material = (object as { material?: { color?: { getHexString(): string } } })
+            .material;
+          if (object.name === name && material?.color)
+            colors.push(`#${material.color.getHexString()}`);
+        });
+        return colors;
+      },
       getObjectCount: (name: string) => {
         let count = 0;
         scene.traverse((object) => {

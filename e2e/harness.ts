@@ -547,3 +547,21 @@ export function applyWirePatch(
   }
   return clone;
 }
+
+/**
+ * UI-LAY-01 (MV-244): the DM picks only on the active layer, so a spec that clicks a map, prop,
+ * effect or DM-layer object makes that layer active first, from the Layers tab like a DM would.
+ */
+export async function setActiveLayer(
+  page: Page,
+  label: 'Map' | 'Props' | 'Tokens' | 'DM only' | 'Effects',
+): Promise<void> {
+  await page.getByRole('tab', { name: 'Layers', exact: true }).click();
+  const layers = page.getByRole('region', { name: 'Layers' });
+  // The Map row's name carries its description, so match the label as a prefix.
+  const row = layers.getByRole('button', { name: new RegExp(`^${label}\\b`) });
+  // The panel loads lazily: wait for the row before reading its state.
+  await row.waitFor();
+  if ((await row.getAttribute('aria-pressed')) !== 'true') await row.click();
+  await layers.getByRole('button', { name: new RegExp(`^${label}\\b`), pressed: true }).waitFor();
+}

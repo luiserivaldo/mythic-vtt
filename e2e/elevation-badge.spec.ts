@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { RawClient, startTable, testUlid } from './harness.js';
+import { RawClient, setActiveLayer, startTable, testUlid } from './harness.js';
 
 // UX-41 (UI-TOKEN-05, MV-243): the elevation badge reads relative to the walkable ground under a
 // token, so a token on a platform reads 0, a flyer reads its height above what is below it, and the
@@ -93,6 +93,8 @@ test('badge is relative to the ground, and the collidable toggle changes it', as
     });
     const point = at(8.5, 11.5);
     const menu = page.getByTestId('prop-context-menu');
+    // MV-244: the prop is picked while its layer is the active one.
+    await setActiveLayer(page, 'Props');
     await expect(async () => {
       await page.mouse.click(point.x, point.y, { button: 'right' });
       await expect(menu).toBeVisible({ timeout: 1000 });

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, startTable, testUlid } from './harness.js';
+import { RawClient, setActiveLayer, startTable, testUlid } from './harness.js';
 
 test('DM selects, moves and resizes a rectangular battlemap using its real bounds', async ({
   browser,
@@ -57,6 +57,8 @@ test('DM selects, moves and resizes a rectangular battlemap using its real bound
     await page.goto(table.clientUrl);
     await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
     await expect.poll(() => imageLoaded).toBe(true);
+    // MV-244: the battlemap is picked while the Map layer is active.
+    await setActiveLayer(page, 'Map');
     const canvas = page.locator('canvas');
     const box = await canvas.boundingBox();
     if (!box) throw new Error('missing canvas');

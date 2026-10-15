@@ -12,6 +12,7 @@ import {
 import type { AoEShape, WalkableSurface } from '@mythic/shared';
 import { sectionPolygon, shellDimensions, surfaceRings, type Volume } from './aoe-geometry.js';
 import type { RenderMode } from './PrimitiveMesh.js';
+import { layerShade } from './layer-visibility.js';
 
 function shellGeometry(shape: AoEShape): BufferGeometry {
   const d = shellDimensions(shape);
@@ -59,11 +60,14 @@ export function AoEVolume({
   walkables,
   mode,
   renderOrder,
+  dimmed,
 }: {
   volume: Volume;
   walkables: readonly WalkableSurface[];
   mode: RenderMode;
   renderOrder: number;
+  /** UI-LAY-01 (MV-244): the AoE sits on a layer other than the viewer's active one. */
+  dimmed?: boolean | undefined;
 }) {
   const shell = useMemo(() => shellGeometry(volume.shape), [volume.shape]);
   const section = useMemo(() => sectionGeometry(volume), [volume]);
@@ -77,7 +81,7 @@ export function AoEVolume({
     },
     [shell, section, rings],
   );
-  const color = volume.shape.color;
+  const color = layerShade(volume.shape.color, dimmed);
   // Even elevated volumes retain their 2D section. Surface rings communicate where they touch terrain.
   return (
     <>

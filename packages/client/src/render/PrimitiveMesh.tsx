@@ -14,6 +14,7 @@ import {
 import type { RenderEntity, RenderShape } from './scene-model.js';
 import { SELECTION_COLOR } from './canvas-style.js';
 import { useTiledTexture } from './use-texture.js';
+import { layerShade } from './layer-visibility.js';
 
 export type RenderMode = '2d' | '3d';
 
@@ -49,7 +50,9 @@ export function PrimitiveMesh({
   onContextMenu: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const [x, y, z] = entity.position;
-  const color = safeColor(shape.color);
+  const color = layerShade(safeColor(shape.color), entity.dimmed);
+  // MV-244: a texture is tinted through the material colour, which is otherwise white.
+  const textureTint = layerShade('#ffffff', entity.dimmed);
   const outline = selected ? SELECTED : entity.secret ? SECRET : '#0b1118';
   const tiling = textureTiling(shape);
   const threeD = mode === '3d';
@@ -76,7 +79,7 @@ export function PrimitiveMesh({
         <meshStandardMaterial
           // A texture replaces the solid colour (ENV-05); the key makes three compile the map.
           key={texture ? 'textured' : 'flat'}
-          color={texture ? '#ffffff' : color}
+          color={texture ? textureTint : color}
           {...(texture ? { map: texture } : {})}
           side={DoubleSide}
           emissive={selected ? SELECTED : '#000000'}
@@ -139,7 +142,7 @@ function Footprint2D({
       >
         <meshBasicMaterial
           key={texture ? 'textured' : 'flat'}
-          color={texture ? '#ffffff' : color}
+          color={texture ? layerShade('#ffffff', entity.dimmed) : color}
           {...(texture ? { map: texture } : {})}
           side={DoubleSide}
           transparent={!shape.walkable}

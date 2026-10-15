@@ -60,6 +60,21 @@ const scene = Scene.parse({
 });
 
 describe('raycast picking', () => {
+  it('skips objects off the focused layer, so a click reaches the active layer beneath (MV-244)', () => {
+    const hits = [
+      { id: effect.id, distance: 1 },
+      { id: token.id, distance: 5 },
+      { id: map.id, distance: 9 },
+    ];
+    expect(pickEntity(hits, scene, host, 'tokens')).toBe(token.id);
+    expect(pickEntity(hits, scene, host, 'map')).toBe(map.id);
+    // The map layer is exempt: it stays pickable whatever layer is active.
+    expect(pickEntity(hits, scene, host, 'dm')).toBe(map.id);
+    expect(pickEntity([{ id: map.id, distance: 9 }], scene, host, 'tokens')).toBe(map.id);
+    // No focus (players, spectators): the overlay order alone decides, as before.
+    expect(pickEntity(hits, scene, host, null)).toBe(effect.id);
+  });
+
   it('chooses the highest eligible layer before nearest ray distance', () => {
     const hits = [
       { id: map.id, distance: 1 },

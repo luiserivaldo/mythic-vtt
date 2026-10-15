@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
-import { RawClient, settledCameraPose, startTable, testUlid, type Table } from './harness.js';
+import {
+  RawClient,
+  setActiveLayer,
+  settledCameraPose,
+  startTable,
+  testUlid,
+  type Table,
+} from './harness.js';
 
 // UI-LAY-01 / F23: unchecking "Show <layer>" removes that layer's entities from the DM's own scene
 // (drawn and picked), in 2D and 3D, for every layer. The eye is local view state only.
@@ -74,7 +81,8 @@ test('hiding a layer removes its entities from the scene and from picking, in 2D
   try {
     await page.goto(table.clientUrl);
     await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
-    await page.getByRole('tab', { name: 'Layers', exact: true }).click();
+    // MV-244: the DM token is only pickable while its layer is the active one.
+    await setActiveLayer(page, 'DM only');
     const layers = page.getByRole('region', { name: 'Layers' });
     await expect(layers.getByRole('checkbox', { name: 'Show DM only' })).toBeVisible();
     // UI-TOKEN-01: a single selected token shows its preview card.
