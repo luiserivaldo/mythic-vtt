@@ -100,9 +100,10 @@ export function RulerPath({
             zIndexRange={[5, 0]}
             style={{ pointerEvents: 'none' }}
           >
+            {/* MV-250: checkpoint (leg) labels stay visible but quieter than the total. */}
             <div
               data-testid={`${testId}-segment`}
-              style={{ ...pillStyle, fontSize: 11, opacity: 0.85 }}
+              style={{ ...pillStyle, fontSize: 10, opacity: 0.65 }}
             >
               {segment.label}
             </div>

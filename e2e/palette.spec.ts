@@ -105,6 +105,8 @@ test('grey tiles and dark blue surround keep a populated board readable in 2D an
   const to = await cellToPixel(page, 19.5, 11.5);
   await page.getByRole('button', { name: 'Measure', exact: true }).click();
   await page.getByLabel('Ruler fade').selectOption('linger');
+  // UI-MEAS-01: the panel floats beside the rail; tuck it away to measure under it.
+  await page.getByRole('button', { name: 'Close Measure panel' }).click();
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 6 });
@@ -116,6 +118,7 @@ test('grey tiles and dark blue surround keep a populated board readable in 2D an
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await page.waitForTimeout(500);
   // Q29: changing the board camera preserves the independently selected 2D measurement mode.
+  await page.getByRole('button', { name: 'Restore Measure panel' }).click();
   await expect(page.getByLabel('Measurement mode')).toHaveValue('2d');
   await expect(page.getByTestId('ruler-total')).toHaveText('30 ft');
   await page.screenshot({ path: testInfo.outputPath('palette-3d.png'), fullPage: true });

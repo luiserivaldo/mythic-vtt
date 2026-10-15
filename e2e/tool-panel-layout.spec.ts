@@ -43,13 +43,15 @@ test('tool panels share an ordered dock and active tools collapse to restore but
   await expect(page.getByRole('button', { name: 'Restore Transform panel' })).toBeVisible();
   await page.getByRole('button', { name: 'Restore Transform panel' }).click();
 
+  // UI-MEAS-01: the Measure panel opens beside its rail button, never in the dock.
   await page.getByRole('button', { name: 'Measure', exact: true }).click();
-  await page.getByText('Measurement shapes', { exact: true }).click();
-  await page.getByLabel('Measurement shape').selectOption('cone');
-  await dock.getByRole('button', { name: 'Close Ruler panel' }).click();
-  await expect(page.getByRole('button', { name: 'Restore Ruler panel' })).toBeVisible();
-  await page.getByRole('button', { name: 'Restore Ruler panel' }).click();
-  await expect(page.getByLabel('Measurement shape')).toHaveValue('cone');
+  const pane = page.getByRole('complementary', { name: 'Measure', exact: true });
+  await expect(dock.locator('[data-tool-panel="ruler"]')).toHaveCount(0);
+  await page.getByRole('radio', { name: 'Cone', exact: true }).check();
+  await pane.getByRole('button', { name: 'Close Measure panel' }).click();
+  await expect(page.getByRole('button', { name: 'Restore Measure panel' })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore Measure panel' }).click();
+  await expect(page.getByRole('radio', { name: 'Cone', exact: true })).toBeChecked();
 
   await context.close();
 });

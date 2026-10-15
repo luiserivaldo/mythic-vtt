@@ -1,14 +1,19 @@
+import { Html } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { walkableFromEntity, type Scene } from '@mythic/shared';
-import { useContext, useEffect, useMemo, useRef } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { Plane, Raycaster, Vector2, Vector3, type Object3D } from 'three';
 import {
   aoePlacePayload,
+  dragSize,
   placeDraft,
+  sceneUnitReadout,
+  sizeNoun,
   validAoEDraft,
   type AoEDraft,
 } from '../tools/aoe-placement.js';
+import { LABEL_BACKGROUND_COLOR, LABEL_TEXT_COLOR } from './canvas-style.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { measurementScene } from '../tools/measurement-tool.js';
@@ -30,6 +35,7 @@ export function AoEPlacementCanvas({ scene, mode }: { scene: Scene | null; mode:
   const draft = useStore(aoeToolStore, (s) => s.draft);
   const preview = useStore(aoeToolStore, (s) => s.preview);
   const busy = useStore(aoeToolStore, (s) => s.busy);
+  const [readoutAt, setReadoutAt] = useState<{ x: number; z: number } | null>(null);
   const latest = useRef({ scene, draft, submit, active, busy, identityId });
   latest.current = { scene, draft, submit, active, busy, identityId };
   const walkables = useMemo(
@@ -134,11 +140,18 @@ export function AoEPlacementCanvas({ scene, mode }: { scene: Scene | null; mode:
       if (!p) return;
       if (press?.id === event.pointerId) {
         const distance = Math.hypot(event.clientX - press.clientX, event.clientY - press.clientY);
-        const degrees =
-          distance >= 4
-            ? (Math.atan2(p.x - press.origin.x, p.z - press.origin.z) * 180) / Math.PI
-            : press.origin.degrees;
-        aoeToolStore.getState().setPreview({ ...press.origin, degrees });
+        if (distance < 4) return;
+        // UI-MEAS-04 / Q28: the drag both aims and sizes the shape. The draft follows too, so the
+        // panel's size field reads live and the next click reuses the size.
+        const degrees = (Math.atan2(p.x - press.origin.x, p.z - press.origin.z) * 180) / Math.PI;
+        const size = dragSize(
+          press.origin.kind,
+          Math.hypot(p.x - press.origin.x, p.z - press.origin.z),
+          measurementScene(state.scene).grid.snap,
+        );
+        aoeToolStore.getState().setPreview({ ...press.origin, degrees, size });
+        aoeToolStore.getState().setDraft({ size });
+        setReadoutAt({ x: p.x, z: p.z });
       } else if (inside(p.x, p.z, state.scene))
         aoeToolStore.getState().setPreview({ ...state.draft, ...p });
     };
@@ -170,6 +183,7 @@ export function AoEPlacementCanvas({ scene, mode }: { scene: Scene | null; mode:
       if (press?.id !== event.pointerId) return;
       const current = press;
       press = null;
+      setReadoutAt(null);
       pointerClaims.release(event.pointerId);
       if (el.hasPointerCapture(event.pointerId)) el.releasePointerCapture(event.pointerId);
       if (event.type === 'pointercancel') return;
@@ -188,7 +202,8 @@ export function AoEPlacementCanvas({ scene, mode }: { scene: Scene | null; mode:
         .submit('aoe.place', payload, state.scene.id)
         .then((result) => {
           aoeToolStore.getState().setError(result.ok ? null : describeFailure(result));
-          if (result.ok) aoeToolStore.getState().setDraft({ degrees: d.degrees, x: d.x, z: d.z });
+          if (result.ok)
+            aoeToolStore.getState().setDraft({ degrees: d.degrees, x: d.x, z: d.z, size: d.size });
         })
         .finally(() => {
           aoeToolStore.getState().setBusy(false);
@@ -223,7 +238,44 @@ export function AoEPlacementCanvas({ scene, mode }: { scene: Scene | null; mode:
       if (removePress) pointerClaims.release(removePress.id);
     };
   }, [gl, get, invalidate]);
-  return volume ? (
-    <AoEVolume volume={volume} walkables={walkables} mode={mode} renderOrder={10} />
-  ) : null;
+  if (!volume || !scene || !preview) return null;
+  return (
+    <>
+      <AoEVolume volume={volume} walkables={walkables} mode={mode} renderOrder={10} />
+      {readoutAt && (
+        // UI-MEAS-04: a live, camera-facing readout at the pointer while the drag sizes the shape
+        // (CAM-04: screen-space HTML, no world-space text). Scene units only (GRID-02).
+        <Html
+          position={[readoutAt.x, volume.position.y + LIFT, readoutAt.z]}
+          style={{ pointerEvents: 'none' }}
+          zIndexRange={[20, 0]}
+        >
+          <span style={pillStyle} data-testid="aoe-size-readout">
+            {sizeReadout(preview, scene)}
+          </span>
+        </Html>
+      )}
+    </>
+  );
+}
+
+const LIFT = 0.05;
+
+const pillStyle = {
+  display: 'inline-block',
+  transform: 'translate(12px, -50%)',
+  padding: '1px 6px',
+  borderRadius: 4,
+  background: LABEL_BACKGROUND_COLOR,
+  color: LABEL_TEXT_COLOR,
+  fontSize: 13,
+  whiteSpace: 'nowrap',
+  userSelect: 'none',
+} as const;
+
+/** "Radius 20 ft": what the drag is setting, in the scene's own unit. */
+function sizeReadout(draft: AoEDraft, scene: Scene): string {
+  const noun = sizeNoun(draft.kind);
+  const value = sceneUnitReadout(draft.size, scene.grid);
+  return `${noun.charAt(0).toUpperCase()}${noun.slice(1)} ${String(value)} ${scene.grid.unitLabel}`;
 }

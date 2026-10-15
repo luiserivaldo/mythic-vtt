@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Scene } from '@mythic/shared';
 import { aoeToolStore } from './aoe-tool-store.js';
-import { activateMeasurement, measurementScene } from './measurement-tool.js';
+import {
+  activateMeasurement,
+  measureShapeChoices,
+  measurementScene,
+  shapeAfterModeChange,
+} from './measurement-tool.js';
 import { rulerStore } from './ruler-store.js';
 import { prepareRulerPoint } from './ruler.js';
 
@@ -60,5 +65,27 @@ describe('unified measurement tools', () => {
       broadcast: false,
       measureMovement: false,
     });
+  });
+  // UI-MEAS-02: 2D offers ruler, cone, square, circle; 3D adds volumes and drops nothing a user needs.
+  it('lists the shape group for each mode, ruler first', () => {
+    expect(measureShapeChoices('2d').map((c) => c.label)).toEqual([
+      'Ruler',
+      'Cone',
+      'Square',
+      'Circle',
+    ]);
+    expect(measureShapeChoices('3d').map((c) => c.label)).toEqual([
+      '3D ruler',
+      'Sphere',
+      'Cylinder',
+      'Cone',
+      'Cube',
+    ]);
+  });
+  it('keeps the shape across a mode switch when the other group has it', () => {
+    expect(shapeAfterModeChange('cone', '3d')).toBe('cone');
+    expect(shapeAfterModeChange('sphere', '2d')).toBe('sphere');
+    expect(shapeAfterModeChange('cylinder', '2d')).toBe('distance');
+    expect(shapeAfterModeChange('line', '3d')).toBe('distance');
   });
 });

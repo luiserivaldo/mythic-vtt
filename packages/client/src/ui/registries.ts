@@ -25,9 +25,10 @@ export interface TokenQuickField extends RegistryEntry {
 
 /**
  * UI-SHELL-05: the shell regions a tool panel can open in. `left-pane` sits beside the rail
- * (principle 3); `right-dock` is the dock's context slot under the active tab.
+ * (principle 3); `right-dock` is the dock's context slot under the active tab. `beside-rail`
+ * floats over the board directly beside the tool's rail button (UI-MEAS-01, MV-265).
  */
-export type PanelRegion = 'left-pane' | 'right-dock';
+export type PanelRegion = 'left-pane' | 'right-dock' | 'beside-rail';
 
 /** A tool panel (rail tool options or a selection-driven panel) and the region it opens in. */
 export interface ToolPanel extends RegistryEntry {
@@ -200,11 +201,12 @@ export const toolPanels = createRegistry<ToolPanel>([
   },
   {
     id: 'ruler',
-    label: 'Ruler',
+    label: 'Measure',
     icon: 'ruler',
     group: 'rail',
     allowed: everyone,
-    region: 'right-dock',
+    // UI-MEAS-01 / MV-265: the Measure panel opens beside its rail button, not in the dock.
+    region: 'beside-rail',
   },
   {
     id: 'draw',

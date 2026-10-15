@@ -10,9 +10,10 @@ describe('UI-SHELL-05 left pane', () => {
 
   it('registers every tool panel with a region', () => {
     expect(toolPanels.all().map((panel) => panel.id)).toEqual([...TOOL_PANEL_ORDER]);
-    // UX-38: Initiative is the first shipped panel in the left pane; the rest stay in the dock.
-    for (const id of TOOL_PANEL_ORDER)
-      expect(panelRegion(id)).toBe(id === 'initiative' ? 'left-pane' : 'right-dock');
+    // UX-38: Initiative is the first shipped panel in the left pane. UI-MEAS-01 / MV-265: Measure
+    // opens beside its rail button. The rest stay in the dock (MV-239).
+    const expected: Record<string, string> = { initiative: 'left-pane', ruler: 'beside-rail' };
+    for (const id of TOOL_PANEL_ORDER) expect(panelRegion(id)).toBe(expected[id] ?? 'right-dock');
   });
 
   it('routes a panel to the region its entry names', () => {

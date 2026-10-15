@@ -34,6 +34,14 @@ async function cellToPixel(page: Page) {
   });
 }
 
+/** UI-MEAS-01: the Measure panel floats beside the rail; tuck it away to measure under it. */
+async function tuckMeasurePanel(page: Page) {
+  await page.getByRole('button', { name: 'Close Measure panel' }).click();
+}
+async function showMeasurePanel(page: Page) {
+  await page.getByRole('button', { name: 'Restore Measure panel' }).click();
+}
+
 test('the ruler measures in scene units and a second client sees it with the sender name', async ({
   browser,
 }) => {
@@ -99,6 +107,7 @@ test('the ruler measures in scene units and a second client sees it with the sen
     'aria-pressed',
     'true',
   );
+  await tuckMeasurePanel(dm);
   await dm.mouse.move(a.x, a.y);
   await dm.mouse.down();
   await dm.mouse.move(b.x, b.y, { steps: 5 });
@@ -123,7 +132,9 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
 
   // Persistent rulers remain after release, and each sender has one independent slot.
+  await showMeasurePanel(dm);
   await dm.getByLabel('Ruler fade').selectOption('linger');
+  await tuckMeasurePanel(dm);
   await dm.mouse.move(a.x, a.y);
   await dm.mouse.down();
   await dm.mouse.move(b.x, b.y, { steps: 5 });
@@ -133,14 +144,14 @@ test('the ruler measures in scene units and a second client sees it with the sen
 
   await player.keyboard.press('r');
   await player.getByLabel('Ruler fade').selectOption('linger');
-  await player.getByText('Measurement shapes', { exact: true }).click();
   // MV-180 / Q27: players can measure shapes before promoting a lasting object.
-  await expect(player.getByRole('option', { name: 'Cone', exact: true })).toBeEnabled();
-  await expect(player.getByLabel('Measurement shape')).toHaveValue('distance');
-  // Preference updates must preserve the user's expanded shape picker.
+  await expect(player.getByRole('radio', { name: 'Cone', exact: true })).toBeEnabled();
+  await expect(player.getByRole('radio', { name: 'Ruler', exact: true })).toBeChecked();
+  // Preference updates keep the shape group in place.
   await player.getByLabel('Grid snapping').uncheck();
-  await expect(player.getByLabel('Measurement shape')).toBeVisible();
+  await expect(player.getByRole('radiogroup', { name: 'Measurement shape' })).toBeVisible();
   await player.getByLabel('Grid snapping').check();
+  await tuckMeasurePanel(player);
   const playerAt = await cellToPixel(player);
   const playerA = playerAt(5.5, 5.5);
   const playerB = playerAt(11.5, 5.5);
@@ -161,7 +172,9 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await expect(dm.getByTestId('remote-ruler-total')).toHaveText('Aria: 30 ft');
 
   // Turning broadcast off cancels the public ruler and keeps a new measure local.
+  await showMeasurePanel(dm);
   await dm.getByLabel('Broadcast to others').uncheck();
+  await tuckMeasurePanel(dm);
   await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
   const privateStart = frames.length;
   await dm.mouse.move(a.x, a.y);
@@ -205,7 +218,9 @@ test('the ruler measures in scene units and a second client sees it with the sen
   // A finished ruler consumes the first Escape and broadcasts its cancel. The selected token
   // remains until a second Escape reaches BoardCanvas. Broadcast was turned off above.
   await dm.getByRole('button', { name: 'Measure', exact: true }).click();
+  // Arming the tool brings its panel back (UI-MEAS-01).
   await dm.getByLabel('Broadcast to others').check();
+  await tuckMeasurePanel(dm);
   await dm.mouse.move(a.x, a.y);
   await dm.mouse.down();
   await dm.mouse.move(b.x, b.y, { steps: 5 });
