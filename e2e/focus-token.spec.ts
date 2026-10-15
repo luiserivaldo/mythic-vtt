@@ -29,13 +29,17 @@ interface View2d {
   poses: number;
 }
 
+interface TrailPoint {
+  x: number;
+  z: number;
+}
+
 interface Diagnostics {
-  __mythicFocus?: { getView2d(): View2d };
+  __mythicFocus?: { getView2d(): View2d; getTrail(): TrailPoint[] };
   __mythicCamera?: { getPose(): Pose };
-  // Scratch space the stability waiters keep between polls, plus the frame sampler's samples.
+  // Scratch space the stability waiters keep between polls.
   __mythicFocusRest?: { centerX: number; centerZ: number; zoom: number; stable: number };
   __mythicCameraRest?: { azimuth: number; polar: number; distance: number; stable: number };
-  __mythicSamples?: number[];
 }
 
 interface View {
@@ -158,31 +162,42 @@ async function waitForSettledPose(page: Page): Promise<void> {
   });
 }
 
-/** Records the camera centre on every frame, so a tween can be seen travelling and not jumping. */
-async function recordCentres(page: Page, view: '2d' | '3d'): Promise<void> {
-  await page.evaluate((which) => {
-    const diagnostics = globalThis as unknown as Diagnostics;
-    // `page.evaluate` serialises this callback and runs it in the browser, where the frame clock
-    // exists; this package's tsconfig has no DOM lib, so it is reached through a cast.
-    const raf = (globalThis as unknown as { requestAnimationFrame: (cb: () => void) => number })
-      .requestAnimationFrame;
-    const samples: number[] = [];
-    diagnostics.__mythicSamples = samples;
-    const read = () =>
-      which === '2d'
-        ? diagnostics.__mythicFocus?.getView2d().centerX
-        : diagnostics.__mythicCamera?.getPose().targetX;
-    const tick = () => {
-      const value = read();
-      if (value !== undefined) samples.push(value);
-      raf(tick);
-    };
-    raf(tick);
-  }, view);
+/**
+ * MV-235: the focus centre of every pose the tween itself applied (FocusCamera's DEV trail). Read
+ * from inside the frame loop, so a loaded host cannot hide the in-between poses from the test the
+ * way sampling with a separate `requestAnimationFrame` could.
+ */
+async function readTrail(page: Page): Promise<TrailPoint[]> {
+  return page.evaluate(() => {
+    const focus = (globalThis as unknown as Diagnostics).__mythicFocus;
+    if (!focus) throw new Error('focus diagnostics are not mounted');
+    return focus.getTrail();
+  });
 }
 
-async function recordedCentres(page: Page): Promise<number[]> {
-  return page.evaluate(() => (globalThis as unknown as Diagnostics).__mythicSamples ?? []);
+/**
+ * CAM-06 travelled, not teleported: the tween starts on the old centre, ends exactly on the token,
+ * never steps backwards, and applied at least one pose strictly between the two on both axes.
+ */
+function expectTravelled(trail: readonly TrailPoint[], from: TrailPoint): void {
+  expect(trail.length).toBeGreaterThan(1);
+  const first = trail[0];
+  const last = trail[trail.length - 1];
+  if (!first || !last) throw new Error('empty focus trail');
+  expect(first.x).toBeCloseTo(from.x, 6);
+  expect(first.z).toBeCloseTo(from.z, 6);
+  expect(last.x).toBeCloseTo(TOKEN.x, 6);
+  expect(last.z).toBeCloseTo(TOKEN.z, 6);
+  const xs = trail.map((point) => point.x);
+  const zs = trail.map((point) => point.z);
+  expect(xs).toEqual([...xs].sort((a, b) => (TOKEN.x > from.x ? a - b : b - a)));
+  expect(zs).toEqual([...zs].sort((a, b) => (TOKEN.z > from.z ? a - b : b - a)));
+  const middle = trail.filter(
+    (point) =>
+      between([point.x], from.x, TOKEN.x).length === 1 &&
+      between([point.z], from.z, TOKEN.z).length === 1,
+  );
+  expect(middle.length).toBeGreaterThanOrEqual(1);
 }
 
 /** Two frames of the on-demand loop, so a stray tween would have moved the camera by now. */
@@ -293,7 +308,6 @@ test('double-clicking a token in 2D tweens the camera onto it and an empty board
     expect(at.y).toBeGreaterThan(box.y);
     expect(at.y).toBeLessThan(box.y + box.height);
 
-    await recordCentres(page, '2d');
     await page.mouse.dblclick(at.x, at.y);
     await page.waitForFunction(
       (target) => {
@@ -315,9 +329,10 @@ test('double-clicking a token in 2D tweens the camera onto it and an empty board
     expect(after.animating).toBe(false);
 
     // The camera travelled through the middle instead of teleporting, over several frames.
-    const travelled = between(await recordedCentres(page), before.centerX, TOKEN.x);
-    expect(travelled.length).toBeGreaterThan(1);
+    const trail = await readTrail(page);
+    expectTravelled(trail, { x: before.centerX, z: before.centerZ });
     expect(after.poses).toBeGreaterThan(1);
+    expect(trail).toHaveLength(after.poses);
 
     // A double-click on the empty board is not a focus request.
     await page.mouse.dblclick(box.x + box.width * 0.12, box.y + box.height * 0.12);
@@ -356,7 +371,6 @@ test('double-clicking a token in 3D tweens the focus onto it without changing th
     expect(at.y).toBeGreaterThan(box.y);
     expect(at.y).toBeLessThan(box.y + box.height);
 
-    await recordCentres(page, '3d');
     await page.mouse.dblclick(at.x, at.y);
     await page.waitForFunction(
       (target) => {
@@ -379,8 +393,8 @@ test('double-clicking a token in 3D tweens the focus onto it without changing th
     // The token stands on the ground, so the focus ends at ground level.
     expect(after.targetY).toBeCloseTo(0.05, 6);
 
-    const travelled = between(await recordedCentres(page), before.targetX, TOKEN.x);
-    expect(travelled.length).toBeGreaterThan(1);
+    // The focus travelled through the middle instead of teleporting.
+    expectTravelled(await readTrail(page), { x: before.targetX, z: before.targetZ });
 
     expect(errors).toEqual([]);
   } finally {

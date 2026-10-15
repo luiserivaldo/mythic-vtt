@@ -49,6 +49,11 @@ export function FocusCamera({
   /** The request already being followed; a request made before this mounted is still honoured. */
   const handled = useRef<FocusTarget | null>(null);
   const poses = useRef(0);
+  /**
+   * DEV only: the focus centre of every pose the current tween applied, in order. The e2e reads
+   * this to prove the camera travelled (CAM-06) without sampling frames from outside the loop.
+   */
+  const trail = useRef<{ x: number; z: number }[]>([]);
 
   useEffect(() => {
     if (request === null || handled.current === request) return;
@@ -79,6 +84,7 @@ export function FocusCamera({
     // Consumed only once a tween is armed, so a request during a 2D↔3D switch is not swallowed.
     handled.current = request;
     poses.current = 0;
+    trail.current = [];
     invalidate();
   }, [request, bounds, canvasSize, getState, invalidate, orbitRef, applyRef]);
 
@@ -102,6 +108,7 @@ export function FocusCamera({
       camera.position.z = view.centerZ;
       camera.zoom = view.zoom;
       camera.updateProjectionMatrix();
+      if (import.meta.env.DEV) trail.current.push({ x: camera.position.x, z: camera.position.z });
     } else {
       const apply = applyRef.current;
       if (!apply) {
@@ -109,6 +116,9 @@ export function FocusCamera({
         return;
       }
       apply(lerpOrbit(t.from, t.to, p));
+      if (import.meta.env.DEV) {
+        trail.current.push({ x: orbitRef.current.targetX, z: orbitRef.current.targetZ });
+      }
     }
     poses.current += 1;
     if (p < 1) {
@@ -133,6 +143,8 @@ export function FocusCamera({
           poses: poses.current,
         };
       },
+      /** The focus centres the latest tween applied, one per pose (2D camera or 3D orbit). */
+      getTrail: () => trail.current.map((point) => ({ ...point })),
     };
     window.__mythicFocus = diagnostics;
     return () => {
