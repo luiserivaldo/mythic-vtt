@@ -5,6 +5,8 @@ interface SelectionState {
   sceneId: string | null;
   ids: string[];
   pick(sceneId: string, id: string | null, additive: boolean): void;
+  /** UI-TOOL-01: set the whole selection at once (area select). */
+  replace(sceneId: string, ids: readonly string[]): void;
   reconcile(sceneId: string | null, ids: readonly string[]): void;
   clear(): void;
 }
@@ -19,6 +21,9 @@ export const selectionStore = createStore<SelectionState>()((set, get) => ({
       sceneId,
       ids: nextSelection(current.sceneId === sceneId ? current.ids : [], id, additive),
     });
+  },
+  replace(sceneId, ids) {
+    set({ sceneId, ids: [...ids] });
   },
   reconcile(sceneId, ids) {
     const current = get();

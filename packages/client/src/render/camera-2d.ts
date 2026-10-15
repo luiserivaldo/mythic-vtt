@@ -31,9 +31,6 @@ export const DEFAULT_ZOOM = 48;
 
 export const DEFAULT_VIEW: View2D = { centerX: 0, centerZ: 0, zoom: DEFAULT_ZOOM };
 
-/** Pointer movement (px) before a press becomes a drag-pan, so plain clicks still reach picking. */
-export const DRAG_THRESHOLD_PX = 4;
-
 export function clampZoom(zoom: number): number {
   if (!Number.isFinite(zoom)) return DEFAULT_ZOOM;
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));

@@ -171,7 +171,9 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   expect(position()).toMatchObject({ x: 6.5, z: 4.5 });
   const resized = entityState;
 
-  // Dragging empty board still pans (the label moves on screen).
+  // With the Pan tool, dragging empty board pans (the label moves on screen). UX-16: with Select
+  // the same drag would be a marquee, which would replace the selection.
+  await page.getByRole('button', { name: 'Pan', exact: true }).click();
   const empty = at(10, 8);
   await page.mouse.move(empty.x, empty.y);
   await page.mouse.down();
@@ -179,6 +181,7 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   await page.mouse.up();
   const labelAfterPan = await page.getByTestId('token-label').boundingBox();
   expect(labelAfterPan?.x).toBeGreaterThan((labelBefore?.x ?? 0) + 2 * zoom);
+  await page.getByRole('button', { name: 'Select', exact: true }).click();
 
   // The chip opens the panel, which reads the gizmo's commits.
   await chip.click();

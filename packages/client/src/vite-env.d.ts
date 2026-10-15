@@ -36,6 +36,7 @@ declare global {
       getObjectNames(): string[];
       getRenderInfo(): { calls: number; triangles: number; lines: number; points: number };
       getObjectCount(name: string): number;
+      getSelection(): string[];
       getMeshLayering(name: string): { depthTest: boolean; renderOrder: number }[];
       getMeshColors(name: string): string[];
     };

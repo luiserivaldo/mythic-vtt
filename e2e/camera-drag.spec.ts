@@ -55,7 +55,9 @@ test.afterAll(async () => {
   await table?.stop();
 });
 
-test('held right orbits while middle and available left pan monotonically', async ({ browser }) => {
+test('held right orbits while middle, and left with the Pan tool, pan monotonically', async ({
+  browser,
+}) => {
   if (!table) throw new Error('table not started');
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -88,7 +90,10 @@ test('held right orbits while middle and available left pan monotonically', asyn
     );
   }
 
+  // UI-INPUT-01 / UI-TOOL-02 (UX-16): the left button pans only with the Pan tool.
+  const panTool = page.getByRole('button', { name: 'Pan', exact: true });
   for (const button of ['middle', 'left'] as const) {
+    if (button === 'left') await panTool.click();
     await page.getByRole('button', { name: 'Reset view' }).click();
     await waitForCameraToRest(page);
     await page.mouse.move(x, y);

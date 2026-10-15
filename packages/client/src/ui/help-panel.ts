@@ -94,8 +94,13 @@ export const HELP_SECTIONS: Readonly<Record<HelpTopic, HelpSection>> = {
       },
       // UI-INPUT-03 / CAM-01.
       { input: 'Middle drag', action: 'Pans the view, in both 2D and 3D.' },
-      // UI-INPUT-01 / CAM-01: a press no token or handle claimed belongs to the camera.
-      { input: 'Left drag on the empty board', action: 'Pans the view, in both 2D and 3D.' },
+      // UI-INPUT-01 / UI-TOOL-01/02 / C13 (UX-16): only the Pan tool lets the left button pan; with
+      // Select a left drag on empty board is the marquee (board-input.ts).
+      {
+        input: 'Left drag on the empty board',
+        action:
+          'With Select, draws a box and selects every token and prop inside it (Shift, Ctrl or Cmd adds to the selection). With Pan, pans the view. It never moves the camera otherwise.',
+      },
       // UI-INPUT-04 / CAM-02: right-drag orbits in 3D; in 2D the button stays free for the tool.
       {
         input: 'Right drag in 3D',
