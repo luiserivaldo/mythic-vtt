@@ -7,6 +7,8 @@ import {
   type Entity,
   type LayerId,
   type Scene,
+  StatusIcon,
+  TokenStatusMarkers,
 } from '@mythic/shared';
 import { labelAnchor3d } from '../render/token-standee.js';
 import { HIDDEN_TOKEN_NAME, labelState, type LabelSubject } from '../render/token-labels.js';
@@ -72,7 +74,9 @@ const NO_DELETE_REASON = 'You cannot delete this token.';
 const NO_NAME_REASON = 'This token’s name is not shared with you.';
 const NO_TARGET_REASON = 'Not allowed';
 const NO_LAYER_REASON = 'No layer is available.';
-const WIP_REASON = 'Not available yet.';
+const NO_CONDITION_REASON = 'You cannot change this token’s conditions.';
+const CONDITIONS_FULL_REASON = 'This token has the most conditions it can hold.';
+const CONDITION_HELD_REASON = 'Already on this token.';
 
 const ELEVATION_LIMIT = 1000;
 
@@ -99,12 +103,17 @@ export interface TokenMenuModel {
   layers: TokenLayerTarget[];
 }
 
+export interface TokenConditionTarget {
+  icon: StatusIcon;
+  enabled: boolean;
+  /** null when the icon may be added, else why the host would refuse it. */
+  reason: string | null;
+}
+
 export interface TokenContextItem {
   id: TokenContextActionId;
   label: string;
   enabled: boolean;
-  /** A WIP placeholder: greyed, labelled and never interactive (UIUX §1.7). */
-  wip: boolean;
   reason: string | null;
 }
 
@@ -227,9 +236,10 @@ export function tokenMenuModel(input: TokenMenuInput): TokenMenuModel {
 
 /**
  * UI-TOKEN-03: the curated right-click list, to the right of the token. It shows only what this
- * viewer may do; a viewer who may not select the token gets nothing at all. See Sheet and Token
- * Options are always there; Add Condition is the honest WIP placeholder; Change Layer appears only
- * when the token can be moved.
+ * viewer may do; a viewer who may not select the token gets nothing at all. See Sheet, Ping and
+ * Token Options are always there; Add Condition opens the status-marker picker, greyed with a
+ * reason when the viewer may not set markers or the token is full; Change Layer appears only when
+ * the token can be moved.
  */
 export function tokenContextMenu(input: TokenMenuInput): TokenContextItem[] {
   const { entity, viewer } = input;
@@ -240,15 +250,12 @@ export function tokenContextMenu(input: TokenMenuInput): TokenContextItem[] {
       id: 'see-sheet',
       label: TOKEN_CONTEXT_LABELS['see-sheet'],
       enabled: true,
-      wip: false,
       reason: null,
     },
     {
       id: 'add-condition',
       label: TOKEN_CONTEXT_LABELS['add-condition'],
-      enabled: false,
-      wip: true,
-      reason: WIP_REASON,
+      ...conditionState(input),
     },
   ];
   if (tokenMayMove(input)) {
@@ -257,7 +264,6 @@ export function tokenContextMenu(input: TokenMenuInput): TokenContextItem[] {
       id: 'change-layer',
       label: TOKEN_CONTEXT_LABELS['change-layer'],
       enabled: anyLayer,
-      wip: false,
       reason: anyLayer ? null : NO_LAYER_REASON,
     });
   }
@@ -265,17 +271,63 @@ export function tokenContextMenu(input: TokenMenuInput): TokenContextItem[] {
     id: 'ping',
     label: TOKEN_CONTEXT_LABELS.ping,
     enabled: true,
-    wip: false,
     reason: null,
   });
   items.push({
     id: 'token-options',
     label: TOKEN_CONTEXT_LABELS['token-options'],
     enabled: true,
-    wip: false,
     reason: null,
   });
   return items;
+}
+
+/** TOK-06: the same permission and limits the Status panel applies to a new marker. */
+function conditionState(input: TokenMenuInput): Pick<TokenContextItem, 'enabled' | 'reason'> {
+  const { campaign, entity, actor, viewer } = input;
+  const markers = entity.token?.statusMarkers ?? [];
+  const allowed =
+    labelState(subjectOf(entity), viewer) === 'visible' &&
+    canPerform(campaign, actor, 'token.setStatusMarkers', {
+      sceneId: worldOf(input).id,
+      entityId: entity.id,
+      markers,
+    });
+  if (!allowed) return { enabled: false, reason: NO_CONDITION_REASON };
+  return tokenConditionTargets(entity).some((target) => target.enabled)
+    ? { enabled: true, reason: null }
+    : { enabled: false, reason: CONDITIONS_FULL_REASON };
+}
+
+/**
+ * TOK-06: the icon picker's rows, the Status panel's icon set. An icon the token already holds, or
+ * one past the marker limit, is greyed with the reason (the schema refuses duplicates).
+ */
+export function tokenConditionTargets(entity: Entity): TokenConditionTarget[] {
+  const markers = entity.token?.statusMarkers ?? [];
+  return StatusIcon.options.map((icon) => {
+    if (markers.some((marker) => marker.kind === 'icon' && marker.icon === icon)) {
+      return { icon, enabled: false, reason: CONDITION_HELD_REASON };
+    }
+    const fits = TokenStatusMarkers.safeParse([...markers, { kind: 'icon', icon }]).success;
+    return fits
+      ? { icon, enabled: true, reason: null }
+      : { icon, enabled: false, reason: CONDITIONS_FULL_REASON };
+  });
+}
+
+/** TOK-06: the picker's choice, added to the token's existing markers. */
+export function tokenConditionIntent(
+  sceneId: string,
+  entity: Entity,
+  icon: StatusIcon,
+): IntentSpec {
+  const markers = [...(entity.token?.statusMarkers ?? []), { kind: 'icon' as const, icon }];
+  return {
+    type: 'token.setStatusMarkers',
+    sceneId,
+    payload: { sceneId, entityId: entity.id, markers },
+  };
 }
 
 /** Gap between the token's edge and its menu, in cells. */

@@ -1,4 +1,12 @@
-import type { Actor, AssetRef, Campaign, Entity, Scene, Seat } from '@mythic/shared';
+import {
+  StatusIcon,
+  type Actor,
+  type AssetRef,
+  type Campaign,
+  type Entity,
+  type Scene,
+  type Seat,
+} from '@mythic/shared';
 import { describe, expect, it } from 'vitest';
 import { HIDDEN_TOKEN_NAME } from '../render/token-labels.js';
 import type { SelectionActor } from '../tools/selection.js';
@@ -10,6 +18,8 @@ import {
   TOKEN_CONTEXT_LABELS,
   TOKEN_MENU_FIELD_IDS,
   TOKEN_MENU_LABELS,
+  tokenConditionIntent,
+  tokenConditionTargets,
   tokenContextMenu,
   tokenDeleteIntent,
   tokenFlyingIntent,
@@ -323,7 +333,7 @@ describe('tokenContextMenu (UI-TOKEN-03, PERM-02, LAY-07)', () => {
     ).toEqual([]);
   });
 
-  it('offers the five curated items, in order, with Add Condition greyed and WIP', () => {
+  it('offers the five curated items, in order, with Add Condition enabled for the host', () => {
     const items = tokenContextMenu(input());
     expect(items.map((i) => i.id)).toEqual([
       'see-sheet',
@@ -334,10 +344,65 @@ describe('tokenContextMenu (UI-TOKEN-03, PERM-02, LAY-07)', () => {
     ]);
     for (const item of items) expect(item.label).toBe(TOKEN_CONTEXT_LABELS[item.id]);
     const condition = items.find((i) => i.id === 'add-condition');
+    expect(condition?.enabled).toBe(true);
+    expect(condition?.reason).toBeNull();
+  });
+
+  it('greys Add Condition, with a reason, for a seat that may not set markers (TOK-06)', () => {
+    const items = tokenContextMenu(input({ actor: seatActor(OWNER), viewer: viewerOf(ownerSeat) }));
+    const condition = items.find((i) => i.id === 'add-condition');
     expect(condition?.enabled).toBe(false);
-    expect(condition?.wip).toBe(true);
-    expect(condition?.reason).not.toBeNull();
-    expect(items.filter((i) => i.wip).map((i) => i.id)).toEqual(['add-condition']);
+    expect(condition?.reason).toBe('You cannot change this token’s conditions.');
+  });
+
+  it('greys an icon the token already holds, and Add Condition once every icon is held', () => {
+    const held = tokenEntity({
+      token: {
+        sizeCells: 1,
+        heightCells: 1,
+        labelVisibility: 'all',
+        statusMarkers: [
+          { kind: 'icon', icon: 'prone' },
+          { kind: 'text', text: 'Hexed' },
+        ],
+      },
+    });
+    const targets = tokenConditionTargets(held);
+    expect(targets.map((t) => t.icon)).toEqual(StatusIcon.options);
+    expect(targets.find((t) => t.icon === 'prone')).toMatchObject({
+      enabled: false,
+      reason: 'Already on this token.',
+    });
+    expect(targets.filter((t) => t.enabled)).toHaveLength(StatusIcon.options.length - 1);
+
+    const full = tokenEntity({
+      token: {
+        sizeCells: 1,
+        heightCells: 1,
+        labelVisibility: 'all',
+        statusMarkers: StatusIcon.options.map((icon) => ({ kind: 'icon' as const, icon })),
+      },
+    });
+    const state = campaign({ scenes: { [SCENE]: scene({ entities: { [TOKEN]: full } }) } });
+    const condition = tokenContextMenu(inputOf(state)).find((i) => i.id === 'add-condition');
+    expect(condition?.enabled).toBe(false);
+    expect(condition?.reason).toBe('This token has the most conditions it can hold.');
+  });
+
+  it('appends the picked icon to the markers the token already holds', () => {
+    const markers = [{ kind: 'text' as const, text: 'Hexed' }];
+    const entity = tokenEntity({
+      token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all', statusMarkers: markers },
+    });
+    expect(tokenConditionIntent(SCENE, entity, 'stunned')).toEqual({
+      type: 'token.setStatusMarkers',
+      sceneId: SCENE,
+      payload: {
+        sceneId: SCENE,
+        entityId: TOKEN,
+        markers: [...markers, { kind: 'icon', icon: 'stunned' }],
+      },
+    });
   });
 
   it('keeps See Sheet and Token Options for everyone who can open the menu', () => {
