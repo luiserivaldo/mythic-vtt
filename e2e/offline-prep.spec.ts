@@ -61,15 +61,16 @@ test('the DM preps scenes with no players connected, then starts the session fro
     await dm.getByRole('button', { name: 'Create scene' }).click();
     await expect(dm.getByLabel('Current scene', { exact: true })).toHaveText('Vault of ash');
     await dm.getByLabel('Canvas of Vault of ash width').fill('30');
-    await dm.getByRole('button', { name: 'Set size' }).click();
+    await dm.getByRole('button', { name: 'Save settings' }).click();
     await createToken(dm, 'Warden of ash');
     // The prep edit landed in the browsed scene, not somewhere else.
     await expect(dm.getByRole('heading', { name: 'In Vault of ash' })).toBeVisible();
 
     // Start the session from the prepared state.
     await dm.getByRole('tab', { name: 'Scenes', exact: true }).click();
+    await dm.getByRole('button', { name: 'Options for Vault of ash' }).click();
     await sceneRow(dm, 'Vault of ash')
-      .getByRole('button', { name: 'Activate', exact: true })
+      .getByRole('button', { name: 'Set active', exact: true })
       .click();
     await expect(sceneRow(dm, 'Vault of ash').getByText('Active')).toBeVisible();
     await addSeat(dm, 'Aria');
@@ -161,6 +162,7 @@ test('a player waits out the prep, then joins the scene the DM starts the sessio
     await dm.getByRole('button', { name: 'Create scene' }).click();
     // Deleting a scene is immediate; the last scene cannot be deleted, so the campaign ends up
     // with no active scene while the DM prepares.
+    await dm.getByRole('button', { name: 'Options for Old map' }).click();
     await sceneRow(dm, 'Old map').getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(sceneRow(dm, 'Old map')).toHaveCount(0);
 

@@ -143,7 +143,13 @@ function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
         changed = true;
       }
     }
-    return changed ? { ...scene, entities, ...(initiative ? { initiative } : {}) } : scene;
+    const view = changed ? { ...scene, entities, ...(initiative ? { initiative } : {}) } : scene;
+    // UI-SCN-01 / PERM-03: folder names are DM organisation (they can name later scenes), so
+    // only the host and co-DM seats receive them.
+    if (view.folder === undefined || seat?.role === 'codm') return view;
+    const withoutFolder = { ...view };
+    delete withoutFolder.folder;
+    return withoutFolder;
   });
 }
 

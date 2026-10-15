@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AssetRef, Id, SceneBounds, LastingAoELimit } from '../schema/index.js';
+import { AssetRef, Id, SceneBounds, SceneFolder, LastingAoELimit } from '../schema/index.js';
 import { defineAction, isCoDm, isHost } from './define.js';
 
 export const sceneUpdate = defineAction({
@@ -16,6 +16,8 @@ export const sceneUpdate = defineAction({
       // D37: shrinking never moves entities; they stay and can be dragged back in.
       bounds: SceneBounds.optional(),
       maxLastingAoEsPerPlayer: LastingAoELimit.optional(),
+      // UI-SCN-01: null takes the scene out of its folder.
+      folder: SceneFolder.nullable().optional(),
     })
     .refine(
       (p) =>
@@ -24,7 +26,8 @@ export const sceneUpdate = defineAction({
         p.zenith !== undefined ||
         p.skybox !== undefined ||
         p.bounds !== undefined ||
-        p.maxLastingAoEsPerPlayer !== undefined,
+        p.maxLastingAoEsPerPlayer !== undefined ||
+        p.folder !== undefined,
       {
         message: 'at least one field to update is required',
       },
@@ -41,6 +44,8 @@ export const sceneUpdate = defineAction({
       scene.maxLastingAoEsPerPlayer = a.payload.maxLastingAoEsPerPlayer;
     if (a.payload.zenith === null) delete scene.environment.zenith;
     else if (a.payload.zenith !== undefined) scene.environment.zenith = a.payload.zenith;
+    if (a.payload.folder === null) delete scene.folder;
+    else if (a.payload.folder !== undefined) scene.folder = a.payload.folder;
     if (a.payload.skybox === null) delete scene.environment.skybox;
     else if (a.payload.skybox !== undefined) scene.environment.skybox = a.payload.skybox;
   },
