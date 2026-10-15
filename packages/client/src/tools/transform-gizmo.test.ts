@@ -161,6 +161,28 @@ describe('handles (UI-TOKEN-07)', () => {
     expect(hitHandle({ x: -3, z: -3 }, token, hit)).toBeNull();
   });
 
+  it('keeps the corner squares off the body of a small footprint', () => {
+    // A Tiny token at about 28 px per cell: its corners would sit within the hit radius of
+    // the middle, so a press on the body would grab a scale square instead of dragging.
+    const small = 1 / 28;
+    const tiny = handleLayout({
+      ...base,
+      halfWidth: 0.25,
+      halfDepth: 0.25,
+      worldPerPx: small,
+      freeMove: false,
+    });
+    for (const c of tiny.corners) {
+      expect(Math.hypot(c.x, c.z)).toBeCloseTo(20 * small);
+    }
+    expect(tiny.ringRadius).toBeCloseTo((20 + 14) * small);
+    expect(hitHandle({ x: 0, z: 0 }, tiny, 10 * small)).toBeNull();
+    expect(hitHandle({ x: 0.1, z: -0.1 }, tiny, 10 * small)).toBeNull();
+    // Large enough footprints keep their squares exactly on the corners.
+    expect(token.corners[0]?.x).toBeCloseTo(0.5);
+    expect(token.corners[0]?.z).toBeCloseTo(0.5);
+  });
+
   it('gives non-token entities a centre move pad', () => {
     expect(token.move).toBeNull();
     expect(hitHandle({ x: 0, z: 0 }, prop, hit)).toBe('move');

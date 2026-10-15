@@ -149,6 +149,11 @@ export const ARROW_START_PX = 6;
 export const ARROW_LENGTH_PX = 38;
 export const SCALE_SQUARE_PX = 9;
 export const MOVE_PAD_PX = 9;
+/**
+ * Scale squares never sit closer to the centre than this, so on a small footprint (a Tiny token
+ * at low zoom) they stay clear of the body and a press on it is still token drag.
+ */
+export const MIN_CORNER_PX = 2 * HANDLE_HIT_PX;
 
 export interface HandleLayout {
   center: Xz;
@@ -159,7 +164,10 @@ export interface HandleLayout {
   moveZ: { from: Xz; to: Xz };
   /** Rotate ring radius (yaw about Y, green). */
   ringRadius: number;
-  /** Uniform scale squares on the four footprint corners, turned with the entity's yaw. */
+  /**
+   * Uniform scale squares on the four footprint corners, turned with the entity's yaw; pushed
+   * out along the diagonals to `MIN_CORNER_PX` on footprints smaller than that.
+   */
   corners: readonly Xz[];
 }
 
@@ -172,7 +180,13 @@ export function handleLayout(args: {
   worldPerPx: number;
   freeMove: boolean;
 }): HandleLayout {
-  const { center, yaw, halfWidth, halfDepth, worldPerPx: wpp } = args;
+  const { center, yaw, worldPerPx: wpp } = args;
+  const cornerDistance = Math.hypot(args.halfWidth, args.halfDepth);
+  const minCorner = MIN_CORNER_PX * wpp;
+  const spread =
+    cornerDistance > EPS && cornerDistance < minCorner ? minCorner / cornerDistance : 1;
+  const halfWidth = cornerDistance > EPS ? args.halfWidth * spread : minCorner / Math.SQRT2;
+  const halfDepth = cornerDistance > EPS ? args.halfDepth * spread : minCorner / Math.SQRT2;
   const ringRadius = Math.hypot(halfWidth, halfDepth) + RING_GAP_PX * wpp;
   const start = ringRadius + ARROW_START_PX * wpp;
   const end = start + ARROW_LENGTH_PX * wpp;

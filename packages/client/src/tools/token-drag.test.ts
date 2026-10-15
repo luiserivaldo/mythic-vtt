@@ -363,4 +363,10 @@ describe('gestures', () => {
     expect(pressOnGizmoHandle(e, { x: c.x - layout.ringRadius, z: c.z }, 48)).toBe(true);
     expect(pressOnGizmoHandle(e, layout.moveX.to, 48)).toBe(true);
   });
+
+  it('leaves the body of a Tiny token to token drag at low zoom', () => {
+    const tiny = entity({ token: { sizeCells: 0.5, heightCells: 1, labelVisibility: 'all' } });
+    const c = tiny.transform.position;
+    expect(pressOnGizmoHandle(tiny, { x: c.x, z: c.z }, 28)).toBe(false);
+  });
 });
