@@ -121,6 +121,10 @@ test('M0 exit: browser sync survives clean and SIGKILL host restarts', async ({ 
     // TECHNICAL §8.3 batches log fsync for at most 500 ms. Waiting one full interval plus
     // scheduling margin makes this a recovery test, not an assertion about an unflushed tail.
     await new Promise((resolve) => setTimeout(resolve, 600));
+    // MV-268: one drag is exactly one durable action. The knight starts beside the selected mage,
+    // whose gizmo handles used to start a second drag from the same press and commit an
+    // entity.update on the mage a few ms later, so `beforeKillSeq` missed one acknowledged seq.
+    expect(highestSeq(playerFrames)).toBe(beforeKillSeq);
     const snapshotsBeforeKill = snapshots(playerFrames).length;
     const dmSnapshotsBeforeKill = snapshots(dmFrames).length;
     await table.restart('SIGKILL');
