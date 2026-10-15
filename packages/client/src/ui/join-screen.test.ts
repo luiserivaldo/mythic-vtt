@@ -105,6 +105,14 @@ describe('join seat rows (UI-JOIN-01)', () => {
       ['Wizard', 'Player', false, true],
     ]);
   });
+  it('never offers Claim on a co-DM seat, free or not (MV-269)', () => {
+    const rows = joinSeatRows(payload(), tid(22));
+    expect(rows.map((r) => [r.label, r.claimable])).toEqual([
+      ['Cleric', false],
+      ['Rogue', false],
+      ['Wizard', true],
+    ]);
+  });
   it('shows an empty list when the DM has made no seats', () => {
     expect(joinSeatRows({ ...payload(), seats: [] }, undefined)).toEqual([]);
   });

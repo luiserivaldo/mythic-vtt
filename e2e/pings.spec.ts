@@ -312,7 +312,8 @@ test('a ping on a DM-only scene reaches the DM only, never a player or a spectat
     });
     clients.push(coDm);
     await coDm.waitFor('snapshot', () => coDm.state !== undefined);
-    coDm.join(coDmSeatId);
+    // MV-269: only the host grants a co-DM seat.
+    await ok(host.intent('seat.assign', { seatId: coDmSeatId, identityId: codmId }));
     await coDm.waitFor('co-DM joined', () => JSON.stringify(coDm.state).includes(codmId));
 
     // PERM-03: the DM-only prep scene does not exist for a player or a spectator.

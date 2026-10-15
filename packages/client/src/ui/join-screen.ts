@@ -112,6 +112,11 @@ export interface JoinSeatRow {
   icon: JoinIcon | undefined;
   /** Someone holds it; the payload never says who (PERM-03). */
   claimed: boolean;
+  /**
+   * The Claim button is offered. A co-DM seat is only ever granted by the host (MV-269): the host
+   * leaves co-DM seats out of the payload, and a row that still says `codm` is never claimable.
+   */
+  claimable: boolean;
   /** The seat this browser last sat in (SES-06). */
   previous: boolean;
 }
@@ -125,6 +130,7 @@ export function joinSeatRows(payload: JoinPayload, lastSeatId: string | undefine
       roleLabel: seat.role === 'codm' ? 'Co-DM' : 'Player',
       icon: seat.icon,
       claimed: seat.claim === 'claimed',
+      claimable: seat.claim === 'free' && seat.role !== 'codm',
       previous: seat.seatId === lastSeatId,
     }));
 }

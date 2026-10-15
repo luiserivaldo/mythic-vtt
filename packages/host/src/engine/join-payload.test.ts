@@ -75,7 +75,6 @@ describe('buildJoinPayload (PERM-03: a joiner sees only what the link shows)', (
     expect(payload.seats.map((s) => [s.label, s.role, s.claim])).toEqual([
       ['A', 'player', 'claimed'],
       ['B', 'player', 'free'],
-      ['Co', 'codm', 'free'],
     ]);
     expect(payload.seats[0]?.icon).toEqual({ kind: 'image', hash: 'f'.repeat(64) });
     const wire = JSON.stringify(payload);
@@ -99,6 +98,17 @@ describe('buildJoinPayload (PERM-03: a joiner sees only what the link shows)', (
       ARCHIVED,
     ])
       expect(wire).not.toContain(leak);
+  });
+
+  it('never offers a co-DM seat, free or held: only the host grants one (MV-269)', () => {
+    const state = campaignWithSecrets();
+    const free = buildJoinPayload(state, undefined);
+    const coDm = state.seats[T.coDm];
+    if (coDm) coDm.identityId = T.carol;
+    for (const payload of [free, buildJoinPayload(state, undefined)]) {
+      expect(payload.seats.some((s) => s.role === 'codm')).toBe(false);
+      expect(JSON.stringify(payload)).not.toContain(T.coDm);
+    }
   });
 
   it('never lists an archived seat as taken, and says so when no scene is active (F36)', () => {
