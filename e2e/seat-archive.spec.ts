@@ -61,7 +61,8 @@ test('archive hands back entities and immediately removes co-DM access without l
     };
     const guest = await RawClient.connect(table, { name: 'guest', ...guestIdentity });
     await guest.waitFor('snapshot', () => guest.state !== undefined);
-    guest.join(seatId);
+    // MV-269: only the host grants a co-DM seat.
+    await host.intent('seat.assign', { seatId, identityId: guestIdentity.identityId });
     await guest.waitFor('co-DM secret', () =>
       JSON.stringify(guest.state).includes('SECRET ARCHIVE TOKEN'),
     );

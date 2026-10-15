@@ -71,6 +71,30 @@ describe(`${T} permissions`, () => {
   });
 });
 
+describe(`${T} co-DM seats (MV-269)`, () => {
+  const coDmPayload = { seatId: IDS.coDm, identityId: IDS.identity };
+  const withCoDm = (identityId: string | null, activeSceneId: string | null = IDS.scene) => {
+    const state = makeCampaign();
+    state.activeSceneId = activeSceneId;
+    const seat = state.seats[IDS.coDm];
+    if (seat) seat.identityId = identityId;
+    return state;
+  };
+  it('refuses a self-claim of a free co-DM seat, with or without an active scene', () => {
+    expect(sessionJoin.permission(withCoDm(null), joiningActor, coDmPayload)).toBe(false);
+    expect(sessionJoin.permission(withCoDm(null, null), joiningActor, coDmPayload)).toBe(false);
+  });
+  it('lets the host seat anyone, and a granted identity rejoin its co-DM seat', () => {
+    expect(sessionJoin.permission(withCoDm(null), { kind: 'host' }, coDmPayload)).toBe(true);
+    expect(sessionJoin.permission(withCoDm(IDS.identity), joiningActor, coDmPayload)).toBe(true);
+  });
+  it('applies the no-active-scene gate to a co-DM seat too', () => {
+    expect(sessionJoin.permission(withCoDm(IDS.identity, null), joiningActor, coDmPayload)).toBe(
+      false,
+    );
+  });
+});
+
 describe(`${T} reducer`, () => {
   it('binds the joining identity to either binding mode', () => {
     const persistent = reduceAction(makeCampaign(), envelope()).state;

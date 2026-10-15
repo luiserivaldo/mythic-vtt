@@ -7,9 +7,12 @@ export const sessionJoin = defineAction({
   schema: z.strictObject({ seatId: Id, identityId: Id }),
   permission: (state, actor, p) => {
     const seat = state.seats[p.seatId];
-    if (state.activeSceneId === null && !isHost(actor) && seat?.role !== 'codm') return false;
+    if (state.activeSceneId === null && !isHost(actor)) return false;
     if (!seat || seat.archived || (seat.identityId !== null && seat.identityId !== p.identityId))
       return false;
+    // MV-269: only the host grants a co-DM seat (`seat.assign`, or a SES-04 invite). Anyone else
+    // may only rejoin a co-DM seat their identity already holds.
+    if (seat.role === 'codm' && !isHost(actor) && seat.identityId !== p.identityId) return false;
     if (
       Object.values(state.seats).some(
         (candidate) =>

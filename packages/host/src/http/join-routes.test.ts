@@ -27,7 +27,8 @@ describe('GET /api/join', () => {
     expect(response.headers['cache-control']).toBe('no-store');
     const payload = JoinPayload.parse(response.json());
     expect(payload.host.name).toBe('Dungeon Master');
-    expect(payload.seats).toHaveLength(3);
+    // The two player seats; the fixture's free co-DM seat is never offered (MV-269).
+    expect(payload.seats.map((s) => s.role)).toEqual(['player', 'player']);
     for (const secret of SECRETS) expect(response.body).not.toContain(secret);
     expect(response.body).not.toContain('identityId');
   });

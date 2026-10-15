@@ -339,7 +339,7 @@ function TableChoices({
               <button
                 type="button"
                 aria-label={`Claim ${row.label}`}
-                disabled={row.claimed}
+                disabled={!row.claimable}
                 onClick={() => {
                   onClaim(row.seatId);
                 }}

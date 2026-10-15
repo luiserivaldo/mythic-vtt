@@ -204,3 +204,64 @@ describe('Join As Spectator (UI-JOIN-01, C10)', () => {
     expect(presenceOf(host).at(-1)?.spectators).toBe(0);
   });
 });
+
+describe('Co-DM seats are host-granted (MV-269)', () => {
+  const snapshotsOf = (c: FakeConnection) => c.received.filter((m) => m.t === 'snapshot');
+
+  it('refuses a link visitor who claims a free co-DM seat, by join or by intent', async () => {
+    for (const activeSceneId of [T.scene, null]) {
+      const campaign = fixtureCampaign();
+      campaign.activeSceneId = activeSceneId;
+      const { engine, log } = setup(campaign);
+      const bob = named(T.bob, 'Bob');
+      await engine.onConnect(bob);
+      await engine.onJoin(bob, { t: 'join', seatId: T.coDm });
+      await engine.onIntent(bob, {
+        t: 'intent',
+        type: 'session.join',
+        payload: { seatId: T.coDm, identityId: T.bob },
+        clientRef: 'grab',
+      });
+      await engine.idle();
+      expect(engine.state().seats[T.coDm]?.identityId).toBeNull();
+      expect(errorsOf(bob)).toMatchObject([{ code: 'seat-unavailable' }]);
+      expect(bob.received).toContainEqual({ t: 'reject', clientRef: 'grab', reason: 'forbidden' });
+      expect(log.entries).toHaveLength(0);
+      expect(snapshotsOf(bob).at(-1)).toMatchObject({ seatId: null });
+    }
+  });
+
+  it('seats an identity the host assigned to the co-DM seat, and lets it rejoin', async () => {
+    const { engine } = setup();
+    const host = named(T.host, 'DM', { isHost: true });
+    await engine.onConnect(host);
+    await engine.onIntent(host, {
+      t: 'intent',
+      type: 'seat.assign',
+      payload: { seatId: T.coDm, identityId: T.bob },
+      clientRef: 'grant',
+    });
+    const bob = named(T.bob, 'Bob');
+    await engine.onConnect(bob);
+    await engine.onJoin(bob, { t: 'join', seatId: T.coDm });
+    await engine.idle();
+    expect(engine.state().seats[T.coDm]?.identityId).toBe(T.bob);
+    expect(errorsOf(bob)).toEqual([]);
+    expect(snapshotsOf(bob).at(-1)).toMatchObject({ seatId: T.coDm });
+  });
+
+  it('assigns a co-DM seat through a host-issued invite on the host authority', async () => {
+    const campaign = fixtureCampaign();
+    campaign.activeSceneId = null;
+    const { engine, log } = setup(campaign);
+    expect(await engine.claimSeat(T.bob, T.coDm)).toBe(true);
+    expect(engine.state().seats[T.coDm]?.identityId).toBe(T.bob);
+    expect(log.entries.at(-1)?.envelope).toMatchObject({
+      type: 'seat.assign',
+      actor: { kind: 'host' },
+      payload: { seatId: T.coDm, identityId: T.bob },
+    });
+    // The invite still cannot take a seat someone else already holds.
+    expect(await engine.claimSeat(T.carol, T.coDm)).toBe(false);
+  });
+});

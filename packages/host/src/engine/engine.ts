@@ -82,7 +82,8 @@ export interface Engine extends GatewayHandler {
   /**
    * SES-04: seats an authenticated identity through the normal `session.join` pipeline (seat free
    * or already theirs, one seat per identity, active scene). The caller has already verified an
-   * invite credential; every shared permission rule still applies.
+   * invite credential; every shared permission rule still applies. A co-DM seat is assigned with
+   * `seat.assign` as the host instead, since only the host grants co-DM (MV-269).
    */
   claimSeat(identityId: string, seatId: string): Promise<boolean>;
   /** M4-02 / SES-11: the seat spectators currently watch through, or null for the player view. */
@@ -427,12 +428,22 @@ export function createEngine(options: EngineOptions): Engine {
     claimSeat(identityId, seatId) {
       let claimed = false;
       return serialize(async () => {
-        const outcome = await apply(
-          undefined,
-          'session.join',
-          { seatId, identityId },
-          { actor: { kind: 'seat', identityId } },
-        );
+        // MV-269: a co-DM seat is never self-claimed. The host's invite is the grant, so the seat
+        // is assigned on the host's authority (`seat.assign` keeps the free/one-seat rules).
+        const outcome =
+          state.seats[seatId]?.role === 'codm'
+            ? await apply(
+                undefined,
+                'seat.assign',
+                { seatId, identityId },
+                { actor: { kind: 'host' } },
+              )
+            : await apply(
+                undefined,
+                'session.join',
+                { seatId, identityId },
+                { actor: { kind: 'seat', identityId } },
+              );
         claimed = outcome.ok;
       }).then(() => claimed);
     },
@@ -529,11 +540,7 @@ export function createEngine(options: EngineOptions): Engine {
           }
           return;
         }
-        if (
-          state.activeSceneId === null &&
-          !conn.isHost &&
-          (!msg.seatId || state.seats[msg.seatId]?.role !== 'codm')
-        ) {
+        if (state.activeSceneId === null && !conn.isHost) {
           conn.send({
             t: 'error',
             code: 'seat-unavailable',
