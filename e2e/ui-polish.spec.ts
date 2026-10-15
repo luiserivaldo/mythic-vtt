@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { startTable, type Table } from './harness.js';
+import { createProp } from './create-prop.js';
 
 // Live-test feedback: entities spawned in the corner, panels pushed the board down, and
 // image-less tokens had no colour.
@@ -45,10 +46,12 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
   await page.getByLabel('Token name').fill('Goblin');
   await page.getByLabel('Colour (no image)').fill('#cc3322');
   await page.getByRole('button', { name: 'Create token' }).click();
-  await page.getByLabel('Prop name').fill('Crate');
-  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
-
   const list = page.getByRole('list', { name: 'Entities in this scene' });
+  // The form clears its name once the create lands; wait so it cannot wipe the next name.
+  await expect(list.getByRole('button', { name: 'Goblin', exact: true })).toBeVisible();
+  await page.getByLabel('Token name').fill('Orc');
+  await page.getByRole('button', { name: 'Create token' }).click();
+
   const x = page.getByLabel('X (ft)');
   const z = page.getByLabel('Z (ft)');
   // Default scene: 40 x 30 cells, 5 ft per cell. A medium token snaps to the cell centre at
@@ -67,10 +70,27 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
   expect(selectedPanels.x + selectedPanels.width).toBeLessThanOrEqual(
     selectedBoard.x + selectedBoard.width,
   );
-  await list.getByRole('button', { name: 'Crate', exact: true }).click();
+  await list.getByRole('button', { name: 'Orc', exact: true }).click();
   await chip.click();
   await expect(x).toHaveValue('107.5');
   await expect(z).toHaveValue('82.5');
+  // UX-39 (UI-TOOL-04, MV-266): a new prop lands selected, on a cell centre inside the board.
+  await createProp(page, { name: 'Crate' });
+  await expect(list.getByRole('button', { name: 'Crate', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await chip.click();
+  // 5 ft cells on a 40 x 30 cell board: a cell centre sits 2.5 ft past a multiple of 5.
+  for (const [field, extent] of [
+    [x, 200],
+    [z, 150],
+  ] as const) {
+    const value = Number(await field.inputValue());
+    expect(value).toBeGreaterThan(0);
+    expect(value).toBeLessThan(extent);
+    expect(value % 5).toBe(2.5);
+  }
 
   // The transform panel is readable: light labels (--ui-muted) on the dark panel surface.
   const panel = page.locator('.ui-transform');

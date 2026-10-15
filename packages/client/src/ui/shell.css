@@ -911,6 +911,28 @@ main .ui-danger-button:not(:disabled) {
   align-self: flex-start;
   box-shadow: none;
 }
+/* UI-TOOL-04: Create Prop's shapes as an icon strip; the chosen one takes the accent. */
+.ui-shape-picker {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+main .ui-shape-picker button {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+}
+.ui-shape-picker svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
 /* UI-TOOL-05: the initiative list. Rows carry their own `1.` rank; controls are spaced (F04). */
 .ui-initiative {
   display: flex;

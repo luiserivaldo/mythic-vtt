@@ -41,7 +41,7 @@ export function MarqueeTool({
 }: {
   rendered: RenderScene | null;
   scene: Scene | null;
-  /** The rail tool in effect; the marquee belongs to Select only. */
+  /** The rail tool in effect; the marquee belongs to Select (and Create Prop, MV-271). */
   tool: string;
 }) {
   const gl = useThree((s) => s.gl);

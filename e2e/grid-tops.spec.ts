@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid, type Table } from './harness.js';
+import { createProp } from './create-prop.js';
 
 // M3-09 (GRID-05): overlapping walkable tops render only the winning grid without page errors.
 let table: Table | undefined;
@@ -26,9 +27,7 @@ test('overlapping walkable tops render one stable top grid in 3D', async ({ brow
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
 
   await page.getByRole('tab', { name: 'Entities', exact: true }).click();
-  await page.getByLabel('Prop name').fill('Dais');
-  await page.getByLabel('Walkable').check();
-  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
+  await createProp(page, { name: 'Dais', walkable: true });
   const list = page.getByRole('list', { name: 'Entities in this scene' });
   await list.getByRole('button', { name: 'Dais', exact: true }).click();
   const toggle = page.getByLabel('Show grid on top of Dais');

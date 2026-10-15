@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { startTable, type Table } from './harness.js';
+import { createProp } from './create-prop.js';
 
-// The DM had no way to create a token or prop, so nothing could be selected or moved.
+// The DM had no way to create a token or prop, so nothing could be selected or moved. Tokens are
+// created in the Entities panel; props from the rail's Create Prop tool (UX-39).
 let table: Table | undefined;
 
 test.beforeAll(async () => {
@@ -12,7 +14,7 @@ test.afterAll(async () => {
   await table?.stop();
 });
 
-test('the host creates a scene, a token and a box from the Entities panel and selects them', async ({
+test('the host creates a scene, a token and a box and selects them', async ({
   browser,
 }, testInfo) => {
   if (!table) throw new Error('table not started');
@@ -79,11 +81,10 @@ test('the host creates a scene, a token and a box from the Entities panel and se
   await page.getByRole('button', { name: 'Restore Transform panel' }).click();
   await expect(page.getByLabel('X (ft)')).toBeVisible();
 
-  const propName = page.getByLabel('Prop name');
-  await propName.fill('Crate');
-  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
-  await expect(propName).toHaveValue('');
-  await expect(propName).toBeFocused();
+  await expect(page.getByRole('form', { name: 'Create prop' })).toHaveCount(0);
+  const propForm = await createProp(page, { name: 'Crate' });
+  // The name field goes back to the next sequential default.
+  await expect(propForm.getByLabel('Prop name')).toHaveValue('Prop 1');
 
   await expect(list.getByRole('button', { name: 'Goblin', exact: true })).toBeVisible();
   await expect(list.getByRole('button', { name: 'Crate', exact: true })).toHaveAttribute(

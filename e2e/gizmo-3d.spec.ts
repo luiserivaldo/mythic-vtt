@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid, type Table } from './harness.js';
+import { createProp } from './create-prop.js';
 
 // M2-08 (ENV-03, ENV-04): in 3D the selected prop shows the transform gizmo, and a typed
 // elevation commits as one entity.update.
@@ -34,8 +35,7 @@ test('selecting a prop in 3D mounts the gizmo without errors and a typed value c
   await page.getByRole('button', { name: 'Create scene' }).click();
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Entities', exact: true }).click();
-  await page.getByLabel('Prop name').fill('Crate');
-  await page.getByRole('button', { name: 'Create prop', exact: true }).click();
+  await createProp(page, { name: 'Crate' });
   const list = page.getByRole('list', { name: 'Entities in this scene' });
   await list.getByRole('button', { name: 'Crate', exact: true }).click();
 

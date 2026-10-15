@@ -192,6 +192,29 @@ test('mouse mapping: marquee, pan, flying lock, context menu and orbit', async (
     await expect(select).toHaveAttribute('aria-pressed', 'true');
   });
 
+  await test.step('Create Prop: the board acts like Select; a board click creates nothing (MV-271)', async () => {
+    const count = () => Object.keys((host.state as Snapshot).scenes[SCENE]?.entities ?? {}).length;
+    const before = count();
+    await page.getByRole('button', { name: 'Create Prop', exact: true }).click();
+    await expect(page.getByRole('form', { name: 'Create prop' })).toBeVisible();
+    const board = await canvas.boundingBox();
+    if (!board) throw new Error('missing canvas');
+    const at = { x: board.x + board.width / 2, y: board.y + board.height - 60 };
+    await page.mouse.click(at.x, at.y);
+    await expect.poll(() => selection(page)).toEqual([]);
+    // The pans above moved the view and the left pane narrows the board (Alpha is now at its
+    // edge): frame the marquee on where Bravo and Charlie are drawn now.
+    const bravo = await labelCentre(page, 'Bravo');
+    const charlie = await labelCentre(page, 'Charlie');
+    await drag(
+      { x: charlie.x + 2 * zoom, y: charlie.y + 2 * zoom },
+      { x: bravo.x - 2 * zoom, y: bravo.y - 2 * zoom },
+    );
+    await expect.poll(() => selection(page)).toEqual([BRAVO, CHARLIE].sort());
+    expect(count()).toBe(before);
+    await select.click();
+  });
+
   await test.step('3D: right drag orbits without a menu; a right click opens it', async () => {
     await page.getByRole('button', { name: '3D view' }).click();
     await page.waitForFunction(

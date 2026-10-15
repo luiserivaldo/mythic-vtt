@@ -53,9 +53,12 @@ export function cameraPress(
   return null;
 }
 
-/** What an unclaimed left drag on empty board does with the tool in effect. */
+/**
+ * What an unclaimed left drag on empty board does with the tool in effect. Create Prop acts like
+ * Select on the board (MV-271): its props come from the left pane's shape icons, not board clicks.
+ */
 export function emptyBoardLeftDrag(tool: string): 'marquee' | 'pan' | null {
-  if (tool === 'select') return 'marquee';
+  if (tool === 'select' || tool === 'create-prop') return 'marquee';
   if (tool === 'pan') return 'pan';
   return null;
 }

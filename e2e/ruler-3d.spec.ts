@@ -6,6 +6,7 @@ import {
   type CameraPose,
   type Table,
 } from './harness.js';
+import { createProp, moveSelectedTo } from './create-prop.js';
 
 function projectToCanvas(
   pose: CameraPose,
@@ -60,14 +61,19 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   await expect(page.getByText('Active', { exact: true })).toBeVisible();
 
   await page.getByRole('tab', { name: 'Entities', exact: true }).click();
-  const prop = page.getByRole('form', { name: 'Create prop' });
-  await prop.getByLabel('Prop name').fill('High platform');
-  await prop.getByLabel('Width (cells)').fill('6');
-  await prop.getByLabel('Height (cells)').fill('10');
-  await prop.getByLabel('Depth (cells)').fill('6');
-  await prop.getByLabel('Walkable').check();
-  await prop.getByRole('button', { name: 'Create prop' }).click();
+  await createProp(page, {
+    name: 'High platform',
+    width: 6,
+    height: 10,
+    depth: 6,
+    walkable: true,
+  });
   await expect(page.getByRole('button', { name: 'High platform', exact: true })).toBeVisible();
+  // Pin the platform to the scene centre (20, 15 cells), wherever Create Prop placed it (MV-266).
+  await moveSelectedTo(page, 100, 75);
+  // Leave the tool so its left pane closes before the canvas pose below is projected.
+  await page.getByRole('button', { name: 'Select', exact: true }).click();
+  await expect(page.getByRole('complementary', { name: 'Left pane' })).toHaveCount(0);
 
   const viewer = await openClient(browser, table, 'viewer');
   viewer.page.on('pageerror', (error) => errors.push(error.message));
@@ -91,7 +97,7 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   await page.getByLabel('Ruler fade').selectOption('linger');
   // UI-MEAS-01: the panel floats beside the rail; tuck it away to measure under it.
   await page.getByRole('button', { name: 'Close Measure panel' }).click();
-  // The platform spawns at scene centre. Project known world points through the live pose so this
+  // The platform sits at scene centre. Project known world points through the live pose so this
   // regression remains about surface measurement rather than one particular camera framing.
   await page.mouse.move(ground.x, ground.y);
   await page.mouse.down();
@@ -104,7 +110,7 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   await page.mouse.move(box.x + 10, box.y + 10);
 
   // M3-11: the 3D ruler is one straight segment labelled with the total length only. The
-  // platform spawns at scene centre: 10 cells of horizontal run and 10 of elevation, so the
+  // platform sits at scene centre: 10 cells of horizontal run and 10 of elevation, so the
   // alternating diagonal rule reports 10 + 10/2 = 15 cells, i.e. 75 ft.
   const total = /^75 ft$/;
   await expect(page.getByTestId('ruler-total')).toHaveText(total);

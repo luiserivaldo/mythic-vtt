@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid, claimSeat } from './harness.js';
+import { createProp } from './create-prop.js';
 
 // UX-15 (UI-TOOL-01..07): the left tool rail lists Select, Pan, Measure, Draw, Create Prop and the
 // Initiative tracker. A tool a seat may not use stays on the rail, disabled with a reason;
@@ -67,12 +68,8 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     await rail(dm, 'Select').click();
     await expect(rail(dm, 'Measure')).toHaveAttribute('aria-pressed', 'false');
 
-    // Create Prop opens the prop form and places the prop.
-    await rail(dm, 'Create Prop').click();
-    const form = dm.getByRole('form', { name: 'Create prop' });
-    await expect(form).toBeVisible();
-    await form.getByLabel('Prop name').fill('Rail crate');
-    await form.getByRole('button', { name: 'Create prop' }).click();
+    // Create Prop opens its quick settings in the left pane and places the prop (UX-39).
+    await createProp(dm, { name: 'Rail crate' });
     await expect
       .poll(() => JSON.stringify(setup.state).includes('Rail crate'), { timeout: 10_000 })
       .toBe(true);

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { LayerId, Scene } from '@mythic/shared';
+import type { Scene } from '@mythic/shared';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -28,19 +28,20 @@ const scene: Scene = {
 let container: HTMLDivElement;
 let root: Root;
 
-/** The Create prop form's layer picker, found by its own label. */
-function layerSelect(): HTMLSelectElement {
-  const label = [...container.querySelectorAll('label')].find((l) =>
-    l.textContent.startsWith('Layer'),
+function field(label: string): HTMLInputElement | HTMLSelectElement {
+  const found = [...container.querySelectorAll('label')].find((l) =>
+    l.textContent.trim().startsWith(label),
   );
-  const select = label?.querySelector('select');
-  if (!select) throw new Error('no layer select in the Create prop form');
-  return select;
+  const control = found?.querySelector('input, select');
+  if (!(control instanceof HTMLInputElement) && !(control instanceof HTMLSelectElement))
+    throw new Error(`no ${label} field in the Create prop form`);
+  return control;
 }
 
-function show(activeLayer: LayerId, isHost: boolean): void {
+function show(isHost: boolean): void {
   const store = createUiStore();
-  store.getState().setActiveLayer(activeLayer);
+  // The Layers tab's active layer no longer steers the default (UI-TOOL-04, MV-246).
+  store.getState().setActiveLayer('dm');
   act(() => {
     root.render(
       createElement(
@@ -66,13 +67,34 @@ describe('Create Prop panel', () => {
     container.remove();
   });
 
-  it('starts its layer select on the viewer active layer (Layers tab)', () => {
-    show('dm', true);
-    expect(layerSelect().value).toBe('dm');
+  it('offers every shape as an icon button, with no separate Create button (MV-266)', () => {
+    show(true);
+    const shapes = [...container.querySelectorAll('[role="group"][aria-label="Shape"] button')];
+    expect(shapes.map((s) => s.getAttribute('aria-label'))).toEqual([
+      'Box',
+      'Cylinder',
+      'Cone',
+      'Pyramid',
+      'Sphere',
+      'Plane',
+      'Wedge',
+    ]);
+    expect(shapes.every((s) => s.querySelector('svg') !== null)).toBe(true);
+    expect(container.querySelectorAll('button')).toHaveLength(shapes.length);
   });
 
-  it('falls back to Props where the viewer may not create on the active layer', () => {
-    show('dm', false);
-    expect(layerSelect().value).toBe('props');
+  it('starts on the defaults: Prop 1, 1x1x1, grey, collidable, Props, no texture field', () => {
+    show(true);
+    expect(field('Prop name').value).toBe('Prop 1');
+    for (const dim of ['Width', 'Height', 'Depth']) expect(field(dim).value).toBe('1');
+    expect(field('Prop colour').value).toBe('#808080');
+    expect((field('Collidable') as HTMLInputElement).checked).toBe(true);
+    expect(field('Layer').value).toBe('props');
+    expect(container.querySelector('input[type="file"]')).toBeNull();
+  });
+
+  it('defaults to Props for a co-DM too', () => {
+    show(false);
+    expect(field('Layer').value).toBe('props');
   });
 });

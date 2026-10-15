@@ -92,6 +92,61 @@ export const TOKEN_FORM_DEFAULTS = {
   color: string;
 };
 
+/**
+ * UI-TOOL-04 (MV-246): the Create Prop tool's quick-setting defaults, a grey collidable 1x1x1
+ * box on the Props layer.
+ */
+export const PROP_FORM_DEFAULTS = {
+  kind: 'box',
+  color: '#808080',
+  size: { x: 1, y: 1, z: 1 },
+  walkable: true,
+  layer: 'props',
+} as const satisfies {
+  kind: PrimitiveKind;
+  color: string;
+  size: { x: number; y: number; z: number };
+  walkable: boolean;
+  layer: LayerId;
+};
+
+/**
+ * UI-TOOL-04 (MV-266): a new prop lands on the cell centre under the middle of the current view,
+ * or under the map centre when the view centre is off the map (or unknown). Ghost placement (a
+ * translucent preview following the pointer, placed on left click) will pass its own point instead.
+ */
+export function propViewPosition(
+  scene: Pick<Scene, 'bounds'>,
+  viewCentre: { x: number; z: number } | null,
+): { x: number; y: number; z: number } {
+  const { width, height } = resolveSceneBounds(scene);
+  const onMap =
+    viewCentre !== null &&
+    Number.isFinite(viewCentre.x) &&
+    Number.isFinite(viewCentre.z) &&
+    viewCentre.x >= 0 &&
+    viewCentre.x <= width &&
+    viewCentre.z >= 0 &&
+    viewCentre.z <= height;
+  const centre = onMap ? viewCentre : { x: width / 2, z: height / 2 };
+  // The centre of the cell it falls in, kept on the map (a centre on the far edge would spill out).
+  const cell = (v: number, size: number) =>
+    Math.min(Math.floor(v), Math.max(0, Math.ceil(size) - 1)) + 0.5;
+  return { x: cell(centre.x, width), y: 0, z: cell(centre.z, height) };
+}
+
+const PROP_NAME = /^Prop (\d+)$/;
+
+/** UI-TOOL-04: the next sequential default name, one past the highest "Prop N" in the scene. */
+export function nextPropName(scene: Pick<Scene, 'entities'>): string {
+  let highest = 0;
+  for (const entity of Object.values(scene.entities)) {
+    const match = PROP_NAME.exec(entity.name);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+  return `Prop ${String(highest + 1)}`;
+}
+
 export interface OwnerOption {
   id: string;
   label: string;
@@ -201,6 +256,8 @@ export interface PropDraft {
   layer: LayerId;
   /** ENV-05: uploaded image, tiled once per cell; the colour is the fallback. */
   texture?: AssetRef;
+  /** Where the prop's base sits; without one it spawns at the scene centre. */
+  position?: { x: number; y: number; z: number };
 }
 
 /** ENV-02: a primitive prop; scale is its size in cells and its base sits at elevation 0. */
@@ -211,7 +268,9 @@ export function propCreateIntent(scene: Scene, d: PropDraft): IntentSpec {
     name: d.name.trim(),
     owners: [],
     transform: {
-      position: placementPosition(scene, d.size.x, spawnIndexOf(scene)),
+      position: d.position
+        ? { ...d.position }
+        : placementPosition(scene, d.size.x, spawnIndexOf(scene)),
       rotation: UNIT_ROTATION,
       scale: { ...d.size },
     },
