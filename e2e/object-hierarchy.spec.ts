@@ -12,10 +12,12 @@ import {
 // UI-ENT-01 / C16 (MV-245, MV-264): in 3D the DM gets a Hierarchy dock tab listing every object by
 // layer. Rows and board picks share one selection; a row's popup renames the object and sets a
 // prop's collidable flag through entity.update. Rows off the active layer are shaded and inert
-// (MV-258). A player never gets the tab.
+// (MV-258), as are rows on a locked or hidden layer (MV-276). A Co-DM gets the tab too; a player
+// never does.
 
 const SCENE = testUlid('SCENE', 264);
 const SEAT = testUlid('SEAT', 264);
+const CODM_SEAT = testUlid('SEAT', 265);
 const CRATE = testUlid('PROP', 264);
 const SLAB = testUlid('PROP', 265);
 const GOBLIN = testUlid('TOKEN', 264);
@@ -92,6 +94,10 @@ test('the DM hierarchy follows and drives the 3D selection, edits a prop, and ne
   await ok('scene.create', { sceneId: SCENE, name: 'Vault' });
   await ok('scene.activate', { sceneId: SCENE });
   await ok('seat.create', { seatId: SEAT, label: 'Rogue' });
+  // A Co-DM seat is never offered on the join screen: the host assigns it to an identity.
+  const coDmIdentity = { identityId: testUlid('CODM', 264), identitySecret: 'hierarchy-codm' };
+  await ok('seat.create', { seatId: CODM_SEAT, label: 'Warden', role: 'codm' });
+  await ok('seat.assign', { seatId: CODM_SEAT, identityId: coDmIdentity.identityId });
   await ok('entity.create', {
     sceneId: SCENE,
     entity: box(CRATE, 'Crate', { x: 3, z: 26 }, { x: 1, y: 1, z: 1 }),
@@ -115,9 +121,22 @@ test('the DM hierarchy follows and drives the 3D selection, edits a prop, and ne
   const playerContext = await browser.newContext();
   const player = await playerContext.newPage();
   const playerFrames = recordPageFrames(player);
+  const coDmContext = await browser.newContext();
+  await coDmContext.addInitScript(
+    ({ identity, seatId }) => {
+      localStorage.setItem('mythic.identity.v1', JSON.stringify(identity));
+      localStorage.setItem(
+        'mythic.profile.v1',
+        JSON.stringify({ displayName: 'Wren', lastSeatId: seatId }),
+      );
+    },
+    { identity: coDmIdentity, seatId: CODM_SEAT },
+  );
+  const coDm = await coDmContext.newPage();
   const errors: string[] = [];
   dm.on('pageerror', (error) => errors.push(error.message));
   player.on('pageerror', (error) => errors.push(error.message));
+  coDm.on('pageerror', (error) => errors.push(error.message));
 
   try {
     await dm.goto(table.clientUrl);
@@ -182,6 +201,51 @@ test('the DM hierarchy follows and drives the 3D selection, edits a prop, and ne
     await popup.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(popup).toHaveCount(0);
 
+    // MV-276: the popup opens with its name field focused, so Escape closes it straight away and
+    // focus returns to the row's edit button.
+    const editCrate = panel.getByRole('button', { name: 'Edit Iron Crate', exact: true });
+    await editCrate.click();
+    await expect(popup.getByPlaceholder('Name of Iron Crate')).toBeFocused();
+    await dm.keyboard.press('Escape');
+    await expect(popup).toHaveCount(0);
+    await expect(editCrate).toBeFocused();
+
+    // MV-276: a row on a locked layer is disabled, and clicking it leaves the selection alone.
+    const ironCrateRow = props.getByRole('button', { name: 'Iron Crate', exact: true });
+    await slabRow.click();
+    await expect.poll(() => selection(dm)).toEqual([SLAB]);
+    await ok('layer.lock', { sceneId: SCENE, layer: 'props', locked: true });
+    await expect(ironCrateRow).toBeDisabled();
+    await expect(ironCrateRow).toHaveAttribute('title', 'Props is locked');
+    const lockedBefore = await selection(dm);
+    await ironCrateRow.click({ force: true });
+    await expect(ironCrateRow).toHaveAttribute('aria-pressed', 'false');
+    expect(await selection(dm)).toEqual(lockedBefore);
+    await ok('layer.lock', { sceneId: SCENE, layer: 'props', locked: false });
+    await expect(ironCrateRow).toBeEnabled();
+
+    // The same for a layer hidden on this screen (the eye in the Layers tab).
+    await slabRow.click();
+    await expect.poll(() => selection(dm)).toEqual([SLAB]);
+    await dm.getByRole('tab', { name: 'Layers', exact: true }).click();
+    const showProps = dm
+      .getByRole('region', { name: 'Layers' })
+      .getByRole('checkbox', { name: 'Show Props' });
+    await showProps.click();
+    await expect(showProps).not.toBeChecked();
+    await hierarchyTab.click();
+    await expect(ironCrateRow).toBeDisabled();
+    await expect(ironCrateRow).toHaveAttribute('title', 'Props is hidden');
+    const hiddenBefore = await selection(dm);
+    await ironCrateRow.click({ force: true });
+    await expect(ironCrateRow).toHaveAttribute('aria-pressed', 'false');
+    expect(await selection(dm)).toEqual(hiddenBefore);
+    await dm.getByRole('tab', { name: 'Layers', exact: true }).click();
+    await showProps.click();
+    await expect(showProps).toBeChecked();
+    await hierarchyTab.click();
+    await expect(ironCrateRow).toBeEnabled();
+
     // Back in 2D the tab is withdrawn and the dock falls back to Chat.
     await dm.getByRole('button', { name: '2D view' }).click();
     await expect(hierarchyTab).toHaveCount(0);
@@ -199,10 +263,23 @@ test('the DM hierarchy follows and drives the 3D selection, edits a prop, and ne
     const leaks = playerFrames.filter((f) => f.includes(SECRET) || f.includes(SECRET_NAME));
     expect(leaks).toEqual([]);
     expect(playerFrames.length).toBeGreaterThan(0);
+
+    // MV-276: a Co-DM seat is an admin, so it gets the tab in 3D (and not in 2D).
+    await coDm.goto(table.clientUrl);
+    await expect(coDm.getByRole('status')).toHaveText('Connected to New campaign');
+    const coDmTab = coDm.getByRole('tab', { name: 'Hierarchy', exact: true });
+    await expect(coDm.getByRole('tab', { name: 'Entities', exact: true })).toBeVisible();
+    await expect(coDmTab).toHaveCount(0);
+    await coDm.getByRole('button', { name: '3D view' }).click();
+    await coDmTab.click();
+    await expect(
+      coDm.getByRole('region', { name: 'Hierarchy' }).getByRole('list', { name: 'Props layer' }),
+    ).toContainText('Iron Crate');
     expect(errors).toEqual([]);
   } finally {
     await host.close();
     await dmContext.close();
     await playerContext.close();
+    await coDmContext.close();
   }
 });
