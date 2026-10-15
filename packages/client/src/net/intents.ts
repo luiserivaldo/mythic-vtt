@@ -5,7 +5,8 @@ type RejectReason = Extract<ServerMessage, { t: 'reject' }>['reason'];
 export type IntentFailure = RejectReason | 'connection-lost' | 'timeout' | 'queue-full';
 
 export type IntentResult =
-  { ok: true; seq: number } | { ok: false; reason: IntentFailure; detail?: string };
+  | { ok: true; seq: number }
+  | { ok: false; reason: IntentFailure; detail?: string; explanation?: string };
 
 export interface IntentRequest {
   clientRef: string;

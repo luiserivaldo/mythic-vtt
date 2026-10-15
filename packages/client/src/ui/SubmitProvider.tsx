@@ -1,8 +1,8 @@
 import { useViewedCampaign } from '../store/viewed-campaign.js';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { IntentResult } from '../net/intents.js';
 import { usePointerOwner } from '../render/pointer-claims.js';
-import { useClientStore } from '../store/react.js';
+import { ClientStoreContext, useClientStore } from '../store/react.js';
 import { useUiStore } from './ui-store.js';
 import {
   appendDiagnostic,
@@ -10,6 +10,7 @@ import {
   summarizePayload,
   type IntentDiagnostic,
 } from './intent-diagnostics.js';
+import { explainFailure } from './reject-reason.js';
 import { describeFailure, SubmitContext, type SubmitIntent } from './submit.js';
 
 interface Toast {
@@ -152,6 +153,7 @@ export function SubmitProvider({
   children: ReactNode;
 }) {
   const preview = useClientStore((state) => state.viewAs.kind !== 'host');
+  const store = useContext(ClientStoreContext);
   const nextId = useRef(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [diagnostics, setDiagnostics] = useState<IntentDiagnostic[]>([]);
@@ -178,11 +180,23 @@ export function SubmitProvider({
         }),
       );
       if (!result.ok) {
-        setToasts((current) => [...current, { id, message: describeFailure(result) }]);
+        const view = store?.getState();
+        const explained = {
+          ...result,
+          explanation: explainFailure(result.reason, {
+            campaign: view?.campaign ?? null,
+            seatId: view?.seatId ?? null,
+            isHost: view?.isHost ?? false,
+            type,
+            payload,
+          }),
+        };
+        setToasts((current) => [...current, { id, message: describeFailure(explained) }]);
+        return explained;
       }
       return result;
     },
-    [submit],
+    [submit, store],
   );
 
   return (

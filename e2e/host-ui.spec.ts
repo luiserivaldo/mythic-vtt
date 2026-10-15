@@ -73,7 +73,7 @@ test('the DM link makes the browser host: panels appear, the token leaves the UR
   await expect(playerPage.getByRole('status')).toHaveText('Connected to New campaign');
   await playerPage.getByRole('button', { name: 'Test rejection' }).click();
   await expect(playerPage.getByRole('alert')).toContainText(
-    'The host did not accept that (forbidden).',
+    'You do not have permission to do that.',
   );
   await expect(
     playerPage.getByRole('complementary', { name: 'Developer diagnostics' }),
