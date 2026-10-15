@@ -12,7 +12,7 @@ declare global {
     __mythicOcclusion?: {
       getMaterials(): { id: string; opacity: number; depthWrite: boolean }[];
     };
-    /** Development-only 2D camera state for the CAM-06 focus e2e. */
+    /** Development-only camera state and focus-tween trail for the CAM-06 focus e2e. */
     __mythicFocus?: {
       getView2d(): {
         centerX: number;
@@ -21,6 +21,7 @@ declare global {
         animating: boolean;
         poses: number;
       };
+      getTrail(): { x: number; z: number }[];
     };
     /** Development-only camera-link counters for the CAM-06 pull/follow e2e. */
     __mythicCameraLink?: {
