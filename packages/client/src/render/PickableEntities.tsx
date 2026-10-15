@@ -19,6 +19,7 @@ import { RENDER_LAYERS, type RenderEntity, type RenderScene } from './scene-mode
 import type { RenderGrid } from './grid-model.js';
 import { AoEVolume } from './AoEVolume.js';
 import { useUiStore } from '../ui/ui-store.js';
+import { visibleEntities } from './layer-visibility.js';
 import type { ElevatedGridSurface } from './elevated-grid.js';
 
 const Lighting3D = lazy(async () => {
@@ -63,6 +64,15 @@ export function PickableEntities({
   const selected = useStore(selectionStore, (state) => state.ids);
   const hiddenLayers = useUiStore((state) => state.hiddenLayers);
   const actor = selectionActor(isHost, seatId, seats);
+  // UI-LAY-01: entities on a hidden layer are not mounted, so they are not drawn or picked.
+  const visible = useMemo(
+    () => visibleEntities(rendered, scene, hiddenLayers),
+    [rendered, scene, hiddenLayers],
+  );
+  const visibleScene = useMemo(
+    () => (rendered ? { ...rendered, entities: visible } : null),
+    [rendered, visible],
+  );
   const walkables = useMemo(
     () =>
       Object.values(scene?.entities ?? {}).flatMap((entity) => {
@@ -74,12 +84,12 @@ export function PickableEntities({
   );
   const gridSurfaces = useMemo<readonly ElevatedGridSurface[]>(
     () =>
-      (rendered?.entities ?? []).flatMap((entity) =>
-        entity.shape?.walkable && !hiddenLayers.has(scene?.entities[entity.id]?.layer ?? 'effects')
+      visible.flatMap((entity) =>
+        entity.shape?.walkable
           ? [{ id: entity.id, shape: entity.shape, position: entity.position }]
           : [],
       ),
-    [rendered, scene, hiddenLayers],
+    [visible],
   );
 
   useEffect(() => {
@@ -143,53 +153,51 @@ export function PickableEntities({
       {mode === '3d' && (
         <Suspense fallback={null}>
           <Lighting3D />
-          <DropLines rendered={rendered} />
+          <DropLines rendered={visibleScene} />
         </Suspense>
       )}
-      {rendered?.entities
+      {visible
         .filter((entity) => entity.token && entity.rings?.length)
         .map((entity) => (
           <TokenRings key={entity.id} entity={entity} />
         ))}
       {RENDER_LAYERS.map((layer, order) => (
         <group key={layer} name={layer}>
-          {rendered?.entities
+          {visible
             .filter((entity) => entity.layer === layer)
             .map((entity: RenderEntity) =>
               entity.aoe ? (
-                hiddenLayers.has(scene?.entities[entity.id]?.layer ?? 'effects') ? null : (
-                  <group key={entity.id}>
-                    <AoEVolume
-                      volume={entity.aoe}
-                      walkables={walkables}
-                      mode={mode}
-                      renderOrder={order + 1}
+                <group key={entity.id}>
+                  <AoEVolume
+                    volume={entity.aoe}
+                    walkables={walkables}
+                    mode={mode}
+                    renderOrder={order + 1}
+                  />
+                  <mesh
+                    name={entity.id}
+                    position={[entity.position[0], entity.position[1] + 0.06, entity.position[2]]}
+                    rotation={[-Math.PI / 2, 0, 0]}
+                    onClick={onClick}
+                  >
+                    <circleGeometry
+                      args={[
+                        Math.max(
+                          0.25,
+                          entity.aoe.shape.kind === 'sphere' ||
+                            entity.aoe.shape.kind === 'cylinder' ||
+                            entity.aoe.shape.kind === 'cone'
+                            ? entity.aoe.shape.radius
+                            : entity.aoe.shape.kind === 'cube'
+                              ? entity.aoe.shape.size / 2
+                              : entity.aoe.shape.width / 2,
+                        ),
+                        32,
+                      ]}
                     />
-                    <mesh
-                      name={entity.id}
-                      position={[entity.position[0], entity.position[1] + 0.06, entity.position[2]]}
-                      rotation={[-Math.PI / 2, 0, 0]}
-                      onClick={onClick}
-                    >
-                      <circleGeometry
-                        args={[
-                          Math.max(
-                            0.25,
-                            entity.aoe.shape.kind === 'sphere' ||
-                              entity.aoe.shape.kind === 'cylinder' ||
-                              entity.aoe.shape.kind === 'cone'
-                              ? entity.aoe.shape.radius
-                              : entity.aoe.shape.kind === 'cube'
-                                ? entity.aoe.shape.size / 2
-                                : entity.aoe.shape.width / 2,
-                          ),
-                          32,
-                        ]}
-                      />
-                      <meshBasicMaterial visible={false} />
-                    </mesh>
-                  </group>
-                )
+                    <meshBasicMaterial visible={false} />
+                  </mesh>
+                </group>
               ) : entity.mapImage ? (
                 <MapImageMesh
                   key={entity.id}
