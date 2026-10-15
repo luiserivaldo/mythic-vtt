@@ -1,6 +1,9 @@
 import { initiativeSet } from './initiative.set.js';
 import { initiativeAdvance } from './initiative.advance.js';
 import { seatArchive } from './seat.archive.js';
+import { seatJoinTemporary } from './seat.joinTemporary.js';
+import { seatDiscardTemporary } from './seat.discardTemporary.js';
+import { campaignSetBranding } from './campaign.setBranding.js';
 import { tokenSetQuickField } from './token.setQuickField.js';
 import { historyUndo } from './history.undo.js';
 import { historyRollback } from './history.rollback.js';
@@ -78,6 +81,9 @@ export const allActions: readonly AnyAction[] = [
   historyRollback,
   aoePersist,
   seatArchive,
+  seatJoinTemporary,
+  seatDiscardTemporary,
+  campaignSetBranding,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

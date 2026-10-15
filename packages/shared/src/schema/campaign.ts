@@ -2,14 +2,17 @@ import { Prefabs } from './prefab.js';
 import { z } from 'zod';
 import { Id } from './ids.js';
 import { Scene } from './scene.js';
-import { Seat } from './seat.js';
+import { ImageHash, Seat, SeatIcon } from './seat.js';
 
 /** Bumped by the `schema-change` skill; migrations live in `../migrations`. */
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 export const Campaign = z.object({
   id: Id,
   name: z.string(),
+  /** UI-JOIN-01 (UX-44): shown on the join screen before anyone joins. */
+  icon: SeatIcon.optional(),
+  screenshot: ImageHash.optional(),
   schemaVersion: z.number().int().positive(),
   settings: z.object({
     defaultBinding: z.enum(['persistent', 'session']),

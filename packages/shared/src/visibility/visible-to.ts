@@ -12,6 +12,23 @@ type Cache<T> = WeakMap<object, Map<string, T>>;
 const entityCache: Cache<Entity | null> = new WeakMap();
 const sceneCache: Cache<Scene> = new WeakMap();
 const campaignCache: Cache<Campaign> = new WeakMap();
+const redactedSeatCache: WeakMap<Seat, Seat> = new WeakMap();
+
+/**
+ * UX-44 / PERM-03: valid-looking constant that keeps "this seat is taken" for spectators without
+ * revealing which identity holds it (spectators see only what the join payload allows).
+ */
+export const REDACTED_IDENTITY_ID = '0'.repeat(26);
+
+function viewSeat(audience: Audience, seat: Seat): Seat {
+  if (audience.kind !== 'spectators' || seat.identityId === null) return seat;
+  let view = redactedSeatCache.get(seat);
+  if (!view) {
+    view = { ...seat, identityId: REDACTED_IDENTITY_ID };
+    redactedSeatCache.set(seat, view);
+  }
+  return view;
+}
 
 function memo<T>(cache: Cache<T>, input: object, key: string, compute: () => T): T {
   let byAudience = cache.get(input);
@@ -153,8 +170,17 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
       audience.kind === 'seat' && seat?.role === 'codm' && seat.permissions.view;
     const activeSceneId =
       state.activeSceneId && scenes[state.activeSceneId] ? state.activeSceneId : null;
-    const seats = Object.fromEntries(Object.entries(state.seats).filter(([, s]) => !s.archived));
-    const hideArchived = Object.keys(seats).length !== Object.keys(state.seats).length;
+    const seats: Campaign['seats'] = {};
+    let hideArchived = false;
+    for (const [id, s] of Object.entries(state.seats)) {
+      if (s.archived) {
+        hideArchived = true;
+        continue;
+      }
+      const seatView = viewSeat(audience, s);
+      if (seatView !== s) hideArchived = true;
+      seats[id] = seatView;
+    }
     const view =
       changed || hideArchived || activeSceneId !== state.activeSceneId
         ? { ...state, scenes, seats, activeSceneId }

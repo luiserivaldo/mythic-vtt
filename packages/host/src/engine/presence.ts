@@ -12,15 +12,22 @@ export interface PresenceConn {
   readonly avatar: string | undefined;
   readonly isHost: boolean;
   readonly latencyMs?: number | null;
+  /** UX-44: a watch-link or "Join As Spectator" connection: counted, never listed. */
+  readonly spectating?: boolean;
 }
 
 /**
  * SES-07 + M1-11: who is connected, per seat, plus the connected identities with no seat so the DM
- * can seat them. The result carries identity ids, so the engine sends it to the host only (PERM-03).
+ * can seat them. `spectators` (UX-44) counts spectator connections and lists none of them. The result carries identity ids, so the engine sends it to the host only (PERM-03).
  */
 export function buildHostPresence(state: Campaign, conns: Iterable<PresenceConn>): PresenceMessage {
   const byIdentity = new Map<string, PresenceConn>();
-  for (const c of conns) if (!byIdentity.has(c.identityId)) byIdentity.set(c.identityId, c);
+  for (const c of conns) {
+    const first = byIdentity.get(c.identityId);
+    // A non-spectating connection of an identity represents it (it may hold a seat).
+    if (!first || (first.spectating === true && c.spectating !== true))
+      byIdentity.set(c.identityId, c);
+  }
 
   const seats: PresenceMessage['seats'] = Object.values(state.seats)
     .filter((seat) => !seat.archived)
@@ -36,8 +43,14 @@ export function buildHostPresence(state: Campaign, conns: Iterable<PresenceConn>
     });
 
   const unseated: NonNullable<PresenceMessage['unseated']> = [];
+  let spectators = 0;
   for (const c of byIdentity.values()) {
     if (c.isHost || seatIdOf(state, c.identityId) !== undefined) continue;
+    if (c.spectating === true) {
+      // UX-44: spectators carry no visual credentials; only their number reaches the DM.
+      spectators += 1;
+      continue;
+    }
     unseated.push({
       identityId: c.identityId,
       displayName: c.displayName,
@@ -49,5 +62,5 @@ export function buildHostPresence(state: Campaign, conns: Iterable<PresenceConn>
     (a, b) =>
       a.displayName.localeCompare(b.displayName) || a.identityId.localeCompare(b.identityId),
   );
-  return { t: 'presence', seats, spectators: unseated.length, unseated };
+  return { t: 'presence', seats, spectators, unseated };
 }

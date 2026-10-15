@@ -1,0 +1,53 @@
+{
+  "client": [
+    {
+      "t": "hello",
+      "v": 10,
+      "identityId": "00000000000000000000000001",
+      "identitySecret": "synthetic-fixture-secret",
+      "displayName": "Fixture guest"
+    },
+    { "t": "join", "seatId": "00000000000000000000000002" },
+    { "t": "join", "as": "temporary", "label": "Visiting Bard" },
+    { "t": "join", "as": "spectator" }
+  ],
+  "server": [
+    {
+      "t": "presence",
+      "seats": [
+        {
+          "seatId": "00000000000000000000000002",
+          "connected": false,
+          "latencyMs": null
+        }
+      ],
+      "spectators": 2,
+      "unseated": []
+    }
+  ],
+  "joinPayload": {
+    "protocol": 10,
+    "host": { "name": "Fixture DM" },
+    "campaign": {
+      "title": "The Sunken Chapel",
+      "icon": { "kind": "glyph", "value": "⚔" },
+      "screenshot": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "sceneActive": true,
+    "seats": [
+      {
+        "seatId": "00000000000000000000000002",
+        "label": "Mira",
+        "role": "player",
+        "icon": { "kind": "glyph", "value": "M" },
+        "claim": "free"
+      },
+      {
+        "seatId": "00000000000000000000000003",
+        "label": "Tor",
+        "role": "player",
+        "claim": "claimed"
+      }
+    ]
+  }
+}

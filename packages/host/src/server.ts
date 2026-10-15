@@ -13,6 +13,7 @@ import {
   registerAssetRoutes,
   registerCampaignRoutes,
   registerHistoryRoutes,
+  registerJoinRoutes,
   registerSeatInviteRoutes,
   registerStaticClient,
   type UploadAuthorizer,
@@ -197,6 +198,21 @@ export async function startHost(
     auth: httpAuth,
     view: spectatorView,
     apply: (seatId) => engine.setSpectatorView(seatId),
+  });
+  // UX-44: the pre-join payload; the host's public profile is its stored display name and avatar.
+  registerJoinRoutes(gateway.app, {
+    state: () => engine.state(),
+    host: async () => {
+      const id = await identities.getHostIdentityId();
+      const stored = id === undefined ? undefined : await identities.get(id);
+      return stored
+        ? {
+            name: stored.displayName,
+            ...(stored.avatar !== undefined ? { avatar: stored.avatar } : {}),
+          }
+        : undefined;
+    },
+    now: clock,
   });
   registerSeatInviteRoutes(gateway.app, {
     auth: httpAuth,
