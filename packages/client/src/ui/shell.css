@@ -488,6 +488,42 @@ main .ui-danger-button:not(:disabled) {
   color: var(--ui-danger);
   border-color: var(--ui-danger);
 }
+/* UI-ENT-01 (MV-245): the 3D hierarchy, a file-explorer tree grouped by layer. */
+main .ui-hierarchy-head {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: left;
+}
+.ui-hierarchy-group > .ui-list {
+  margin-left: 1rem;
+}
+.ui-hierarchy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.35rem;
+}
+.ui-hierarchy-row[data-selected='true'] {
+  border-left: 3px solid var(--ui-accent);
+  padding-left: 0.4rem;
+}
+/* MV-244/MV-258: off the active layer, shaded like the board. */
+.ui-hierarchy-row[data-dimmed='true'] {
+  opacity: 0.5;
+}
+.ui-hierarchy-popup {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--ui-bg-raised);
+  border: 1px solid var(--ui-accent);
+  border-radius: 4px;
+}
 .ui-entity-bulk {
   display: flex;
   flex-wrap: wrap;

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useId } from 'react';
+import { useViewMode } from '../render/view-mode-store.js';
 import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { ChatPanel } from './ChatPanel.js';
@@ -20,6 +21,9 @@ const SeatPanel = lazy(async () => ({ default: (await import('./SeatPanel.js')).
 const SharePanel = lazy(async () => ({ default: (await import('./SharePanel.js')).SharePanel }));
 const PrefabPanel = lazy(async () => ({ default: (await import('./PrefabPanel.js')).PrefabPanel }));
 const EntityPanel = lazy(async () => ({ default: (await import('./EntityPanel.js')).EntityPanel }));
+const HierarchyPanel = lazy(async () => ({
+  default: (await import('./HierarchyPanel.js')).HierarchyPanel,
+}));
 
 export type DockTheme = 'dark' | 'light';
 
@@ -45,11 +49,12 @@ export function RightDock({ theme, onThemeChange }: Props) {
   const notices = useClientStore((s) => s.notices);
   const { collapsed, requested, open, toggleCollapsed } = useDockState();
   const idBase = useId();
+  const view = useViewMode();
 
   const role = viewerRole({ isHost, seatId, campaign });
   const permissions = (seatId === null ? undefined : campaign?.seats[seatId]?.permissions) ?? null;
-  const tabs = visibleDockTabs(role, permissions);
-  const active = resolveActiveTab(role, permissions, requested);
+  const tabs = visibleDockTabs(role, permissions, view);
+  const active = resolveActiveTab(role, permissions, requested, view);
   const activeLabel = tabs.find((tab) => tab.id === active)?.label ?? 'Chat';
   const tabId = (id: string) => `${idBase}-tab-${id}`;
   const panelId = `${idBase}-panel`;
@@ -90,6 +95,8 @@ export function RightDock({ theme, onThemeChange }: Props) {
         return <LayerPanel campaign={board} role={role} />;
       case 'entities':
         return <EntityPanel campaign={board} />;
+      case 'hierarchy':
+        return <HierarchyPanel campaign={board} />;
       case 'prefabs':
         return <PrefabPanel key={board.activeSceneId} campaign={board} />;
       case 'seats':

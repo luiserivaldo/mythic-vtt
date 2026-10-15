@@ -54,6 +54,7 @@ describe('UI-SHELL-03 registries', () => {
       ['scenes', 'scenes'],
       ['layers', 'layers'],
       ['entities', 'entities'],
+      ['hierarchy', 'hierarchy'],
       ['prefabs', 'prefabs'],
       ['seats', 'seats'],
       ['share', 'share'],
