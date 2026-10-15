@@ -260,6 +260,22 @@ describe('campaign export/import (HIST-03)', () => {
     await rejects(stores(tmp()), zipSync(noManifest), 'invalid-archive');
   });
 
+  it.each(['America/New_York', 'Pacific/Honolulu', 'UTC', 'Asia/Jakarta'])(
+    'exports under TZ=%s (fixed 1980 mtime must stay inside the DOS date range)',
+    async (tz) => {
+      const source = await seed(tmp());
+      const previous = process.env['TZ'];
+      process.env['TZ'] = tz;
+      try {
+        const files = unzipSync(await exported(source));
+        expect(Object.keys(files)).toContain('manifest.json');
+      } finally {
+        if (previous === undefined) delete process.env['TZ'];
+        else process.env['TZ'] = previous;
+      }
+    },
+  );
+
   it('leaves no staging directories behind', async () => {
     const root = tmp();
     const s = stores(root);
