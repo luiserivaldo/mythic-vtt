@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { encodeQrCode } from '../packages/client/src/net/qr.js';
-import { openClient, startTable, type Table } from './harness.js';
+import { openClient, startTable, type Table, claimSeat } from './harness.js';
 
 /**
  * SES-09: an identity can leave the file system entirely and travel as a QR code. The reader is
@@ -94,10 +94,7 @@ test('shows the stored identity as a QR code and transfers it to another browser
   await dm.getByRole('button', { name: 'Add custom participant' }).click();
 
   const source = await openClient(browser, running, 'source', { joinScreen: true });
-  await source.page.getByLabel('Display name').fill('Alice');
-  await source.page.getByRole('button', { name: 'Continue' }).click();
-  await source.page.getByRole('radio', { name: /Wizard/ }).check();
-  await source.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+  await claimSeat(source.page, 'Wizard', 'Alice');
   await expect(source.page.getByRole('dialog')).toHaveCount(0);
   await source.page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await source.page.getByText('Identity backup and transfer', { exact: true }).click();

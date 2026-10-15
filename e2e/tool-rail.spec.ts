@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, startTable, testUlid } from './harness.js';
+import { RawClient, startTable, testUlid, claimSeat } from './harness.js';
 
 // UX-15 (UI-TOOL-01..07): the left tool rail lists Select, Pan, Measure, Draw, Create Prop and the
 // Initiative tracker. A tool a seat may not use stays on the rail, disabled with a reason;
@@ -80,10 +80,7 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     // A player without edit rights: Create Prop stays, disabled with its reason.
     const player = await playerContext.newPage();
     await player.goto(table.clientUrl);
-    await player.getByLabel('Display name').fill('Rail Guest');
-    await player.getByRole('button', { name: 'Continue', exact: true }).click();
-    await player.getByRole('radio', { name: /Rail seat/ }).check();
-    await player.getByRole('button', { name: 'Join participant slot' }).click();
+    await claimSeat(player, 'Rail seat', 'Rail Guest');
     await expect(player.getByRole('dialog')).toHaveCount(0);
     for (const name of TOOLS) await expect(rail(player, name)).toBeVisible();
     await expect(rail(player, 'Create Prop')).toHaveAttribute('aria-disabled', 'true');
@@ -139,9 +136,7 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     try {
       const spectator = await spectatorContext.newPage();
       await spectator.goto(table.clientUrl);
-      await spectator.getByLabel('Display name').fill('Rail watcher');
-      await spectator.getByRole('button', { name: 'Continue', exact: true }).click();
-      await spectator.getByRole('button', { name: 'Join as spectator' }).click();
+      await spectator.getByRole('button', { name: 'Join As Spectator' }).click();
       await expect(spectator.getByRole('dialog')).toHaveCount(0);
       await expect(spectator.getByRole('region', { name: 'Rounds and initiative' })).toHaveCount(0);
       const watcherRail = rail(spectator, 'Initiative');

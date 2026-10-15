@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { startTable, type Table } from './harness.js';
+import { startTable, type Table, claimSeat } from './harness.js';
 
 // UX-24 / UI-CHAT-01: the Chat tab is a message log with a disabled composer until M4-22/M4-23.
 let table: Table | undefined;
@@ -51,10 +51,7 @@ test('the DM and a player both open the Chat tab and find a disabled composer', 
   const player = await playerContext.newPage();
   player.on('pageerror', (error) => errors.push(error.message));
   await player.goto(table.clientUrl);
-  await player.getByLabel('Display name').fill('Chat Player');
-  await player.getByRole('button', { name: 'Continue', exact: true }).click();
-  await player.getByRole('radio', { name: /Player/ }).check();
-  await player.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+  await claimSeat(player, 'Player', 'Chat Player');
   await expect(player.getByRole('status')).toHaveText('Connected to New campaign');
 
   await player.getByRole('tab', { name: 'Chat', exact: true }).click();

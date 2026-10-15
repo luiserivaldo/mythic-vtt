@@ -255,6 +255,16 @@ export async function openClient(
   return { name, context, page };
 }
 
+/**
+ * UI-JOIN-01: a first-time visitor claims `seat` on the join screen under `name`. The caller
+ * waits for whatever "joined" means in its test.
+ */
+export async function claimSeat(page: Page, seat: string, name: string): Promise<void> {
+  await page.getByRole('button', { name: `Claim ${seat}`, exact: true }).click();
+  await page.getByLabel('Display name').fill(name);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+}
+
 /** Starts a table and opens a DM context plus `playerCount` player contexts. */
 export async function openTable(browser: Browser, playerCount: number): Promise<OpenTable> {
   const table = await startTable();

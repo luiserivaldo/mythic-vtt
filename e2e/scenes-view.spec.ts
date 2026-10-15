@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { Campaign } from '../packages/shared/src/index.js';
-import { RawClient, openClient, recordPageFrames, startTable, testUlid } from './harness.js';
+import {
+  RawClient,
+  openClient,
+  recordPageFrames,
+  startTable,
+  testUlid,
+  claimSeat,
+} from './harness.js';
 
 // UI-SCN-01 (MV-247): the DM's Scenes view expands from the top bar as cards grouped in folders.
 // Setting a scene active moves the party; folders and DM-only scenes never reach a player.
@@ -53,10 +60,7 @@ test('the DM creates scenes in folders, sizes the canvas and sets the active sce
     const player = await openClient(browser, table, 'scenes-view-player', { joinScreen: true });
     const frames = recordPageFrames(player.page);
     player.page.on('pageerror', (error) => errors.push(error.message));
-    await player.page.getByLabel('Display name').fill('Aria');
-    await player.page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await player.page.getByRole('radio', { name: /Player/ }).check();
-    await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+    await claimSeat(player.page, 'Player', 'Aria');
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
     await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Blank scene');
 

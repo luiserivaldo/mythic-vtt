@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, startTable, testUlid, type Table } from './harness.js';
+import { RawClient, startTable, testUlid, type Table, claimSeat } from './harness.js';
 
 // UX-34 / UI-SHEET-01: the Sheet tab is a placeholder labelled `WIP`, and "See Sheet" on a token
 // selects it. No sheet data exists yet (CHAR-01), so nothing but text is rendered.
@@ -83,10 +83,7 @@ test('the Sheet tab is a WIP placeholder and See Sheet on a token selects it', a
   const player = await playerContext.newPage();
   player.on('pageerror', (error) => errors.push(error.message));
   await player.goto(table.clientUrl);
-  await player.getByLabel('Display name').fill('Sheet Player');
-  await player.getByRole('button', { name: 'Continue', exact: true }).click();
-  await player.getByRole('radio', { name: /Player/ }).check();
-  await player.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+  await claimSeat(player, 'Player', 'Sheet Player');
   await expect(player.getByRole('status')).toHaveText('Connected to New campaign');
 
   const playerSheetTab = player.getByRole('tab', { name: 'Sheet', exact: true });

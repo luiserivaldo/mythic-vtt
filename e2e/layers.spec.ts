@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, startTable, testUlid } from './harness.js';
+import { RawClient, startTable, testUlid, claimSeat } from './harness.js';
 
 // UI-LAY-01: the Layers tab lists layers top row first, marks one active layer for the viewer,
 // and the DM row never reaches a player.
@@ -87,10 +87,7 @@ test('the Layers tab lists draw order, one active layer, and hides the DM row fr
     const player = await playerContext.newPage();
     player.on('pageerror', (error) => errors.push(error.message));
     await player.goto(table.clientUrl);
-    await player.getByLabel('Display name').fill('Layers guest');
-    await player.getByRole('button', { name: 'Continue', exact: true }).click();
-    await player.getByRole('radio', { name: /Layers guest/ }).check();
-    await player.getByRole('button', { name: 'Join participant slot' }).click();
+    await claimSeat(player, 'Layers guest', 'Layers guest');
     await expect(player.getByRole('status')).toHaveText('Connected to New campaign');
     await expect(player.getByRole('tab', { name: 'Layers', exact: true })).toHaveCount(0);
     for (const name of ['Chat', 'Sheet', 'Help', 'Settings']) {

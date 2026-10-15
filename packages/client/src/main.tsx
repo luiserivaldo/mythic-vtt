@@ -7,7 +7,7 @@ import { loadOrCreateIdentity } from './net/identity.js';
 import { extractSeatInvite, redeemSeatInvite, seatInviteMessage } from './net/seat-invite.js';
 import { ClientStoreContext } from './store/react.js';
 import { createClientStore } from './store/store.js';
-import { JoinContext } from './ui/join-context.js';
+import { JoinContext, RETURNING_KEY } from './ui/join-context.js';
 import { loadProfile } from './ui/join-screen.js';
 import { createSession } from './ui/session.js';
 import { SubmitProvider } from './ui/SubmitProvider.js';
@@ -70,6 +70,15 @@ const session = createSession({
 });
 const hostVisitor = !watchVisitor && (hostToken !== undefined || remembered);
 const initialProfile = loadProfile(localStorage);
+const returning = (() => {
+  try {
+    const flag = sessionStorage.getItem(RETURNING_KEY) === '1';
+    sessionStorage.removeItem(RETURNING_KEY);
+    return flag;
+  } catch {
+    return false;
+  }
+})();
 if (watchVisitor) session.start({ displayName: 'Spectator' });
 else if (hostVisitor)
   session.start({
@@ -113,6 +122,7 @@ createRoot(rootEl).render(
                 hostVisitor,
                 readOnlyVisitor: watchVisitor,
                 initialProfile,
+                returning,
               }}
             >
               <ViewerPreferencesProvider>

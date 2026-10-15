@@ -13,6 +13,7 @@ import {
   startTable,
   testUlid,
   type Reply,
+  claimSeat,
 } from './harness.js';
 
 // LAY-05 (M4-13): freehand drawings live on the effects layer. A drag draws a stroke, the stroke
@@ -103,10 +104,7 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
     player.on('pageerror', (error) => errors.push(error.message));
     const playerFrames = recordPageFrames(player);
     await player.goto(table.clientUrl);
-    await player.getByLabel('Display name').fill('Draw guest');
-    await player.getByRole('button', { name: 'Continue', exact: true }).click();
-    await player.getByRole('radio', { name: /Drawer/ }).check();
-    await player.getByRole('button', { name: 'Join participant slot' }).click();
+    await claimSeat(player, 'Drawer', 'Draw guest');
     await expect(player.getByRole('dialog')).toHaveCount(0);
     const draw = player.getByRole('button', { name: 'Draw', exact: true });
     const panel = player.getByRole('region', { name: 'Draw tool' });

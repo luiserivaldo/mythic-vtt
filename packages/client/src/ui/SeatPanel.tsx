@@ -20,6 +20,7 @@ import {
   seatRows,
 } from './seat-panel.js';
 import { useSubmit } from './submit.js';
+import { useClientStore } from '../store/react.js';
 
 interface Props {
   campaign: Campaign;
@@ -38,6 +39,7 @@ export function SeatPanel({ campaign, presence, unseated, joinUrls }: Props) {
   const { send, error } = useSubmit();
   const [archiveId, setArchiveId] = useState<string | null>(null);
   const [identity, setIdentity] = useState<Record<string, string>>({});
+  const spectators = useClientStore((s) => s.presence?.spectators ?? 0);
   return (
     <section aria-labelledby="ui-seats-h" className="ui-panel">
       <h2 id="ui-seats-h">Participants and permissions</h2>
@@ -55,6 +57,8 @@ export function SeatPanel({ campaign, presence, unseated, joinUrls }: Props) {
           ))}
         </ul>
       )}
+      {/* UI-JOIN-01: spectators are counted, never listed or named. */}
+      <p aria-label="Spectators">Spectators watching: {spectators}</p>
       {archiveId !== null && campaign.seats[archiveId] && (
         <section role="dialog" aria-modal="true" aria-labelledby="archive-title">
           <h3 id="archive-title">Archive {campaign.seats[archiveId].label}?</h3>

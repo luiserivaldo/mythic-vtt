@@ -25,7 +25,8 @@ export interface Session {
   started: () => boolean;
   currentProfile: () => Pick<Profile, 'displayName' | 'avatar' | 'color'> | null;
   subscribe: (listener: () => void) => () => void;
-  joinSeat: (seatId: string) => void;
+  /** Sends `join` on the current connection: a seat claim, a temporary seat or spectating. */
+  join: (fields: Parameters<GameClient['join']>[0]) => void;
   /** Stable for the whole page, so contexts never change; fails fast until a client exists. */
   submitIntent: SubmitIntent;
   sendEphemeral: (channel: string, data: unknown) => void;
@@ -82,8 +83,8 @@ export function createSession(deps: SessionDeps): Session {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    joinSeat(seatId) {
-      client?.join({ seatId });
+    join(fields) {
+      client?.join(fields);
     },
     sendEphemeral: (channel, data) => client?.sendEphemeral(channel, data),
     onEphemeral: (listener) => {

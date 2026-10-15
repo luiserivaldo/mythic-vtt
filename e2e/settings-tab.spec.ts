@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import { RawClient, startTable, testUlid } from './harness.js';
+import { RawClient, startTable, testUlid, claimSeat } from './harness.js';
 
 test('viewer settings persist locally, DM permissions work, and export downloads a ZIP', async ({
   browser,
@@ -48,10 +48,7 @@ test('viewer settings persist locally, DM permissions work, and export downloads
       }),
     ).toMatchObject({ t: 'ack' });
     await player.goto(table.clientUrl);
-    await player.getByLabel('Display name').fill('Settings player');
-    await player.getByRole('button', { name: 'Continue', exact: true }).click();
-    await player.getByRole('radio', { name: /Settings player/ }).check();
-    await player.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+    await claimSeat(player, 'Settings player', 'Settings player');
     await expect(player.getByRole('dialog')).toHaveCount(0);
     for (const page of [dm, player]) {
       await page.getByRole('tab', { name: 'Settings', exact: true }).click();

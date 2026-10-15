@@ -1,44 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { makeCampaign, tid } from '../testing.js';
+import type { JoinPayload } from '@mythic/protocol';
+import { tid } from '../testing.js';
 import {
   AVATAR_MAX_CHARS,
   avatarHue,
   cleanDisplayName,
-  defaultSeat,
   fitSize,
   initialsOf,
   isValidAvatar,
-  joinStep,
+  joinSeatRows,
+  joinView,
   loadProfile,
+  parseJoinPayload,
   parseProfile,
   saveProfile,
-  seatChoices,
-  validSelection,
   withoutSpectator,
-  type JoinFlowInput,
+  type JoinViewInput,
 } from './join-screen.js';
 import { rosterOptions } from './seat-panel.js';
 
-const ME = tid(10);
-const OTHER = tid(11);
-
-function campaignWithSeats() {
-  const c = makeCampaign();
-  const seat = (n: number, label: string, identityId: string | null) => ({
-    id: tid(n),
-    label,
-    binding: 'persistent' as const,
-    identityId,
-    role: 'player' as const,
-    permissions: { view: true, move: true, edit: false, delete: false },
-  });
+function payload(): JoinPayload {
   return {
-    ...c,
-    seats: {
-      [tid(20)]: seat(20, 'Wizard', null),
-      [tid(21)]: seat(21, 'Rogue', OTHER),
-      [tid(22)]: seat(22, 'Cleric', null),
-    },
+    protocol: 10,
+    host: { name: 'Game Master' },
+    campaign: { title: 'Vault', icon: { kind: 'glyph', value: 'V' } },
+    sceneActive: true,
+    seats: [
+      { seatId: tid(20), label: 'Wizard', role: 'player', claim: 'free' },
+      { seatId: tid(21), label: 'Rogue', role: 'player', claim: 'claimed' },
+      { seatId: tid(22), label: 'Cleric', role: 'codm', claim: 'free' },
+    ],
   };
 }
 
@@ -105,59 +96,52 @@ describe('profile persistence', () => {
   });
 });
 
-describe('seat picker view model', () => {
-  it('enables free seats, disables taken ones and marks the previous seat', () => {
-    const rows = seatChoices(campaignWithSeats(), ME, tid(22));
-    expect(rows.map((r) => [r.label, r.state, r.disabled, r.previous])).toEqual([
-      ['Cleric', 'free', false, true],
-      ['Rogue', 'taken', true, false],
-      ['Wizard', 'free', false, false],
+describe('join seat rows (UI-JOIN-01)', () => {
+  it('sorts by name, marks claimed seats and the last seat', () => {
+    const rows = joinSeatRows(payload(), tid(20));
+    expect(rows.map((r) => [r.label, r.roleLabel, r.claimed, r.previous])).toEqual([
+      ['Cleric', 'Co-DM', false, false],
+      ['Rogue', 'Player', true, false],
+      ['Wizard', 'Player', false, true],
     ]);
-    expect(defaultSeat(rows)).toBe(tid(22));
   });
-  it('does not preselect a previous seat that was taken meanwhile', () => {
-    const rows = seatChoices(campaignWithSeats(), ME, tid(21));
-    expect(defaultSeat(rows)).toBeNull();
+  it('shows an empty list when the DM has made no seats', () => {
+    expect(joinSeatRows({ ...payload(), seats: [] }, undefined)).toEqual([]);
   });
-  it('marks and preselects your own bound seat (SES-06)', () => {
-    const c = campaignWithSeats();
-    const wizard = c.seats[tid(20)];
-    if (!wizard) throw new Error('fixture');
-    const seats = { ...c.seats, [tid(20)]: { ...wizard, identityId: ME } };
-    const rows = seatChoices({ ...c, seats }, ME, undefined);
-    expect(rows.find((r) => r.id === tid(20))).toMatchObject({ state: 'mine', disabled: false });
-    expect(defaultSeat(rows)).toBe(tid(20));
-  });
-  it('drops a selection once the seat is taken', () => {
-    const rows = seatChoices(campaignWithSeats(), ME, undefined);
-    expect(validSelection(rows, tid(22))).toBe(tid(22));
-    expect(validSelection(rows, tid(21))).toBeNull();
-    expect(validSelection(rows, null)).toBeNull();
-  });
-  it('shows an empty list when the campaign has no seats', () => {
-    expect(seatChoices(makeCampaign(), ME, undefined)).toEqual([]);
+  it('accepts only a strict join payload', () => {
+    expect(parseJoinPayload(payload())).toEqual(payload());
+    expect(parseJoinPayload({ ...payload(), spectators: 3 })).toBeNull();
+    expect(parseJoinPayload({ error: 'too many requests' })).toBeNull();
   });
 });
 
-describe('joinStep', () => {
-  const base: JoinFlowInput = {
+describe('joinView', () => {
+  const base: JoinViewInput = {
     hostVisitor: false,
-    started: true,
-    editingName: false,
-    ready: true,
+    started: false,
+    ready: false,
     seatId: null,
-    spectator: false,
+    naming: null,
+    pending: null,
+    watching: false,
+    sceneActive: true,
+    noScene: false,
   };
   it.each([
-    [{ hostVisitor: true, started: false }, 'done'],
-    [{ started: false }, 'name'],
-    [{ editingName: true }, 'name'],
-    [{ ready: false }, 'connecting'],
-    [{}, 'seat'],
-    [{ seatId: tid(20) }, 'done'],
-    [{ spectator: true }, 'done'],
-  ] as const)('%j -> %s', (over, step) => {
-    expect(joinStep({ ...base, ...over })).toBe(step);
+    [{ hostVisitor: true }, 'done'],
+    [{}, 'pick'],
+    [{ sceneActive: null }, 'loading'],
+    [{ sceneActive: false }, 'waiting'],
+    [{ naming: { kind: 'temporary' } }, 'name'],
+    [{ started: true }, 'connecting'],
+    [{ started: true, ready: true, pending: { kind: 'claim', seatId: tid(20) } }, 'connecting'],
+    [{ started: true, ready: true, seatId: tid(20) }, 'done'],
+    [{ started: true, ready: true, watching: true }, 'watching'],
+    [{ started: true, ready: true }, 'pick'],
+    [{ started: true, ready: true, noScene: true }, 'waiting'],
+    [{ started: true, ready: true, seatId: tid(20), noScene: true }, 'waiting'],
+  ] as const)('%j -> %s', (over, view) => {
+    expect(joinView({ ...base, ...over })).toBe(view);
   });
 });
 
@@ -170,7 +154,7 @@ describe('rosterOptions', () => {
   });
 });
 
-it('validates and preserves the chosen colour across profile persistence and seat choice', () => {
+it('validates and preserves the chosen colour across profile persistence', () => {
   const profile = parseProfile(
     JSON.stringify({ displayName: 'Colour Guest', color: '#AABBCC', spectator: true }),
   );

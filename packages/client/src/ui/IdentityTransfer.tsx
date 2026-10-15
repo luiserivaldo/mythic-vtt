@@ -13,7 +13,7 @@ import {
   parseIdentityQr,
 } from '../net/identity-qr.js';
 import type { QrCode } from '../net/qr.js';
-import { useJoinEnv } from './join-context.js';
+import { RETURNING_KEY, useJoinEnv } from './join-context.js';
 import { pollQrText } from './qr-scan.js';
 import { qrSvg } from './qr-svg.js';
 
@@ -240,6 +240,11 @@ export function IdentityTransfer() {
               try {
                 installIdentityFile(env.storage, pending);
                 env.session.stop();
+                try {
+                  sessionStorage.setItem(RETURNING_KEY, '1');
+                } catch {
+                  // Without it the visitor gets the normal join screen after the reload.
+                }
                 window.location.reload();
               } catch {
                 setError('The identity could not be saved. Check browser storage and try again.');

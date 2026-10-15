@@ -8,6 +8,7 @@ import {
   type Client,
   type Reply,
   type Table,
+  claimSeat,
 } from './harness.js';
 
 // M4-11 / CAM-06: the DM "pulls all players to my view" and a spectator can follow the DM camera.
@@ -131,12 +132,9 @@ async function addPlayerSeat(dm: Page, label: string): Promise<void> {
   await expect(dm.getByText(label, { exact: true }).first()).toBeVisible();
 }
 
-/** A first-time visitor joins the table by name, seated in the only free slot. */
-async function joinAsPlayer(page: Page, name: string): Promise<void> {
-  await page.getByLabel('Display name').fill(name);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('radio', { name: /Player/ }).check();
-  await page.getByRole('button', { name: 'Join participant slot' }).click();
+/** A first-time visitor claims `seat` on the join screen under `name`. */
+async function joinAsPlayer(page: Page, seat: string, name: string): Promise<void> {
+  await claimSeat(page, seat, name);
   await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
 }
 
@@ -173,7 +171,7 @@ test('the DM pulls a player to their 2D view and a spectator follows the DM came
     const player = await openClient(browser, dm.table, 'player', { joinScreen: true });
     player.page.on('pageerror', (error) => errors.push(error.message));
     await expect(player.page.getByRole('dialog', { name: 'Join the table' })).toBeVisible();
-    await joinAsPlayer(player.page, 'Followed Rogue');
+    await joinAsPlayer(player.page, 'Followed', 'Followed Rogue');
 
     const spectator = await openClient(browser, dm.table, 'watcher');
     await expect(spectator.page.getByRole('status')).toHaveText('Connected to New campaign');
@@ -251,7 +249,7 @@ test('a pull adopts the DM 3D camera, mode included', async ({ browser }) => {
 
     const player = await openClient(browser, dm.table, 'player-3d', { joinScreen: true });
     player.page.on('pageerror', (error) => errors.push(error.message));
-    await joinAsPlayer(player.page, 'Adopted Rogue');
+    await joinAsPlayer(player.page, 'Adopted', 'Adopted Rogue');
     // The player starts in 2D, so the pull has to carry the DM's mode as well as the pose.
     await expect(player.page.getByRole('button', { name: '2D view' })).toHaveAttribute(
       'aria-pressed',
