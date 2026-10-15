@@ -45,15 +45,14 @@ test('join colour persists and colours the avatar and shared ruler in 2D and 3D'
     const player = await playerContext.newPage();
     await player.goto(table.clientUrl);
     await expect(player.getByRole('heading', { name: 'Mythic VTT by MythicTomes' })).toBeVisible();
+    await player.getByRole('button', { name: 'Claim Colour seat', exact: true }).click();
     await player.getByLabel('Display name').fill('Colour Guest');
     await player.getByLabel('Your colour').fill('#c04e32');
-    await player.getByRole('button', { name: 'Continue', exact: true }).click();
-    await expect(player.locator('.join-who .join-avatar')).toHaveCSS(
+    await expect(player.locator('.join-avatar-row .join-avatar')).toHaveCSS(
       'background-color',
       'rgb(192, 78, 50)',
     );
-    await player.getByRole('radio', { name: /Colour seat/ }).check();
-    await player.getByRole('button', { name: 'Join participant slot' }).click();
+    await player.getByRole('button', { name: 'Continue', exact: true }).click();
     await expect(player.getByRole('dialog')).toHaveCount(0);
     await setup.waitFor('host presence colour', () =>
       setup.frames.some((f) => f.includes('"color":"#c04e32"')),
@@ -93,9 +92,7 @@ test('join colour persists and colours the avatar and shared ruler in 2D and 3D'
   }
 });
 
-test('a new colour profile cannot join or spectate until the DM activates a scene', async ({
-  browser,
-}) => {
+test('a visitor cannot join or spectate until the DM activates a scene', async ({ browser }) => {
   const table = await startTable();
   const context = await browser.newContext();
   try {
@@ -113,18 +110,17 @@ test('a new colour profile cannot join or spectate until the DM activates a scen
     await host.intent('scene.delete', { sceneId: active });
     const guest = await context.newPage();
     await guest.goto(table.clientUrl);
-    await guest.getByLabel('Display name').fill('Waiting Guest');
-    await guest.getByLabel('Your colour').fill('#123456');
-    await guest.getByRole('button', { name: 'Continue', exact: true }).click();
     await expect(guest.getByRole('alert')).toContainText('No active scene');
-    await expect(guest.getByRole('button', { name: 'Join as spectator' })).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'Join As Spectator' })).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'Temporary Player' })).toHaveCount(0);
     await host.intent('scene.activate', { sceneId: spare });
-    await guest.getByRole('button', { name: 'Join as spectator' }).click();
+    await guest.getByRole('button', { name: 'Join As Spectator' }).click();
     await expect(guest.getByRole('dialog')).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'Watching: choose a seat' })).toBeVisible();
+    // A spectator stores no profile, so the next visit offers the choices again.
     await guest.reload();
-    await expect(
-      guest.getByRole('button', { name: 'Spectating: choose a participant slot' }),
-    ).toBeVisible();
+    await expect(guest.getByRole('dialog', { name: 'Join the table' })).toBeVisible();
+    expect(await guest.evaluate(() => localStorage.getItem('mythic.profile.v1'))).toBeNull();
     await host.close();
   } finally {
     await context.close();

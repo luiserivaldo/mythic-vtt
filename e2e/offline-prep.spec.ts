@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openClient, recordPageFrames, startTable } from './harness.js';
+import { openClient, recordPageFrames, startTable, claimSeat } from './harness.js';
 
 // HOST-04: the DM builds and edits scenes with the host running and no players connected, then
 // starts the session from that state.
@@ -78,10 +78,7 @@ test('the DM preps scenes with no players connected, then starts the session fro
     const player = await openClient(browser, table, 'prep-player', { joinScreen: true });
     const frames = recordPageFrames(player.page);
     player.page.on('pageerror', (error) => errors.push(error.message));
-    await player.page.getByLabel('Display name').fill('Aria');
-    await player.page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await player.page.getByRole('radio', { name: /Aria/ }).check();
-    await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+    await claimSeat(player.page, 'Aria', 'Aria');
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
     await expect(player.page.getByLabel('Current scene', { exact: true })).toHaveText(
       'Vault of ash',
@@ -127,10 +124,7 @@ test('prep survives a host restart and a player joins the state prepared offline
     await addSeat(dm, 'Borin');
     const player = await openClient(browser, table, 'prep-restart-player', { joinScreen: true });
     player.page.on('pageerror', (error) => errors.push(error.message));
-    await player.page.getByLabel('Display name').fill('Borin');
-    await player.page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await player.page.getByRole('radio', { name: /Borin/ }).check();
-    await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+    await claimSeat(player.page, 'Borin', 'Borin');
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
     await expect(player.page.getByLabel('Current scene', { exact: true })).toHaveText(
       'Prepared hall',
@@ -170,8 +164,6 @@ test('a player waits out the prep, then joins the scene the DM starts the sessio
     const player = await openClient(browser, table, 'prep-waiter', { joinScreen: true });
     const frames = recordPageFrames(player.page);
     player.page.on('pageerror', (error) => errors.push(error.message));
-    await player.page.getByLabel('Display name').fill('Aria');
-    await player.page.getByRole('button', { name: 'Continue', exact: true }).click();
     await expect(player.page.getByRole('alert')).toContainText('No active scene');
 
     // The DM keeps prepping, then starts the session with the prepared scene.
@@ -188,9 +180,7 @@ test('a player waits out the prep, then joins the scene the DM starts the sessio
     await addSeat(dm, 'Aria');
 
     // The waiting player is let in and sees the prepared scene.
-    await expect(player.page.getByRole('radio', { name: /Aria/ })).toBeVisible();
-    await player.page.getByRole('radio', { name: /Aria/ }).check();
-    await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+    await claimSeat(player.page, 'Aria', 'Aria');
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
     await expect(player.page.getByLabel('Current scene', { exact: true })).toHaveText(
       'Vault of ash',

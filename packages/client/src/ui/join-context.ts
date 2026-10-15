@@ -12,7 +12,12 @@ export interface JoinEnv {
   /** SES-11: credential-bound spectators cannot switch identities or claim seats. */
   readOnlyVisitor?: boolean;
   initialProfile: Profile | null;
+  /** Just replaced its identity (transfer): ask for a name and let the host restore the seat. */
+  returning?: boolean;
 }
+
+/** Set by an identity transfer just before it reloads the page; read once on start. */
+export const RETURNING_KEY = 'mythic.join.returning';
 
 export const JoinContext = createContext<JoinEnv | null>(null);
 

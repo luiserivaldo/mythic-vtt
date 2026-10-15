@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, recordPageFrames, startTable, testUlid, type Table } from './harness.js';
+import {
+  RawClient,
+  recordPageFrames,
+  startTable,
+  testUlid,
+  type Table,
+  claimSeat,
+} from './harness.js';
 
 // UX-23: the right dock is an icon tab strip whose tabs depend on the viewer's role.
 let table: Table | undefined;
@@ -76,10 +83,7 @@ test('players get four tabs, never render DM tabs, and the DM sees them all', as
   const frames = recordPageFrames(guest);
   guest.on('pageerror', (error) => errors.push(error.message));
   await guest.goto(table.clientUrl);
-  await guest.getByLabel('Display name').fill('Dock Guest');
-  await guest.getByRole('button', { name: 'Continue' }).click();
-  await guest.getByRole('radio', { name: /Spectator/ }).check();
-  await guest.getByRole('button', { name: 'Join participant slot' }).click();
+  await claimSeat(guest, 'Spectator', 'Dock Guest');
   await expect(guest.getByRole('status')).toHaveText('Connected to New campaign');
 
   const guestTabs = guest.getByRole('tablist', { name: 'Dock tabs' });

@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, recordPageFrames, startTable, testUlid, type Table } from './harness.js';
+import {
+  RawClient,
+  recordPageFrames,
+  startTable,
+  testUlid,
+  type Table,
+  claimSeat,
+} from './harness.js';
 
 let table: Table | undefined;
 
@@ -82,10 +89,7 @@ test('the DM adds role templates and the spectator preset receives a read-only p
   const frames = recordPageFrames(viewer);
   viewer.on('pageerror', (error) => errors.push(error.message));
   await viewer.goto(table.clientUrl);
-  await viewer.getByLabel('Display name').fill('Read Only Guest');
-  await viewer.getByRole('button', { name: 'Continue' }).click();
-  await viewer.getByRole('radio', { name: /Spectator/ }).check();
-  await viewer.getByRole('button', { name: 'Join participant slot' }).click();
+  await claimSeat(viewer, 'Spectator', 'Read Only Guest');
   await expect(viewer.getByRole('status')).toHaveText('Connected to New campaign');
   await expect(viewer.getByTestId('token-label').filter({ hasText: 'PUBLIC TOKEN' })).toBeVisible();
   await expect(viewer.getByText('SECRET TEMPLATE TOKEN')).toHaveCount(0);

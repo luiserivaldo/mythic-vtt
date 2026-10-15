@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, openClient, recordPageFrames, startTable, testUlid } from './harness.js';
+import {
+  RawClient,
+  openClient,
+  recordPageFrames,
+  startTable,
+  testUlid,
+  claimSeat,
+} from './harness.js';
 
 test('DM browsing stays local, deleted player scene becomes empty, and new joins are blocked', async ({
   browser,
@@ -33,10 +40,7 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     const player = await openClient(browser, table, 'lifecycle-player', { joinScreen: true });
     const frames = recordPageFrames(player.page);
     player.page.on('pageerror', (error) => errors.push(error.message));
-    await player.page.getByLabel('Display name').fill('Aria');
-    await player.page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await player.page.getByRole('radio', { name: /Player/ }).check();
-    await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+    await claimSeat(player.page, 'Player', 'Aria');
     await expect(player.page.getByRole('dialog')).toHaveCount(0);
     expect(
       await host.intent('scene.rename', { sceneId: active, name: 'Player scene' }),
@@ -118,9 +122,9 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     await expect(secret.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled();
     const late = await openClient(browser, table, 'lifecycle-late', { joinScreen: true });
     const lateFrames = recordPageFrames(late.page);
-    await late.page.getByLabel('Display name').fill('Late visitor');
-    await late.page.getByRole('button', { name: 'Continue', exact: true }).click();
+    // UI-JOIN-01: the late visitor is blocked before giving a name or opening a socket.
     await expect(late.page.getByRole('alert')).toContainText('No active scene');
+    await expect(late.page.getByRole('button', { name: 'Join As Spectator' })).toHaveCount(0);
     await player.page.reload();
     await expect(player.page.getByRole('alert')).toContainText('No active scene');
     for (const received of [frames, lateFrames]) {

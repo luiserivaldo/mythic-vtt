@@ -1,5 +1,4 @@
-import { PlayerColor } from '@mythic/protocol';
-import type { Campaign } from '@mythic/shared';
+import { JoinPayload, PlayerColor } from '@mythic/protocol';
 import type { KeyValueStore } from '../net/identity.js';
 
 // SES-01 / SES-02 / SES-06: the join screen's rules, kept free of React and the DOM so they can be
@@ -103,84 +102,84 @@ export function withoutSpectator(profile: Profile): Profile {
   };
 }
 
-export type SeatState = 'free' | 'taken' | 'mine';
+export type JoinIcon = NonNullable<JoinPayload['campaign']['icon']>;
 
-export interface SeatChoice {
-  id: string;
+/** UI-JOIN-01: one row of the pre-join seat list, built from `GET /api/join` only. */
+export interface JoinSeatRow {
+  seatId: string;
   label: string;
   roleLabel: string;
-  state: SeatState;
-  /** The seat this identity last sat in (SES-06). */
+  icon: JoinIcon | undefined;
+  /** Someone holds it; the payload never says who (PERM-03). */
+  claimed: boolean;
+  /** The seat this browser last sat in (SES-06). */
   previous: boolean;
-  disabled: boolean;
+}
+
+export function joinSeatRows(payload: JoinPayload, lastSeatId: string | undefined): JoinSeatRow[] {
+  return [...payload.seats]
+    .sort((a, b) => a.label.localeCompare(b.label) || a.seatId.localeCompare(b.seatId))
+    .map((seat) => ({
+      seatId: seat.seatId,
+      label: seat.label,
+      roleLabel: seat.role === 'codm' ? 'Co-DM' : 'Player',
+      icon: seat.icon,
+      claimed: seat.claim === 'claimed',
+      previous: seat.seatId === lastSeatId,
+    }));
+}
+
+/** The join payload, or null when the body is not one (an old or foreign host). */
+export function parseJoinPayload(body: unknown): JoinPayload | null {
+  const parsed = JoinPayload.safeParse(body);
+  return parsed.success ? parsed.data : null;
+}
+
+/** Image icons are content hashes on the host's public asset route. */
+export function joinImageUrl(hash: string): string {
+  return `/assets/${hash}`;
 }
 
 /**
- * The picker rows: free seats are selectable, taken ones are disabled, this identity's own seat is
- * marked. `identityId` comes from the seat binding already in the visitor's snapshot.
+ * What the visitor asked for. `returning` follows an identity transfer: the name step connects
+ * and the host puts a bound identity back in its seat.
  */
-export function seatChoices(
-  campaign: Campaign,
-  identityId: string,
-  lastSeatId: string | undefined,
-): SeatChoice[] {
-  return Object.values(campaign.seats)
-    .filter((seat) => !seat.archived)
-    .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id))
-    .map((seat) => {
-      const state: SeatState =
-        seat.identityId === null ? 'free' : seat.identityId === identityId ? 'mine' : 'taken';
-      return {
-        id: seat.id,
-        label: seat.label,
-        roleLabel:
-          seat.role === 'codm'
-            ? 'Co-DM'
-            : !seat.permissions.move && !seat.permissions.edit && !seat.permissions.delete
-              ? 'Spectator'
-              : 'Player',
-        state,
-        previous: seat.id === lastSeatId || state === 'mine',
-        disabled: state === 'taken',
-      };
-    });
-}
+export type JoinRequest =
+  | { kind: 'claim'; seatId: string }
+  | { kind: 'temporary' }
+  | { kind: 'spectator' }
+  | { kind: 'returning' };
 
-/** Preselect your own seat, else your previous seat if still free, else nothing. */
-export function defaultSeat(choices: readonly SeatChoice[]): string | null {
-  const own = choices.find((c) => c.state === 'mine');
-  if (own) return own.id;
-  const previous = choices.find((c) => c.previous && !c.disabled);
-  return previous?.id ?? null;
-}
-
-/** Keep a selection only while its seat is still free (someone may take it meanwhile). */
-export function validSelection(
-  choices: readonly SeatChoice[],
-  selected: string | null,
-): string | null {
-  const row = choices.find((c) => c.id === selected);
-  return row && !row.disabled ? row.id : null;
-}
-
-export interface JoinFlowInput {
+export interface JoinViewInput {
   hostVisitor: boolean;
   started: boolean;
-  editingName: boolean;
   ready: boolean;
   seatId: string | null;
-  spectator: boolean;
+  /** A request whose name step is open. */
+  naming: JoinRequest | null;
+  /** A request sent (or about to be sent) on the current connection, not yet answered. */
+  pending: JoinRequest | null;
+  /** Watching without a seat: an anonymous spectator, or a remembered unseated profile. */
+  watching: boolean;
+  /** From the join payload; null until it arrives. */
+  sceneActive: boolean | null;
+  /** Connected, and this visitor has no active scene to play in (UI-TOP-03), seated or not. */
+  noScene: boolean;
 }
 
-export type JoinStep = 'name' | 'connecting' | 'seat' | 'done';
+export type JoinView = 'done' | 'name' | 'connecting' | 'watching' | 'waiting' | 'loading' | 'pick';
 
-/** Which screen to show. Host and DM-link visitors never see one (the DM link skips it). */
-export function joinStep(i: JoinFlowInput): JoinStep {
+/** Which screen to show. Host and DM-link visitors never see one. */
+export function joinView(i: JoinViewInput): JoinView {
   if (i.hostVisitor) return 'done';
-  if (!i.started || i.editingName) return 'name';
-  if (!i.ready) return 'connecting';
-  if (i.seatId !== null || i.spectator) return 'done';
-  return 'seat';
+  if (i.noScene) return 'waiting';
+  if (i.seatId !== null) return 'done';
+  if (i.naming) return 'name';
+  if (i.started && (!i.ready || i.pending)) return 'connecting';
+  if (i.started && i.watching) return 'watching';
+  if (i.sceneActive === false) return 'waiting';
+  if (i.sceneActive === null) return 'loading';
+  return 'pick';
 }
 
 /** Down-scaled image size that keeps the aspect ratio and fits a square of `max` pixels. */

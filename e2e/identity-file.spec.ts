@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openClient, startTable, type Table } from './harness.js';
+import { openClient, startTable, type Table, claimSeat } from './harness.js';
 
 let table: Table | undefined;
 test.beforeAll(async () => {
@@ -21,10 +21,7 @@ test('identity backup transfers an occupied seat to another browser without uplo
   await dm.getByPlaceholder('Custom participant name').fill('Wizard');
   await dm.getByRole('button', { name: 'Add custom participant' }).click();
   const first = await openClient(browser, table, 'original', { joinScreen: true });
-  await first.page.getByLabel('Display name').fill('Alice');
-  await first.page.getByRole('button', { name: 'Continue' }).click();
-  await first.page.getByRole('radio', { name: /Wizard/ }).check();
-  await first.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+  await claimSeat(first.page, 'Wizard', 'Alice');
   await expect(first.page.getByRole('dialog')).toHaveCount(0);
   await first.page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await first.page.getByText('Identity backup and transfer', { exact: true }).click();

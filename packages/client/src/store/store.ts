@@ -40,6 +40,8 @@ export interface ClientState {
   notices: Notice[];
   /** Fatal host error, e.g. protocol mismatch; shown instead of the table. */
   fatalError: string | null;
+  /** UI-JOIN-01: refused `join` requests so far and the last reason, for the join screen. */
+  joinRefusals: { count: number; message: string };
   pendingIntents: number;
 }
 
@@ -76,6 +78,7 @@ const initial: ClientState = {
   presence: null,
   notices: [],
   fatalError: null,
+  joinRefusals: { count: 0, message: '' },
   pendingIntents: 0,
 };
 
@@ -189,6 +192,10 @@ export function createClientStore(): StoreApi<ClientStore> {
           return 'ok';
         case 'error':
           if (message.fatal) set({ fatalError: `${message.code}: ${message.message}` });
+          else if (message.code === 'seat-unavailable')
+            set({
+              joinRefusals: { count: get().joinRefusals.count + 1, message: message.message },
+            });
           return 'ok';
         // ack/reject belong to the intent queue; ephemeral and pong are not state.
         case 'ack':

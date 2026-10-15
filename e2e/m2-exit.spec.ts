@@ -6,6 +6,7 @@ import {
   startTable,
   testUlid,
   type Table,
+  claimSeat,
 } from './harness.js';
 
 let table: Table | undefined;
@@ -62,13 +63,8 @@ test('DM, player and spectator keep shared state and privacy across independent 
   const errors: string[] = [];
   for (const page of pages) page.on('pageerror', (error) => errors.push(error.message));
   await dm.goto(table.clientUrl);
-  await spectator.page.getByLabel('Display name').fill('Spectator');
-  await spectator.page.getByRole('button', { name: 'Continue' }).click();
-  await spectator.page.getByRole('button', { name: 'Join as spectator' }).click();
-  await player.page.getByLabel('Display name').fill('Player');
-  await player.page.getByRole('button', { name: 'Continue' }).click();
-  await player.page.getByRole('radio', { name: /Wizard/ }).check();
-  await player.page.getByRole('button', { name: 'Join participant slot', exact: true }).click();
+  await spectator.page.getByRole('button', { name: 'Join As Spectator' }).click();
+  await claimSeat(player.page, 'Wizard', 'Player');
   for (const page of pages) {
     await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
     await expect(
