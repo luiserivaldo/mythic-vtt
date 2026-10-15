@@ -1,5 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
+import { selectionStore } from '../tools/selection-store.js';
 
 const DIAGNOSTICS_ENABLED = import.meta.env.DEV || import.meta.env.MODE === 'test';
 
@@ -51,6 +52,8 @@ export function RenderDiagnostics() {
         });
         return colors;
       },
+      /** The local selection (UX-16 marquee e2e). */
+      getSelection: () => [...selectionStore.getState().ids],
       getObjectCount: (name: string) => {
         let count = 0;
         scene.traverse((object) => {

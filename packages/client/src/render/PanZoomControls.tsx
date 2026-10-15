@@ -4,7 +4,6 @@ import type { OrthographicCamera } from 'three';
 import {
   applyWheel,
   classifyWheel,
-  DRAG_THRESHOLD_PX,
   panByPixels,
   pinchUpdate,
   clampViewToBounds,
@@ -14,10 +13,12 @@ import {
   type Point,
   type View2D,
 } from './camera-2d.js';
+import { cameraPress, isDrag } from './board-input.js';
 import { pointerClaims } from './pointer-claims.js';
 
 /**
- * Mouse, trackpad and touch pan/zoom for the 2D orthographic camera (CAM-01).
+ * Mouse, trackpad and touch pan/zoom for the 2D orthographic camera (CAM-01). Which button pans
+ * is board-input's call (UI-INPUT-01..03): middle always, left only with the Pan tool.
  * Renders nothing; it only drives the default camera and invalidates the
  * on-demand frame loop. Maths lives in camera-2d.ts.
  */
@@ -25,10 +26,13 @@ export function PanZoomControls({
   bounds,
   frameKey,
   initialView,
+  tool,
 }: {
   bounds: CanvasSize;
   frameKey: string;
   initialView?: View2D | undefined;
+  /** The rail tool in effect; only Pan lets a left drag move the camera (UI-TOOL-02). */
+  tool: string;
 }) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
@@ -38,6 +42,8 @@ export function PanZoomControls({
   // Kept in a ref so the long-lived listeners below always clamp to the current canvas.
   const boundsRef = useRef(bounds);
   boundsRef.current = bounds;
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
   const restored = useRef(initialView);
   const framed = useRef<{ camera: unknown; key: string } | null>(null);
   // Until the user pans or zooms, a resize (e.g. the header changing height) keeps the whole
@@ -99,8 +105,8 @@ export function PanZoomControls({
     };
 
     const onPointerDown = (e: PointerEvent) => {
-      // Left, middle or touch/pen contact pans. Right button is left for context menus.
-      if (e.pointerType === 'mouse' && e.button === 2) return;
+      // UI-INPUT-01/03: middle pans, left only with the Pan tool; right is left for the menu.
+      if (cameraPress('2d', e.pointerType, e.button, toolRef.current) !== 'pan') return;
       // M1-20: a press that started on a gizmo handle belongs to the gizmo, not the camera.
       if (pointerClaims.isClaimed(e.pointerId)) return;
       pointers.set(e.pointerId, local(e));
@@ -130,7 +136,7 @@ export function PanZoomControls({
         return;
       }
       if (!dragging && pressStart) {
-        if (Math.hypot(next.x - pressStart.x, next.y - pressStart.y) < DRAG_THRESHOLD_PX) return;
+        if (!isDrag(pressStart, next)) return;
         dragging = true;
       }
       if (dragging) {

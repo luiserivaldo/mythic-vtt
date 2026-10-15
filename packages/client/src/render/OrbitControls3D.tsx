@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react';
 import type { PerspectiveCamera as ThreePerspectiveCamera } from 'three';
 import {
   clampTargetToGround,
-  cameraPointerMode,
   dampVelocity,
   defaultOrbit,
   dolly,
@@ -19,7 +18,7 @@ import {
   type Orbit3D,
   type Point,
 } from './camera-3d.js';
-import { DRAG_THRESHOLD_PX } from './camera-2d.js';
+import { cameraPress, isDrag } from './board-input.js';
 import { pointerClaims } from './pointer-claims.js';
 
 export interface OrbitControls3DProps {
@@ -33,13 +32,15 @@ export interface OrbitControls3DProps {
   applyRef?: RefObject<((o: Orbit3D) => void) | null>;
   /** M2-05: mount at `orbitRef`'s pose instead of the default view (Reset view still resets). */
   keepInitialOrbit?: boolean;
-  /** M2-15: left-drag pans only while no board tool is active. */
-  leftPanEnabled?: boolean;
+  /** The rail tool in effect; only Pan lets a left drag move the camera (UI-INPUT-01, UI-TOOL-02). */
+  tool?: string;
 }
 
 /**
  * Self-contained 3D camera (CAM-02): perspective camera + orbit/pan/dolly input.
- * Mouse: right-drag orbits; middle-drag and an unclaimed left-drag pan; wheel dollies.
+ * Mouse (board-input, UI-INPUT-01..04): right-drag orbits; middle-drag pans, and so does left-drag
+ * with the Pan tool; wheel dollies. A mouse press waits for the drag threshold, so a right click
+ * opens the menu and a middle click toggles flying without nudging the camera.
  * Touch: one finger orbits, two fingers pinch-zoom and pan. Board tools claim left presses
  * before the camera sees them. Mounted by the 2D↔3D toggle (M2-05).
  * Maths lives in camera-3d.ts; the camera up vector is always +Y so roll cannot occur.
@@ -50,7 +51,7 @@ export function OrbitControls3D({
   orbitRef,
   applyRef,
   keepInitialOrbit = false,
-  leftPanEnabled = true,
+  tool = 'pan',
 }: OrbitControls3DProps) {
   // Compare bounds by value: a new object with the same extent (e.g. after an entity moves)
   // must not reset the user's orbit.
@@ -166,16 +167,17 @@ export function OrbitControls3D({
 
     const onPointerDown = (e: PointerEvent) => {
       if (pointerClaims.isClaimed(e.pointerId)) return;
-      const mode = cameraPointerMode(e.pointerType, e.button, leftPanEnabled);
+      const mode = cameraPress('3d', e.pointerType, e.button, tool);
       if (!mode) return;
       velocity.current = { az: 0, polar: 0 };
       const point = local(e);
       pointers.set(e.pointerId, point);
       starts.set(e.pointerId, point);
       modes.set(e.pointerId, mode);
-      // A pan waits for the drag threshold (left or middle), so a middle click on a selected token
-      // can toggle flying (TOK-03) without nudging the camera. Orbit starts at once.
-      if (mode !== 'pan') dragging.add(e.pointerId);
+      // A mouse press waits for the drag threshold: a middle click on a selected token toggles
+      // flying (TOK-03) and a right click opens the menu, neither nudging the camera. Touch orbits
+      // at once.
+      if (e.pointerType !== 'mouse') dragging.add(e.pointerId);
       gestureActive.current = true;
       el.setPointerCapture(e.pointerId);
       lastMoveTime = e.timeStamp;
@@ -195,15 +197,10 @@ export function OrbitControls3D({
       } else {
         const dx = next.x - prev.x;
         const dy = next.y - prev.y;
+        const start = starts.get(e.pointerId);
+        if (!dragging.has(e.pointerId) && start && !isDrag(start, next)) return;
+        dragging.add(e.pointerId);
         if (modes.get(e.pointerId) === 'pan') {
-          const start = starts.get(e.pointerId);
-          if (
-            !dragging.has(e.pointerId) &&
-            start &&
-            Math.hypot(next.x - start.x, next.y - start.y) < DRAG_THRESHOLD_PX
-          )
-            return;
-          dragging.add(e.pointerId);
           if (e.pointerType === 'mouse' && e.buttons === 1) swallowClick = true;
           apply(panOnGround(orbit.current, dx, dy, rect().height));
         } else {
@@ -270,7 +267,7 @@ export function OrbitControls3D({
       el.removeEventListener('click', onClickCapture, true);
       el.removeEventListener('contextmenu', onContextMenu);
     };
-  }, [gl, apply, invalidate, leftPanEnabled]);
+  }, [gl, apply, invalidate, tool]);
 
   return <PerspectiveCamera makeDefault fov={DEFAULT_FOV_DEGREES} near={0.1} far={2000} />;
 }

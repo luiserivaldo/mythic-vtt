@@ -22,7 +22,6 @@ import { RulerTool } from './RulerTool.js';
 import { DrawTool } from './DrawTool.js';
 import { ToolRail } from '../ui/ToolRail.js';
 import { BoardContextMenu } from '../ui/BoardContextMenu.js';
-import { rulerStore } from '../tools/ruler-store.js';
 import { TokenDrag } from './TokenDrag.js';
 import { TransformGizmo } from './TransformGizmo.js';
 import { DEFAULT_BACKGROUND, resolveBackground } from './skybox-model.js';
@@ -40,6 +39,9 @@ import { RenderDiagnostics } from './RenderDiagnostics.js';
 import { ToolPanelDock } from '../ui/ToolPanelDock.js';
 import { isReadOnlyViewer } from '../ui/viewer.js';
 import { handleBoardEscape } from './board-keyboard.js';
+import { MarqueeOverlay, MarqueeTool } from './MarqueeTool.js';
+import { RightClickGate } from './RightClickGate.js';
+import { useRailTools } from '../ui/use-rail-tools.js';
 
 const OrbitControls3D = lazy(async () => {
   const module = await import('./OrbitControls3D.js');
@@ -77,7 +79,8 @@ function BoardScene({
 }) {
   const invalidate = useThree((state) => state.invalidate);
   const aoeActive = useStore(aoeToolStore, (s) => s.active);
-  const rulerActive = useStore(rulerStore, (s) => s.tool);
+  // UI-INPUT-01..04: the tool in effect decides what a left drag on empty board does (board-input).
+  const tool = useRailTools().activeId;
   const localDrag = useStore(tokenDragStore, (state) => state.local);
   const shown = useMemo(() => withLocalDrag(scene, localDrag), [scene, localDrag]);
   useEffect(() => {
@@ -105,6 +108,8 @@ function BoardScene({
           <Skybox spec={backdrop} {...(scene?.skybox ? { skybox: scene.skybox } : {})} />
         </Suspense>
       )}
+      {/* UI-INPUT-04: first, so a right drag never reaches a menu or right-click action. */}
+      <RightClickGate />
       {mode3d ? (
         <Suspense fallback={null}>
           <OrbitControls3D
@@ -113,7 +118,7 @@ function BoardScene({
             orbitRef={director.orbitRef}
             applyRef={director.applyRef}
             keepInitialOrbit={director.keepInitialOrbit}
-            leftPanEnabled={!aoeActive && !rulerActive}
+            tool={tool}
           />
         </Suspense>
       ) : (
@@ -122,6 +127,7 @@ function BoardScene({
             bounds={canvasSize}
             frameKey={`${frameKey}:${String(resetToken)}`}
             initialView={director.restored2d ? director.view2d : undefined}
+            tool={tool}
           />
           <OrthographicCamera
             makeDefault
@@ -167,6 +173,8 @@ function BoardScene({
           TokenDrag; the layer renders for every viewer, including read-only ones. */}
       <DrawTool mode={mode3d ? '3d' : '2d'} readOnly={readOnly} />
       {!aoeActive && <TokenDrag readOnly={readOnly} />}
+      {/* UI-TOOL-01 / C13: Select-tool area select; claimed presses (gizmo, token) win. */}
+      {!readOnly && <MarqueeTool rendered={shown} scene={source} tool={tool} />}
       <PickableEntities rendered={shown} scene={source} mode={mode3d ? '3d' : '2d'} grid={grid} />
       {/* MEAS-05: hovering a token with one token selected shows the token-to-token range. */}
       <RangeReadout scene={source} />
@@ -234,6 +242,7 @@ export function BoardCanvas() {
       </div>
       {/* UX-40: right-click on empty board; Ping is offered here and on a token's menu. */}
       <BoardContextMenu />
+      <MarqueeOverlay />
       <ToolPanelDock campaign={campaign} scene={source} mode3d={mode3d} />
       <Canvas
         frameloop="demand"

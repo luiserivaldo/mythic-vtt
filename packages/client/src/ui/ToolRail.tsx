@@ -1,9 +1,5 @@
-import { Fragment, useEffect, useMemo } from 'react';
-import { useStore } from 'zustand';
-import { canUseSceneToggle, type Actor } from '@mythic/shared';
+import { Fragment, useEffect } from 'react';
 import { isTypingTarget } from '../render/typing-target.js';
-import { useClientStore } from '../store/react.js';
-import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { activeToolStore } from '../tools/active-tool-store.js';
 import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { activateMeasurement } from '../tools/measurement-tool.js';
@@ -12,8 +8,8 @@ import { dockStore } from './dock-store.js';
 import { leftPaneStore, panelRegion } from './left-pane.js';
 import { railTools } from './registries.js';
 import { toolPanelLayoutStore } from './tool-panel-layout.js';
-import { railToolStates, resolveActiveTool } from './tool-rail.js';
-import { isReadOnlyViewer, viewerRole } from './viewer.js';
+import { resolveActiveTool } from './tool-rail.js';
+import { useRailTools } from './use-rail-tools.js';
 
 const GLYPHS: Readonly<Record<string, string>> = {
   cursor: '↖',
@@ -45,52 +41,9 @@ function revealMeasurePanel(): void {
  * its own. Which tool is active is local view state; nothing here is sent to the host.
  */
 export function ToolRail() {
-  const store = useClientStore((state) => state.campaign);
-  const viewed = useViewedCampaign();
-  const isHost = useClientStore((state) => state.isHost);
-  const seatId = useClientStore((state) => state.seatId);
-  const requested = useStore(activeToolStore, (state) => state.tool);
-  const rulerArmed = useStore(rulerStore, (state) => state.tool);
-  const aoeActive = useStore(aoeToolStore, (state) => state.active);
-  const measuring = rulerArmed || aoeActive;
-
-  const role = viewerRole({ isHost, seatId, campaign: store });
-  const preview = useClientStore((state) => state.viewAs.kind !== 'host');
-  const readOnly = preview || isReadOnlyViewer({ isHost, seatId, campaign: store });
-  const seat = seatId === null ? undefined : store?.seats[seatId];
-  const permissions = seat?.permissions ?? null;
-  // Enable Interaction is a per-seat switch; the host and seat-less viewers are never switched off.
-  const interactionEnabled = isHost || seat === undefined || seat.interactionEnabled !== false;
-
-  // PERM-05: each scene's own toggles still apply to seats the registry would allow.
-  const sceneReasons = useMemo<Record<string, string | undefined>>(() => {
-    const sceneId = viewed?.activeSceneId;
-    if (!viewed || !sceneId || isHost) return {};
-    const actor: Actor = seatId !== null ? { kind: 'seat', seatId } : { kind: 'seat' };
-    return {
-      measure: canUseSceneToggle(viewed, actor, sceneId, 'measure')
-        ? undefined
-        : 'Measuring is disabled in this scene',
-      draw: canUseSceneToggle(viewed, actor, sceneId, 'draw')
-        ? undefined
-        : 'Drawing is disabled in this scene',
-    };
-  }, [viewed, isHost, seatId]);
-
-  const states = useMemo(
-    () =>
-      railToolStates({
-        role,
-        permissions,
-        readOnly,
-        interactionEnabled,
-        sceneReasons,
-      }),
-    [role, permissions, readOnly, interactionEnabled, sceneReasons],
-  );
+  const { states, activeId, measuring } = useRailTools();
   const measureUsable = states.find((state) => state.id === 'measure')?.enabled === true;
   const drawUsable = states.find((state) => state.id === 'draw')?.enabled === true;
-  const activeId = measuring ? 'measure' : resolveActiveTool(states, requested);
 
   // A tool that stops being usable (interaction switched off, seat permissions changed) must not
   // stay armed. The fallback tool is derived above, not stored, so the choice survives a brief

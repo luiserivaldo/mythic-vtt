@@ -14,7 +14,7 @@ import {
   type Scene,
   type Vec3,
 } from '@mythic/shared';
-import { DRAG_THRESHOLD_PX } from '../render/camera-2d.js';
+import { isDrag } from '../render/board-input.js';
 import type { RenderScene } from '../render/scene-model.js';
 import { appendWaypoint, withCursor } from './ruler.js';
 import type { LocalDrag, RemotePreview } from './token-drag-store.js';
@@ -23,7 +23,7 @@ export function dragStarted(
   start: { x: number; y: number },
   now: { x: number; y: number },
 ): boolean {
-  return Math.hypot(now.x - start.x, now.y - start.y) >= DRAG_THRESHOLD_PX;
+  return isDrag(start, now);
 }
 
 export function movableToken(
