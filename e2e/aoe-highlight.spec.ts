@@ -256,7 +256,13 @@ test('D35: a player sees a placeholder for an unreadable label and nothing for a
 
     // The player owns nothing here: one readable name, one neutral placeholder, and nothing at
     // all for the token on the DM layer.
-    await player.keyboard.press('r');
+    // MV-236: the R shortcut is ignored until the seat is bound (a seat-less viewer is read-only),
+    // so a key pressed as soon as the canvas shows can be lost. The rail's Measure button turns
+    // enabled exactly when measuring becomes usable; wait for that, then open it as the DM does.
+    const playerMeasure = player.getByRole('button', { name: 'Measure', exact: true });
+    await expect(playerMeasure).not.toHaveAttribute('aria-disabled', 'true');
+    await playerMeasure.click();
+    await expect(playerMeasure).toHaveAttribute('aria-pressed', 'true');
     const playerPanel = player.getByRole('region', { name: 'Affected tokens' });
     const rows = playerPanel.getByTestId('aoe-affected-token');
     await expect(rows).toHaveCount(2);
