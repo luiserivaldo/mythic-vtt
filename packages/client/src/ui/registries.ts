@@ -23,6 +23,17 @@ export interface TokenQuickField extends RegistryEntry {
   field: string;
 }
 
+/**
+ * UI-SHELL-05: the shell regions a tool panel can open in. `left-pane` sits beside the rail
+ * (principle 3); `right-dock` is the dock's context slot under the active tab.
+ */
+export type PanelRegion = 'left-pane' | 'right-dock';
+
+/** A tool panel (rail tool options or a selection-driven panel) and the region it opens in. */
+export interface ToolPanel extends RegistryEntry {
+  region: PanelRegion;
+}
+
 /** A local registry keeps test and feature additions isolated from the defaults. */
 export function createRegistry<T extends RegistryEntry>(entries: readonly T[] = []) {
   const items = new Map<string, T>();
@@ -153,6 +164,68 @@ export const dockTabs = createRegistry<DockTab>([
     group: 'info',
     allowed: everyone,
     panel: 'settings',
+  },
+]);
+
+// Who sees a panel is decided where it renders (selection, the active rail tool, read-only seats)
+// and the host re-checks every intent, so the predicate here only places it. Moving a panel to
+// another region is a one-word change to `region` (MV-254, MV-255).
+export const toolPanels = createRegistry<ToolPanel>([
+  {
+    id: 'transform',
+    label: 'Transform',
+    icon: 'move',
+    group: 'selection',
+    allowed: everyone,
+    region: 'right-dock',
+  },
+  {
+    id: 'aoe',
+    label: 'AoE',
+    icon: 'aoe',
+    group: 'selection',
+    allowed: everyone,
+    region: 'right-dock',
+  },
+  {
+    id: 'token',
+    label: 'Token',
+    icon: 'token',
+    group: 'selection',
+    allowed: everyone,
+    region: 'right-dock',
+  },
+  {
+    id: 'ruler',
+    label: 'Ruler',
+    icon: 'ruler',
+    group: 'rail',
+    allowed: everyone,
+    region: 'right-dock',
+  },
+  {
+    id: 'draw',
+    label: 'Draw',
+    icon: 'pen',
+    group: 'rail',
+    allowed: everyone,
+    region: 'right-dock',
+  },
+  {
+    id: 'create-prop',
+    label: 'Create Prop',
+    icon: 'cube',
+    group: 'rail',
+    allowed: everyone,
+    region: 'right-dock',
+  },
+  {
+    id: 'initiative',
+    label: 'Initiative',
+    icon: 'list',
+    group: 'rail',
+    allowed: everyone,
+    region: 'right-dock',
   },
 ]);
 

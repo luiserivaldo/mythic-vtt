@@ -26,6 +26,10 @@ declare global {
     __mythicCameraLink?: {
       getLink(): { sent: number; pulls: number; following: boolean };
     };
+    /** Development-only panel routing for the UI-SHELL-05 left pane e2e. */
+    __mythicPanelRegions?: {
+      set(id: string, region: 'left-pane' | 'right-dock'): void;
+    };
     /** Development/test-only render counters for performance assertions. */
     __mythicRender?: {
       getFrameCount(): number;
