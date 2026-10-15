@@ -28,12 +28,32 @@ export const Hello = z.strictObject({
 });
 
 /** Sit down / start a session: claim a seat, or join as a spectator when no seat is named. */
-export const Join = z.strictObject({
-  t: z.literal('join'),
-  seatId: Ulid.optional(),
-  seatToken: z.string().optional(),
-  spectatorToken: z.string().optional(),
-});
+export const Join = z
+  .strictObject({
+    t: z.literal('join'),
+    seatId: Ulid.optional(),
+    seatToken: z.string().optional(),
+    spectatorToken: z.string().optional(),
+    /**
+     * UX-44 / UI-JOIN-01: `temporary` makes a session-only seat named `label`; `spectator` marks
+     * this connection a spectator, which the host only counts (it keeps no name or avatar for it).
+     */
+    as: z.enum(['temporary', 'spectator']).optional(),
+    label: z.string().trim().min(1).max(80).optional(),
+  })
+  .superRefine((join, context) => {
+    const issue = (message: string) => {
+      context.addIssue({ code: 'custom', path: ['as'], message });
+    };
+    if (join.as === undefined) {
+      if (join.label !== undefined) issue('label needs as=temporary');
+      return;
+    }
+    if (join.seatId !== undefined || join.seatToken !== undefined)
+      issue('as excludes seatId and seatToken');
+    if (join.as === 'temporary' && join.label === undefined) issue('temporary needs a label');
+    if (join.as === 'spectator' && join.label !== undefined) issue('spectators carry no label');
+  });
 
 export const Intent = z.strictObject({
   t: z.literal('intent'),

@@ -1,4 +1,4 @@
-import { Campaign, reduceAction } from '@mythic/shared';
+import { Campaign, reduceAction, withoutTemporarySeats } from '@mythic/shared';
 import { CampaignFile, StorageDataError, type Snapshot } from '../storage/types.js';
 import type { LocalCampaignStore } from '../storage/local-campaign-store.js';
 
@@ -43,16 +43,19 @@ export async function recoverCampaign(
     }
     seq = envelope.seq;
   }
-  return { campaign: state, seq };
+  // UX-44: a crash can leave session-only seats in the log; they never outlive their session.
+  return { campaign: withoutTemporarySeats(state), seq };
 }
 
 export async function saveCampaignCheckpoint(
   store: LocalCampaignStore,
-  campaign: Campaign,
+  live: Campaign,
   sessionId: string,
   seq: number,
   label: 'autosave' | 'end',
 ): Promise<void> {
+  // UX-44: temporary seats are session-only, so no file on disk may hold one.
+  const campaign = withoutTemporarySeats(live);
   // Write the authoritative checkpoint first. A crash during split writes can then recover
   // from this atomic snapshot and replay any later complete log entries.
   await store.writeSnapshot(campaign.id, sessionId, label, { seq, state: campaign });

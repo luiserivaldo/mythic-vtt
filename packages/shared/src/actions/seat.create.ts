@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id, SeatPermissions } from '../schema/index.js';
+import { Id, SeatIcon, SeatPermissions } from '../schema/index.js';
 import { defineAction, isHost } from './define.js';
 
 const DEFAULT_PERMISSIONS = { view: true, move: true, edit: false, delete: false } as const;
@@ -12,6 +12,7 @@ export const seatCreate = defineAction({
     binding: z.enum(['persistent', 'session']).optional(),
     role: z.enum(['player', 'codm']).optional(),
     permissions: SeatPermissions.strict().optional(),
+    icon: SeatIcon.optional(),
   }),
   permission: (state, actor, p) => isHost(actor) && !(p.seatId in state.seats),
   reduce: (draft, a) => {
@@ -23,6 +24,7 @@ export const seatCreate = defineAction({
       role: a.payload.role ?? 'player',
       interactionEnabled: true,
       permissions: { ...(a.payload.permissions ?? DEFAULT_PERMISSIONS) },
+      ...(a.payload.icon !== undefined ? { icon: a.payload.icon } : {}),
     };
   },
   modExposed: false,

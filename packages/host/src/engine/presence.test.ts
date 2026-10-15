@@ -42,7 +42,8 @@ describe('buildHostPresence', () => {
       named(T.host, 'DM', { isHost: true }),
     ]);
     expect(p.unseated).toEqual([{ identityId: T.bob, displayName: 'Bob' }]);
-    expect(p.spectators).toBe(1);
+    // UX-44: unseated identities are listed for seating; only spectating connections are counted.
+    expect(p.spectators).toBe(0);
     expect(p.seats.find((s) => s.seatId === T.seatA)).toEqual({
       seatId: T.seatA,
       displayName: 'Alice',

@@ -15,3 +15,4 @@ export {
   SeatInviteRedeemed,
   SeatInviteRevoked,
 } from './seat-invite.js';
+export { JoinIcon, JoinPayload, JoinSeat } from './join-payload.js';

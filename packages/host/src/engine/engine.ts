@@ -15,7 +15,13 @@ import {
 } from '@mythic/shared';
 import type { GatewayConnection, GatewayHandler } from '../gateway/engine-seam.js';
 import type { CampaignStore } from '../storage/types.js';
-import { actorFor, audienceFor, audienceViewKey, spectatorSourceSeat } from './audience.js';
+import {
+  actorFor,
+  audienceFor,
+  audienceViewKey,
+  seatIdOf,
+  spectatorSourceSeat,
+} from './audience.js';
 import {
   createEphemeralRelay,
   type EphemeralRelayOptions,
@@ -126,6 +132,11 @@ export function createEngine(options: EngineOptions): Engine {
   /** What `history.undo` may revert: this run's applied actions with their inverse patches. */
   const journal: JournalEntry[] = [];
   const members = new Map<string, Member>();
+  /**
+   * UX-44: connections that chose "Join As Spectator". Only the host-side count is kept; the
+   * connection's name, avatar and colour are never read for it (no visual credentials).
+   */
+  const declaredSpectators = new Set<string>();
   const ephemeralRelay = createEphemeralRelay(clock, options.ephemeral);
 
   // All state-touching work runs one item at a time, so `seq` order equals broadcast order and a
@@ -241,7 +252,15 @@ export function createEngine(options: EngineOptions): Engine {
       if (!member.conn.isHost) continue;
       message ??= buildHostPresence(
         state,
-        Array.from(members.values(), (m) => m.conn),
+        Array.from(members.values(), (m) => ({
+          identityId: m.conn.identityId,
+          displayName: m.conn.displayName,
+          color: m.conn.color,
+          avatar: m.conn.avatar,
+          isHost: m.conn.isHost,
+          latencyMs: m.conn.latencyMs ?? null,
+          spectating: m.conn.isSpectator === true || declaredSpectators.has(m.conn.connectionId),
+        })),
       );
       member.conn.send(message);
     }
@@ -422,7 +441,11 @@ export function createEngine(options: EngineOptions): Engine {
       return serialize(async () => {
         const seatIds = Object.values(state.seats)
           .filter(
-            (seat) => !seat.archived && seat.binding === 'session' && seat.identityId !== null,
+            (seat) =>
+              !seat.archived &&
+              !seat.temporary &&
+              seat.binding === 'session' &&
+              seat.identityId !== null,
           )
           .map((seat) => seat.id);
         for (const seatId of seatIds) {
@@ -433,6 +456,16 @@ export function createEngine(options: EngineOptions): Engine {
             { actor: { kind: 'host' } },
           );
           if (!outcome.ok) throw new Error(`failed to release per-session seat ${seatId}`);
+        }
+        // UX-44: temporary seats exist for one session only; drop them (and their ownership).
+        for (const seat of Object.values(state.seats).filter((s) => s.temporary)) {
+          const outcome = await apply(
+            undefined,
+            'seat.discardTemporary',
+            { seatId: seat.id },
+            { actor: { kind: 'host' } },
+          );
+          if (!outcome.ok) throw new Error(`failed to discard temporary seat ${seat.id}`);
         }
       });
     },
@@ -488,6 +521,14 @@ export function createEngine(options: EngineOptions): Engine {
     onJoin(conn, msg: Of<'join'>) {
       return serialize(async () => {
         if (!members.has(conn.connectionId)) return;
+        if (msg.as === 'spectator') {
+          // UX-44: the host keeps a count only. A seated identity or the host is not a spectator.
+          if (!conn.isHost && !conn.isSpectator && seatIdOf(state, conn.identityId) === undefined) {
+            declaredSpectators.add(conn.connectionId);
+            publishPresence();
+          }
+          return;
+        }
         if (
           state.activeSceneId === null &&
           !conn.isHost &&
@@ -501,17 +542,29 @@ export function createEngine(options: EngineOptions): Engine {
           });
           return;
         }
-        if (conn.isSpectator || msg.seatId === undefined) return;
-        const outcome = await apply(
-          conn,
-          'session.join',
-          {
-            seatId: msg.seatId,
-            identityId: conn.identityId,
-          },
-          {},
-        );
-        if (!outcome.ok) {
+        if (conn.isSpectator) return;
+        const outcome =
+          msg.as === 'temporary'
+            ? await apply(
+                conn,
+                'seat.joinTemporary',
+                {
+                  seatId: ulid(clock(), random),
+                  identityId: conn.identityId,
+                  label: msg.label ?? '',
+                },
+                {},
+              )
+            : msg.seatId === undefined
+              ? undefined
+              : await apply(
+                  conn,
+                  'session.join',
+                  { seatId: msg.seatId, identityId: conn.identityId },
+                  {},
+                );
+        if (outcome?.ok) declaredSpectators.delete(conn.connectionId);
+        if (outcome && !outcome.ok) {
           conn.send({
             t: 'error',
             code: 'seat-unavailable',
@@ -525,7 +578,8 @@ export function createEngine(options: EngineOptions): Engine {
     onEphemeral(conn, msg) {
       return serialize(() => {
         if (!members.has(conn.connectionId)) return;
-        if (!conn.isSpectator) ephemeralRelay.relay(conn, msg, state, members.values());
+        if (!conn.isSpectator && !declaredSpectators.has(conn.connectionId))
+          ephemeralRelay.relay(conn, msg, state, members.values());
       });
     },
 
@@ -544,6 +598,7 @@ export function createEngine(options: EngineOptions): Engine {
       // SES-05/06: a dropped connection is not the end of the Session. Both binding modes remain
       // seated so the same Identity can reconnect without DM action.
       members.delete(conn.connectionId);
+      declaredSpectators.delete(conn.connectionId);
       ephemeralRelay.disconnect(conn.connectionId);
       publishPresence();
     },

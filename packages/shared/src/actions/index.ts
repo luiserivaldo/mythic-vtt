@@ -47,3 +47,7 @@ export {
 
 export { aoePersist } from './aoe.persist.js';
 export { seatArchive } from './seat.archive.js';
+export { seatJoinTemporary } from './seat.joinTemporary.js';
+export { seatDiscardTemporary } from './seat.discardTemporary.js';
+export { campaignSetBranding } from './campaign.setBranding.js';
+export * from './temporary-seats.js';

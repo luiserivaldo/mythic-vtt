@@ -211,7 +211,7 @@ describe('v7 lasting AoE', () => {
 });
 
 describe('v9 initiative', () => {
-  it('round-trips the synthetic initiative frames and pins the handshake to v9', () => {
+  it('round-trips the synthetic initiative frames and keeps the v9 handshake rejected', () => {
     const fixture = JSON.parse(
       readFileSync(
         new URL('../../../fixtures/protocol/v9/initiative.json', import.meta.url),
@@ -224,7 +224,7 @@ describe('v9 initiative', () => {
       expect(decoded.ok).toBe(true);
       if (!decoded.ok) throw new Error('invalid client fixture');
       expect(JSON.parse(encodeClientMessage(decoded.message))).toEqual(frame);
-      if (decoded.message.t === 'hello') expect(decoded.message.v).toBe(PROTOCOL_VERSION);
+      if (decoded.message.t === 'hello') expect(decoded.message.v).toBe(9);
     }
     for (const frame of fixture.server) {
       const decoded = decodeServerMessage(JSON.stringify(frame));
@@ -232,7 +232,7 @@ describe('v9 initiative', () => {
       if (!decoded.ok) throw new Error('invalid server fixture');
       expect(JSON.parse(encodeServerMessage(decoded.message))).toEqual(frame);
     }
-    expect(PROTOCOL_VERSION).toBe(9);
-    expect(isSupportedVersion(8)).toBe(false);
+    // UX-44 moved the wire to v10; the v9 frames stay decodable but are no longer supported.
+    expect(isSupportedVersion(9)).toBe(false);
   });
 });
