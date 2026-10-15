@@ -20,6 +20,9 @@ import { CreatePropPanel } from './RailPanels.js';
 import { InitiativeTools } from './InitiativeTools.js';
 import { seeSheet } from './sheet-panel.js';
 import { DrawPanel } from './DrawPanel.js';
+import { LeftPane } from './LeftPane.js';
+import { leftPaneStore, panelRegion } from './left-pane.js';
+import { toolPanels, type PanelRegion } from './registries.js';
 
 const TransformPanel3D = lazy(async () => {
   const module = await import('./TransformPanel3D.js');
@@ -74,7 +77,11 @@ function PanelFrame({
   );
 }
 
-/** M1-37: one ordered dock prevents the Entity, Transform and AoE tools overlapping. */
+/**
+ * M1-37: one ordered stack per region prevents the tool panels overlapping. UI-SHELL-05: each
+ * panel opens in the region its `toolPanels` entry names (the right dock's context slot, or the
+ * left pane beside the rail).
+ */
 export function ToolPanelDock({
   campaign,
   scene,
@@ -90,6 +97,7 @@ export function ToolPanelDock({
   const isHost = useClientStore((state) => state.isHost);
   const seatId = useClientStore((state) => state.seatId);
   const collapsed = useStore(toolPanelLayoutStore, (state) => state.collapsed);
+  const leftContainer = useStore(leftPaneStore, (state) => state.container);
   const aoeActive = useStore(aoeToolStore, (state) => state.active);
   const rulerActive = useStore(rulerStore, (state) => state.tool);
   const activeTool = useStore(activeToolStore, (state) => state.tool);
@@ -110,56 +118,37 @@ export function ToolPanelDock({
   const showCreateProp = scene !== null && !measuring && activeTool === 'create-prop';
   const showDraw = scene !== null && !measuring && activeTool === 'draw';
   const showInitiative = !measuring && activeTool === 'initiative';
-  // Read-only viewers get no editing panels, the read-only initiative tracker.
   if (!container) return null;
-  if (
-    (readOnly ||
-      (!showTransform && !showAoE && !showToken && !showRuler && !showCreateProp && !showDraw)) &&
-    !showInitiative
-  )
-    return null;
-  if (readOnly) {
-    return createPortal(
-      <aside className="ui-tool-dock" aria-label="Tool panels">
-        <PanelFrame id="initiative" label="Initiative" collapsed={collapsed.initiative}>
-          <InitiativeTools />
-        </PanelFrame>
-      </aside>,
-      container,
-    );
+  const panels: { id: ToolPanelId; node: ReactNode }[] = [];
+  const add = (id: ToolPanelId, node: ReactNode) => {
+    panels.push({ id, node });
+  };
+  // Read-only viewers get no editing panels, only the read-only initiative tracker.
+  if (!readOnly) {
+    if (showCreateProp) add('create-prop', <CreatePropPanel scene={scene} isHost={isHost} />);
+    if (showDraw) add('draw', <DrawPanel scene={scene} />);
   }
-  return createPortal(
-    <aside className="ui-tool-dock" aria-label="Tool panels">
-      {showCreateProp && (
-        <PanelFrame id="create-prop" label="Create Prop" collapsed={collapsed['create-prop']}>
-          <CreatePropPanel scene={scene} isHost={isHost} />
-        </PanelFrame>
-      )}
-      {showDraw && (
-        <PanelFrame id="draw" label="Draw" collapsed={collapsed.draw}>
-          <DrawPanel scene={scene} />
-        </PanelFrame>
-      )}
-      {showInitiative && (
-        <PanelFrame id="initiative" label="Initiative" collapsed={collapsed.initiative}>
-          <InitiativeTools />
-        </PanelFrame>
-      )}
-      {showTransform && (
-        <PanelFrame id="transform" label="Transform" collapsed={collapsed.transform}>
-          <Suspense fallback={<span role="status">Loading transform tools…</span>}>
-            {mode3d ? <TransformPanel3D /> : <TransformPanel />}
-          </Suspense>
-        </PanelFrame>
-      )}
-      {showAoE && (
-        <PanelFrame id="aoe" label="AoE" collapsed={collapsed.aoe}>
+  if (showInitiative) add('initiative', <InitiativeTools />);
+  if (!readOnly) {
+    if (showTransform)
+      add(
+        'transform',
+        <Suspense fallback={<span role="status">Loading transform tools…</span>}>
+          {mode3d ? <TransformPanel3D /> : <TransformPanel />}
+        </Suspense>,
+      );
+    if (showAoE)
+      add(
+        'aoe',
+        <>
           <AoEToolPanel scene={scene} unified />
           <AoEAffectedPanel scene={scene} />
-        </PanelFrame>
-      )}
-      {showToken && (
-        <PanelFrame id="token" label="Token" collapsed={collapsed.token}>
+        </>,
+      );
+    if (showToken)
+      add(
+        'token',
+        <>
           {/* UI-SHEET-01: See Sheet also lives in the token's right-click menu (UI-TOKEN-03); the
               selected token's panel keeps the same shortcut. */}
           <button type="button" onClick={seeSheet}>
@@ -177,17 +166,44 @@ export function ToolPanelDock({
             scene={scene}
             entity={selectedEntity}
           />
-        </PanelFrame>
-      )}
-      {showRuler && (
-        <PanelFrame id="ruler" label="Ruler" collapsed={collapsed.ruler}>
+        </>,
+      );
+    if (showRuler)
+      add(
+        'ruler',
+        <>
           <RulerPanel scene={scene} />
           {/* MEAS-04: a live readout of every stored AoE, for any viewer the ruler panel is open to
               (the AoE frame above already carries it whenever an AoE is selected). */}
           {!showAoE && <AoEAffectedPanel scene={scene} />}
+        </>,
+      );
+  }
+  const frames = (region: PanelRegion) =>
+    panels
+      .filter((panel) => panelRegion(panel.id) === region)
+      .map(({ id, node }) => (
+        <PanelFrame
+          key={id}
+          id={id}
+          label={toolPanels.get(id)?.label ?? id}
+          collapsed={collapsed[id]}
+        >
+          {node}
         </PanelFrame>
-      )}
-    </aside>,
-    container,
+      ));
+  const right = frames('right-dock');
+  const left = frames('left-pane');
+  return (
+    <>
+      {right.length > 0 &&
+        createPortal(
+          <aside className="ui-tool-dock" aria-label="Tool panels">
+            {right}
+          </aside>,
+          container,
+        )}
+      {left.length > 0 && leftContainer && createPortal(<LeftPane>{left}</LeftPane>, leftContainer)}
+    </>
   );
 }

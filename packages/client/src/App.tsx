@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { UndoHotkey } from './ui/UndoHotkey.js';
 import { useClientStore } from './store/react.js';
 import { RightDock } from './ui/RightDock.js';
+import { leftPaneStore } from './ui/left-pane.js';
 import { JoinScreen } from './ui/JoinScreen.js';
 import './ui/shell.css';
 import { BoardCanvas } from './render/BoardCanvas.js';
@@ -30,6 +31,10 @@ export function App() {
     setPanelContainer(node);
   }, []);
 
+  const leftPaneRef = useCallback((node: HTMLDivElement | null) => {
+    leftPaneStore.getState().setContainer(node);
+  }, []);
+
   const changeTheme = (next: Theme) => {
     setTheme(next);
     try {
@@ -53,6 +58,8 @@ export function App() {
       <UndoHotkey />
       <TopBar />
       <div className="ui-app-body">
+        {/* UI-SHELL-05: the left pane portals in here; empty, the slot takes no width. */}
+        <div className="ui-left-pane-slot" ref={leftPaneRef} />
         <BoardCanvas panelContainer={panelContainer} />
         <RightDock theme={theme} onThemeChange={changeTheme} contextPanelRef={panelRef} />
       </div>

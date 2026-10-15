@@ -9,6 +9,8 @@ import { aoeToolStore } from '../tools/aoe-tool-store.js';
 import { activateMeasurement } from '../tools/measurement-tool.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { dockStore } from './dock-store.js';
+import { leftPaneStore, panelRegion } from './left-pane.js';
+import { railTools } from './registries.js';
 import { toolPanelLayoutStore } from './tool-panel-layout.js';
 import { railToolStates, resolveActiveTool } from './tool-rail.js';
 import { isReadOnlyViewer, viewerRole } from './viewer.js';
@@ -105,10 +107,12 @@ export function ToolRail() {
       return;
     }
     activateMeasurement(null);
-    if (id === 'initiative') {
-      toolPanelLayoutStore.getState().restore('initiative');
-      if (dockStore.getState().collapsed) dockStore.getState().toggleCollapsed();
-    }
+    if (id === 'initiative') toolPanelLayoutStore.getState().restore('initiative');
+    // UI-SHELL-05: choosing a tool reveals the region its panel opens in, even if collapsed.
+    const panel = railTools.get(id)?.panel;
+    if (panel && panelRegion(panel) === 'left-pane') leftPaneStore.getState().expand();
+    else if (id === 'initiative' && dockStore.getState().collapsed)
+      dockStore.getState().toggleCollapsed();
     activeToolStore.getState().setTool(id);
   };
 
