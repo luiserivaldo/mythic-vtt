@@ -45,8 +45,8 @@ test('the DM creates a bounded scene from the panel and resizes it, with no page
   await expect(page.getByLabel('Canvas of Bounded height')).toHaveValue('12');
 
   await canvasWidth.fill('25');
-  await page.getByRole('button', { name: 'Set size' }).click();
-  await expect(page.getByRole('button', { name: 'Set size' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByRole('button', { name: 'Save settings' })).toBeDisabled();
   await expect(page.getByLabel('Canvas of Bounded width')).toHaveValue('25');
 
   // Wheel over the board (zoom) and a drag (pan) must not throw.

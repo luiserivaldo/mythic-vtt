@@ -675,6 +675,85 @@ main .ui-danger-button:not(:disabled) {
   background: var(--ui-bg);
   border-bottom: 1px solid var(--ui-border);
 }
+/* UI-SCN-01 (MV-247): the Scenes view drops down from the scene header over the board. */
+.ui-top-bar {
+  position: relative;
+}
+.ui-scenes-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0.5rem;
+  z-index: 40;
+  width: min(44rem, calc(100vw - 1rem));
+  max-height: 75vh;
+  overflow: auto;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+}
+.ui-scene-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ui-scene-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.35rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-bg-raised);
+}
+.ui-scene-card[data-active='true'] {
+  border-color: var(--ui-accent);
+}
+.ui-scene-card[data-viewing='true'] {
+  outline: 2px solid var(--ui-fg);
+}
+.ui-scene-card-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ui-scene-card-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.ui-scene-card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-scene-card-badges,
+.ui-scene-card-menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+.ui-scene-card-badges > button {
+  margin-left: auto;
+}
+.ui-scene-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
 .ui-scene-heading {
   font-weight: 650;
   overflow: hidden;

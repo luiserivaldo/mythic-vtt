@@ -4,6 +4,7 @@ import {
   MAX_SCENE_CELLS,
   resolveSceneBounds,
   type Campaign,
+  type Scene,
   type SceneBounds,
 } from '@mythic/shared';
 
@@ -21,7 +22,10 @@ export const DEFAULT_BOUNDS_DRAFT: BoundsDraft = {
 /** Stable per-scene draft; an unknown scene gives the defaults. */
 export function boundsDraft(campaign: Campaign, sceneId: string): BoundsDraft {
   const scene = campaign.scenes[sceneId];
-  if (!scene) return DEFAULT_BOUNDS_DRAFT;
+  return scene ? boundsDraftOf(scene) : DEFAULT_BOUNDS_DRAFT;
+}
+
+export function boundsDraftOf(scene: Pick<Scene, 'bounds'>): BoundsDraft {
   const b = resolveSceneBounds(scene);
   return { width: String(b.width), height: String(b.height) };
 }

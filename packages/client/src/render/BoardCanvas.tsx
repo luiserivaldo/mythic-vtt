@@ -1,5 +1,4 @@
 import { useViewedCampaign } from '../store/viewed-campaign.js';
-import { SceneOverlay } from './SceneOverlay.js';
 import { Canvas, useThree } from '@react-three/fiber';
 import { resolveSceneBounds, type Scene, type SceneBounds } from '@mythic/shared';
 import { OrthographicCamera } from '@react-three/drei';
@@ -176,7 +175,6 @@ function BoardScene({
       <TokenMenus scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
       {mode3d && <OcclusionFade rendered={shown} />}
       <AoEHighlights scene={source} rendered={shown} mode={mode3d ? '3d' : '2d'} />
-      <SceneOverlay overlay={source?.overlay} />
       {/* M1-20 / M2-08: 2D handles, or the 3D gizmo; both are off while the AoE tool is active. */}
       {!readOnly &&
         !aoeActive &&

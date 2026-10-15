@@ -77,27 +77,27 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
         },
       }),
     ).toMatchObject({ t: 'ack' });
-    await dm.getByRole('tab', { name: 'Scenes', exact: true }).click();
-    await dm.getByRole('button', { name: 'Collapse dock' }).click();
-    await dm.getByRole('button', { name: 'Open scene picker' }).click();
-    await expect(dm.getByRole('tab', { name: 'Scenes', exact: true })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-    await expect(dm.getByRole('button', { name: 'Collapse dock' })).toBeVisible();
-    await expect(player.page.getByRole('button', { name: 'Open scene picker' })).toHaveCount(0);
+    // UI-SCN-01: the Scenes view expands from the scene header; closing it is undoable (F28).
+    const picker = dm.getByRole('button', { name: 'Scene picker', exact: true });
+    await picker.click();
+    await expect(picker).toHaveAttribute('aria-expanded', 'true');
+    await expect(dm.getByRole('heading', { name: 'Scenes', exact: true })).toBeVisible();
+    await picker.click();
+    await expect(picker).toHaveAttribute('aria-expanded', 'false');
+    await expect(dm.getByRole('heading', { name: 'Scenes', exact: true })).toHaveCount(0);
+    await picker.click();
+    await expect(player.page.getByRole('button', { name: 'Scene picker' })).toHaveCount(0);
     await expect(player.page.getByLabel('Scene name', { exact: true })).toHaveText('Player scene');
     const secret = dm.getByRole('listitem').filter({ hasText: 'SECRET-PRIVATE-SCENE' });
-    await secret.getByRole('button', { name: 'Browse', exact: true }).click();
+    await expect(secret.getByText('DM-only', { exact: true })).toBeVisible();
+    await dm.getByRole('button', { name: 'View SECRET-PRIVATE-SCENE', exact: true }).click();
     await expect(dm.getByLabel('Current scene', { exact: true })).toHaveText(
       'SECRET-PRIVATE-SCENE',
     );
     await expect(player.page.getByLabel('Current scene', { exact: true })).toHaveText(
       'Player scene',
     );
-    await expect(dm.getByRole('button', { name: 'Open scene picker' })).toHaveText(
-      'SECRET-PRIVATE-SCENE',
-    );
+    await expect(picker).toHaveText('SECRET-PRIVATE-SCENE');
     await dm.getByRole('button', { name: '3D view', exact: true }).click();
     await player.page.getByRole('button', { name: '3D view', exact: true }).click();
     expect(await host.intent('scene.activate', { sceneId: privateId })).toMatchObject({
@@ -114,6 +114,7 @@ test('DM browsing stays local, deleted player scene becomes empty, and new joins
     expect(await host.intent('scene.delete', { sceneId: privateId })).toMatchObject({
       t: 'reject',
     });
+    await dm.getByRole('button', { name: 'Options for SECRET-PRIVATE-SCENE' }).click();
     await expect(secret.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled();
     const late = await openClient(browser, table, 'lifecycle-late', { joinScreen: true });
     const lateFrames = recordPageFrames(late.page);

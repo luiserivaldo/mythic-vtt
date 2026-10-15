@@ -1,15 +1,24 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { BoundsFields } from './BoundsFields.js';
 import { DEFAULT_BOUNDS_DRAFT, parseBoundsDraft } from './bounds-form.js';
-import { isValidSceneName } from './scene-list.js';
+import { isValidFolder, isValidSceneName } from './scene-list.js';
 
-/** Name plus canvas size (D37, defaults shown) in one form so scene.create carries both. */
+/** Name, folder and canvas size (D37, defaults shown) in one form so scene.create carries all. */
 export function SceneCreateForm({
+  folders,
   onSubmit,
 }: {
-  onSubmit: (name: string, bounds: { width: number; height: number }) => Promise<boolean>;
+  /** UI-SCN-01: folder names already in use, offered as suggestions. */
+  folders: string[];
+  onSubmit: (
+    name: string,
+    bounds: { width: number; height: number },
+    folder: string,
+  ) => Promise<boolean>;
 }) {
   const [name, setName] = useState('');
+  const [folder, setFolder] = useState('');
+  const listId = useId();
   const [bounds, setBounds] = useState(DEFAULT_BOUNDS_DRAFT);
   const [busy, setBusy] = useState(false);
   const parsed = parseBoundsDraft(bounds);
@@ -18,9 +27,9 @@ export function SceneCreateForm({
       className="ui-row"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!parsed || !isValidSceneName(name)) return;
+        if (!parsed || !isValidSceneName(name) || !isValidFolder(folder)) return;
         setBusy(true);
-        void onSubmit(name, parsed)
+        void onSubmit(name, parsed, folder.trim())
           .then((ok) => {
             if (ok) {
               setName('');
@@ -44,6 +53,24 @@ export function SceneCreateForm({
           }}
         />
       </label>
+      <label>
+        <span className="ui-visually-hidden">New scene folder</span>
+        <input
+          type="text"
+          value={folder}
+          placeholder="Folder (optional)"
+          maxLength={64}
+          list={listId}
+          onChange={(e) => {
+            setFolder(e.target.value);
+          }}
+        />
+      </label>
+      <datalist id={listId}>
+        {folders.map((f) => (
+          <option key={f} value={f} />
+        ))}
+      </datalist>
       <BoundsFields label="New scene" draft={bounds} onChange={setBounds} />
       <button type="submit" disabled={busy || !parsed || !isValidSceneName(name)}>
         Create scene

@@ -123,3 +123,13 @@ describe(`${T} bounds (D37)`, () => {
     expect(without.state.scenes[testId(20)]).not.toHaveProperty('bounds');
   });
 });
+
+describe(`${T} folder (UI-SCN-01)`, () => {
+  it('stores a trimmed folder when given and omits it otherwise', () => {
+    expect(sceneCreate.schema.safeParse({ ...payload, folder: '' }).success).toBe(false);
+    const inFolder = reduceAction(makeCampaign(), envelope({ ...payload, folder: ' Act 2 ' }));
+    expect(inFolder.state.scenes[testId(20)]?.folder).toBe('Act 2');
+    const without = reduceAction(makeCampaign(), envelope());
+    expect(without.state.scenes[testId(20)]).not.toHaveProperty('folder');
+  });
+});

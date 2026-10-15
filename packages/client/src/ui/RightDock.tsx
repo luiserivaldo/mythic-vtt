@@ -13,7 +13,7 @@ import { joinUrlsFromNotices } from './share-panel.js';
 import { useDockState } from './dock-store.js';
 import { viewerRole } from './viewer.js';
 
-const ScenePanel = lazy(async () => ({ default: (await import('./ScenePanel.js')).ScenePanel }));
+const ScenesView = lazy(async () => ({ default: (await import('./ScenesView.js')).ScenesView }));
 const LayerPanel = lazy(async () => ({ default: (await import('./LayerPanel.js')).LayerPanel }));
 const MapPanel = lazy(async () => ({ default: (await import('./MapPanel.js')).MapPanel }));
 const SeatPanel = lazy(async () => ({ default: (await import('./SeatPanel.js')).SeatPanel }));
@@ -83,7 +83,7 @@ export function RightDock({ theme, onThemeChange, contextPanelRef }: Props) {
       case 'scenes':
         return (
           <>
-            <ScenePanel campaign={campaign} />
+            <ScenesView campaign={campaign} />
             <MapPanel campaign={board} />
           </>
         );

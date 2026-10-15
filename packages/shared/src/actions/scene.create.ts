@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEFAULT_SCENE_BACKGROUND, Id, SceneBounds } from '../schema/index.js';
+import { DEFAULT_SCENE_BACKGROUND, Id, SceneBounds, SceneFolder } from '../schema/index.js';
 import { defineAction, isCoDm, isHost } from './define.js';
 
 // GRID-02: default 5 ft per square. Ids come from the payload (not generated here) so the
@@ -12,6 +12,7 @@ export const sceneCreate = defineAction({
     background: z.string().min(1).max(64).optional(),
     bounds: SceneBounds.optional(),
     dmOnly: z.boolean().optional(),
+    folder: SceneFolder.optional(),
   }),
   permission: (state, actor, p) =>
     !(p.sceneId in state.scenes) && (isHost(actor) || isCoDm(state, actor)),
@@ -27,6 +28,7 @@ export const sceneCreate = defineAction({
       id: a.payload.sceneId,
       name: a.payload.name,
       dmOnly: a.payload.dmOnly ?? false,
+      ...(a.payload.folder ? { folder: a.payload.folder } : {}),
       grid: {
         type: 'square',
         sizePx: 70,

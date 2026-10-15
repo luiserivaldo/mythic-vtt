@@ -6,8 +6,8 @@ import type { AssetRef } from '@mythic/shared';
 import type { IntentSpec } from './intent-specs.js';
 import { BackgroundForm } from './BackgroundForm.js';
 
-// ENV-07: the form's only job for the image skybox is to turn a chosen file into a `scene.update`
-// intent through the injectable uploader; the dome that consumes it is covered by the e2e specs.
+// ENV-07 / UI-SCN-01: the skybox image upload is out of the alpha (MV-247); a scene that already
+// has one can still clear it. The dome that consumes it is covered by the e2e specs.
 
 const HASH = 'a'.repeat(64);
 let container: HTMLDivElement;
@@ -36,36 +36,13 @@ function form(send: (intent: IntentSpec) => Promise<boolean>, skybox?: AssetRef)
     initial: { background: '#000000', zenith: '' },
     ...(skybox ? { skybox } : {}),
     send,
-    uploader: () => Promise.resolve({ hash: HASH, width: 1, height: 1 }),
-  });
-}
-
-async function chooseFile(name: string): Promise<void> {
-  const input = container.querySelector('input[type="file"]');
-  if (!input) throw new Error('no file input');
-  Object.defineProperty(input, 'files', {
-    configurable: true,
-    value: [new File([new Uint8Array([1])], name, { type: 'image/png' })],
-  });
-  await act(async () => {
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    await Promise.resolve();
   });
 }
 
 describe('background form image skybox (ENV-07)', () => {
-  it('uploads a chosen image and sets it as the scene skybox', async () => {
-    const send = vi.fn(() => Promise.resolve(true));
-    await mount(form(send));
-    await chooseFile('sky.png');
-    expect(send).toHaveBeenCalledWith({
-      type: 'scene.update',
-      payload: {
-        sceneId: 's1',
-        skybox: { source: 'local', hash: HASH, kind: 'image', name: 'sky.png' },
-      },
-      sceneId: 's1',
-    });
+  it('has no skybox upload in the alpha (UI-SCN-01, MV-247)', async () => {
+    await mount(form(vi.fn(() => Promise.resolve(true))));
+    expect(container.querySelector('input[type="file"]')).toBeNull();
   });
 
   it('offers a clear control only while an image is set', async () => {

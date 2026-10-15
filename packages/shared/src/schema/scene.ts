@@ -59,10 +59,16 @@ export const DEFAULT_PLAYER_TOGGLES: Readonly<Record<PlayerToggle, boolean>> = {
   pins: false,
 };
 
+/** UI-SCN-01: a free-text folder label for grouping scenes in the DM's Scenes view. */
+export const SceneFolder = z.string().trim().min(1).max(64);
+
 export const Scene = z.object({
   id: Id,
   name: z.string(),
   dmOnly: z.boolean().optional(),
+  // UI-SCN-01 (MV-247): optional additive (no schemaVersion bump); absent = not in a folder.
+  // DM organisation only: visibleTo strips it for players and spectators (PERM-03).
+  folder: SceneFolder.optional(),
   grid: Grid,
   // D37: optional additive (no schemaVersion bump); read through resolveSceneBounds().
   bounds: SceneBounds.optional(),

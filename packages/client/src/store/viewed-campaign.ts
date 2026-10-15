@@ -5,11 +5,30 @@ import { createStore } from 'zustand/vanilla';
 import { useClientStore } from './react.js';
 
 /** UX-04: local browsing only; never serialized or written to the authoritative store. */
-export const sceneBrowseStore = createStore<{ sceneId: string | null; browse(id: string): void }>()(
+export const sceneBrowseStore = createStore<{
+  sceneId: string | null;
+  browse(id: string): void;
+  /** Back to the active scene (playtest F28: leaving a viewed scene must be undoable). */
+  reset(): void;
+}>()((set) => ({
+  sceneId: null,
+  browse: (sceneId) => {
+    set({ sceneId });
+  },
+  reset: () => {
+    set({ sceneId: null });
+  },
+}));
+
+/** UI-SCN-01: whether the Scenes view is expanded under the top bar's scene header. Local. */
+export const scenesViewStore = createStore<{ open: boolean; toggle(): void; close(): void }>()(
   (set) => ({
-    sceneId: null,
-    browse: (sceneId) => {
-      set({ sceneId });
+    open: false,
+    toggle: () => {
+      set((s) => ({ open: !s.open }));
+    },
+    close: () => {
+      set({ open: false });
     },
   }),
 );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { patchesFor } from '../visibility/index.js';
+import { patchesFor, visibleTo } from '../visibility/index.js';
 import type { ActionEnvelope } from './envelope.js';
 import { sceneUpdate } from './scene.update.js';
 import { reduceAction } from './run.js';
@@ -161,5 +161,39 @@ describe(`${T} bounds (D37)`, () => {
     });
     const { state } = reduceAction(makeCampaign(), envelope(p));
     expect(state.scenes[IDS.scene]?.bounds).toEqual({ width: 30, height: 20 });
+  });
+});
+
+describe(`${T} folder (UI-SCN-01)`, () => {
+  it('sets, trims and clears the folder; rejects an empty or overlong one', () => {
+    const ok = (folder: unknown) =>
+      sceneUpdate.schema.safeParse({ sceneId: IDS.scene, folder }).success;
+    expect(ok('Act 1')).toBe(true);
+    expect(ok(null)).toBe(true);
+    expect(ok('  ')).toBe(false);
+    expect(ok('x'.repeat(65))).toBe(false);
+    const set = reduceAction(makeCampaign(), envelope({ sceneId: IDS.scene, folder: ' Act 1 ' }));
+    expect(set.state.scenes[IDS.scene]?.folder).toBe('Act 1');
+    const cleared = reduceAction(set.state, envelope({ sceneId: IDS.scene, folder: null }));
+    expect(cleared.state.scenes[IDS.scene]).not.toHaveProperty('folder');
+  });
+
+  it('never sends the folder name to players or spectators (PERM-03)', () => {
+    const before = makeCampaign();
+    const { state } = reduceAction(
+      before,
+      envelope({ sceneId: IDS.scene, folder: 'SECRET-FOLDER' }),
+    );
+    const audiences = [
+      { kind: 'seat', seatId: IDS.other },
+      { kind: 'seat', seatId: IDS.owner },
+      { kind: 'spectators' },
+    ] as const;
+    for (const a of audiences) {
+      expect(JSON.stringify(patchesFor(a, before, state))).not.toContain('SECRET-FOLDER');
+      expect(JSON.stringify(visibleTo(a, state))).not.toContain('SECRET-FOLDER');
+    }
+    const coDm = { kind: 'seat', seatId: IDS.coDm } as const;
+    expect(JSON.stringify(patchesFor(coDm, before, state))).toContain('SECRET-FOLDER');
   });
 });

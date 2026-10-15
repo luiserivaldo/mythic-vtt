@@ -55,11 +55,7 @@ test('initiative follows local DM browsing without changing the players scene', 
       .getByRole('region', { name: 'Rounds and initiative' });
     await expect(panel).toContainText('Round 2');
     await page.getByRole('tab', { name: 'Scenes', exact: true }).click();
-    await page
-      .getByRole('listitem')
-      .filter({ hasText: 'Private initiative' })
-      .getByRole('button', { name: 'Browse', exact: true })
-      .click();
+    await page.getByRole('button', { name: 'View Private initiative', exact: true }).click();
     await expect(panel.getByLabel('Set round')).toHaveValue('7');
     await panel.getByLabel('Set round').fill('8');
     await panel.getByRole('button', { name: 'Apply round' }).click();
