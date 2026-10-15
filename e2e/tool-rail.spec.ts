@@ -51,7 +51,7 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     // Pin, Lighting and Fog are still unimplemented (UI-TOOL-06), so they are not on the rail at all.
     for (const absent of ['Pin', 'Lighting', 'Fog']) await expect(rail(dm, absent)).toHaveCount(0);
 
-    // Initiative opens the real tracker in the dock.
+    // Initiative opens the real tracker in the left pane (UX-38).
     await expect(rail(dm, 'Initiative')).not.toContainText('WIP');
     await rail(dm, 'Initiative').click();
     await expect(dm.getByRole('region', { name: 'Rounds and initiative' })).toContainText(

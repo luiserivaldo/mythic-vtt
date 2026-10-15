@@ -14,17 +14,19 @@ const fixture = JSON.parse(
 ) as { client: unknown[]; server: unknown[]; joinPayload: unknown };
 
 describe('v10 join flow', () => {
-  it('round-trips the synthetic frames and pins the handshake to v10', () => {
+  it('round-trips the synthetic v10 frames', () => {
     for (const frame of fixture.client) {
       const decoded = decodeClientMessage(JSON.stringify(frame));
       expect(decoded.ok).toBe(true);
       if (!decoded.ok) throw new Error('invalid client fixture');
       expect(JSON.parse(encodeClientMessage(decoded.message))).toEqual(frame);
-      if (decoded.message.t === 'hello') expect(decoded.message.v).toBe(PROTOCOL_VERSION);
+      if (decoded.message.t === 'hello') expect(decoded.message.v).toBe(10);
     }
     for (const frame of fixture.server)
       expect(decodeServerMessage(JSON.stringify(frame)).ok).toBe(true);
-    expect(PROTOCOL_VERSION).toBe(10);
+    // UX-38 moved the wire to v11 (initiative scores); v10 frames stay decodable but unsupported.
+    expect(PROTOCOL_VERSION).toBe(11);
+    expect(isSupportedVersion(10)).toBe(false);
     expect(isSupportedVersion(9)).toBe(false);
   });
 

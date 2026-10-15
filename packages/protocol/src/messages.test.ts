@@ -236,3 +236,27 @@ describe('v9 initiative', () => {
     expect(isSupportedVersion(9)).toBe(false);
   });
 });
+
+describe('v11 initiative scores', () => {
+  it('round-trips scored initiative frames on the current handshake', () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL('../../../fixtures/protocol/v11/initiative-scores.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { client: unknown[]; server: unknown[] };
+    for (const frame of fixture.client) {
+      const decoded = decodeClientMessage(JSON.stringify(frame));
+      expect(decoded.ok).toBe(true);
+      if (!decoded.ok) throw new Error('invalid client fixture');
+      expect(JSON.parse(encodeClientMessage(decoded.message))).toEqual(frame);
+      if (decoded.message.t === 'hello') expect(isSupportedVersion(decoded.message.v)).toBe(true);
+    }
+    for (const frame of fixture.server) {
+      const decoded = decodeServerMessage(JSON.stringify(frame));
+      expect(decoded.ok).toBe(true);
+      if (!decoded.ok) throw new Error('invalid server fixture');
+      expect(JSON.parse(encodeServerMessage(decoded.message))).toEqual(frame);
+    }
+  });
+});

@@ -1,6 +1,49 @@
 import { expect, it } from 'vitest';
 import fc from 'fast-check';
-import { Initiative, MAX_ROUND, nextInitiative } from './initiative.js';
+import {
+  Initiative,
+  MAX_ROUND,
+  nextInitiative,
+  previousInitiative,
+  sortInitiative,
+} from './initiative.js';
+
+const ids = ['A', 'B', 'C', 'D'].map((letter) => letter.repeat(26));
+
+it('accepts scores only for listed combatants, within bounds', () => {
+  const [a, b] = ids as [string, string];
+  const base = { round: 1, order: [a], activeEntityId: null };
+  expect(Initiative.safeParse({ ...base, values: { [a]: 12.5 }, ascending: true }).success).toBe(
+    true,
+  );
+  for (const values of [{ [b]: 3 }, { [a]: 10000 }, { [a]: Number.NaN }])
+    expect(Initiative.safeParse({ ...base, values }).success).toBe(false);
+});
+it('sorts by score, descending by default, unscored last and ties stable', () => {
+  const [a, b, c, d] = ids as [string, string, string, string];
+  const value = {
+    round: 1,
+    order: [a, b, c, d],
+    activeEntityId: b,
+    values: { [a]: 5, [b]: 18, [d]: 5 },
+  };
+  expect(sortInitiative(value).order).toEqual([b, a, d, c]);
+  expect(sortInitiative({ ...value, ascending: true }).order).toEqual([a, d, b, c]);
+  expect(sortInitiative(value).activeEntityId).toBe(b);
+});
+it('steps back a turn, wrapping to the previous round but never before round 1', () => {
+  const [a, b] = ids as [string, string];
+  expect(previousInitiative({ round: 2, order: [a, b], activeEntityId: b })).toMatchObject({
+    round: 2,
+    activeEntityId: a,
+  });
+  expect(previousInitiative({ round: 2, order: [a, b], activeEntityId: a })).toMatchObject({
+    round: 1,
+    activeEntityId: b,
+  });
+  expect(previousInitiative({ round: 1, order: [a, b], activeEntityId: a })).toBeUndefined();
+  expect(previousInitiative({ round: 3, order: [a], activeEntityId: null })).toBeUndefined();
+});
 
 it('validates unique bounded orders and existing active members', () => {
   const id = '0'.repeat(26);

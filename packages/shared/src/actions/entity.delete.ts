@@ -24,6 +24,9 @@ export const entityDelete = defineAction({
       scene.initiative.order = scene.initiative.order.filter((id) => id !== a.payload.entityId);
       if (scene.initiative.activeEntityId === a.payload.entityId)
         scene.initiative.activeEntityId = null;
+      // UX-38: a score must belong to a listed combatant.
+      if (scene.initiative.values)
+        Reflect.deleteProperty(scene.initiative.values, a.payload.entityId);
     }
   },
   modExposed: false,
