@@ -231,6 +231,8 @@ export async function startHost(
     store,
     auth: httpAuth,
     now: clock,
+    current: () => engine.state(),
+    thumbnailAsset: (campaignId, hash) => scopedAssetStore(assetStore, campaignId).get(hash),
     ...(options.importLimits ? { importLimits: options.importLimits } : {}),
   });
   registerHistoryRoutes(gateway.app, { store, engine, auth: httpAuth, now: clock });

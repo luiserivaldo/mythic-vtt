@@ -1,16 +1,23 @@
 import { createInterface } from 'node:readline/promises';
 import type { CampaignMeta } from './storage/index.js';
 
-/** One line per campaign, newest first: `  1) Name  (id, last saved 2026-10-12 04:40)`. */
+const utc = (ms: number): string => new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
+
+/**
+ * One line per campaign in list order (UI-HOST-02: last played, newest first):
+ * `  1) Name  (id, last played 2026-10-12 04:40 UTC, thumbnail)`.
+ */
 export function formatCampaignList(campaigns: readonly CampaignMeta[]): string[] {
   return campaigns.map((c, i) => {
-    const saved = new Date(c.updatedAt).toISOString().slice(0, 16).replace('T', ' ');
-    return `  ${String(i + 1)}) ${c.name}  (${c.id}, last saved ${saved} UTC)`;
+    const played =
+      c.lastPlayedAt === undefined ? 'never played' : `last played ${utc(c.lastPlayedAt)} UTC`;
+    const thumbnail = c.thumbnail === undefined ? '' : ', thumbnail';
+    return `  ${String(i + 1)}) ${c.name}  (${c.id}, ${played}${thumbnail})`;
   });
 }
 
 /**
- * HOST-03 start-up picker. Enter takes the first (most recently saved) campaign; an unusable
+ * HOST-03 start-up picker. Enter takes the first (most recently played) campaign; an unusable
  * answer asks again, and a closed input falls back to the first rather than hanging the host.
  */
 export async function pickCampaignInteractively(

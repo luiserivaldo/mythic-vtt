@@ -1,11 +1,11 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { desc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { mkdir, open, opendir, readFile, readdir, stat, rm } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { Id, Scene } from '@mythic/shared';
+import { campaignThumbnail, Id, Scene } from '@mythic/shared';
 import type { Readable } from 'node:stream';
 import {
   exportCampaign,
@@ -39,6 +39,19 @@ const SessionMeta = z.object({
 });
 export type SessionMeta = z.infer<typeof SessionMeta>;
 
+/** UI-HOST-02: last played, newest first; never-opened campaigns last, by last save. */
+export function byLastPlayed(a: CampaignMeta, b: CampaignMeta): number {
+  const played = (b.lastPlayedAt ?? -1) - (a.lastPlayedAt ?? -1);
+  return played !== 0 ? played : b.updatedAt - a.updatedAt;
+}
+
+type CampaignRow = typeof campaigns.$inferSelect;
+const toMeta = ({ lastPlayedAt, thumbnail, ...row }: CampaignRow): CampaignMeta => ({
+  ...row,
+  ...(lastPlayedAt !== null ? { lastPlayedAt } : {}),
+  ...(thumbnail !== null ? { thumbnail } : {}),
+});
+
 export class LocalCampaignStore implements CampaignStore, ArchiveHost {
   private readonly db: Database.Database;
   private readonly index;
@@ -58,11 +71,26 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
     this.db.exec(
       'CREATE TABLE IF NOT EXISTS campaigns (id TEXT PRIMARY KEY, name TEXT NOT NULL, schema_version INTEGER NOT NULL, updated_at INTEGER NOT NULL)',
     );
+    // UX-05: optional columns added in place to an older index; `reindex` fills them from disk.
+    const columns = new Set(
+      (this.db.pragma('table_info(campaigns)') as { name: string }[]).map((c) => c.name),
+    );
+    if (!columns.has('last_played_at'))
+      this.db.exec('ALTER TABLE campaigns ADD COLUMN last_played_at INTEGER');
+    if (!columns.has('thumbnail')) this.db.exec('ALTER TABLE campaigns ADD COLUMN thumbnail TEXT');
   }
   list(): Promise<CampaignMeta[]> {
     return Promise.resolve(
-      this.index.select().from(campaigns).orderBy(desc(campaigns.updatedAt)).all(),
+      this.index.select().from(campaigns).all().map(toMeta).sort(byLastPlayed),
     );
+  }
+  /** UX-05: the newest session start on disk, or null if the campaign was never opened. */
+  private async lastSessionStart(id: string): Promise<number | null> {
+    try {
+      return (await this.readSessions(id)).at(-1)?.startedAt ?? null;
+    } catch {
+      return null;
+    }
   }
   /**
    * HOST-03: the `campaigns` table is a cache of the folders. Adds a row for every readable
@@ -71,13 +99,22 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
    * existing data loads unchanged; an unreadable folder is reported, not fatal.
    */
   async reindex(): Promise<{ added: string[]; skipped: { id: string; reason: string }[] }> {
-    const known = new Set(
+    const rows = this.index.select().from(campaigns).all();
+    const known = new Set(rows.map((row) => row.id));
+    // UX-05: rows indexed before last-played and thumbnails existed get them from their folder.
+    for (const row of rows) {
+      if (row.lastPlayedAt !== null && row.thumbnail !== null) continue;
+      const file = join(this.folder(row.id), 'campaign.json');
+      const thumbnail =
+        row.thumbnail ??
+        (await this.read(file, 'campaign', CampaignFile).then(campaignThumbnail, () => undefined));
+      const lastPlayedAt = row.lastPlayedAt ?? (await this.lastSessionStart(row.id));
       this.index
-        .select()
-        .from(campaigns)
-        .all()
-        .map((row) => row.id),
-    );
+        .update(campaigns)
+        .set({ lastPlayedAt, thumbnail: thumbnail ?? null })
+        .where(eq(campaigns.id, row.id))
+        .run();
+    }
     const added: string[] = [];
     const skipped: { id: string; reason: string }[] = [];
     let names: string[];
@@ -100,6 +137,8 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
             name: campaign.name,
             schemaVersion: campaign.schemaVersion,
             updatedAt: Math.trunc((await stat(file)).mtimeMs),
+            lastPlayedAt: await this.lastSessionStart(id),
+            thumbnail: campaignThumbnail(campaign) ?? null,
           })
           .onConflictDoNothing()
           .run();
@@ -188,6 +227,7 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
     if (parsed.id !== campaignId) throw new StorageDataError('Campaign id mismatch', 'corrupt');
     if (parsed.schemaVersion !== CURRENT_SCHEMA_VERSION)
       throw new StorageDataError('Unsupported campaign schemaVersion', 'unsupported-version');
+    const thumbnail = campaignThumbnail(parsed) ?? null;
     await atomicWrite(
       join(this.folder(campaignId), 'campaign.json'),
       JSON.stringify({ ...parsed, schemaVersion: CURRENT_SCHEMA_VERSION }),
@@ -199,10 +239,16 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
         name: parsed.name,
         schemaVersion: CURRENT_SCHEMA_VERSION,
         updatedAt: Date.now(),
+        thumbnail,
       })
       .onConflictDoUpdate({
         target: campaigns.id,
-        set: { name: parsed.name, schemaVersion: CURRENT_SCHEMA_VERSION, updatedAt: Date.now() },
+        set: {
+          name: parsed.name,
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          updatedAt: Date.now(),
+          thumbnail,
+        },
       })
       .run();
   }
@@ -285,6 +331,12 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION, ...Snapshot.parse(snapshot) }),
     );
     await atomicWrite(join(dir, 'meta.json'), JSON.stringify(SessionMeta.parse(meta)));
+    // UX-05 / UI-HOST-02: "last played" is when a session opened the campaign.
+    this.index
+      .update(campaigns)
+      .set({ lastPlayedAt: meta.startedAt })
+      .where(eq(campaigns.id, campaignId))
+      .run();
   }
   async readSessions(campaignId: Id, max?: number): Promise<SessionMeta[]> {
     const dir = join(this.folder(campaignId), 'sessions');

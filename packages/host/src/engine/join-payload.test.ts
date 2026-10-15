@@ -128,4 +128,15 @@ describe('buildJoinPayload (PERM-03: a joiner sees only what the link shows)', (
     });
     expect(buildJoinPayload(fixtureCampaign(), undefined).host).toEqual({ name: 'Game Master' });
   });
+
+  it('shows the sign-out capture when the DM has not uploaded a screenshot (UX-05)', () => {
+    const state = fixtureCampaign();
+    state.autoScreenshot = 'a'.repeat(64);
+    expect(buildJoinPayload(state, undefined).campaign.screenshot).toBe('a'.repeat(64));
+    state.screenshot = 'b'.repeat(64);
+    expect(buildJoinPayload(state, undefined).campaign).toEqual({
+      title: state.name,
+      screenshot: 'b'.repeat(64),
+    });
+  });
 });

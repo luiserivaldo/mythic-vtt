@@ -4,6 +4,7 @@ import { useClientStore } from './store/react.js';
 import { RightDock } from './ui/RightDock.js';
 import { leftPaneStore } from './ui/left-pane.js';
 import { JoinScreen } from './ui/JoinScreen.js';
+import { SignedOutScreen } from './ui/CampaignThumbnailControls.js';
 import './ui/shell.css';
 import { BoardCanvas } from './render/BoardCanvas.js';
 import { TopBar } from './ui/TopBar.js';
@@ -59,6 +60,7 @@ export function App() {
         <RightDock theme={theme} onThemeChange={changeTheme} />
       </div>
       <JoinScreen />
+      <SignedOutScreen />
     </main>
   );
 }

@@ -9,7 +9,7 @@ export interface HostConfig {
   dataDir: string;
   hostSecretPath: string;
   maxImageUploadBytes: number;
-  /** Campaign to open (`MYTHIC_CAMPAIGN_ID`); default: most recently updated, else a new one. */
+  /** Campaign to open (`MYTHIC_CAMPAIGN_ID`); default: most recently played, else a new one. */
   campaignId?: string;
   /** HOST-03: id, unique name or unique id prefix of the campaign to open (`MYTHIC_CAMPAIGN`). */
   campaign?: string;

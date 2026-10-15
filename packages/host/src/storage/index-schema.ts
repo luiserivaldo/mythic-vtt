@@ -5,6 +5,10 @@ export const campaigns = sqliteTable('campaigns', {
   name: text('name').notNull(),
   schemaVersion: integer('schema_version').notNull(),
   updatedAt: integer('updated_at').notNull(),
+  /** UX-05: start of the newest session; null until the campaign is first opened. */
+  lastPlayedAt: integer('last_played_at'),
+  /** UX-05: `campaignThumbnail` of the saved campaign, an asset hash linked to it. */
+  thumbnail: text('thumbnail'),
 });
 export const assets = sqliteTable('assets', {
   hash: text('hash').primaryKey(),

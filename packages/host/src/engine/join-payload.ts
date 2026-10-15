@@ -1,5 +1,5 @@
 import { JoinPayload, PROTOCOL_VERSION } from '@mythic/protocol';
-import type { Campaign } from '@mythic/shared';
+import { campaignThumbnail, type Campaign } from '@mythic/shared';
 
 /** The host's own profile as stored when it connected (never its identity id or secret). */
 export interface HostProfile {
@@ -18,6 +18,8 @@ const FALLBACK_HOST_NAME = 'Game Master';
  */
 export function buildJoinPayload(state: Campaign, host: HostProfile | undefined): JoinPayload {
   const name = host?.name.trim();
+  // UX-05: the DM's upload, else the sign-out capture (rendered as spectators see the board).
+  const screenshot = campaignThumbnail(state);
   return JoinPayload.parse({
     protocol: PROTOCOL_VERSION,
     host: {
@@ -27,7 +29,7 @@ export function buildJoinPayload(state: Campaign, host: HostProfile | undefined)
     campaign: {
       title: state.name,
       ...(state.icon !== undefined ? { icon: state.icon } : {}),
-      ...(state.screenshot !== undefined ? { screenshot: state.screenshot } : {}),
+      ...(screenshot !== undefined ? { screenshot } : {}),
     },
     sceneActive: state.activeSceneId !== null,
     seats: Object.values(state.seats)

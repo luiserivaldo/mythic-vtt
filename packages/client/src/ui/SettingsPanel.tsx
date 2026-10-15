@@ -4,6 +4,7 @@ import { useClientStore } from '../store/react.js';
 import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { IDENTITY_STORAGE_KEY } from '../net/identity.js';
 import { parseIdentityFile } from '../net/identity-file.js';
+import { CampaignThumbnailControls } from './CampaignThumbnailControls.js';
 import { useJoinEnv } from './join-context.js';
 import { useSubmit } from './submit.js';
 import { isAdminRole, viewerRole } from './viewer.js';
@@ -150,6 +151,8 @@ export function SettingsPanel({
           {exportError && <p role="alert">{exportError}</p>}
         </fieldset>
       )}
+      {/* UX-05: renders only for the host DM. */}
+      <CampaignThumbnailControls />
       <button type="button" disabled title="Game log is a work in progress">
         Game log (WIP)
       </button>

@@ -1,7 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Readable } from 'node:stream';
+import { CampaignList } from '@mythic/protocol';
+import { campaignThumbnail, type Campaign } from '@mythic/shared';
 import {
   ArchiveError,
+  StorageDataError,
   DEFAULT_IMPORT_LIMITS,
   type CampaignStore,
   type ImportLimits,
@@ -19,6 +22,10 @@ export interface CampaignRouteOptions {
   importLimits?: Partial<ImportLimits>;
   /** Export/import are heavy: budget per host identity per minute. */
   maxPerMinute?: number;
+  /** UX-05: the open campaign's live state (its thumbnail is newer than the index row). */
+  current?: () => Pick<Campaign, 'id' | 'screenshot' | 'autoScreenshot'>;
+  /** UX-05: a campaign-scoped read of the asset pool (HOST-03). */
+  thumbnailAsset?: (campaignId: string, hash: string) => Promise<Readable>;
   now?: () => number;
 }
 
@@ -43,17 +50,79 @@ export function registerCampaignRoutes(app: FastifyInstance, options: CampaignRo
     },
   );
 
-  async function hostOnly(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  // UX-05: the list and its thumbnails are light reads, so they get their own, larger budget.
+  const listLimiter = createRateLimiter({
+    max: 120,
+    windowMs: 60_000,
+    ...(options.now ? { now: options.now } : {}),
+  });
+
+  /** The index rows, with the open campaign's thumbnail taken from its unsaved state. */
+  async function thumbnails() {
+    const open = options.current?.();
+    return (await options.store.list()).map((meta) => ({
+      meta,
+      thumbnail: open && meta.id === open.id ? campaignThumbnail(open) : meta.thumbnail,
+    }));
+  }
+
+  async function hostOnly(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    budget = limiter,
+  ): Promise<boolean> {
     const result = await options.auth.authenticate(request);
     let status: 401 | 403 | 429 | undefined = result.ok ? undefined : result.status;
     if (result.ok) {
       if (!result.principal.isHost) status = 403;
-      else if (!limiter.hit(result.principal.identityId)) status = 429;
+      else if (!budget.hit(result.principal.identityId)) status = 429;
     }
     if (status === undefined) return true;
     await reply.code(status).send({ error: DENIED[status] });
     return false;
   }
+
+  // UX-05 / UI-HOST-02: every campaign on this host, last played first, for the DM's picker.
+  // Host only, like export: campaign names and activity are the DM's business (PERM-03).
+  app.get('/api/campaigns', async (request, reply) => {
+    if (!(await hostOnly(request, reply, listLimiter))) return reply;
+    const open = options.current?.();
+    if (!open) return reply.code(404).send({ error: 'not available' });
+    const body = CampaignList.parse({
+      current: open.id,
+      campaigns: (await thumbnails()).map(({ meta: c, thumbnail }) => ({
+        id: c.id,
+        name: c.name.slice(0, 200),
+        ...(c.lastPlayedAt !== undefined ? { lastPlayedAt: c.lastPlayedAt } : {}),
+        ...(thumbnail !== undefined ? { thumbnail } : {}),
+      })),
+    });
+    return reply.header('Cache-Control', 'no-store').send(body);
+  });
+
+  // UX-05: a campaign's thumbnail, even for one this process has not opened (its other assets
+  // stay unreachable, HOST-03). Only the hash its index row names, and only if linked to it.
+  app.get<{ Params: { id: string } }>('/api/campaigns/:id/thumbnail', async (request, reply) => {
+    if (!(await hostOnly(request, reply, listLimiter))) return reply;
+    const { id } = request.params;
+    if (!CAMPAIGN_ID.test(id)) return reply.code(400).send({ error: 'invalid campaign id' });
+    const hash = (await thumbnails()).find((c) => c.meta.id === id)?.thumbnail;
+    if (hash === undefined || !options.thumbnailAsset)
+      return reply.code(404).send({ error: 'no thumbnail' });
+    try {
+      const data = await options.thumbnailAsset(id, hash);
+      return await reply
+        .header('Cache-Control', 'private, no-cache')
+        .header('ETag', `"${hash}"`)
+        .header('X-Content-Type-Options', 'nosniff')
+        .type('image/webp')
+        .send(data);
+    } catch (error) {
+      if (error instanceof StorageDataError && error.code === 'not-found')
+        return reply.code(404).send({ error: 'no thumbnail' });
+      throw error;
+    }
+  });
 
   app.get<{ Params: { id: string } }>('/api/campaigns/:id/export', async (request, reply) => {
     if (!(await hostOnly(request, reply))) return reply;

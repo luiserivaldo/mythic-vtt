@@ -16,3 +16,4 @@ export {
   SeatInviteRevoked,
 } from './seat-invite.js';
 export { JoinIcon, JoinPayload, JoinSeat } from './join-payload.js';
+export { CampaignList, CampaignListEntry } from './campaign-list.js';
