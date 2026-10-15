@@ -1,11 +1,39 @@
+import type { Entity, LayerId } from '@mythic/shared';
 import { createStore } from 'zustand/vanilla';
 import type { Px } from '../render/board-input.js';
+import type { RenderEntity } from '../render/scene-model.js';
 
 /**
  * UI-TOOL-01 / C13 (MV-242): Select-tool area select. A left drag on empty board draws a screen
- * rectangle; on release every selectable token or prop whose centre lies inside it is selected.
- * Selection is local view state, never an action.
+ * rectangle; on release every selectable token, prop or AoE whose centre lies inside it is
+ * selected (MV-272). Selection is local view state, never an action.
  */
+
+/**
+ * MV-272: whether the marquee may gather this drawn entity (before the viewer's select permission).
+ * Tokens, props and AoEs count; anything off the active layer (`dimmed`, MV-258) does not. A map
+ * image is never dimmed, since the map layer keeps its picking for clicks, so the marquee takes it
+ * only while the Map layer itself is the viewer's focused layer.
+ */
+export function marqueeGathers(
+  entity: Pick<RenderEntity, 'dimmed' | 'token' | 'shape' | 'aoe' | 'mapImage'>,
+  focus: LayerId | null,
+): boolean {
+  if (entity.dimmed) return false;
+  if (entity.mapImage) return focus === 'map';
+  return Boolean(entity.token ?? entity.shape ?? entity.aoe);
+}
+
+/**
+ * MV-272: a map image the marquee runs over. A press on it starts a marquee rather than counting
+ * as a click on something selectable, unless the Map layer is focused (then the map is a target).
+ */
+export function isMarqueeBackdrop(
+  entity: Pick<Entity, 'layer' | 'image'>,
+  focus: LayerId | null,
+): boolean {
+  return entity.layer === 'map' && entity.image !== undefined && focus !== 'map';
+}
 
 export interface ScreenRect {
   left: number;

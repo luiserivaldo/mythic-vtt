@@ -1,10 +1,13 @@
+import { toolClaimsEmptyBoardDrag } from '../tools/board-drag-claims.js';
+
 /**
  * UI-INPUT-01..04 (UX-16): the board's mouse mapping in one place. Each control (camera, marquee,
  * token drag, context menu) asks here what a press means instead of re-deriving it, so the
  * buttons stay consistent between 2D and 3D.
  *
- * - Left selects and moves. It pans only while the Pan tool is active (UI-TOOL-02); with the
- *   Select tool a left-drag on empty board draws the marquee (UI-TOOL-01, C13).
+ * - Left selects and moves. It pans only while the Pan tool is active (UI-TOOL-02); with any other
+ *   tool a left-drag on empty board draws the marquee (UI-TOOL-01, C13) unless that tool claims
+ *   the drag itself (Measure, Draw; MV-272).
  * - Wheel zooms.
  * - Middle-drag pans; a middle click on a selected token toggles its flying lock (Q26).
  * - Right-drag orbits in 3D; a right click opens the context menu or the tool's right-click
@@ -54,13 +57,16 @@ export function cameraPress(
 }
 
 /**
- * What an unclaimed left drag on empty board does with the tool in effect. Create Prop acts like
- * Select on the board (MV-271): its props come from the left pane's shape icons, not board clicks.
+ * What an unclaimed left drag on empty board does with the tool in effect: Pan pans, a tool that
+ * claims the drag (`toolClaimsEmptyBoardDrag`, MV-272) keeps it (null), and every other tool
+ * (Select, Create Prop, Initiative, …) draws the marquee. `claims` is injectable for tests.
  */
-export function emptyBoardLeftDrag(tool: string): 'marquee' | 'pan' | null {
-  if (tool === 'select' || tool === 'create-prop') return 'marquee';
+export function emptyBoardLeftDrag(
+  tool: string,
+  claims: (tool: string) => boolean = toolClaimsEmptyBoardDrag,
+): 'marquee' | 'pan' | null {
   if (tool === 'pan') return 'pan';
-  return null;
+  return claims(tool) ? null : 'marquee';
 }
 
 /**
