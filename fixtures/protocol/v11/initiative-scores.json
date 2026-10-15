@@ -1,0 +1,56 @@
+{
+  "client": [
+    {
+      "t": "hello",
+      "v": 11,
+      "identityId": "00000000000000000000000001",
+      "identitySecret": "synthetic-fixture-secret",
+      "displayName": "Fixture guest",
+      "color": "#c04e32"
+    },
+    {
+      "t": "intent",
+      "type": "initiative.set",
+      "payload": {
+        "sceneId": "00000000000000000000000002",
+        "initiative": {
+          "round": 1,
+          "order": ["00000000000000000000000004", "00000000000000000000000003"],
+          "activeEntityId": "00000000000000000000000004",
+          "values": {
+            "00000000000000000000000003": 8,
+            "00000000000000000000000004": 19.5
+          }
+        }
+      },
+      "clientRef": "initiative-scores-fixture"
+    }
+  ],
+  "server": [
+    {
+      "t": "patch",
+      "seq": 3,
+      "patches": [
+        {
+          "op": "add",
+          "path": ["scenes", "00000000000000000000000002", "initiative"],
+          "value": {
+            "round": 1,
+            "order": ["00000000000000000000000004", "00000000000000000000000003"],
+            "activeEntityId": "00000000000000000000000004",
+            "values": {
+              "00000000000000000000000003": 8,
+              "00000000000000000000000004": 19.5
+            }
+          }
+        }
+      ],
+      "clientRef": "initiative-scores-fixture"
+    },
+    {
+      "t": "ack",
+      "clientRef": "initiative-scores-fixture",
+      "seq": 3
+    }
+  ]
+}

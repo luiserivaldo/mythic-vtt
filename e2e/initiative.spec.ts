@@ -71,12 +71,20 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await page.goto(table.clientUrl);
   await page.getByRole('button', { name: 'Initiative', exact: true }).click();
   const panel = page.getByRole('region', { name: 'Rounds and initiative' });
-  const dock = page.getByRole('complementary', { name: 'Right dock' });
-  await expect(dock.getByRole('region', { name: 'Rounds and initiative' })).toBeVisible();
-  await page.getByRole('button', { name: 'Collapse dock' }).click();
+  // UX-38: the list opens in the left pane beside the rail; the right dock has no segment for it.
+  const pane = page.getByRole('complementary', { name: 'Left pane' });
+  await expect(pane.getByRole('region', { name: 'Rounds and initiative' })).toBeVisible();
+  await expect(
+    page
+      .getByRole('complementary', { name: 'Right dock' })
+      .getByRole('region', { name: 'Rounds and initiative' }),
+  ).toHaveCount(0);
+  await pane.getByRole('button', { name: 'Collapse left pane' }).click();
   await expect(panel).toBeHidden();
-  await page.getByRole('button', { name: 'Expand dock' }).click();
+  await pane.getByRole('button', { name: 'Expand left pane' }).click();
   await expect(panel).toBeVisible();
+  const rows = panel.getByRole('listitem');
+  const score = (name: string) => panel.getByLabel(`Initiative for ${name}`);
   for (const id of [hero, secret]) {
     await panel.getByLabel('Initiative token').selectOption(id);
     await panel.getByRole('button', { name: 'Add to initiative' }).click();
@@ -92,18 +100,53 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   await spectator.page.getByRole('button', { name: 'Initiative', exact: true }).click();
   const readonly = spectator.page.getByRole('region', { name: 'Rounds and initiative' });
   await expect(readonly.getByRole('listitem')).toHaveCount(1);
-  await expect(readonly.getByRole('button', { name: 'Next turn' })).toHaveCount(0);
+  // UX-38: a spectator gets the list with no control at all, enabled or otherwise.
+  await expect(readonly.getByRole('button')).toHaveCount(0);
+  await expect(readonly.getByRole('spinbutton')).toHaveCount(0);
+  await expect(readonly.getByRole('combobox')).toHaveCount(0);
   await expect(readonly).not.toContainText('Secret combatant');
   await panel.getByRole('button', { name: 'Next turn' }).click();
   await expect(panel).toContainText('Round 2 · Turn 1');
   await expect(panel.getByLabel('Set round')).toHaveValue('2');
   await panel.getByLabel('Initiative token').selectOption(beast);
   await panel.getByRole('button', { name: 'Add to initiative' }).click();
-  await expect(panel.getByRole('listitem')).toHaveCount(3);
-  await panel.getByRole('button', { name: 'Earlier 3', exact: true }).click();
-  // Wait for the reordered roster before choosing a position whose occupant has changed.
-  await expect(panel.getByRole('listitem').nth(1)).toContainText('Beast');
-  await panel.getByRole('button', { name: 'Current turn 2', exact: true }).click();
+  await expect(rows).toHaveCount(3);
+
+  // Sort order: scores sort the rows highest first, numbered 1. 2. 3., unscored rows last.
+  await score('Hero').fill('12');
+  await score('Hero').press('Enter');
+  await score('Secret combatant').fill('20');
+  await score('Secret combatant').press('Enter');
+  await expect(rows).toHaveText([/^1\.Secret combatant/, /^2\.Hero/, /^3\.Beast/]);
+  await score('Beast').fill('15');
+  await score('Beast').press('Enter');
+  await expect(rows).toHaveText([/^1\.Secret combatant/, /^2\.Beast/, /^3\.Hero/]);
+  await expect(panel).toContainText('Round 2 · Turn 3');
+  // Live edit re-sort: raising a score moves the row, for the DM and for every viewer.
+  await score('Hero').fill('30');
+  await score('Hero').blur();
+  await expect(rows).toHaveText([/^1\.Hero/, /^2\.Secret combatant/, /^3\.Beast/]);
+  await expect(score('Hero')).toHaveValue('30');
+  await expect(readonly.getByRole('listitem')).toHaveText([/^1\.Hero30$/, /^2\.Beast15$/]);
+  await player.waitFor('public scores', () => initiative(player)?.values?.[hero] === 30);
+  // PERM-03: the hidden combatant's score never reaches a player.
+  expect(initiative(player)?.values).toEqual({ [hero]: 30, [beast]: 15 });
+  await panel.getByRole('button', { name: 'Highest first' }).click();
+  await expect(rows).toHaveText([/^1\.Beast/, /^2\.Secret combatant/, /^3\.Hero/]);
+  await panel.getByRole('button', { name: 'Lowest first' }).click();
+  await expect(rows).toHaveText([/^1\.Hero/, /^2\.Secret combatant/, /^3\.Beast/]);
+
+  // Loop advance: the arrow keys step the turn around the list and wrap into the next round.
+  await panel.getByRole('list', { name: 'Turn order' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(panel).toContainText('Round 2 · Turn 2');
+  await page.keyboard.press('ArrowDown');
+  await expect(panel).toContainText('Round 2 · Turn 3');
+  await page.keyboard.press('ArrowDown');
+  await expect(panel).toContainText('Round 3 · Turn 1');
+  await expect(rows.nth(0)).toHaveAttribute('aria-current', 'step');
+  await page.keyboard.press('ArrowUp');
+  await expect(panel).toContainText('Round 2 · Turn 3');
   await player.waitFor('public current turn', () => initiative(player)?.activeEntityId === beast);
   expect(initiative(player)?.order).toEqual([hero, beast]);
   expect(await player.intent('initiative.advance', { sceneId })).toMatchObject({ t: 'reject' });
@@ -142,11 +185,11 @@ test('DM initiative syncs in both views, persists and excludes private combatant
   expect(player.frames.join('\n')).not.toMatch(new RegExp(`${secret}|Secret combatant`));
   await page.getByRole('button', { name: '3D view' }).click();
   await expect(page.getByRole('button', { name: 'Reset view' })).toBeVisible();
-  await expect(panel).toContainText('Beast (current)');
+  await expect(panel.locator('li[aria-current="step"]')).toContainText('Beast');
   await page.reload();
   await page.getByRole('button', { name: 'Initiative', exact: true }).click();
   await expect(panel.getByRole('listitem')).toHaveCount(3);
-  await expect(panel).toContainText('Round 2 · Turn 2');
+  await expect(panel).toContainText('Round 2 · Turn 3');
   // The history endpoint must report the viewer's public position, not the host's index.
   expect(
     await host.intent('initiative.set', {

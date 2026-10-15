@@ -74,14 +74,15 @@ describe('golden save v1 through the shared migrate hook', () => {
       await store.close();
     }
   });
-  it.each(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9'])(
+  it.each(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10'])(
     'loads and saves %s through the lasting-AoE, archive and initiative migration chain',
     async (version) => {
       const store = new LocalCampaignStore(await copyFixture(version), storeMigrate);
       try {
         const loaded = await store.load(campaignId);
         expect(loaded.campaign.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
-        if (version === 'v7' || version === 'v8' || version === 'v9') {
+        const since = (n: number) => Number(version.slice(1)) >= n;
+        if (since(7)) {
           expect(loaded.campaign.seats['01J8Z0000000000000000SEAT2']).toMatchObject({
             archived: true,
             identityId: '00000000000000000000000001',
@@ -91,7 +92,7 @@ describe('golden save v1 through the shared migrate hook', () => {
             for (const entity of Object.values(scene.entities))
               expect(entity.owners).not.toContain('01J8Z0000000000000000SEAT2');
         }
-        if (version === 'v9') {
+        if (since(9)) {
           // UX-44: the new optional fields survive load and save; older saves simply lack them.
           expect(loaded.campaign.icon).toEqual({ kind: 'glyph', value: '\u2694' });
           expect(loaded.campaign.screenshot).toBe('a'.repeat(64));
@@ -104,18 +105,27 @@ describe('golden save v1 through the shared migrate hook', () => {
         }
         for (const scene of loaded.scenes) {
           expect(scene.maxLastingAoEsPerPlayer).toBe(1);
-          if (version === 'v6' || version === 'v7' || version === 'v8' || version === 'v9') {
+          if (since(6)) {
             expect(Object.values(scene.entities).some((entity) => entity.lastingAoE)).toBe(true);
             expect(Object.values(scene.entities).some((entity) => entity.token?.quickFields)).toBe(
               true,
             );
           }
           expect(scene.initiative).toEqual(
-            version === 'v8' || version === 'v9'
+            since(8)
               ? {
                   round: 2,
                   order: ['01J8Z0000000000000000ENT01', '01J8Z0000000000000000ENT02'],
                   activeEntityId: '01J8Z0000000000000000ENT01',
+                  // UX-38: v10 adds initiative scores; older saves are unscored.
+                  ...(since(10)
+                    ? {
+                        values: {
+                          '01J8Z0000000000000000ENT01': 17,
+                          '01J8Z0000000000000000ENT02': 9.5,
+                        },
+                      }
+                    : {}),
                 }
               : undefined,
           );

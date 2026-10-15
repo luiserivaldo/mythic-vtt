@@ -139,7 +139,13 @@ function viewScene(audience: Audience, scene: Scene, seat?: Seat): Scene {
         order.length !== initiative.order.length ||
         activeEntityId !== initiative.activeEntityId
       ) {
-        initiative = { ...initiative, order, activeEntityId };
+        // UX-38: a hidden combatant's score is keyed by its id, so it goes with the row.
+        const values = initiative.values
+          ? Object.fromEntries(
+              Object.entries(initiative.values).filter(([id]) => order.includes(id)),
+            )
+          : undefined;
+        initiative = { ...initiative, order, activeEntityId, ...(values ? { values } : {}) };
         changed = true;
       }
     }

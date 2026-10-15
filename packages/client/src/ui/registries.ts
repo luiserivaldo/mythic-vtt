@@ -228,7 +228,8 @@ export const toolPanels = createRegistry<ToolPanel>([
     icon: 'list',
     group: 'rail',
     allowed: everyone,
-    region: 'right-dock',
+    // UX-38 / MV-265: quick, frequently used tooling lives in the left pane, beside the rail.
+    region: 'left-pane',
   },
 ]);
 

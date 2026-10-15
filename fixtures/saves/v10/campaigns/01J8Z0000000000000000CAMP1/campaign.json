@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 10,
+  "id": "01J8Z0000000000000000CAMP1",
+  "name": "The Sunken Chapel",
+  "settings": {
+    "defaultBinding": "persistent",
+    "instanceMode": "linked",
+    "spectators": {
+      "enabled": true,
+      "view": "players"
+    }
+  },
+  "seats": {
+    "01J8Z0000000000000000SEAT1": {
+      "id": "01J8Z0000000000000000SEAT1",
+      "label": "Dungeon Master",
+      "binding": "persistent",
+      "identityId": null,
+      "role": "codm",
+      "permissions": {
+        "view": true,
+        "move": true,
+        "edit": true,
+        "delete": true
+      },
+      "interactionEnabled": true,
+      "icon": {
+        "kind": "image",
+        "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    },
+    "01J8Z0000000000000000SEAT2": {
+      "id": "01J8Z0000000000000000SEAT2",
+      "label": "Mira",
+      "binding": "persistent",
+      "identityId": "00000000000000000000000001",
+      "role": "player",
+      "permissions": {
+        "view": true,
+        "move": true,
+        "edit": false,
+        "delete": false
+      },
+      "interactionEnabled": false,
+      "archived": true,
+      "icon": {
+        "kind": "glyph",
+        "value": "M"
+      }
+    }
+  },
+  "activeSceneId": "01J8Z0000000000000000SCN01",
+  "icon": {
+    "kind": "glyph",
+    "value": "⚔"
+  },
+  "screenshot": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

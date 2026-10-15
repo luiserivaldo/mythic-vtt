@@ -1,3 +1,4 @@
+import { v9ToV10 } from './v9-to-v10.js';
 import { v8ToV9 } from './v8-to-v9.js';
 import { v7ToV8 } from './v7-to-v8.js';
 import { v6ToV7 } from './v6-to-v7.js';
@@ -22,6 +23,7 @@ export const MIGRATION_STEPS: readonly MigrationStep[] = [
   v6ToV7,
   v7ToV8,
   v8ToV9,
+  v9ToV10,
 ];
 
 /**

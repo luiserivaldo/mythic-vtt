@@ -16,8 +16,8 @@ test.afterAll(async () => {
 });
 
 // UX-37 / UI-SHELL-05: a panel registered to the left pane opens there, beside the rail, and not
-// in the right dock. No shipped panel is registered to the pane yet (MV-254, MV-255 move them), so
-// the development build's routing hook sends the Initiative panel there for this check.
+// in the right dock. Initiative is registered there since UX-38 (MV-254); the development build's
+// routing hook call below is then a no-op, kept so the check survives future panel moves.
 test('a panel registered to the left pane renders there, collapses, and widens the board', async ({
   browser,
 }) => {

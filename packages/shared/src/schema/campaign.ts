@@ -5,7 +5,7 @@ import { Scene } from './scene.js';
 import { ImageHash, Seat, SeatIcon } from './seat.js';
 
 /** Bumped by the `schema-change` skill; migrations live in `../migrations`. */
-export const CURRENT_SCHEMA_VERSION = 9;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 export const Campaign = z.object({
   id: Id,
