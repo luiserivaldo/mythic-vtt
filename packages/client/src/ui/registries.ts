@@ -250,6 +250,15 @@ export const toolPanels = createRegistry<ToolPanel>([
     // UX-38 / MV-265: quick, frequently used tooling lives in the left pane, beside the rail.
     region: 'left-pane',
   },
+  {
+    id: 'camera',
+    label: 'Camera',
+    icon: 'hand',
+    group: 'rail',
+    allowed: everyone,
+    // UI-CAM-01 (UX-17): the Pan tool's 3D camera joystick, an expandable bar in the left pane.
+    region: 'left-pane',
+  },
 ]);
 
 export const tokenQuickFields = createRegistry<TokenQuickField>([

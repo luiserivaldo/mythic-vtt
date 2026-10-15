@@ -10,6 +10,7 @@ export const TOOL_PANEL_ORDER = [
   'draw',
   'create-prop',
   'initiative',
+  'camera',
 ] as const;
 export type ToolPanelId = (typeof TOOL_PANEL_ORDER)[number];
 
@@ -31,6 +32,8 @@ export const toolPanelLayoutStore = createStore<ToolPanelLayoutState>()((set) =>
     draw: false,
     'create-prop': false,
     initiative: false,
+    // UI-CAM-01: the Pan tool's camera panel starts as its bar and expands on demand.
+    camera: true,
   },
   collapse: (panel) => {
     set((state) => ({ collapsed: { ...state.collapsed, [panel]: true } }));

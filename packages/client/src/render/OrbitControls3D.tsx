@@ -19,6 +19,7 @@ import {
   type Point,
 } from './camera-3d.js';
 import { cameraPress, isDrag } from './board-input.js';
+import { cameraJoystickStore, isIdle, joystickOrbit, nudgeOrbit } from './camera-joystick.js';
 import { pointerClaims } from './pointer-claims.js';
 
 export interface OrbitControls3DProps {
@@ -134,8 +135,30 @@ export function OrbitControls3D({
     apply(orbit.current);
   }, [activeCamera, apply]);
 
+  // UI-CAM-02: the Pan panel's joystick asks for a frame whenever its input changes.
+  useEffect(
+    () =>
+      cameraJoystickStore.subscribe((state, previous) => {
+        if (state.input !== previous.input || state.pending !== previous.pending) invalidate();
+      }),
+    [invalidate],
+  );
+
   // Continue damped rotation; frames are only requested while velocity is non-zero.
   useFrame((_, delta) => {
+    // UI-CAM-02: the joystick turns this same orbit, so its tilt keeps the orbit's own clamp. A
+    // held knob keeps the on-demand loop running; a released one stops it.
+    const joystick = cameraJoystickStore.getState();
+    const steps = joystick.takePending();
+    const held = !isIdle(joystick.input);
+    if (held || steps.rotate !== 0 || steps.tilt !== 0) {
+      velocity.current = { az: 0, polar: 0 };
+      let next = nudgeOrbit(orbit.current, steps.rotate, steps.tilt);
+      if (held) next = joystickOrbit(next, joystick.input, delta);
+      apply(next);
+      if (held) invalidate();
+      return;
+    }
     const v = velocity.current;
     if (gestureActive.current || (v.az === 0 && v.polar === 0)) return;
     const dt = Math.min(delta, 0.05);
@@ -154,6 +177,13 @@ export function OrbitControls3D({
     const dragging = new Set<number>();
     let swallowClick = false;
     let lastMoveTime = 0;
+    // UI-CAM-03: a mouse that moves the camera closes the Pan panel; report it once per gesture.
+    let mouseReported = false;
+    const reportMouseMove = () => {
+      if (mouseReported) return;
+      mouseReported = true;
+      cameraJoystickStore.getState().mouseMoved();
+    };
     const rect = () => el.getBoundingClientRect();
     const local = (e: { clientX: number; clientY: number }): Point => {
       const r = rect();
@@ -163,6 +193,7 @@ export function OrbitControls3D({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       apply(dolly(orbit.current, wheelFactor(e)));
+      cameraJoystickStore.getState().mouseMoved();
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -181,6 +212,7 @@ export function OrbitControls3D({
       gestureActive.current = true;
       el.setPointerCapture(e.pointerId);
       lastMoveTime = e.timeStamp;
+      mouseReported = false;
     };
 
     const onPointerMove = (e: PointerEvent) => {
@@ -200,6 +232,7 @@ export function OrbitControls3D({
         const start = starts.get(e.pointerId);
         if (!dragging.has(e.pointerId) && start && !isDrag(start, next)) return;
         dragging.add(e.pointerId);
+        if (e.pointerType === 'mouse') reportMouseMove();
         if (modes.get(e.pointerId) === 'pan') {
           if (e.pointerType === 'mouse' && e.buttons === 1) swallowClick = true;
           apply(panOnGround(orbit.current, dx, dy, rect().height));

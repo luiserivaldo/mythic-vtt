@@ -1,0 +1,55 @@
+/* UI-CAM-01..02: the Pan tool's 3D camera joystick, flanked by its rotate buttons. */
+.ui-camera-joystick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.5rem;
+}
+.ui-camera-joystick > button {
+  min-width: 2.2rem;
+  font-size: 1.1rem;
+}
+.ui-camera-joystick-base {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  background: var(--ui-bg-raised);
+  border: 1px solid var(--ui-border);
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.ui-camera-joystick-base:active {
+  cursor: grabbing;
+}
+.ui-camera-joystick-base:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+.ui-camera-joystick-mark {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  font-size: 0.6rem;
+  color: var(--ui-muted);
+  pointer-events: none;
+}
+.ui-camera-joystick-mark[data-dir='forward'] {
+  top: 0.3rem;
+}
+.ui-camera-joystick-mark[data-dir='back'] {
+  bottom: 0.3rem;
+}
+.ui-camera-joystick-knob {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: var(--ui-control);
+  border: 1px solid var(--ui-border);
+  pointer-events: none;
+}
