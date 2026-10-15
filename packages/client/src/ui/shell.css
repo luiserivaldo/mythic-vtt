@@ -1022,3 +1022,62 @@ main [tabindex]:focus-visible {
   margin: 0;
   min-width: 0;
 }
+
+/* UI-TOP-07: the DM's invite popover drops from its top bar button, like the View as menu. */
+.ui-invite {
+  position: relative;
+}
+.ui-invite-popover {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 30;
+  width: min(24rem, calc(100vw - 2rem));
+  box-sizing: border-box;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.75rem;
+  background: var(--ui-bg-raised);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+}
+.ui-invite-popover[hidden] {
+  display: none;
+}
+.ui-invite-popover h2,
+.ui-invite-popover h3 {
+  margin: 0;
+}
+.ui-invite-popover h3 {
+  font-size: 0.9rem;
+  color: var(--ui-muted);
+}
+.ui-invite-popover section {
+  display: grid;
+  gap: 0.4rem;
+}
+.ui-invite-popover a {
+  color: var(--ui-accent);
+}
+.ui-invite-title {
+  font-size: 1rem;
+}
+.ui-invite-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ui-invite-note {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+}
+/* CLOUD-02: a planned service, greyed and dashed like the rail's WIP tools. */
+.ui-invite-card {
+  padding: 0.6rem;
+  border: 1px dashed var(--ui-border);
+  border-radius: 4px;
+  color: var(--ui-muted);
+}
