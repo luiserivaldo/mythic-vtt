@@ -42,6 +42,8 @@ export interface SurfaceHeightOptions {
 export const GROUND_ELEVATION = 0;
 export const DEFAULT_MAX_STEP_UP = 0.5;
 const EPS = 1e-9;
+/** A foot-height within this of a surface counts as standing on it (matches the drop line). */
+const EPS_STANDING = 0.05;
 
 /** The walkable form of an entity, or undefined when it has no shape or is not walkable. */
 export function walkableFromEntity(
@@ -204,4 +206,21 @@ export function dropElevation(
     currentElevation: position.y,
     maxStepUp,
   });
+}
+
+/**
+ * How far a token's feet are above the highest walkable ground beneath them (UI-TOKEN-05, MV-243):
+ * 0 on a platform, the full height above bare ground (negative below the plane). A surface overhead is not
+ * ground, so a token under a ceiling is measured to what it stands on.
+ */
+export function heightAboveGround(
+  position: { x: number; y: number; z: number },
+  walkables: readonly WalkableSurface[],
+  tolerance: number = EPS_STANDING,
+): number {
+  const ground = surfaceHeightAt(position.x, position.z, walkables, {
+    currentElevation: position.y,
+    maxStepUp: tolerance,
+  });
+  return position.y - ground;
 }

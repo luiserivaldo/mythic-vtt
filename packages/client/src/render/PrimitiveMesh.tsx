@@ -37,6 +37,7 @@ export function PrimitiveMesh({
   selected,
   renderOrder,
   onClick,
+  onContextMenu,
 }: {
   entity: RenderEntity;
   shape: RenderShape;
@@ -44,6 +45,8 @@ export function PrimitiveMesh({
   selected: boolean;
   renderOrder: number;
   onClick: (event: ThreeEvent<MouseEvent>) => void;
+  /** MV-243: a right click opens the prop's collidable menu. */
+  onContextMenu: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const [x, y, z] = entity.position;
   const color = safeColor(shape.color);
@@ -66,6 +69,7 @@ export function PrimitiveMesh({
         geometry={unitGeometry(shape.kind)}
         renderOrder={renderOrder}
         onClick={onClick}
+        onContextMenu={onContextMenu}
       >
         {/* CAM-05 owns opacity, transparency and depthWrite temporarily; keep those out of
             JSX so a colour/selection rerender does not overwrite an active fade. */}
@@ -91,6 +95,7 @@ export function PrimitiveMesh({
       texture={texture}
       renderOrder={renderOrder}
       onClick={onClick}
+      onContextMenu={onContextMenu}
     />
   );
 }
@@ -103,6 +108,7 @@ function Footprint2D({
   texture,
   renderOrder,
   onClick,
+  onContextMenu,
 }: {
   entity: RenderEntity;
   shape: RenderShape;
@@ -111,6 +117,7 @@ function Footprint2D({
   texture: Texture | null;
   renderOrder: number;
   onClick: (event: ThreeEvent<MouseEvent>) => void;
+  onContextMenu: (event: ThreeEvent<MouseEvent>) => void;
 }) {
   const { kind, width, depth, yaw, scale } = shape;
   const geometries = useMemo(() => {
@@ -123,7 +130,13 @@ function Footprint2D({
 
   return (
     <group position={[x, drawY, z]}>
-      <mesh name={entity.id} geometry={geometries.fill} renderOrder={renderOrder} onClick={onClick}>
+      <mesh
+        name={entity.id}
+        geometry={geometries.fill}
+        renderOrder={renderOrder}
+        onClick={onClick}
+        onContextMenu={onContextMenu}
+      >
         <meshBasicMaterial
           key={texture ? 'textured' : 'flat'}
           color={texture ? '#ffffff' : color}

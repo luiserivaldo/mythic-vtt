@@ -1,10 +1,11 @@
 import { useFrame } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
+import type { WalkableSurface } from '@mythic/shared';
 import { DoubleSide, type Group } from 'three';
 import type { SelectionActor } from '../tools/selection.js';
 import type { RenderEntity } from './scene-model.js';
-import { TokenLabel, TokenMaterial } from './TokenSprite.js';
+import { ElevationBadge, TokenLabel, TokenMaterial } from './TokenSprite.js';
 import { TokenStatusMarkers } from './TokenStatusMarkers.js';
 import { markerAnchor3d } from './status-markers.js';
 import {
@@ -12,6 +13,7 @@ import {
   facingMarkerPosition,
   standeeDimensions,
   labelAnchor3d,
+  badgeAnchor3d,
 } from './token-standee.js';
 import { SELECTION_COLOR } from './canvas-style.js';
 
@@ -33,6 +35,7 @@ export function TokenStandee({
   onClick,
   onDoubleClick,
   onContextMenu,
+  walkables,
 }: {
   entity: RenderEntity;
   color: string;
@@ -44,6 +47,8 @@ export function TokenStandee({
   onDoubleClick: () => void;
   /** UI-TOKEN-03: a right click opens the token's short menu (R3F's own context-menu event). */
   onContextMenu: (event: ThreeEvent<MouseEvent>) => void;
+  /** The ground the badge's elevation is measured from (MV-243). */
+  walkables: readonly WalkableSurface[];
 }) {
   const pivot = useRef<Group>(null);
   const [x, y, z] = entity.position;
@@ -106,6 +111,13 @@ export function TokenStandee({
         </mesh>
       </group>
       <TokenLabel entity={entity} actor={actor} anchor={labelAnchor3d(entity.sizeCells)} />
+      {/* F11: the height label was only drawn in 2D; it sits just above the name in 3D. */}
+      <ElevationBadge
+        entity={entity}
+        actor={actor}
+        walkables={walkables}
+        anchor={badgeAnchor3d(entity.sizeCells)}
+      />
       <TokenStatusMarkers entity={entity} actor={actor} anchor={markerAnchor3d(entity.sizeCells)} />
     </group>
   );

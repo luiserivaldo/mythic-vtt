@@ -190,7 +190,8 @@ test('elevated tokens keep their height; flying locks it; a spectator cannot tog
   await panel.getByRole('checkbox', { name: 'Flying' }).click();
   await expect.poll(() => entity()?.token?.flying, { timeout: 10_000 }).toBeUndefined();
   await expect(panel.getByRole('checkbox', { name: 'Flying' })).not.toBeChecked();
-  await expect(page.getByTestId('elevation-badge')).not.toContainText('Flying');
+  // Unflown, it stands on the platform, which now reads 0: no badge at all (MV-243).
+  await expect(page.getByTestId('elevation-badge')).toHaveCount(0);
 
   expect(errors).toEqual([]);
   await spectator.close();
