@@ -1,4 +1,5 @@
 import type { SeatPermissions } from '@mythic/shared';
+import type { ViewMode } from '../render/view-mode-store.js';
 import { dockTabs, type DockTab } from './registries.js';
 import type { ViewerRole } from './viewer.js';
 
@@ -12,6 +13,7 @@ export const DOCK_ICONS: Readonly<Record<string, string>> = {
   scenes: '🗺',
   layers: '📚',
   entities: '♟',
+  hierarchy: '🗂',
   prefabs: '🧰',
   seats: '👥',
   share: '🔗',
@@ -19,11 +21,15 @@ export const DOCK_ICONS: Readonly<Record<string, string>> = {
   settings: '⚙',
 };
 
+/** `view` is the local 2D/3D mode; a tab bound to a view mode is offered only there (C16). */
 export function visibleDockTabs(
   role: ViewerRole,
   permissions: SeatPermissions | null = null,
+  view: ViewMode = '2d',
 ): DockTab[] {
-  return dockTabs.allowed(role, permissions);
+  return dockTabs
+    .allowed(role, permissions)
+    .filter((tab) => tab.view === undefined || tab.view === view);
 }
 
 /**
@@ -34,8 +40,9 @@ export function resolveActiveTab(
   role: ViewerRole,
   permissions: SeatPermissions | null,
   requested: string,
+  view: ViewMode = '2d',
 ): string {
-  return visibleDockTabs(role, permissions).some((tab) => tab.id === requested)
+  return visibleDockTabs(role, permissions, view).some((tab) => tab.id === requested)
     ? requested
     : DEFAULT_DOCK_TAB;
 }

@@ -17,6 +17,8 @@ export interface RailTool extends RegistryEntry {
 
 export interface DockTab extends RegistryEntry {
   panel: string;
+  /** Offered only in this local view mode (C16: the hierarchy is a 3D edit-mode tab). */
+  view?: '2d' | '3d';
 }
 
 export interface TokenQuickField extends RegistryEntry {
@@ -142,6 +144,15 @@ export const dockTabs = createRegistry<DockTab>([
     group: 'world',
     allowed: admin,
     panel: 'entities',
+  },
+  {
+    id: 'hierarchy',
+    label: 'Hierarchy',
+    icon: 'hierarchy',
+    group: 'world',
+    allowed: admin,
+    panel: 'hierarchy',
+    view: '3d',
   },
   {
     id: 'prefabs',

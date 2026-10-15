@@ -125,6 +125,7 @@ describe('viewerRole', () => {
       'scenes',
       'layers',
       'entities',
+      'hierarchy',
       ...info,
     ]);
     expect(toolbarItems('host').map((i) => i.id)).toEqual([
@@ -132,6 +133,7 @@ describe('viewerRole', () => {
       'scenes',
       'layers',
       'entities',
+      'hierarchy',
       'seats',
       'share',
       ...info,
