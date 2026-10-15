@@ -11,6 +11,7 @@ export type SubmitIntent = (
 export const SubmitContext = createContext<SubmitIntent | null>(null);
 
 export function describeFailure(result: Extract<IntentResult, { ok: false }>): string {
+  if (result.explanation) return result.explanation;
   const detail = result.detail ? `: ${result.detail}` : '';
   return `The host did not accept that (${result.reason}${detail}).`;
 }
