@@ -3,12 +3,12 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import { createHostTokenHolder, extractHostToken } from './net/host-token.js';
-import { loadOrCreateIdentity } from './net/identity.js';
+import { SPECTATOR_IDENTITY_STORAGE_KEY, loadOrCreateIdentity } from './net/identity.js';
 import { extractSeatInvite, redeemSeatInvite, seatInviteMessage } from './net/seat-invite.js';
 import { ClientStoreContext } from './store/react.js';
 import { createClientStore } from './store/store.js';
 import { JoinContext, RETURNING_KEY } from './ui/join-context.js';
-import { loadProfile } from './ui/join-screen.js';
+import { loadProfile, migrateLegacyProfile } from './ui/join-screen.js';
 import { createSession } from './ui/session.js';
 import { SubmitProvider } from './ui/SubmitProvider.js';
 import { EphemeralContext } from './ui/ephemeral-context.js';
@@ -64,11 +64,14 @@ const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
 const session = createSession({
   url: `${wsProtocol}//${location.host}/ws${watchVisitor ? `?watch=${encodeURIComponent(watchToken)}` : ''}`,
   identity,
+  spectatorIdentity: () =>
+    loadOrCreateIdentity(localStorage, Date.now(), randomByte, SPECTATOR_IDENTITY_STORAGE_KEY),
   hostToken: hostTokenHolder,
   store,
   createSocket: (url) => new WebSocket(url),
 });
 const hostVisitor = !watchVisitor && (hostToken !== undefined || remembered);
+if (!watchVisitor) migrateLegacyProfile(localStorage);
 const initialProfile = loadProfile(localStorage);
 const returning = (() => {
   try {

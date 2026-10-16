@@ -31,8 +31,19 @@ interface Visitor {
   close: () => Promise<void>;
 }
 
-async function visit(browser: Browser, running: Table, errors: string[]): Promise<Visitor> {
+async function visit(
+  browser: Browser,
+  running: Table,
+  errors: string[],
+  stored: Record<string, string> = {},
+): Promise<Visitor> {
   const context = await browser.newContext();
+  // What this browser already holds in localStorage (identity, profile), set once.
+  await context.addInitScript((entries) => {
+    if (sessionStorage.getItem('e2e.seeded') === '1') return;
+    sessionStorage.setItem('e2e.seeded', '1');
+    for (const [key, value] of Object.entries(entries)) localStorage.setItem(key, value);
+  }, stored);
   const page = await context.newPage();
   const payloads: string[] = [];
   const received: string[] = [];
@@ -240,6 +251,117 @@ test('claim, temporary player, spectator and an already-claimed seat, with no pr
 
   await zara.close();
   await tamsin.close();
+  await watcher.close();
+  await dmContext.close();
+  await setup.close();
+});
+
+// MV-270, restoring #118's lost coverage: the DM seats an unseated visitor from the Seats tab's
+// roster dropdown, and no roster ever reaches a player socket (PERM-03). Also: a legacy
+// `spectator: true` profile is migrated to `awaitingSeat` (it is not a spectator), and a seat-bound
+// identity with no stored profile that picks Join As Spectator watches anonymously instead of
+// taking its seat back.
+test('the DM seats a remembered visitor from the roster; spectators stay anonymous', async ({
+  browser,
+}) => {
+  if (!table) throw new Error('table not started');
+  const errors: string[] = [];
+  const setup = await RawClient.connect(table, { name: DM_NAME, ...HOST });
+  await setup.waitFor('snapshot', () => setup.state !== undefined);
+  const scene = testUlid('SCENE', 2702);
+  const ranger = testUlid('SEAT', 2702);
+  const bard = testUlid('SEAT', 2703);
+  const bardIdentity = { identityId: testUlid('BARD', 2703), identitySecret: 'bound-bard' };
+  for (const [type, payload] of [
+    ['scene.create', { sceneId: scene, name: 'Roster hall' }],
+    ['scene.activate', { sceneId: scene }],
+    ['seat.create', { seatId: ranger, label: 'Ranger' }],
+    ['seat.create', { seatId: bard, label: 'Bard' }],
+    ['seat.assign', { seatId: bard, identityId: bardIdentity.identityId }],
+  ] as const)
+    expect((await setup.intent(type, payload)).t, type).toBe('ack');
+
+  const dmContext = await browser.newContext();
+  await dmContext.addInitScript(
+    ({ identity, name }) => {
+      localStorage.setItem('mythic.identity.v1', JSON.stringify(identity));
+      localStorage.setItem('mythic.host', '1');
+      localStorage.setItem('mythic.profile.v1', JSON.stringify({ displayName: name }));
+    },
+    { identity: HOST, name: DM_NAME },
+  );
+  const dm = await dmContext.newPage();
+  dm.on('pageerror', (e) => errors.push(e.message));
+  await dm.goto(table.clientUrl);
+  await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
+  await dm.getByRole('tab', { name: 'Seats', exact: true }).click();
+
+  // A returning visitor whose stored profile still carries the legacy spectator flag: it is
+  // rewritten as awaitingSeat, and the visitor waits under their name, never as a "spectator".
+  const quinn = await visit(browser, table, errors, {
+    'mythic.profile.v1': JSON.stringify({ displayName: 'Quinn', spectator: true }),
+  });
+  const storedProfile = () =>
+    quinn.page.evaluate(
+      () => JSON.parse(localStorage.getItem('mythic.profile.v1') ?? '{}') as unknown,
+    );
+  await expect(
+    quinn.page.getByRole('button', { name: 'Waiting for a seat: choose one' }),
+  ).toBeVisible();
+  await expect(quinn.page.getByRole('button', { name: 'Watching: choose a seat' })).toHaveCount(0);
+  expect(await storedProfile()).toEqual({ displayName: 'Quinn', awaitingSeat: true });
+  await expect.poll(() => quinn.sockets()).toBe(1);
+
+  // The DM seats Quinn from the dropdown, not by typing an identity id.
+  const roster = dm.getByRole('list', { name: 'Connected identities' });
+  await expect(roster).toContainText('Quinn');
+  const seatRow = dm.getByRole('listitem', { name: 'Ranger seat', exact: true });
+  await seatRow.locator('summary').click();
+  const picker = seatRow.getByLabel('Connected participant for Ranger');
+  const value = await picker.locator('option', { hasText: 'Quinn' }).getAttribute('value');
+  expect(value).toMatch(/^[0-9A-Z]{26}$/);
+  await picker.selectOption(value ?? '');
+  await seatRow.getByRole('button', { name: 'Assign', exact: true }).click();
+  await expect(quinn.page.getByRole('dialog')).toHaveCount(0);
+  await expect(quinn.page.getByLabel('Current identity')).toContainText('Quinn');
+  await expect(quinn.page.getByLabel('Current identity')).toContainText('Ranger');
+  await expect.poll(() => setup.state && JSON.stringify(setup.state)).toContain(value ?? '-');
+  await expect.poll(storedProfile).toEqual({ displayName: 'Quinn', lastSeatId: ranger });
+
+  // The Bard identity holds a seat but this browser has no stored profile. Join As Spectator
+  // watches anonymously, under a separate identity: the Bard seat is not taken back as "Spectator".
+  const watcher = await visit(browser, table, errors, {
+    'mythic.identity.v1': JSON.stringify(bardIdentity),
+  });
+  await watcher.page.getByRole('button', { name: 'Join As Spectator' }).click();
+  await expect(watcher.page.getByRole('button', { name: 'Watching: choose a seat' })).toBeVisible();
+  await expect(dm.getByLabel('Spectators')).toHaveText('Spectators watching: 1');
+  await expect(watcher.page.getByLabel('Current identity')).not.toContainText('Bard');
+  const sent = watcher.sent.map((f) => JSON.parse(f) as Record<string, unknown>);
+  const hello = sent.find((m) => m['t'] === 'hello');
+  expect(hello?.['identityId']).toMatch(/^[0-9A-Z]{26}$/);
+  expect(hello?.['identityId']).not.toBe(bardIdentity.identityId);
+  expect(sent).toContainEqual({ t: 'join', as: 'spectator' });
+  const presence = setup.frames
+    .filter((f) => f.includes('"t":"presence"'))
+    .map((f) => JSON.parse(f) as { seats: { seatId: string; connected: boolean }[] })
+    .at(-1);
+  expect(presence?.seats.find((s) => s.seatId === bard)).toMatchObject({ connected: false });
+  expect(watcher.received.some((f) => f.includes(`"seatId":"${bard}"`))).toBe(false);
+  await expect(roster).not.toContainText('Spectator');
+
+  // PERM-03: no roster reaches a player or spectator socket, before or after being seated.
+  expect(quinn.received.length).toBeGreaterThan(0);
+  for (const frames of [quinn.received, watcher.received]) {
+    expect(frames.some((f) => f.includes('"t":"presence"'))).toBe(false);
+    expect(frames.join('\n')).not.toContain('unseated');
+  }
+  // D44: the spectator audience gets seats with a placeholder identity, and no visitor names.
+  expect(watcher.received.join('\n')).not.toContain(bardIdentity.identityId);
+  expect(watcher.received.join('\n')).not.toContain('Quinn');
+  expect(errors).toEqual([]);
+
+  await quinn.close();
   await watcher.close();
   await dmContext.close();
   await setup.close();

@@ -25,7 +25,15 @@ export function registerJoinRoutes(
   });
   app.get('/api/join', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    if (!limiter.hit(request.ip)) return reply.code(429).send({ error: 'too many requests' });
+    if (!limiter.hit(request.ip)) {
+      // MV-270: say when to come back, so join screens behind one shared address back off
+      // instead of retrying into the same spent window.
+      reply.header(
+        'retry-after',
+        String(Math.max(1, Math.ceil(limiter.retryAfterMs(request.ip) / 1000))),
+      );
+      return reply.code(429).send({ error: 'too many requests' });
+    }
     return buildJoinPayload(options.state(), await options.host());
   });
 }

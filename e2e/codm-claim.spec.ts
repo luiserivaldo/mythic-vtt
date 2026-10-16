@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, openClient, startTable, testUlid, type Reply, type Table } from './harness.js';
+import {
+  RawClient,
+  openClient,
+  recordPageFrames,
+  startTable,
+  testUlid,
+  type Reply,
+  type Table,
+} from './harness.js';
 
 // MV-269: only the host grants a Co-DM seat (seat.assign or a SES-04 invite). A join-link visitor
 // is never offered one, cannot claim one over the socket, and never sees the DM layer.
@@ -119,4 +127,95 @@ test('an identity the host assigned to the Co-DM seat is seated as Co-DM', async
   expect(seatHolder(CODM_SEAT)).toBe(deputyId);
   expect(JSON.stringify(deputy.state)).toContain(SECRET_NAME);
   await deputy.close();
+});
+
+// MV-270: a co-DM works before any scene is active, so a granted co-DM's reload, a host restart
+// and an explicit Join all succeed then; a visitor is still told to wait and still refused.
+test('co-DM reconnects before a scene is active', async ({ browser }) => {
+  const quiet = await startTable();
+  const context = await browser.newContext();
+  try {
+    const hostIdentity = { identityId: testUlid('HOST', 2701), identitySecret: 'quiet-host' };
+    const dm = await RawClient.connect(quiet, {
+      name: 'dm',
+      ...hostIdentity,
+      hostToken: quiet.hostToken,
+    });
+    await dm.waitFor('host snapshot', () => dm.state !== undefined);
+    const scene = testUlid('SCENE', 2701);
+    const seat = testUlid('SEAT', 2701);
+    const deputy = { identityId: testUlid('DEPUTY', 2701), identitySecret: 'quiet-deputy' };
+    // A scene exists, but none is active (the first scene is activated on create; delete it).
+    const opened = testUlid('SCENE', 2702);
+    await ok(dm.intent('scene.create', { sceneId: opened, name: 'Opened' }));
+    await ok(dm.intent('scene.create', { sceneId: scene, name: 'Unopened' }));
+    await ok(dm.intent('scene.delete', { sceneId: opened }));
+    await ok(dm.intent('seat.create', { seatId: seat, label: 'Warden', role: 'codm' }));
+    await ok(dm.intent('seat.assign', { seatId: seat, identityId: deputy.identityId }));
+    expect((dm.state as { activeSceneId: string | null }).activeSceneId).toBeNull();
+    await dm.close();
+
+    // The co-DM's browser: a reload and a host restart both land back in the seat, with no
+    // "No active scene" notice and no join screen.
+    await context.addInitScript((identity) => {
+      localStorage.setItem('mythic.identity.v1', JSON.stringify(identity));
+      localStorage.setItem('mythic.profile.v1', JSON.stringify({ displayName: 'Dana' }));
+    }, deputy);
+    const page = await context.newPage();
+    const frames = recordPageFrames(page);
+    const seated = async () => {
+      await expect(page.getByRole('status')).toHaveText('Connected to New campaign');
+      await expect(page.getByLabel('Current identity')).toContainText('Warden');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    };
+    await page.goto(quiet.clientUrl);
+    await seated();
+    await page.reload();
+    await seated();
+    await quiet.restart();
+    await page.reload();
+    await seated();
+    expect(frames.join('\n')).toContain(`"seatId":"${seat}"`);
+    expect(frames.some((f) => f.includes('"code":"no-active-scene"'))).toBe(false);
+    expect(frames.some((f) => f.includes('"code":"seat-unavailable"'))).toBe(false);
+
+    // Join on the seat it already holds succeeds over the socket too.
+    const host = await RawClient.connect(quiet, { name: 'dm again', ...hostIdentity });
+    await host.waitFor('host snapshot', () => host.state !== undefined);
+    const raw = await RawClient.connect(quiet, { name: 'Dana', ...deputy });
+    await raw.waitFor('co-DM snapshot', () =>
+      raw.frames.some((f) => f.includes('"t":"snapshot"') && f.includes(`"seatId":"${seat}"`)),
+    );
+    raw.join(seat);
+
+    // A visitor is still told to wait, and cannot take the seat by join or by intent (MV-269).
+    const visitorId = testUlid('VISITOR', 2701);
+    const visitor = await RawClient.connect(quiet, {
+      name: 'visitor',
+      identityId: visitorId,
+      identitySecret: 'quiet-visitor',
+    });
+    await visitor.waitFor('snapshot', () => visitor.state !== undefined);
+    visitor.join(seat);
+    await visitor.waitFor('join refused', () =>
+      visitor.frames.some((f) => f.includes('"code":"seat-unavailable"')),
+    );
+    expect(visitor.frames.some((f) => f.includes('"code":"no-active-scene"'))).toBe(true);
+    expect(
+      await visitor.intent('session.join', { seatId: seat, identityId: visitorId }),
+    ).toMatchObject({ t: 'reject', reason: 'forbidden' });
+
+    await ok(host.intent('scene.rename', { sceneId: scene, name: 'Still unopened' }));
+    await raw.waitForSeq(host.lastSeq);
+    expect(raw.frames.some((f) => f.includes('"code":"seat-unavailable"'))).toBe(false);
+    expect(raw.frames.some((f) => f.includes('"code":"no-active-scene"'))).toBe(false);
+    const seats = (host.state as { seats: Record<string, { identityId: string | null }> }).seats;
+    expect(seats[seat]?.identityId).toBe(deputy.identityId);
+    await raw.close();
+    await visitor.close();
+    await host.close();
+  } finally {
+    await context.close();
+    await quiet.stop();
+  }
 });

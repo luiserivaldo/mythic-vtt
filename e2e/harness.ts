@@ -224,15 +224,16 @@ export async function startTable(options: { publicUrl?: string } = {}): Promise<
 }
 
 /**
- * M1-11: a visitor with a saved profile skips the join screen and connects at once as a
- * spectator. Most specs are about the table, not the join flow, so they start from this.
+ * M1-11: a visitor with a saved profile skips the join screen and connects at once under that
+ * name, unseated, so the DM (or a spec) can seat it. Most specs are about the table, not the join
+ * flow, so they start from this. `awaitingSeat` replaced the legacy `spectator` flag (MV-270).
  */
 export async function seedProfile(context: BrowserContext, displayName = 'Player'): Promise<void> {
   await context.addInitScript((name) => {
     if (localStorage.getItem('mythic.profile.v1') === null) {
       localStorage.setItem(
         'mythic.profile.v1',
-        JSON.stringify({ displayName: name, spectator: true }),
+        JSON.stringify({ displayName: name, awaitingSeat: true }),
       );
     }
   }, displayName);

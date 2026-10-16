@@ -15,6 +15,7 @@ function setup() {
   const session = createSession({
     url: 'ws://test/ws',
     identity: { identityId: tid(2), identitySecret: 'secret' },
+    spectatorIdentity: () => ({ identityId: tid(3), identitySecret: 'watcher' }),
     store: createClientStore(),
     createSocket: sockets.createSocket,
   });
@@ -63,5 +64,20 @@ describe('session ephemeral listeners', () => {
     kept();
     second.serverSend({ t: 'ephemeral', channel: 'draw.stroke', data: { strokeId: 'd' } });
     expect(seen).toEqual([{ strokeId: 'b' }, { strokeId: 'c' }]);
+  });
+});
+
+// MV-270: watching never presents the visitor's own identity, which the host would put back in
+// any seat it holds.
+describe('session identities', () => {
+  it('says hello as the visitor, or as the spectator identity when watching', () => {
+    const { sockets, session } = setup();
+    session.start({ displayName: 'Ana' });
+    sockets.last().serverOpen();
+    expect(sockets.last().sent[0]).toMatchObject({ t: 'hello', identityId: tid(2) });
+    session.start({ displayName: 'Spectator' }, { spectator: true });
+    sockets.last().serverOpen();
+    expect(sockets.last().sent[0]).toMatchObject({ t: 'hello', identityId: tid(3) });
+    expect(JSON.stringify(sockets.last().sent)).not.toContain(tid(2));
   });
 });

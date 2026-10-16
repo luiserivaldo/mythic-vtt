@@ -12,6 +12,12 @@ export interface KeyValueStore {
 }
 
 export const IDENTITY_STORAGE_KEY = 'mythic.identity.v1';
+/**
+ * MV-270: "Join As Spectator" connects with its own identity, never the visitor's own: the host
+ * puts an identity back in the seat it holds on connect, so watching with a seat-bound identity
+ * would take that seat under the name "Spectator". This one is never seated or named.
+ */
+export const SPECTATOR_IDENTITY_STORAGE_KEY = 'mythic.spectator-identity.v1';
 
 function isIdentity(v: unknown): v is Identity {
   if (typeof v !== 'object' || v === null) return false;
@@ -24,8 +30,9 @@ export function loadOrCreateIdentity(
   store: KeyValueStore,
   nowMs: number,
   randomByte: () => number,
+  key: string = IDENTITY_STORAGE_KEY,
 ): Identity {
-  const raw = store.getItem(IDENTITY_STORAGE_KEY);
+  const raw = store.getItem(key);
   if (raw) {
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -38,6 +45,6 @@ export function loadOrCreateIdentity(
     identityId: ulid(nowMs, randomByte),
     identitySecret: randomSecret(32, randomByte),
   };
-  store.setItem(IDENTITY_STORAGE_KEY, JSON.stringify(identity));
+  store.setItem(key, JSON.stringify(identity));
   return identity;
 }

@@ -4,6 +4,8 @@ export interface RateLimiter {
   hit(key: string): boolean;
   /** True if `key` has already spent its budget (does not count a hit). */
   exhausted(key: string): boolean;
+  /** Milliseconds until `key`'s current window ends and its budget is restored (for Retry-After). */
+  retryAfterMs(key: string): number;
 }
 
 export function createRateLimiter(options: {
@@ -32,5 +34,9 @@ export function createRateLimiter(options: {
       return w.count <= options.max;
     },
     exhausted: (key) => current(key).count >= options.max,
+    retryAfterMs(key) {
+      const w = current(key);
+      return Math.max(0, w.start + options.windowMs - now());
+    },
   };
 }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Ulid } from '@mythic/protocol';
-import { loadOrCreateIdentity, type KeyValueStore } from './identity.js';
+import {
+  SPECTATOR_IDENTITY_STORAGE_KEY,
+  loadOrCreateIdentity,
+  type KeyValueStore,
+} from './identity.js';
 
 function memory(): KeyValueStore & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -21,5 +25,21 @@ describe('identity', () => {
     store.setItem('mythic.identity.v1', '{bad');
     const a = loadOrCreateIdentity(store, 1, () => 1);
     expect(a.identitySecret).toHaveLength(64);
+  });
+  it('keeps the spectator identity apart from the visitor identity (MV-270)', () => {
+    const store = memory();
+    let n = 0;
+    const own = loadOrCreateIdentity(store, 1_700_000_000_000, () => n++);
+    const watcher = loadOrCreateIdentity(
+      store,
+      1_700_000_000_001,
+      () => n++,
+      SPECTATOR_IDENTITY_STORAGE_KEY,
+    );
+    expect(watcher.identityId).not.toBe(own.identityId);
+    expect(loadOrCreateIdentity(store, 9, () => 0)).toEqual(own);
+    expect(loadOrCreateIdentity(store, 9, () => 0, SPECTATOR_IDENTITY_STORAGE_KEY)).toEqual(
+      watcher,
+    );
   });
 });
