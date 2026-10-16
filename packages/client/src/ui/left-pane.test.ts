@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { aoeToolStore } from '../tools/aoe-tool-store.js';
+import { rulerStore } from '../tools/ruler-store.js';
 import { leftPaneStore, panelRegion, paneShift } from './left-pane.js';
 import { createRegistry, toolPanels, type ToolPanel } from './registries.js';
 import { TOOL_PANEL_ORDER } from './tool-panel-layout.js';
@@ -36,6 +38,58 @@ describe('UI-SHELL-05 left pane', () => {
     leftPaneStore.getState().toggleCollapsed();
     expect(leftPaneStore.getState().collapsed).toBe(true);
     leftPaneStore.getState().expand();
+    expect(leftPaneStore.getState().collapsed).toBe(false);
+  });
+});
+
+describe('MV-267 Measure tucks the pane away', () => {
+  beforeEach(() => {
+    rulerStore.getState().setTool(false);
+    aoeToolStore.getState().setActive(false);
+    leftPaneStore.setState({ collapsed: false });
+  });
+
+  it('collapses for the ruler and reopens when it is put away', () => {
+    rulerStore.getState().setTool(true);
+    expect(leftPaneStore.getState().collapsed).toBe(true);
+    rulerStore.getState().setTool(false);
+    expect(leftPaneStore.getState().collapsed).toBe(false);
+  });
+
+  it('stays collapsed through a switch from the ruler to an AoE template', () => {
+    rulerStore.getState().setTool(true);
+    aoeToolStore.getState().setActive(true);
+    rulerStore.getState().setTool(false);
+    expect(leftPaneStore.getState().collapsed).toBe(true);
+    aoeToolStore.getState().setActive(false);
+    expect(leftPaneStore.getState().collapsed).toBe(false);
+  });
+
+  it('leaves a pane the user collapsed collapsed', () => {
+    leftPaneStore.getState().toggleCollapsed();
+    rulerStore.getState().setTool(true);
+    rulerStore.getState().setTool(false);
+    expect(leftPaneStore.getState().collapsed).toBe(true);
+  });
+
+  it('keeps the pane where the user puts it while measuring', () => {
+    rulerStore.getState().setTool(true);
+    leftPaneStore.getState().toggleCollapsed();
+    expect(leftPaneStore.getState().collapsed).toBe(false);
+    leftPaneStore.getState().toggleCollapsed();
+    rulerStore.getState().setTool(false);
+    expect(leftPaneStore.getState().collapsed).toBe(true);
+  });
+
+  it('holds a new selection until measuring ends', () => {
+    leftPaneStore.getState().toggleCollapsed();
+    aoeToolStore.getState().setActive(true);
+    leftPaneStore.getState().revealSelection();
+    expect(leftPaneStore.getState().collapsed).toBe(true);
+    aoeToolStore.getState().setActive(false);
+    expect(leftPaneStore.getState().collapsed).toBe(false);
+    leftPaneStore.getState().toggleCollapsed();
+    leftPaneStore.getState().revealSelection();
     expect(leftPaneStore.getState().collapsed).toBe(false);
   });
 });

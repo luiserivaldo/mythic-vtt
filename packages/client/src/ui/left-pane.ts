@@ -1,4 +1,6 @@
 import { createStore } from 'zustand/vanilla';
+import { aoeToolStore } from '../tools/aoe-tool-store.js';
+import { rulerStore } from '../tools/ruler-store.js';
 import type { SelectionAnchor } from './beside-token.js';
 import { toolPanels, type PanelRegion } from './registries.js';
 
@@ -11,7 +13,17 @@ interface LeftPaneState {
   setContainer(container: HTMLElement | null): void;
   toggleCollapsed(): void;
   expand(): void;
+  /** Expands the pane for a new selection, or, while measuring, once measuring ends. */
+  revealSelection(): void;
 }
+
+/** The ruler or an AoE template is armed: both start from a board drag (M3-15). */
+function measuring(): boolean {
+  return rulerStore.getState().tool || aoeToolStore.getState().active;
+}
+
+// MV-267: the pane collapsed itself for Measure and reopens when measuring ends.
+let tuckedForMeasure = false;
 
 export const leftPaneStore = createStore<LeftPaneState>()((set) => ({
   container: null,
@@ -20,12 +32,44 @@ export const leftPaneStore = createStore<LeftPaneState>()((set) => ({
     set({ container });
   },
   toggleCollapsed: () => {
+    tuckedForMeasure = false;
     set((state) => ({ collapsed: !state.collapsed }));
   },
   expand: () => {
+    tuckedForMeasure = false;
     set({ collapsed: false });
   },
+  revealSelection: () => {
+    if (measuring()) tuckedForMeasure = true;
+    else set({ collapsed: false });
+  },
 }));
+
+/**
+ * MV-267 (MV-279): the pane floats over the board's left edge, so an open pane would take the
+ * press of a ruler or AoE drag aimed at the cells under it. Measure's panel opens beside its rail
+ * button, not in the pane, so arming Measure collapses the pane to its strip and disarming it
+ * reopens the pane if Measure closed it. The pane keeps normal pointer input: expanding it while
+ * measuring is the user's choice, and its controls stay clickable. Draw and Create Prop keep their
+ * panels in the pane, so they leave it open.
+ */
+let wasMeasuring = measuring();
+function followMeasuring() {
+  const now = measuring();
+  if (now === wasMeasuring) return;
+  wasMeasuring = now;
+  const pane = leftPaneStore.getState();
+  if (now) {
+    if (!pane.collapsed) {
+      leftPaneStore.setState({ collapsed: true });
+      tuckedForMeasure = true;
+    }
+  } else if (tuckedForMeasure) {
+    pane.expand();
+  }
+}
+rulerStore.subscribe(followMeasuring);
+aoeToolStore.subscribe(followMeasuring);
 
 /** The pane's inset from the board's edges (0.5rem). */
 export const PANE_MARGIN_PX = 8;

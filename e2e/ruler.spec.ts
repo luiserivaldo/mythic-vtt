@@ -239,7 +239,13 @@ test('the ruler measures in scene units and a second client sees it with the sen
   await dm.keyboard.press('Escape');
   await expect(dm.getByTestId('ruler-total')).toHaveCount(0);
   await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
-  await expect(selected).toBeVisible();
+  // The tool stays armed, so the pane is still tucked to its strip (MV-267): the selection's
+  // panel is there, collapsed.
+  await expect(selected).toHaveCount(1);
+  await expect(dm.getByRole('complementary', { name: 'Left pane' })).toHaveAttribute(
+    'data-collapsed',
+    'true',
+  );
   await dm.keyboard.press('Escape');
   await expect(selected).toHaveCount(0);
 

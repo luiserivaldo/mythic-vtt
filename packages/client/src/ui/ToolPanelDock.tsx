@@ -142,9 +142,10 @@ export function ToolPanelDock({
   const showCamera = scene !== null && mode3d && !measuring && activeTool === 'pan';
   const selectionOpen = !readOnly && (showTransform || showAoE || showToken);
   // UI-TOKEN-07: each new selection expands the left pane to show its panels, even if the user
-  // had collapsed it. Collapsing it again keeps it collapsed until the selection changes.
+  // had collapsed it. Collapsing it again keeps it collapsed until the selection changes. While
+  // measuring it waits until measuring ends (MV-267), so it never covers a ruler or AoE drag.
   useEffect(() => {
-    if (selectionOpen) leftPaneStore.getState().expand();
+    if (selectionOpen) leftPaneStore.getState().revealSelection();
   }, [selectionKey, selectionOpen]);
   const panels: { id: ToolPanelId; node: ReactNode }[] = [];
   const add = (id: ToolPanelId, node: ReactNode) => {
