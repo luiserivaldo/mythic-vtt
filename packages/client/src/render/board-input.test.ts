@@ -72,9 +72,20 @@ describe('board-input', () => {
   it('a left drag on empty board is a marquee with Select and a pan with Pan', () => {
     expect(emptyBoardLeftDrag('select')).toBe('marquee');
     expect(emptyBoardLeftDrag('create-prop')).toBe('marquee');
+    expect(emptyBoardLeftDrag('initiative')).toBe('marquee');
     expect(emptyBoardLeftDrag('pan')).toBe('pan');
     expect(emptyBoardLeftDrag('measure')).toBeNull();
     expect(emptyBoardLeftDrag('draw')).toBeNull();
+  });
+
+  it('MV-272: the marquee runs unless the active tool claims the drag', () => {
+    const claimed = new Set(['create-prop']);
+    const claims = (tool: string) => claimed.has(tool);
+    expect(emptyBoardLeftDrag('create-prop', claims)).toBeNull();
+    expect(emptyBoardLeftDrag('select', claims)).toBe('marquee');
+    expect(emptyBoardLeftDrag('measure', claims)).toBe('marquee');
+    // Pan's left drag is the camera's, whatever the claims say.
+    expect(emptyBoardLeftDrag('pan', () => true)).toBe('pan');
   });
 
   it('a right release opens the menu only when the press stayed a click', () => {

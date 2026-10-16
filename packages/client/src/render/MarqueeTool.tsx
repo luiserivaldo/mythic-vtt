@@ -6,6 +6,8 @@ import { useStore } from 'zustand';
 import { useClientStore } from '../store/react.js';
 import {
   idsInRect,
+  isMarqueeBackdrop,
+  marqueeGathers,
   marqueeRect,
   marqueeSelection,
   marqueeStore,
@@ -29,8 +31,9 @@ function sceneEntityIdAt(object: Object3D | null, scene: Scene): string | null {
 }
 
 /**
- * UI-TOOL-01 / UI-INPUT-01 / C13 (MV-242): with the Select tool, a left drag that starts on empty
- * board draws a selection marquee instead of moving the camera. It listens on the canvas in the
+ * UI-TOOL-01 / UI-INPUT-01 / C13 (MV-242): unless the active tool claims it (MV-272, see
+ * `toolClaimsEmptyBoardDrag`), a left drag that starts on empty board draws a selection marquee
+ * instead of moving the camera. It listens on the canvas in the
  * bubble phase, so every control that claims a press first (gizmo handles, token drag, ruler,
  * draw, AoE, ping) keeps it; a press on a selectable entity stays a click for picking.
  */
@@ -41,7 +44,7 @@ export function MarqueeTool({
 }: {
   rendered: RenderScene | null;
   scene: Scene | null;
-  /** The rail tool in effect; the marquee belongs to Select (and Create Prop, MV-271). */
+  /** The rail tool in effect; the marquee runs unless it claims empty-board drags (MV-272). */
   tool: string;
 }) {
   const gl = useThree((s) => s.gl);
@@ -90,22 +93,28 @@ export function MarqueeTool({
         .intersectObjects(getState().scene.children, true)
         .flatMap(({ object, distance }) => {
           const id = sceneEntityIdAt(object, sc);
-          return id ? [{ id, distance }] : [];
+          const entity = id ? sc.entities[id] : undefined;
+          // MV-272: a battlemap under the press is board to draw the marquee over, not a target.
+          return id && entity && !isMarqueeBackdrop(entity, focus()) ? [{ id, distance }] : [];
         });
       return pickEntity(hits, sc, actor(), focus()) !== null;
     };
 
-    /** Screen centres (client px) of every visible token and prop the viewer may select. */
+    /**
+     * Screen centres (client px) of every visible token, prop and AoE the viewer may select, plus
+     * map images while the Map layer is focused (MV-272).
+     */
     const candidates = (sc: Scene): ScreenPoint[] => {
       const { rendered: shown, hiddenLayers: hidden } = latest.current;
       const r = el.getBoundingClientRect();
       const camera = getState().camera;
       const who = actor();
+      const layer = focus();
       const v = new Vector3();
-      return visibleEntities(shown, sc, hidden, focus()).flatMap((entity) => {
+      return visibleEntities(shown, sc, hidden, layer).flatMap((entity) => {
         const source = sc.entities[entity.id];
         // MV-258: `dimmed` marks an object off the active layer, which is not selectable.
-        if (entity.dimmed || !(entity.token ?? entity.shape)) return [];
+        if (!marqueeGathers(entity, layer)) return [];
         if (!source || !canSelect(source, sc, who)) return [];
         v.set(entity.position[0], entity.position[1], entity.position[2]).project(camera);
         return [
