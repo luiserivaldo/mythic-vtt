@@ -3,6 +3,7 @@ import {
   RawClient,
   setActiveLayer,
   settledCameraPose,
+  stableBoardLayout,
   startTable,
   testUlid,
   type Table,
@@ -92,9 +93,7 @@ test('mouse mapping: marquee, pan, flying lock, context menu and orbit', async (
   await ok(token(CHARLIE, 'Charlie', 30.5, 22.5));
   await expect(page.getByTestId('token-label')).toHaveCount(3);
 
-  const canvas = page.locator('canvas');
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('missing canvas');
+  const box = await stableBoardLayout(page);
   // Default 40x30 scene, framed whole: one cell per scene unit, centred on (20, 15).
   const zoom = Math.min(box.width / 42, box.height / 32);
   const screen = (x: number, z: number) => ({
@@ -143,10 +142,12 @@ test('mouse mapping: marquee, pan, flying lock, context menu and orbit', async (
   await test.step('Select: the marquee skips tokens off the active layer (MV-258)', async () => {
     const marquee = () => drag(screen(3, 3), screen(11, 10));
     await setActiveLayer(page, 'Props');
+    await stableBoardLayout(page);
     await expect.poll(() => selection(page)).toEqual([]);
     await marquee();
     await expect.poll(() => selection(page)).toEqual([]);
     await setActiveLayer(page, 'Tokens');
+    await stableBoardLayout(page);
     await marquee();
     await expect.poll(() => selection(page)).toEqual([ALPHA, BRAVO].sort());
   });
@@ -197,8 +198,9 @@ test('mouse mapping: marquee, pan, flying lock, context menu and orbit', async (
     const before = count();
     await page.getByRole('button', { name: 'Create Prop', exact: true }).click();
     await expect(page.getByRole('form', { name: 'Create prop' })).toBeVisible();
-    const board = await canvas.boundingBox();
-    if (!board) throw new Error('missing canvas');
+    // MV-277: the pane moves the canvas at once and the renderer catches up a frame or more later;
+    // read the board and its labels only once both have stopped moving.
+    const board = await stableBoardLayout(page);
     const at = { x: board.x + board.width / 2, y: board.y + board.height - 60 };
     await page.mouse.click(at.x, at.y);
     await expect.poll(() => selection(page)).toEqual([]);

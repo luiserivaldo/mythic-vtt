@@ -364,6 +364,68 @@ export async function settledCameraPose(page: Page): Promise<CameraPose> {
   return previous;
 }
 
+/** A screen rectangle in CSS pixels. */
+export interface ScreenBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * MV-277: the board's settled layout. Opening or closing a left-pane tool reflows the board in two
+ * steps: the canvas element moves with the pane at once (still at its old size, so every token
+ * label jumps by the pane's width), then the renderer measures its container a frame or more later,
+ * resizes the canvas and re-centres the camera (labels move back by half the pane's width; an
+ * untouched view also re-frames its zoom). A spec that reads label positions or the canvas box
+ * between the two steps frames a marquee on pixels the board is about to leave. Wait until the
+ * canvas fills its container and neither the canvas box nor any token label moves across
+ * `frames` consecutive animation frames, then return the canvas box.
+ */
+export async function stableBoardLayout(page: Page, frames = 3): Promise<ScreenBox> {
+  // A string expression: the e2e project has no DOM typings, and this runs in the page.
+  return page.evaluate<ScreenBox>(`(async () => {
+    const needed = ${String(frames)};
+    const read = () => {
+      const canvas = document.querySelector('canvas');
+      const container = canvas && canvas.parentElement;
+      if (!canvas || !container) return null;
+      const c = canvas.getBoundingClientRect();
+      const p = container.getBoundingClientRect();
+      // The renderer has not caught up with the layout yet: the canvas still has its old size.
+      if (
+        Math.abs(c.left - p.left) > 0.5 ||
+        Math.abs(c.top - p.top) > 0.5 ||
+        Math.abs(c.width - p.width) > 0.5 ||
+        Math.abs(c.height - p.height) > 0.5
+      )
+        return null;
+      const labels = [...document.querySelectorAll('[data-testid="token-label"]')].map((el) => {
+        const r = el.getBoundingClientRect();
+        return r.x + ',' + r.y;
+      });
+      const box = { x: c.x, y: c.y, width: c.width, height: c.height };
+      return { key: [box.x, box.y, box.width, box.height, ...labels].join('|'), box };
+    };
+    const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    const deadline = performance.now() + 10000;
+    let previous = null;
+    let steady = 0;
+    while (performance.now() < deadline) {
+      await nextFrame();
+      const now = read();
+      if (now && now.key === previous) {
+        steady += 1;
+        if (steady >= needed) return now.box;
+      } else {
+        steady = 0;
+      }
+      previous = now ? now.key : null;
+    }
+    throw new Error('the board layout did not settle within 10 s');
+  })()`);
+}
+
 // ---------- raw protocol clients (no browser) ----------
 
 export interface RawClientOptions {
