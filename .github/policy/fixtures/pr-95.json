@@ -1,0 +1,26 @@
+{
+  "files": [
+    "e2e/elevation.spec.ts",
+    "e2e/pings.spec.ts",
+    "e2e/view-as.spec.ts",
+    "packages/client/src/render/BoardCanvas.tsx",
+    "packages/client/src/render/PingTool.tsx",
+    "packages/client/src/render/canvas-style.ts",
+    "packages/client/src/tools/ping-store.test.ts",
+    "packages/client/src/tools/ping-store.ts",
+    "packages/client/src/tools/ping.test.ts",
+    "packages/client/src/tools/ping.ts",
+    "packages/client/src/ui/PingButton.tsx",
+    "packages/host/src/engine/ephemeral-relay.test.ts",
+    "packages/host/src/engine/ephemeral-relay.ts",
+    "packages/shared/src/actions/index.ts",
+    "packages/shared/src/actions/scene-toggles.test.ts",
+    "packages/shared/src/actions/scene-toggles.ts",
+    "packages/shared/src/ephemeral.test.ts",
+    "packages/shared/src/ephemeral.ts",
+    "packages/shared/src/index.ts",
+    "packages/shared/src/visibility/visibility.test.ts",
+    "packages/shared/src/visibility/visible-to.ts"
+  ],
+  "pr": 95
+}

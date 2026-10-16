@@ -1,0 +1,19 @@
+{
+  "files": [
+    "e2e/identity-qr.spec.ts",
+    "packages/client/src/net/identity-qr.test.ts",
+    "packages/client/src/net/identity-qr.ts",
+    "packages/client/src/net/qr-golden.ts",
+    "packages/client/src/net/qr.test.ts",
+    "packages/client/src/net/qr.ts",
+    "packages/client/src/store/store.ts",
+    "packages/client/src/store/view-as.test.ts",
+    "packages/client/src/ui/IdentityTransfer.tsx",
+    "packages/client/src/ui/qr-scan.test.ts",
+    "packages/client/src/ui/qr-scan.ts",
+    "packages/client/src/ui/qr-svg.test.ts",
+    "packages/client/src/ui/qr-svg.ts",
+    "packages/client/src/ui/shell.css"
+  ],
+  "pr": 90
+}

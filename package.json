@@ -16,7 +16,8 @@
     "test:load": "pnpm --filter @mythic/e2e test:load",
     "lint": "eslint . && prettier --check .",
     "typecheck": "pnpm -r typecheck",
-    "check": "pnpm build && pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm build && pnpm lint && pnpm typecheck && pnpm test",
+    "check:worker": "node scripts/check-worker.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

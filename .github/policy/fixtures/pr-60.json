@@ -1,0 +1,18 @@
+{
+  "files": [
+    "e2e/camera-drag.spec.ts",
+    "e2e/dock-tabs.spec.ts",
+    "e2e/view-as.spec.ts",
+    "packages/client/src/render/BoardCanvas.tsx",
+    "packages/client/src/render/token-labels.test.ts",
+    "packages/client/src/render/token-labels.ts",
+    "packages/client/src/render/token-preview.test.ts",
+    "packages/client/src/ui/HelpPanel.tsx",
+    "packages/client/src/ui/RightDock.tsx",
+    "packages/client/src/ui/help-panel.test.ts",
+    "packages/client/src/ui/help-panel.ts",
+    "packages/client/src/ui/shell.css",
+    "packages/client/src/ui/token-menu.test.ts"
+  ],
+  "pr": 60
+}
