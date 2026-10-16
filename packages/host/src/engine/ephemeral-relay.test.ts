@@ -1141,3 +1141,149 @@ it('shares the validated profile colour for rulers, cursors and pings instead of
     });
   }
 });
+
+describe('scene gate for every scene-scoped ephemeral (MV-232, PERM-03)', () => {
+  const STROKE = tid(30);
+  const points = [
+    { x: 1.125, y: 0, z: 1 },
+    { x: 2, y: 0, z: 7.875 },
+  ];
+  const stroke = (sceneId: string) => ({
+    sceneId,
+    strokeId: STROKE,
+    color: DEFAULT_DRAW_COLOR,
+    width: DEFAULT_DRAW_WIDTH,
+    phase: 'finished',
+    points,
+  });
+
+  /**
+   * Each scene-scoped channel, as the DM's client sends it on `sceneId`. `before` primes relay
+   * state the frame depends on (an erase needs a remembered stroke) and is relayed to the DM only.
+   */
+  const CHANNELS: readonly {
+    readonly channel: string;
+    readonly data: (sceneId: string) => Record<string, unknown>;
+    readonly before?: (sceneId: string) => { channel: string; data: Record<string, unknown> };
+  }[] = [
+    { channel: 'ruler.preview', data: (sceneId) => ({ sceneId, points, phase: 'active' }) },
+    { channel: PING_CHANNEL, data: (sceneId) => ({ sceneId, x: 1.125, y: 0, z: 7.875 }) },
+    {
+      channel: 'camera.pose',
+      data: (sceneId) => ({
+        mode: '2d',
+        centerX: 1.125,
+        centerZ: 7.875,
+        zoom: 48,
+        sceneId,
+        pull: true,
+      }),
+    },
+    {
+      channel: 'token.drag-preview',
+      data: (sceneId) => ({ sceneId, entityId: T.token, to: { x: 1.125, y: 0, z: 7.875 } }),
+    },
+    { channel: DRAW_STROKE_CHANNEL, data: stroke },
+    {
+      channel: DRAW_ERASE_CHANNEL,
+      data: (sceneId) => ({ sceneId, strokeId: STROKE }),
+      before: (sceneId) => ({ channel: DRAW_STROKE_CHANNEL, data: stroke(sceneId) }),
+    },
+    { channel: DRAW_CLEAR_CHANNEL, data: (sceneId) => ({ sceneId }) },
+  ];
+
+  function table(hidden: { dmOnly: boolean }) {
+    const state = fixtureCampaign();
+    const active = state.scenes[T.scene];
+    const coDmSeat = state.seats[T.coDm];
+    const token = active?.entities[T.token];
+    if (!active || !coDmSeat || !token) throw new Error('fixture incomplete');
+    coDmSeat.identityId = T.carol;
+    token.token = { sizeCells: 1, heightCells: 1, labelVisibility: 'all' };
+    // A copy of the active scene, entities included, so a drag preview resolves its token there.
+    state.scenes[T.newScene] = { ...active, id: T.newScene, name: 'SECRET-SCENE', ...hidden };
+    state.activeSceneId = T.scene;
+    // Every tool open, so only the scene gate can refuse a frame.
+    grantTools(state, { measure: true, draw: true, pins: true });
+    const host = fakeConnection(T.host, { isHost: true });
+    const coDm = fakeConnection(T.carol);
+    const player = fakeConnection(T.alice);
+    // A seat-less identity is a spectator audience (SES-11).
+    const spectator = fakeConnection(T.bob);
+    const relay = createEphemeralRelay(() => 1_000, {
+      activeRate: { ratePerSecond: 100, burst: 100 },
+      spectatorDeliveryRate: { ratePerSecond: 100, burst: 100 },
+    });
+    return { state, host, coDm, player, spectator, relay };
+  }
+
+  for (const hidden of [{ dmOnly: true }, { dmOnly: false }]) {
+    const label = hidden.dmOnly ? 'a DM-only' : 'an inactive';
+    for (const { channel, data, before } of CHANNELS) {
+      it(`${channel} on ${label} scene reaches the co-DM, never a player or spectator`, () => {
+        const { state, host, coDm, player, spectator, relay } = table(hidden);
+        const everyone = recipients(state, [coDm, player, spectator]);
+        const prime = (sceneId: string) => {
+          if (!before) return;
+          relay.relay(
+            host,
+            { t: 'ephemeral', ...before(sceneId) },
+            state,
+            recipients(state, [host]),
+          );
+        };
+        prime(T.newScene);
+        const droppedBefore = relay.stats().dropped['hidden-scene'];
+
+        relay.relay(host, { t: 'ephemeral', channel, data: data(T.newScene) }, state, everyone);
+        expect(coDm.received).toHaveLength(1);
+        expect(coDm.received[0]).toMatchObject({ t: 'ephemeral', channel, from: T.host });
+        expect(player.received).toEqual([]);
+        expect(spectator.received).toEqual([]);
+        const nonDmWire = player.wire() + spectator.wire();
+        expect(nonDmWire).not.toContain(T.newScene);
+        expect(nonDmWire).not.toContain('7.875');
+        expect(relay.stats().dropped['hidden-scene'] - droppedBefore).toBe(2);
+        expect(relay.stats().dropped.forbidden).toBe(0);
+
+        // Control: the same frame on the active scene reaches every viewer.
+        prime(T.scene);
+        relay.relay(host, { t: 'ephemeral', channel, data: data(T.scene) }, state, everyone);
+        expect(coDm.received).toHaveLength(2);
+        expect(player.received).toHaveLength(1);
+        expect(spectator.received).toHaveLength(1);
+      });
+    }
+  }
+
+  it('gates a scene id nested anywhere in the data, even on a channel with no tool gate', () => {
+    const { state, host, coDm, player, spectator, relay } = table({ dmOnly: true });
+    const everyone = recipients(state, [coDm, player, spectator]);
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: 'cursor', data: { at: { sceneId: T.newScene, x: 7.875 } } },
+      state,
+      everyone,
+    );
+    expect(coDm.received).toHaveLength(1);
+    expect(player.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(player.wire() + spectator.wire()).not.toContain(T.newScene);
+    expect(relay.stats().dropped['hidden-scene']).toBe(2);
+
+    // A scene id the gate cannot read is malformed and reaches nobody.
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: 'cursor', data: { at: { sceneId: [T.newScene] } } },
+      state,
+      everyone,
+    );
+    expect(coDm.received).toHaveLength(1);
+    expect(relay.stats().dropped['invalid-entity-reference']).toBe(1);
+
+    // A scene-less cursor is unaffected by the scene gate.
+    relay.relay(host, { t: 'ephemeral', channel: 'cursor', data: { x: 1 } }, state, everyone);
+    expect(player.received).toHaveLength(1);
+    expect(spectator.received).toHaveLength(1);
+  });
+});

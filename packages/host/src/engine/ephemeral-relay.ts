@@ -137,21 +137,39 @@ interface EntityReference {
   readonly entityId: string;
 }
 
-function entityReferences(data: unknown): EntityReference[] | undefined {
-  const found: EntityReference[] = [];
+interface FrameReferences {
+  readonly entities: readonly EntityReference[];
+  /** Every scene the frame names anywhere, at the top level or nested (PERM-03). */
+  readonly scenes: ReadonlySet<string>;
+}
+
+/**
+ * PERM-03: everything a frame's data points at. Any `sceneId` key, however deep, names a scene the
+ * scene gate must check — so a scene-scoped channel cannot slip a hidden scene's id past the relay
+ * by nesting it. `undefined` means the data is malformed: an `entityId` with no scene to resolve it
+ * in, or a `sceneId` that is not a string (which no gate could check).
+ */
+function frameReferences(data: unknown): FrameReferences | undefined {
+  const entities: EntityReference[] = [];
+  const scenes = new Set<string>();
   const visit = (value: unknown, inheritedSceneId?: string): boolean => {
     if (value === null || typeof value !== 'object') return true;
     if (Array.isArray(value)) return value.every((item) => visit(item, inheritedSceneId));
 
     const record = value as Record<string, unknown>;
-    const sceneId = typeof record.sceneId === 'string' ? record.sceneId : inheritedSceneId;
+    let sceneId = inheritedSceneId;
+    if (Object.hasOwn(record, 'sceneId')) {
+      if (typeof record.sceneId !== 'string') return false;
+      sceneId = record.sceneId;
+      scenes.add(sceneId);
+    }
     if (Object.hasOwn(record, 'entityId')) {
       if (typeof record.entityId !== 'string' || sceneId === undefined) return false;
-      found.push({ sceneId, entityId: record.entityId });
+      entities.push({ sceneId, entityId: record.entityId });
     }
     return Object.values(record).every((item) => visit(item, sceneId));
   };
-  return visit(data) ? found : undefined;
+  return visit(data) ? { entities, scenes } : undefined;
 }
 
 function sceneIdOf(data: unknown): string | undefined {
@@ -430,11 +448,12 @@ export function createEphemeralRelay(
           : authoriseDrawing(sender, senderAudience, message, state, senderActor, drawing);
       if (commitDrawing === null) return;
 
-      const refs = entityReferences(message.data);
-      if (refs === undefined) {
+      const references = frameReferences(message.data);
+      if (references === undefined) {
         drop('invalid-entity-reference');
         return;
       }
+      const refs = references.entities;
       for (const ref of refs) {
         if (state.scenes[ref.sceneId]?.entities[ref.entityId] === undefined) {
           drop('invalid-entity-reference');
@@ -454,17 +473,16 @@ export function createEphemeralRelay(
         return;
       }
 
-      // PERM-03 / M4-14: a channel whose data names a scene (a ping's `sceneId`, a ruler's, an
-      // entity reference's) may cross only between viewers who can see that scene. The toggle gate
-      // above decides *whether* a sender may use the channel; this decides *who* receives it, so a
-      // DM pinging, measuring or dragging on a DM-only or inactive scene never leaks its id or
+      // PERM-03 / M4-14 / MV-232: the one scene gate for every scene-scoped ephemeral — rulers,
+      // pings, drag previews, camera poses and drawings alike. A frame whose data names a scene
+      // (anywhere in it, an entity reference's scene included) may cross only between viewers who
+      // can see that scene, as `visibleTo` decides through `seesScene`. The tool gate above decides
+      // *whether* a sender may use the channel; this decides *who* receives it, so a DM pinging,
+      // measuring, drawing or panning on a DM-only or inactive scene never leaks its id or
       // coordinates to players or spectators. A sender must see the scene too.
-      const scenesNamed = new Set<string>();
-      const namedSceneId = sceneIdOf(message.data);
-      if (namedSceneId !== undefined) scenesNamed.add(namedSceneId);
-      for (const ref of refs) scenesNamed.add(ref.sceneId);
-      // CAM-06: a pose names the scene it was taken in (the parsed `sceneId`, the same field read
-      // above), so it is filtered by this one scene rule like every other scene-bearing channel.
+      const scenesNamed = new Set(references.scenes);
+      // CAM-06: the parsed pose names the same top-level `sceneId`; added explicitly so the pose
+      // can never be relayed unfiltered even if its contract moves the field.
       if (pose !== null) scenesNamed.add(pose.sceneId);
       if (!seesEveryScene(state, senderAudience, scenesNamed)) {
         drop('forbidden');
