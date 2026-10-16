@@ -53,7 +53,17 @@ async function pages(token, path) {
 
 const jwt = appJwt(env('GATE_APP_ID'), env('GATE_APP_KEY'));
 const installation = await call(jwt, 'GET', `/repos/${repo}/installation`);
-const { token } = await call(jwt, 'POST', `/app/installations/${installation.id}/access_tokens`);
+// Only what the gate uses: PR, files and compare (read), timeline (read), statuses (write). If the
+// App lacks one, GitHub refuses the token and the gate exits without posting (fail closed).
+const { token } = await call(jwt, 'POST', `/app/installations/${installation.id}/access_tokens`, {
+  repositories: [repo.split('/')[1]],
+  permissions: {
+    statuses: 'write',
+    pull_requests: 'read',
+    issues: 'read',
+    contents: 'read',
+  },
+});
 
 const pr = await call(token, 'GET', `/repos/${repo}/pulls/${prNumber}`);
 if (pr.state !== 'open') {

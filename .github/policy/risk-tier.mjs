@@ -11,9 +11,17 @@ export function loadTierMap(url = new URL('./risk-tiers.json', import.meta.url))
   return JSON.parse(readFileSync(url, 'utf8'));
 }
 
-/** Minimal glob: `**` (any depth), `*` and `?` (within a segment), `{a,b}` alternatives. */
+/**
+ * Minimal glob: `**` (any depth), `*` and `?` (within a segment), `{a,b}` alternatives. A comma
+ * outside braces, nested or unbalanced braces are refused: they would compile to a top-level `|`
+ * and silently widen or narrow the map, so a bad map fails the gate instead (fail closed).
+ */
 export function globToRegExp(glob) {
   let out = '';
+  let depth = 0;
+  const refuse = (why) => {
+    throw new Error(`risk-tier glob ${JSON.stringify(glob)}: ${why}`);
+  };
   for (let i = 0; i < glob.length; i++) {
     const c = glob[i];
     if (c === '*' && glob[i + 1] === '*') {
@@ -27,11 +35,20 @@ export function globToRegExp(glob) {
       }
     } else if (c === '*') out += '[^/]*';
     else if (c === '?') out += '[^/]';
-    else if (c === '{') out += '(?:';
-    else if (c === '}') out += ')';
-    else if (c === ',') out += '|';
-    else out += c.replace(/[.+^$()|[\]\\]/g, '\\$&');
+    else if (c === '{') {
+      if (depth > 0) refuse('nested braces');
+      depth++;
+      out += '(?:';
+    } else if (c === '}') {
+      if (depth === 0) refuse('unbalanced }');
+      depth--;
+      out += ')';
+    } else if (c === ',') {
+      if (depth === 0) refuse('comma outside braces');
+      out += '|';
+    } else out += c.replace(/[.+^$()|[\]\\]/g, '\\$&');
   }
+  if (depth > 0) refuse('unbalanced {');
   return new RegExp(`^${out}$`);
 }
 

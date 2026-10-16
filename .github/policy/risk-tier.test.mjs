@@ -25,6 +25,63 @@ test('globs: ** spans directories, * stays in a segment, braces alternate', () =
   assert.ok(!globToRegExp('docs/**').test('docsx/a.md'));
 });
 
+test('globs: a comma outside braces, nested or unbalanced braces are refused', () => {
+  // `a/b,**` would compile to `^a/b|.*$` and make every path match.
+  assert.throws(() => globToRegExp('a/b,**'), /comma outside braces/);
+  assert.throws(() => globToRegExp('a/{b,{c,d}}'), /nested braces/);
+  assert.throws(() => globToRegExp('a/{b,c'), /unbalanced \{/);
+  assert.throws(() => globToRegExp('a/b}'), /unbalanced \}/);
+  assert.throws(() => compileTierMap({ C: ['x,y'], A: [] }), /comma outside braces/);
+  // Every glob in the real map compiles.
+  assert.doesNotThrow(() => compileTierMap(loadTierMap()));
+});
+
+test('host engine, server, storage, seat and join paths carry PERM-03 / identity / save risk: C', () => {
+  for (const path of [
+    'packages/host/src/engine/join-payload.ts',
+    'packages/host/src/engine/join-payload.test.ts',
+    'packages/host/src/engine/engine.ts',
+    'packages/host/src/engine/engine.test.ts',
+    'packages/host/src/engine/presence.ts',
+    'packages/host/src/engine/presence-latency.integration.test.ts',
+    'packages/host/src/engine/recovery.ts',
+    'packages/host/src/engine/rollback.ts',
+    'packages/host/src/engine/rollback.integration.test.ts',
+    'packages/host/src/engine/spectator-view.test.ts',
+    'packages/host/src/server.ts',
+    'packages/host/src/server.join-payload.test.ts',
+    'packages/host/src/storage/local-campaign-store.ts',
+    'packages/host/src/storage/io.ts',
+    'packages/host/src/storage/nested/new-file.ts',
+    'packages/shared/src/seat-templates.ts',
+    'packages/shared/src/history.ts',
+    'packages/client/src/ui/HostScreen.tsx',
+    'packages/client/src/ui/JoinScreen.tsx',
+    'packages/client/src/ui/host-screen.ts',
+  ]) {
+    assert.equal(fileTier(path, compiled), 'C', path);
+  }
+});
+
+test('unrelated UI and engine paths stay B', () => {
+  for (const path of [
+    'packages/client/src/ui/TopBar.tsx',
+    'packages/client/src/ui/RightDock.tsx',
+    'packages/client/src/ui/RulerPanel.tsx',
+    'packages/client/src/ui/LayerPanel.tsx',
+    'packages/client/src/ui/join-screen.ts',
+    'packages/client/src/render/BoardCanvas.tsx',
+    'packages/host/src/engine/initiative.test.ts',
+    'packages/host/src/engine/undo.ts',
+    'packages/host/src/cli.ts',
+    'packages/shared/src/drawing.ts',
+    'packages/shared/src/geometry/distance.ts',
+  ]) {
+    assert.equal(fileTier(path, compiled), 'B', path);
+  }
+  assert.equal(fileTier('packages/client/src/ui/join-screen.css', compiled), 'A');
+});
+
 test('critical paths are C even when they are markdown or css', () => {
   assert.equal(fileTier('.github/pull_request_template.md', compiled), 'C');
   assert.equal(fileTier('.github/policy/risk-tier.mjs', compiled), 'C');
