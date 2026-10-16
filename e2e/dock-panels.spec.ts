@@ -20,8 +20,8 @@ async function expectDockHoldsTabsOnly(page: Page) {
   await expect(dock.getByRole('complementary', { name: 'Selection panels' })).toHaveCount(0);
 }
 
-// UIUX.md principle 3, UI-TOKEN-02, F01/F02/F03/F18: selecting a token opens its panels beside it
-// on the board, and every rail tool's panel opens beside its button or in the left pane, 2D and 3D.
+// UIUX.md principle 3, UI-TOKEN-07 (MV-266), F01/F02/F03/F18: selecting a token opens its panels in
+// the left pane, and every rail tool's panel opens beside its button or in the left pane, 2D and 3D.
 test('no tool or token panel renders inside the right dock', async ({ browser }) => {
   if (!table) throw new Error('table not started');
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -36,22 +36,19 @@ test('no tool or token panel renders inside the right dock', async ({ browser })
   await page.getByLabel('Token name').fill('Aria');
   await page.getByRole('button', { name: 'Create token' }).click();
 
-  // The new token is selected: its Transform chip shows beside it; the chip opens the panel there.
-  const beside = page.getByRole('complementary', { name: 'Selection panels' });
-  await beside.getByRole('button', { name: 'Restore Transform panel' }).click();
-  await expect(beside.locator('[data-tool-panel="transform"]')).toBeVisible();
-  await expect(beside).toHaveAttribute('data-anchored', 'true');
+  // The new token is selected: its Transform panel is open in the left pane, beside the board.
+  const pane = page.getByRole('complementary', { name: 'Left pane' });
+  await expect(pane.locator('[data-tool-panel="transform"]')).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Selection panels' })).toHaveCount(0);
   const board = await page.getByLabel('Scene board').boundingBox();
-  const panels = await beside.boundingBox();
-  if (!board || !panels) throw new Error('board and selection panels must be visible');
-  expect(panels.x).toBeGreaterThanOrEqual(board.x);
-  expect(panels.x + panels.width).toBeLessThanOrEqual(board.x + board.width);
-  await beside.getByRole('button', { name: 'Restore Token panel' }).click();
-  await expect(beside.locator('[data-tool-panel="token"]')).toBeVisible();
+  const panes = await pane.boundingBox();
+  if (!board || !panes) throw new Error('board and left pane must be visible');
+  expect(panes.x + panes.width).toBeLessThanOrEqual(board.x + 1);
+  await pane.getByRole('button', { name: 'Restore Token panel' }).click();
+  await expect(pane.locator('[data-tool-panel="token"]')).toBeVisible();
   await expectDockHoldsTabsOnly(page);
 
   // Every rail tool's panel opens beside its button (principle 3) or in the left pane (C17, C20).
-  const pane = page.getByRole('complementary', { name: 'Left pane' });
   for (const [tool, panel, popover] of [
     ['Draw', 'draw', null],
     ['Create Prop', 'create-prop', null],
@@ -71,14 +68,14 @@ test('no tool or token panel renders inside the right dock', async ({ browser })
   }
   await page.getByRole('button', { name: 'Measure', exact: true }).click();
 
-  // 3D: the selected token's panels still open beside it, never in the dock.
+  // 3D: the selected token's panels still open in the left pane, never in the dock.
   await page.getByRole('button', { name: 'Select', exact: true }).click();
   await page.getByRole('button', { name: '3D view' }).click();
   await page
     .getByRole('list', { name: 'Entities in this scene' })
     .getByRole('button', { name: 'Aria', exact: true })
     .click();
-  await expect(beside.locator('[data-tool-panel="transform"]')).toBeVisible();
+  await expect(pane.locator('[data-tool-panel="transform"]')).toBeVisible();
   await expectDockHoldsTabsOnly(page);
   await context.close();
 });

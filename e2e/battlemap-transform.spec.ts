@@ -60,21 +60,31 @@ test('DM selects, moves and resizes a rectangular battlemap using its real bound
     // MV-244: the battlemap is picked while the Map layer is active.
     await setActiveLayer(page, 'Map');
     const canvas = page.locator('canvas');
-    const box = await canvas.boundingBox();
-    if (!box) throw new Error('missing canvas');
-    const zoom = Math.min(box.width / 42, box.height / 32);
+    const measure = async () => {
+      const box = await canvas.boundingBox();
+      if (!box) throw new Error('missing canvas');
+      return box;
+    };
+    let box = await measure();
+    let zoom = Math.min(box.width / 42, box.height / 32);
     const at = (x: number, z: number) => ({
       x: box.x + box.width / 2 + (x - 20) * zoom,
       y: box.y + box.height / 2 + (z - 15) * zoom,
     });
     const panel = page.getByRole('region', { name: 'Transform: Wide map' });
-    const chip = page.getByRole('button', { name: 'Restore Transform panel' });
     // Select at the wide edge: outside a square placeholder, inside the loaded image.
+    // UI-TOKEN-07 (MV-266): selecting expands Transform in the left pane.
     await expect(async () => {
       const point = at(23, 15);
       await page.mouse.click(point.x, point.y);
-      await expect(chip).toBeVisible({ timeout: 1000 });
+      await expect(panel).toBeVisible({ timeout: 1000 });
     }).toPass();
+    // The left pane narrows the board, and the untouched view reframes the canvas to fit it
+    // (D37), so map scene points on the narrowed board.
+    const before = box.x;
+    await expect.poll(async () => (await measure()).x).toBeGreaterThan(before);
+    box = await measure();
+    zoom = Math.min(box.width / 42, box.height / 32);
     const position = () =>
       (
         host.state as {
@@ -104,8 +114,6 @@ test('DM selects, moves and resizes a rectangular battlemap using its real bound
     await page.mouse.move(moved.x + corner.x * 1.5, moved.y + corner.y * 1.5, { steps: 6 });
     await page.mouse.up();
     await expect.poll(() => position()?.scale.x).toBeCloseTo(6);
-    // MV-239: Transform starts as its chip; open it to type values.
-    await chip.click();
     await expect(panel.getByLabel('Scale', { exact: true })).toHaveValue('6');
     await panel.getByLabel('Scale', { exact: true }).fill('3');
     await panel.getByRole('button', { name: 'Apply', exact: true }).click();

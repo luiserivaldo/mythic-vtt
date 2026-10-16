@@ -182,12 +182,13 @@ test('the marker picker syncs, persists and never sends private markers', async 
       canvasBox.x + canvasBox.width / 2,
       canvasBox.y + canvasBox.height / 2,
     );
-    await expect(playerPage.getByRole('button', { name: 'Restore Transform panel' })).toBeVisible({
-      timeout: 1000,
-    });
+    // UI-TOKEN-07 (MV-266): the owned token's Transform panel opens in the left pane.
+    await expect(
+      playerPage
+        .getByRole('complementary', { name: 'Left pane' })
+        .locator('[data-tool-panel="transform"]'),
+    ).toBeVisible({ timeout: 1000 });
   }).toPass();
-  // MV-239: Transform starts as its chip; the chip opens it.
-  await playerPage.getByRole('button', { name: 'Restore Transform panel' }).click();
   await playerPage.getByRole('button', { name: 'Restore Token panel' }).click();
   await expect(playerPage.getByRole('region', { name: 'Token status markers' })).toHaveCount(0);
   await expect(playerPage.getByRole('button', { name: 'Add custom marker' })).toHaveCount(0);

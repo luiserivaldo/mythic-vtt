@@ -45,7 +45,7 @@ export function PanZoomControls({
   const toolRef = useRef(tool);
   toolRef.current = tool;
   const restored = useRef(initialView);
-  const framed = useRef<{ camera: unknown; key: string } | null>(null);
+  const framed = useRef<{ camera: unknown; key: string; view: View2D } | null>(null);
   // Until the user pans or zooms, a resize (e.g. the header changing height) keeps the whole
   // canvas framed instead of leaving the camera at its old zoom.
   const touched = useRef(false);
@@ -56,16 +56,30 @@ export function PanZoomControls({
     const cam = camera as OrthographicCamera;
     if (!cam.isOrthographicCamera || size.width <= 0 || size.height <= 0) return;
     const same = framed.current?.camera === cam && framed.current.key === frameKey;
+    // A camera moved since it was framed by anything else (a focus tween, a pulled view) counts as
+    // touched too, so a resize such as the left pane opening on a selection (UI-TOKEN-07) does not
+    // throw that view away.
+    const last = framed.current?.view;
+    if (
+      same &&
+      last &&
+      (cam.position.x !== last.centerX || cam.position.z !== last.centerZ || cam.zoom !== last.zoom)
+    )
+      touched.current = true;
     if (same && touched.current) return;
     // UI-TOP-04: returning from 3D must retain focus instead of framing the whole scene.
     const restore = framed.current === null ? restored.current : undefined;
-    framed.current = { camera: cam, key: frameKey };
     touched.current = restore !== undefined;
     const v = restore ?? frameBounds({ width: size.width, height: size.height }, boundsRef.current);
     cam.position.x = v.centerX;
     cam.position.z = v.centerZ;
     cam.zoom = v.zoom;
     cam.updateProjectionMatrix();
+    framed.current = {
+      camera: cam,
+      key: frameKey,
+      view: { centerX: cam.position.x, centerZ: cam.position.z, zoom: cam.zoom },
+    };
     invalidate();
   }, [camera, size.width, size.height, frameKey, invalidate]);
 

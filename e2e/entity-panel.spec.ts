@@ -76,10 +76,11 @@ test('the host creates a scene, a token and a box and selects them', async ({
     'aria-pressed',
     'true',
   );
-  // MV-239: the selected token shows its Transform chip; the chip opens the panel.
-  await expect(page.getByLabel('X (ft)')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Restore Transform panel' }).click();
-  await expect(page.getByLabel('X (ft)')).toBeVisible();
+  // UI-TOKEN-07 (MV-266): the selected token's Transform panel is open in the left pane.
+  await expect(
+    page.getByRole('complementary', { name: 'Left pane' }).getByLabel('X (ft)'),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Restore Transform panel' })).toHaveCount(0);
 
   await expect(page.getByRole('form', { name: 'Create prop' })).toHaveCount(0);
   const propForm = await createProp(page, { name: 'Crate' });

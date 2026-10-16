@@ -56,6 +56,9 @@ async function selectCell(page: Page, x: number, z: number) {
     await page.mouse.click(point.x, point.y);
     await expect(page.getByTestId('token-preview')).toBeVisible({ timeout: 1000 });
   }).toPass();
+  // UI-TOKEN-07: a selection the viewer may edit opens the left pane once the double-click window
+  // (400 ms) has passed, narrowing the board; let that land so the next cell maps where it shows.
+  await page.waitForTimeout(500);
 }
 
 const valueSpan = (page: Page, field: string) =>
@@ -140,7 +143,9 @@ test('the card shows the fields it may, follows the token, and leaks nothing', a
     }),
   );
 
-  const dmContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  // UI-TOKEN-07: the selection's left pane narrows the board; the extra width keeps the board the
+  // size a 1280 px window gave it, so cells near its left edge stay clear of the floating rail.
+  const dmContext = await browser.newContext({ viewport: { width: 1600, height: 800 } });
   await dmContext.addInitScript((value) => {
     localStorage.setItem('mythic.identity.v1', JSON.stringify(value));
     localStorage.setItem('mythic.host', '1');
@@ -216,9 +221,11 @@ test('the card shows the fields it may, follows the token, and leaks nothing', a
   await expect(dm.getByTestId('token-preview-name')).toHaveText('Aria');
   const posed = await card.boundingBox();
   // Middle-drag pans the 3D camera: the card has to move with the token, not stay at a screen spot.
-  await dm.mouse.move(canvas.x + 60, canvas.y + canvas.height - 60);
+  // Start on the right of the board, clear of the floating rail on its left edge.
+  const right = canvas.x + canvas.width;
+  await dm.mouse.move(right - 260, canvas.y + canvas.height - 60);
   await dm.mouse.down({ button: 'middle' });
-  await dm.mouse.move(canvas.x + 260, canvas.y + canvas.height - 100, { steps: 8 });
+  await dm.mouse.move(right - 60, canvas.y + canvas.height - 100, { steps: 8 });
   await dm.mouse.up({ button: 'middle' });
   await expect(card).toBeVisible();
   await expect
@@ -231,7 +238,8 @@ test('the card shows the fields it may, follows the token, and leaks nothing', a
   // --- a player who owns the token: the fields they may see, nothing they may not ---------
   const playerIdentity = { identityId: testUlid('PLAYER', 1), identitySecret: 'preview-player' };
   await ok(host.intent('seat.assign', { seatId: SEAT, identityId: playerIdentity.identityId }));
-  const playerContext = await browser.newContext();
+  // As for the DM: the owned token's left pane must not push cells under the rail.
+  const playerContext = await browser.newContext({ viewport: { width: 1600, height: 720 } });
   await playerContext.addInitScript(
     ({ identity: who, seatId }) => {
       localStorage.setItem('mythic.identity.v1', JSON.stringify(who));

@@ -10,12 +10,9 @@ describe('UI-SHELL-05 left pane', () => {
 
   it('registers every tool panel with a region', () => {
     expect(toolPanels.all().map((panel) => panel.id)).toEqual([...TOOL_PANEL_ORDER]);
-    // MV-239: selection panels open beside the token, Measure beside its rail button, Draw,
-    // Initiative and Create Prop in the left pane; none in the dock.
+    // UI-TOKEN-07 (MV-266): the selection's panels (Transform, AoE, Token) open in the left pane
+    // with Draw, Initiative and Create Prop; Measure beside its rail button; none in the dock.
     const expected: Record<string, string> = {
-      transform: 'beside-token',
-      aoe: 'beside-token',
-      token: 'beside-token',
       ruler: 'beside-rail',
     };
     for (const id of TOOL_PANEL_ORDER) expect(panelRegion(id)).toBe(expected[id] ?? 'left-pane');

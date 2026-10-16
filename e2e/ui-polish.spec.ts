@@ -41,7 +41,7 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
   // Opening a dock tab keeps the board width.
   const openBox = await board.boundingBox();
   expect(openBox).toEqual(closedBox);
-  const dock = page.getByRole('complementary', { name: 'Selection panels' });
+  const dock = page.getByRole('complementary', { name: 'Left pane' });
 
   await page.getByLabel('Token name').fill('Goblin');
   await page.getByLabel('Colour (no image)').fill('#cc3322');
@@ -56,22 +56,17 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
   const z = page.getByLabel('Z (ft)');
   // Default scene: 40 x 30 cells, 5 ft per cell. A medium token snaps to the cell centre at
   // (20.5, 15.5) cells, then the second spawn steps one cell diagonally.
-  // MV-239: each selection starts with Transform as its chip; the chip opens it.
-  const chip = page.getByRole('button', { name: 'Restore Transform panel' });
+  // UI-TOKEN-07 (MV-266): each selection expands its Transform panel in the left pane.
   await list.getByRole('button', { name: 'Goblin', exact: true }).click();
-  await chip.click();
   await expect(x).toHaveValue('102.5');
   await expect(z).toHaveValue('77.5');
   const selectedBoard = await board.boundingBox();
   const selectedPanels = await dock.boundingBox();
   if (!selectedBoard || !selectedPanels) throw new Error('Selected token panels must be visible');
-  // MV-239 / UI-TOKEN-02: the selected token's panels open beside it, on the board, not in the dock.
-  expect(selectedPanels.x).toBeGreaterThanOrEqual(selectedBoard.x);
-  expect(selectedPanels.x + selectedPanels.width).toBeLessThanOrEqual(
-    selectedBoard.x + selectedBoard.width,
-  );
+  // UI-TOKEN-07 / UI-SHELL-05: the selected token's panels open in the left pane, in flow beside
+  // the board (never over it), and not in the dock.
+  expect(selectedPanels.x + selectedPanels.width).toBeLessThanOrEqual(selectedBoard.x + 1);
   await list.getByRole('button', { name: 'Orc', exact: true }).click();
-  await chip.click();
   await expect(x).toHaveValue('107.5');
   await expect(z).toHaveValue('82.5');
   // UX-39 (UI-TOOL-04, MV-266): a new prop lands selected, on a cell centre inside the board.
@@ -80,7 +75,6 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
     'aria-pressed',
     'true',
   );
-  await chip.click();
   // 5 ft cells on a 40 x 30 cell board: a cell centre sits 2.5 ft past a multiple of 5.
   for (const [field, extent] of [
     [x, 200],

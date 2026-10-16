@@ -86,8 +86,12 @@ test('the map layer is explained, selectable for fixed objects, and shown on bat
   await expect(mapPanel.getByText('Map layer', { exact: true })).toBeVisible();
   await battlemap.click();
   await expect(battlemap).toHaveAttribute('aria-pressed', 'true');
-  // MV-239: the selected battlemap shows its Transform chip; the panel starts tucked.
-  await expect(page.getByRole('button', { name: 'Restore Transform panel' })).toBeVisible();
+  // UI-TOKEN-07 (MV-266): the selected battlemap's Transform panel opens in the left pane.
+  await expect(
+    page
+      .getByRole('complementary', { name: 'Left pane' })
+      .getByRole('region', { name: 'Transform: Dungeon floor' }),
+  ).toBeVisible();
 
   expect(errors).toEqual([]);
   await context.close();
