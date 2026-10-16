@@ -1,10 +1,10 @@
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { RawClient, testUlid } from './harness.js';
+import { hostDir, PNG, start, stop, type Running } from './host-process.js';
 
 // UX-05 / UI-HOST-02: campaigns are listed last played first, each with a thumbnail: the DM's
 // upload, else a capture of the board taken when the DM signs out. The capture may be shown on
@@ -12,69 +12,17 @@ import { RawClient, testUlid } from './harness.js';
 //
 // Like texture-tiling.spec, the host serves the built client so the upload is same-origin (D36).
 
-const hostDir = join(dirname(fileURLToPath(import.meta.url)), '../packages/host');
-const clientDir = join(dirname(fileURLToPath(import.meta.url)), '../packages/client/dist/app');
-// 1x1 PNG: the smallest valid upload the image pipeline accepts.
-const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-  'base64',
-);
-
-interface Running {
-  child: ChildProcess;
-  hostPort: number;
-  hostToken: string;
+interface Colours {
+  magenta: number;
+  green: number;
+  cyan: number;
 }
 
-function start(dataDir: string, args: string[]): Promise<Running> {
-  const child = spawn(process.execPath, ['dist/main.js', ...args], {
-    cwd: hostDir,
-    env: {
-      ...process.env,
-      MYTHIC_PORT: '0',
-      MYTHIC_DATA_DIR: dataDir,
-      MYTHIC_CLIENT_DIR: clientDir,
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  return new Promise((resolve, reject) => {
-    let output = '';
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL');
-      reject(new Error(`host startup timed out: ${output}`));
-    }, 15_000);
-    const onData = (chunk: Buffer) => {
-      output += chunk.toString();
-      const match = /listening on [^\s:]+:(\d+)[\s\S]*DM link: \S+#host=([\w-]+)/.exec(output);
-      if (!match) return;
-      clearTimeout(timer);
-      resolve({ child, hostPort: Number(match[1]), hostToken: match[2] ?? '' });
-    };
-    child.stdout.on('data', onData);
-    child.stderr.on('data', onData);
-    child.once('exit', (code) => {
-      clearTimeout(timer);
-      reject(new Error(`host exited during startup (${String(code)}): ${output}`));
-    });
-  });
-}
-
-async function stop(running: Running): Promise<void> {
-  const { child } = running;
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  await new Promise<void>((resolve) => {
-    child.once('exit', () => {
-      resolve();
-    });
-    child.kill('SIGTERM');
-  });
-}
-
-/** Strongly magenta and strongly green pixels in an image (data URL or same-origin path). */
-function colourCounts(page: Page, src: string): Promise<{ magenta: number; green: number }> {
+/** Strongly magenta, green and cyan pixels in an image (data URL or same-origin path). */
+function colourCounts(page: Page, src: string): Promise<Colours> {
   // A string expression: the e2e project has no DOM typings, and this runs in the page.
   // Hue, not brightness: inactive layers are drawn in a darker shade (MV-244).
-  return page.evaluate<{ magenta: number; green: number }>(`(async () => {
+  return page.evaluate<Colours>(`(async () => {
     const image = new Image();
     image.src = ${JSON.stringify(src)};
     await image.decode();
@@ -86,12 +34,15 @@ function colourCounts(page: Page, src: string): Promise<{ magenta: number; green
     const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
     let magenta = 0;
     let green = 0;
+    let cyan = 0;
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i], g = data[i + 1], b = data[i + 2];
       if (r > g + 80 && b > g + 80) magenta += 1;
       else if (g > r + 50 && g > b + 50) green += 1;
+      // The DM sees a perms.view:false token faded, so cyan is looser than the others.
+      else if (g > r + 40 && b > r + 40) cyan += 1;
     }
-    return { magenta, green };
+    return { magenta, green, cyan };
   })()`);
 }
 
@@ -137,7 +88,8 @@ test('the campaign list is last played first and shows the DM thumbnail or a pub
     }).stdout;
 
   try {
-    // Alpha: a DM-layer secret (magenta) and a public hero (green) on its active scene.
+    // Alpha: a DM-layer secret (magenta), a public hero (green) and, on the public tokens layer, a
+    // scout hidden by its own permission (perms.view:false, cyan) on its active scene.
     running = await start(dataDir, ['--new-campaign', 'Alpha']);
     await openAsDm('Alpha');
     const setup = await RawClient.connect(running, { name: 'setup', ...(await identity()) });
@@ -168,6 +120,24 @@ test('the campaign list is last played first and shows the DM thumbnail or a pub
         }),
       ).toMatchObject({ t: 'ack' });
     }
+    expect(
+      await setup.intent('entity.create', {
+        sceneId,
+        entity: {
+          id: testUlid('TOKEN', 3),
+          layer: 'tokens',
+          name: 'Hidden scout',
+          owners: [],
+          perms: { view: false },
+          transform: {
+            position: { x: 20, y: 0, z: 15 },
+            rotation: { x: 0, y: 0, z: 0, w: 1 },
+            scale: { x: 1, y: 1, z: 1 },
+          },
+          token: { sizeCells: 6, heightCells: 1, labelVisibility: 'all', color: '#00ffff' },
+        },
+      }),
+    ).toMatchObject({ t: 'ack' });
     await setup.close();
     await stop(running);
 
@@ -219,6 +189,7 @@ test('the campaign list is last played first and shows the DM thumbnail or a pub
     );
     expect(dmColours.magenta).toBeGreaterThan(0);
     expect(dmColours.green).toBeGreaterThan(0);
+    expect(dmColours.cyan).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Signed out' })).toBeVisible();
 
@@ -234,6 +205,8 @@ test('the campaign list is last played first and shows the DM thumbnail or a pub
     const captured = await colourCounts(page, `/assets/${auto}`);
     expect(captured.green).toBeGreaterThan(0);
     expect(captured.magenta).toBe(0);
+    // #125 follow-up: an entity hidden by perms.view:false is DM-only content too.
+    expect(captured.cyan).toBe(0);
     // The DM's upload still wins.
     expect((await list()).campaigns[0]?.thumbnail).toBe(uploaded);
 

@@ -41,6 +41,7 @@ import { playerJoinUrls, type PlayerJoinUrl } from './lan.js';
 import {
   LocalAssetStore,
   LocalCampaignStore,
+  StorageDataError,
   backfillAssetLinks,
   scopedAssetStore,
   type CampaignMeta,
@@ -232,7 +233,12 @@ export async function startHost(
     auth: httpAuth,
     now: clock,
     current: () => engine.state(),
-    thumbnailAsset: (campaignId, hash) => scopedAssetStore(assetStore, campaignId).get(hash),
+    thumbnailAsset: async (campaignId, hash) => {
+      const scoped = scopedAssetStore(assetStore, campaignId);
+      const meta = (await scoped.has(hash)) ? await assetStore.meta(hash) : undefined;
+      if (!meta) throw new StorageDataError('Asset not found', 'not-found');
+      return { mime: meta.mime, open: () => scoped.get(hash) };
+    },
     ...(options.importLimits ? { importLimits: options.importLimits } : {}),
   });
   registerHistoryRoutes(gateway.app, { store, engine, auth: httpAuth, now: clock });

@@ -7,6 +7,7 @@ import { SPECTATOR_IDENTITY_STORAGE_KEY, loadOrCreateIdentity } from './net/iden
 import { extractSeatInvite, redeemSeatInvite, seatInviteMessage } from './net/seat-invite.js';
 import { ClientStoreContext } from './store/react.js';
 import { createClientStore } from './store/store.js';
+import { HOST_SCREEN_KEY } from './ui/host-screen.js';
 import { JoinContext, RETURNING_KEY } from './ui/join-context.js';
 import { loadProfile, migrateLegacyProfile } from './ui/join-screen.js';
 import { createSession } from './ui/session.js';
@@ -73,6 +74,16 @@ const session = createSession({
 const hostVisitor = !watchVisitor && (hostToken !== undefined || remembered);
 if (!watchVisitor) migrateLegacyProfile(localStorage);
 const initialProfile = loadProfile(localStorage);
+// UI-HOST-01: "I'm the DM" opened the DM link; read once. Only a host visitor ever uses it.
+const hostScreen = (() => {
+  try {
+    const flag = sessionStorage.getItem(HOST_SCREEN_KEY) === '1';
+    sessionStorage.removeItem(HOST_SCREEN_KEY);
+    return flag && hostVisitor;
+  } catch {
+    return false;
+  }
+})();
 const returning = (() => {
   try {
     const flag = sessionStorage.getItem(RETURNING_KEY) === '1';
@@ -123,6 +134,7 @@ createRoot(rootEl).render(
                 storage: localStorage,
                 identityId: identity.identityId,
                 hostVisitor,
+                hostScreen,
                 readOnlyVisitor: watchVisitor,
                 initialProfile,
                 returning,
