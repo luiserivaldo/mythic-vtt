@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### For the DM
+
+- New Player seats can measure, draw and ping from the start. Turn Draw or Ping off for one seat in the Seats tab. Existing seats keep their current tools. (MV-288)
+- The Seats tab toggle that controls pinging is now called "Ping" (it was "Place pins"). Map pins are a separate, future feature. (MV-288)
+
 ## 0.0.1 — pre-alpha (2026-10-15)
 
 First tagged version of Mythic VTT. This is a pre-alpha for playtesting, not for real campaigns: expect rough edges and keep backups of your data directory.

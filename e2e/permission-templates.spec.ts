@@ -4,9 +4,10 @@ import { expect, test, type Page } from '@playwright/test';
 import { addSeat, claimSeat, RawClient, startTable, testUlid, type Reply } from './harness.js';
 
 // UX-46 (UI-SEAT-02, UI-SET-01, MV-251): permission templates replace the table-wide toggles. A
-// new seat starts from its template's tools, the DM overrides one seat in the Seats tab and the
-// player's rail follows (disabled with a reason, never hidden: UI-TOOL-07), and a 0.0.1 save with
-// scene toggles keeps each seat's effective permissions after it migrates.
+// new seat starts from its template's tools (MV-288: a Player measures, draws and pings), the DM
+// overrides one seat in the Seats tab and the player's rail and right-click Ping follow (disabled
+// with a reason, never hidden: UI-TOOL-07), and a 0.0.1 save with scene toggles keeps each seat's
+// effective permissions after it migrates.
 
 interface Tools {
   measure: boolean;
@@ -21,6 +22,24 @@ interface Campaign {
 
 const rail = (page: Page, name: string) =>
   page.getByRole('toolbar', { name: 'Board controls' }).getByRole('button', { name, exact: true });
+/** Right-click the middle of a page's board and return its context menu. */
+async function openBoardMenu(page: Page) {
+  const canvas = page.locator('canvas');
+  await expect
+    .poll(async () => {
+      const box = await canvas.boundingBox();
+      return box === null ? 0 : Math.min(box.width, box.height);
+    })
+    .toBeGreaterThan(200);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('no canvas box');
+  const menu = page.getByTestId('board-context-menu');
+  await expect(async () => {
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+    await expect(menu).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
+  return menu;
+}
 const ok = async (promise: Promise<Reply>) => {
   expect(await promise).toMatchObject({ t: 'ack' });
 };
@@ -70,25 +89,27 @@ test('a template sets a new seat tools and a per-seat override changes what the 
       'Starts with: no board tools.',
     );
     await form.getByLabel('Seat template').selectOption({ label: 'Player' });
-    await expect(form.getByLabel('Template defaults')).toContainText('Starts with: Measure.');
+    await expect(form.getByLabel('Template defaults')).toContainText(
+      'Starts with: Measure, Draw, Ping.',
+    );
 
-    // Template default: a Player seat starts with Measure on, Draw and Place pins off.
+    // Template default (MV-288): a Player seat starts with Measure, Draw and Ping on.
     await addSeat(dm, 'Player', 'Ranger');
     const seat = dm.getByRole('listitem', { name: 'Ranger seat', exact: true });
     await seat.locator('summary').click();
     const settings = seat.getByRole('group', { name: 'Settings for Ranger' });
     const toggle = (name: string) => settings.getByRole('checkbox', { name, exact: true });
     await expect(toggle('Measure')).toBeChecked();
-    await expect(toggle('Draw')).not.toBeChecked();
-    await expect(toggle('Place pins')).not.toBeChecked();
+    await expect(toggle('Draw')).toBeChecked();
+    await expect(toggle('Ping')).toBeChecked();
     const seatId = Object.entries((setup.state as Campaign).seats).find(
       ([, s]) => s.label === 'Ranger',
     )?.[0];
     if (seatId === undefined) throw new Error('Ranger seat not created');
     expect((setup.state as Campaign).seats[seatId]?.tools).toEqual({
       measure: true,
-      draw: false,
-      pins: false,
+      draw: true,
+      pins: true,
     });
 
     const player = await playerContext.newPage();
@@ -97,11 +118,33 @@ test('a template sets a new seat tools and a per-seat override changes what the 
     await claimSeat(player, 'Ranger', 'Robin');
     await expect(player.getByRole('dialog')).toHaveCount(0);
     await expect(rail(player, 'Measure')).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(rail(player, 'Draw')).not.toHaveAttribute('aria-disabled', 'true');
+    let menu = await openBoardMenu(player);
+    const ping = () => menu.getByRole('menuitem', { name: 'Ping', exact: true });
+    await expect(ping()).not.toHaveAttribute('aria-disabled', 'true');
+    await player.keyboard.press('Escape');
+
+    // Per-seat revoke: the DM unchecks Draw and Ping for this seat. Draw stays on the rail and
+    // Ping stays in the right-click menu, both disabled with the reason.
+    await toggle('Draw').click();
+    await toggle('Ping').click();
+    await expect(toggle('Draw')).not.toBeChecked();
+    await expect(toggle('Ping')).not.toBeChecked();
+    await setup.waitFor('draw and ping off', () => {
+      const tools = (setup.state as Campaign).seats[seatId]?.tools;
+      return tools?.draw === false && !tools.pins;
+    });
     await expect(rail(player, 'Draw')).toHaveAttribute('aria-disabled', 'true');
     await expect(rail(player, 'Draw')).toHaveAttribute(
       'title',
       'The DM has turned off Draw for your seat',
     );
+    menu = await openBoardMenu(player);
+    await expect(ping()).toHaveAttribute('aria-disabled', 'true');
+    await expect(menu.locator('li[title="The DM has turned off Ping for your seat"]')).toHaveCount(
+      1,
+    );
+    await player.keyboard.press('Escape');
 
     // Per-seat override: Measure off for this seat only. The tool stays on the rail, disabled
     // with its reason.

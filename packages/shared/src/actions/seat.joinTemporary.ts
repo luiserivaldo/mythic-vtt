@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id } from '../schema/index.js';
+import { Id, PLAYER_TEMPLATE_TOOLS } from '../schema/index.js';
 import { defineAction, isHost } from './define.js';
 import { MAX_TEMPORARY_SEATS } from './temporary-seats.js';
 
@@ -36,6 +36,9 @@ export const seatJoinTemporary = defineAction({
       role: 'player',
       interactionEnabled: true,
       permissions: { ...DEFAULT_PERMISSIONS },
+      // MV-288: stored explicitly, so a temporary player gets the Player template's tools and
+      // not the frozen `DEFAULT_SEAT_TOOLS` fallback. Temporary seats never reach a save.
+      tools: { ...PLAYER_TEMPLATE_TOOLS },
       temporary: true,
     };
   },

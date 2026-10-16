@@ -1,4 +1,4 @@
-import { DEFAULT_SEAT_TOOLS, type Seat, type SeatTools } from './schema/index.js';
+import { PLAYER_TEMPLATE_TOOLS, type Seat, type SeatTools } from './schema/index.js';
 
 export type SeatTemplateId = 'dm' | 'codm' | 'player' | 'spectator';
 
@@ -46,7 +46,7 @@ export const SEAT_TEMPLATES: readonly SeatTemplate[] = [
     description: 'Player view with movement for owned tokens.',
     role: 'player',
     permissions: { view: true, move: true, edit: false, delete: false },
-    tools: { ...DEFAULT_SEAT_TOOLS },
+    tools: { ...PLAYER_TEMPLATE_TOOLS },
   },
   {
     id: 'spectator',

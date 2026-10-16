@@ -22,8 +22,8 @@ export const Seat = z.object({
   role: z.enum(['player', 'codm']),
   permissions: SeatPermissions,
   /**
-   * UI-SEAT-02 (UX-46, save v11): the board tools this seat may use; absent means the Player
-   * template's (`DEFAULT_SEAT_TOOLS`). Ignored for co-DM seats, which may use every tool.
+   * UI-SEAT-02 (UX-46, save v11): the board tools this seat may use; absent means the fallback
+   * `DEFAULT_SEAT_TOOLS` (measure only). Ignored for co-DM seats, which may use every tool.
    */
   tools: SeatTools.optional(),
   interactionEnabled: z.boolean().optional(),

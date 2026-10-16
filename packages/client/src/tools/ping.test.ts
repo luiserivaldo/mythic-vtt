@@ -58,7 +58,7 @@ describe('who may ping (PERM-05)', () => {
     const owner = campaign.seats[IDS.owner];
     if (!owner) throw new Error('fixture');
 
-    // `pins` is opt-in in the Player template, so a seat without stored tools may not ping.
+    // A seat without stored tools gets the frozen fallback, where `pins` (ping) is off.
     expect(owner.tools).toBeUndefined();
     expect(canPing(campaign, { isHost: false, seatId: IDS.owner }, IDS.scene)).toBe(false);
     expect(canPing(campaign, { isHost: true, seatId: null }, IDS.scene)).toBe(true);

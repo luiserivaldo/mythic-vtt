@@ -38,7 +38,8 @@ export interface PingViewer {
 
 /**
  * PERM-05: who may ping, from the client's own filtered view. The host and co-DMs are exempt; a
- * player needs their seat's `pins` tool AND their seat's Enable Interaction switch. Spectators
+ * player needs their seat's `pins` tool (the ping permission; TRIG-01 map pins must not reuse it)
+ * AND their seat's Enable Interaction switch. Spectators
  * (no seat), unknown scenes and a client that has not loaded a campaign may not ping. The host
  * re-checks all of this in the relay, so this only decides whether the marker is offered at all.
  */

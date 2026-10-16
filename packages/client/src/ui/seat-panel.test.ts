@@ -126,13 +126,13 @@ describe('add a seat from a template', () => {
     expect(seatTemplateOptions().map((t) => t.id)).toEqual(SEAT_TEMPLATES.map((t) => t.id));
     expect(seatTemplateOptions().map((t) => t.label)).toContain('Co-DM');
     const description = (id: string) => seatTemplateOptions().find((t) => t.id === id)?.description;
-    expect(description('player')).toMatch(/Starts with: Measure\.$/);
+    expect(description('player')).toMatch(/Starts with: Measure, Draw, Ping\.$/);
     expect(description('spectator')).toMatch(/Starts with: no board tools\.$/);
     expect(description('codm')).toMatch(/Starts with: every tool\.$/);
   });
 
-  it("shows each seat's own tools, with the Player default when none are stored (UX-46)", () => {
-    expect(SEAT_TOOL_TOGGLES.map((t) => t.label)).toEqual(['Measure', 'Draw', 'Place pins']);
+  it("shows each seat's own tools, with the fallback default when none are stored (UX-46)", () => {
+    expect(SEAT_TOOL_TOGGLES.map((t) => t.label)).toEqual(['Measure', 'Draw', 'Ping']);
     const campaign = table();
     const seat = campaign.seats[A];
     if (!seat) throw new Error('fixture');
@@ -150,7 +150,7 @@ describe('add a seat from a template', () => {
       label: 'Player',
       role: 'player',
       permissions: { view: true, move: true, edit: false, delete: false },
-      tools: { measure: true, draw: false, pins: false },
+      tools: { measure: true, draw: true, pins: true },
     });
     expect(newSeatFields('codm', ' Lieutenant ')).toEqual({
       label: 'Lieutenant',
@@ -174,9 +174,9 @@ describe('add a seat from a template', () => {
     const fields = newSeatFields('player', '');
     if (!fields) throw new Error('expected fields');
     fields.permissions.edit = true;
-    fields.tools.draw = true;
+    fields.tools.draw = false;
     expect(SEAT_TEMPLATES.find((t) => t.id === 'player')?.permissions.edit).toBe(false);
-    expect(SEAT_TEMPLATES.find((t) => t.id === 'player')?.tools.draw).toBe(false);
+    expect(SEAT_TEMPLATES.find((t) => t.id === 'player')?.tools.draw).toBe(true);
   });
 });
 
