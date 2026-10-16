@@ -8,6 +8,7 @@ import {
   filesTier,
   globToRegExp,
   loadTierMap,
+  prFilePaths,
 } from './risk-tier.mjs';
 
 const compiled = compileTierMap(loadTierMap());
@@ -60,6 +61,41 @@ test('the 12 PRs open at cutover classify as reviewed by hand (2026-10-14)', () 
 
 test('an empty file list is never cheaper than B', () => {
   assert.equal(filesTier([], compiled), 'B');
+});
+
+test('a rename out of a critical path is classified by its old path too', () => {
+  const renamed = [
+    {
+      filename: 'packages/client/src/ui/visible-to.ts',
+      previous_filename: 'packages/shared/src/visibility/visible-to.ts',
+      status: 'renamed',
+    },
+  ];
+  assert.deepEqual(prFilePaths(renamed), [
+    'packages/client/src/ui/visible-to.ts',
+    'packages/shared/src/visibility/visible-to.ts',
+  ]);
+  assert.equal(filesTier(prFilePaths(renamed), compiled), 'C');
+  const workflow = [
+    {
+      filename: 'scripts/ci.yml',
+      previous_filename: '.github/workflows/ci.yml',
+      status: 'renamed',
+    },
+  ];
+  assert.equal(filesTier(prFilePaths(workflow), compiled), 'C');
+});
+
+test('a rename between two B paths stays B', () => {
+  const renamed = [
+    {
+      filename: 'packages/client/src/ui/TopBarNew.tsx',
+      previous_filename: 'packages/client/src/ui/TopBar.tsx',
+      status: 'renamed',
+    },
+    { filename: 'e2e/view-as.spec.ts', status: 'modified' },
+  ];
+  assert.equal(filesTier(prFilePaths(renamed), compiled), 'B');
 });
 
 const head = 'a'.repeat(40);

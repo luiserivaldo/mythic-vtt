@@ -46,6 +46,13 @@ export function fileTier(path, compiled) {
   return 'B';
 }
 
+/**
+ * Paths to classify from the PR files API. A rename reports its destination in `filename` and its
+ * source in `previous_filename`; both count, so moving a file out of a critical path stays C.
+ */
+export const prFilePaths = (entries) =>
+  entries.flatMap((f) => [f.filename, f.previous_filename].filter(Boolean));
+
 /** An empty or unreadable file list is never cheap: it counts as B. */
 export function filesTier(paths, compiled) {
   if (paths.length === 0) return 'B';

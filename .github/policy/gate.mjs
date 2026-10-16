@@ -3,7 +3,7 @@
 // mythic-vtt-gate App, on the head and on the test-merge commit. Any error exits non-zero without
 // posting, so a missing verdict keeps the PR blocked (fail closed).
 import { createSign } from 'node:crypto';
-import { compileTierMap, evaluate, loadTierMap } from './risk-tier.mjs';
+import { compileTierMap, evaluate, loadTierMap, prFilePaths } from './risk-tier.mjs';
 
 const env = (name) => {
   const value = process.env[name];
@@ -63,7 +63,7 @@ if (pr.state !== 'open') {
 const head = pr.head.sha;
 const compare = await call(token, 'GET', `/repos/${repo}/compare/${pr.base.sha}...${head}`);
 const base = compare.merge_base_commit.sha;
-const files = (await pages(token, `/repos/${repo}/pulls/${prNumber}/files`)).map((f) => f.filename);
+const files = prFilePaths(await pages(token, `/repos/${repo}/pulls/${prNumber}/files`));
 const timeline = await pages(token, `/repos/${repo}/issues/${prNumber}/timeline`);
 const everLabels = timeline.filter((e) => e.event === 'labeled').map((e) => e.label.name);
 const currentLabels = pr.labels.map((l) => l.name);
