@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { Id, SEAT_TOOLS, SeatIcon, SeatTools, resolveSeatTools } from '../schema/index.js';
+import {
+  DEFAULT_SEAT_TOOLS,
+  Id,
+  SEAT_TOOLS,
+  SeatIcon,
+  SeatTools,
+  resolveSeatTools,
+} from '../schema/index.js';
 import { defineAction, isHost } from './define.js';
 
 export const seatUpdate = defineAction({
@@ -36,7 +43,14 @@ export const seatUpdate = defineAction({
     if (!seat) return;
     if (a.payload.label !== undefined) seat.label = a.payload.label;
     if (a.payload.binding !== undefined) seat.binding = a.payload.binding;
-    if (a.payload.role !== undefined) seat.role = a.payload.role;
+    if (a.payload.role !== undefined) {
+      // UX-46: a demoted Co-DM must not keep the every-tool set it was created with. Tools
+      // that are absent or still the Co-DM template's reset to the Player template; anything
+      // else is an explicit override (for example a migrated 0.0.1 value) and is kept.
+      if (seat.role === 'codm' && a.payload.role === 'player' && !hasOwnTools(seat.tools))
+        seat.tools = { ...DEFAULT_SEAT_TOOLS };
+      seat.role = a.payload.role;
+    }
     if (a.payload.interactionEnabled !== undefined)
       seat.interactionEnabled = a.payload.interactionEnabled;
     if (a.payload.icon === null) delete seat.icon;
@@ -51,3 +65,8 @@ export const seatUpdate = defineAction({
   },
   modExposed: false,
 });
+
+/** True when a Co-DM seat's tools differ from the Co-DM template's (every tool on). */
+function hasOwnTools(tools: SeatTools | undefined): boolean {
+  return tools !== undefined && SEAT_TOOLS.some((tool) => !tools[tool]);
+}

@@ -146,6 +146,31 @@ describe('per-seat override (UX-46)', () => {
   });
 });
 
+describe('demoting a Co-DM (UX-46)', () => {
+  const demote = (tools: SeatTools | undefined) => {
+    const before = makeCampaign();
+    const seat = before.seats[IDS.coDm];
+    if (!seat) throw new Error('seat');
+    if (tools) seat.tools = tools;
+    else delete seat.tools;
+    const { state } = reduceAction(
+      before,
+      envelope('seat.update', { seatId: IDS.coDm, role: 'player' }),
+    );
+    return state.seats[IDS.coDm]?.tools;
+  };
+
+  it('resets template or absent tools to the Player template', () => {
+    expect(demote(ALL)).toEqual(DEFAULT_SEAT_TOOLS);
+    expect(demote(undefined)).toEqual(DEFAULT_SEAT_TOOLS);
+  });
+
+  it('keeps an explicit override, such as a migrated 0.0.1 value', () => {
+    const migrated = { measure: false, draw: true, pins: false };
+    expect(demote(migrated)).toEqual(migrated);
+  });
+});
+
 describe('retired scene.setPlayerToggles (UX-46)', () => {
   const payload = { sceneId: IDS.scene, toggles: { draw: true, measure: false } };
 
@@ -161,10 +186,30 @@ describe('retired scene.setPlayerToggles (UX-46)', () => {
     expect(sceneSetPlayerToggles.schema.safeParse(payload).success).toBe(true);
   });
 
-  it('a replayed 0.0.1 log entry applies to every seat, as the migration does', () => {
+  it('a replayed entry for the only playable scene applies to every seat', () => {
     const { state } = reduceAction(makeCampaign(), envelope('scene.setPlayerToggles', payload));
     for (const seat of Object.values(state.seats))
       expect(seat.tools).toEqual({ measure: false, draw: true, pins: false });
     expect(JSON.stringify(state.scenes)).not.toContain('playerToggles');
+  });
+
+  it('a replayed entry for a DM-only scene changes nothing', () => {
+    const before = makeCampaign();
+    const scene = before.scenes[IDS.scene];
+    if (!scene) throw new Error('scene');
+    scene.dmOnly = true;
+    const { state } = reduceAction(before, envelope('scene.setPlayerToggles', payload));
+    for (const seat of Object.values(state.seats)) expect(seat.tools).toBeUndefined();
+  });
+
+  it('with two playable scenes a replay may lower a tool but never raise it', () => {
+    const before = makeCampaign();
+    const scene = before.scenes[IDS.scene];
+    if (!scene) throw new Error('scene');
+    before.scenes[IDS.other] = { ...scene, id: IDS.other, name: 'Second' };
+    const { state } = reduceAction(before, envelope('scene.setPlayerToggles', payload));
+    // measure lowered to false; the draw raise is refused (the other scene may still be off).
+    for (const seat of Object.values(state.seats))
+      expect(seat.tools).toEqual({ measure: false, draw: false, pins: false });
   });
 });
