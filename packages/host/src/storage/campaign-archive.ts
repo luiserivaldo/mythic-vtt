@@ -14,7 +14,7 @@ import { createInterface } from 'node:readline';
 import { PassThrough, type Readable } from 'node:stream';
 import { Unzip, UnzipInflate, UnzipPassThrough, Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 import { z } from 'zod';
-import { Id, Scene } from '@mythic/shared';
+import { foldLegacyPlayerToggles, Id, Scene, SEAT_TOOLS_SINCE_VERSION } from '@mythic/shared';
 import {
   AssetMeta,
   CampaignFile,
@@ -507,16 +507,22 @@ export async function importCampaign(
     // 4. validate every JSON file (schema + migrations) before any write.
     const campaignEntry = staged.get('campaign.json');
     if (!campaignEntry) throw bad('campaign.json missing');
-    const campaign = await readValidated(host, campaignEntry.path, 'campaign', CampaignFile);
+    let campaign = await readValidated(host, campaignEntry.path, 'campaign', CampaignFile);
     if (campaign.id !== manifest.data.campaignId) throw bad('Manifest campaign id mismatch');
     const scenes: Scene[] = [];
+    const rawScenes: unknown[] = [];
     const snapshots: { session: string; label: string; value: Snapshot }[] = [];
     const logs: { session: string; path: string }[] = [];
     for (const item of staged.values()) {
       const k = item.kind;
       if (k.kind === 'scene') {
-        const scene = await readValidated(host, item.path, 'scene', Scene);
+        // UX-46: kept unparsed too, so a pre-v11 archive's scene toggles fold into its seats.
+        const raw = await readValidated(host, item.path, 'scene', z.unknown());
+        const parsed = Scene.safeParse(raw);
+        if (!parsed.success) throw bad('Invalid scene file');
+        const scene = parsed.data;
         if (scene.id !== k.id) throw bad('Scene id does not match its file name');
+        rawScenes.push(raw);
         scenes.push(scene);
       } else if (k.kind === 'snapshot') {
         snapshots.push({
@@ -539,6 +545,12 @@ export async function importCampaign(
         logs.push({ session: k.session, path: item.path });
       }
     }
+
+    const disk = z
+      .object({ schemaVersion: z.number() })
+      .safeParse(await parseJson(campaignEntry.path));
+    if (disk.success && disk.data.schemaVersion < SEAT_TOOLS_SINCE_VERSION)
+      campaign = CampaignFile.parse(foldLegacyPlayerToggles(campaign, rawScenes));
 
     // 5. never overwrite: an existing campaign id is a conflict.
     if (await host.exists(campaign.id))

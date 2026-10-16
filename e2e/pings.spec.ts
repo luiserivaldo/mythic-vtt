@@ -3,7 +3,7 @@ import { openClient, RawClient, startTable, testUlid, type Reply } from './harne
 
 // LAY-05 / UX-40: an Alt-click, or Ping in the right-click menu of an empty board spot or a token,
 // drops a short animated marker for everyone at the table. There is no Ping rail button. A ping is an ephemeral message — it never enters campaign state or the action log —
-// and the host re-checks the scene's `pins` toggle and its rate limits. Marker names are read from
+// and the host re-checks the seat's `pins` tool and its rate limits. Marker names are read from
 // the development-only render hook, the same one the other render specs use.
 
 interface Diagnostics {
@@ -200,7 +200,7 @@ test('an Alt-click and the right-click menus mark the board for everyone, then e
   }
 });
 
-test('the host gates a player ping on the scene pins toggle and rate-limits a flood', async () => {
+test('the host gates a player ping on the seat pins tool and rate-limits a flood', async () => {
   test.setTimeout(60_000);
   const table = await startTable();
   const sceneId = testUlid('SCENE', 2);
@@ -229,13 +229,13 @@ test('the host gates a player ping on the scene pins toggle and rate-limits a fl
     );
 
     const ping = { sceneId, x: 5, y: 0, z: 5 };
-    // `pins` is opt-in: a scene with no toggles denies a player's ping. The host relays its own.
+    // `pins` is opt-in in the Player template, so a player's ping is denied. The host relays its own.
     player.ephemeral('ping', ping);
     host.ephemeral('ping', ping);
     await host.waitFor('host ping relayed', () => framesFrom(host.frames, hostId) === 1);
     expect(framesFrom(host.frames, PLAYER.identityId)).toBe(0);
 
-    await ok(host.intent('scene.setPlayerToggles', { sceneId, toggles: { pins: true } }));
+    await ok(host.intent('seat.update', { seatId, tools: { pins: true } }));
     await player.waitForSeq(host.lastSeq);
     player.ephemeral('ping', ping);
     await host.waitFor(

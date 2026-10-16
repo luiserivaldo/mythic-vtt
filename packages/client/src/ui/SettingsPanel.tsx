@@ -1,12 +1,9 @@
-import { resolvePlayerToggles } from '@mythic/shared';
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useClientStore } from '../store/react.js';
-import { useViewedCampaign } from '../store/viewed-campaign.js';
 import { IDENTITY_STORAGE_KEY } from '../net/identity.js';
 import { parseIdentityFile } from '../net/identity-file.js';
 import { CampaignThumbnailControls } from './CampaignThumbnailControls.js';
 import { useJoinEnv } from './join-context.js';
-import { useSubmit } from './submit.js';
 import { isAdminRole, viewerRole } from './viewer.js';
 import { useViewerPreferences } from './ViewerPreferencesProvider.js';
 import type { DockTheme } from './RightDock.js';
@@ -20,34 +17,13 @@ export function SettingsPanel({
 }) {
   const { preferences, update } = useViewerPreferences();
   const campaign = useClientStore((s) => s.campaign);
-  const viewed = useViewedCampaign();
   const isHost = useClientStore((s) => s.isHost);
   const seatId = useClientStore((s) => s.seatId);
   const ready = useClientStore((s) => s.ready);
   const admin = isAdminRole(viewerRole({ campaign, isHost, seatId }));
-  const scene = viewed?.activeSceneId ? viewed.scenes[viewed.activeSceneId] : undefined;
   const env = useJoinEnv();
-  const { send, error } = useSubmit();
-  const [pendingMeasure, setPendingMeasure] = useState<boolean | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const createHint = useId();
-  const mayChangePermissions =
-    ready && (isHost || (seatId !== null && campaign?.seats[seatId]?.interactionEnabled !== false));
-
-  async function changeMeasure(measure: boolean) {
-    if (!scene || pendingMeasure !== null) return;
-    setPendingMeasure(measure);
-    try {
-      await send({
-        type: 'scene.setPlayerToggles',
-        sceneId: scene.id,
-        payload: { sceneId: scene.id, toggles: { measure } },
-      });
-    } finally {
-      setPendingMeasure(null);
-    }
-  }
 
   async function exportCampaign() {
     if (!isHost || !campaign || !env || exporting) return;
@@ -115,28 +91,8 @@ export function SettingsPanel({
       {admin && (
         <fieldset>
           <legend>Table settings</legend>
-          {scene ? (
-            <>
-              <p>Player permissions in {scene.name}</p>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={pendingMeasure ?? resolvePlayerToggles(scene).measure}
-                  disabled={!mayChangePermissions || pendingMeasure !== null}
-                  onChange={(e) => {
-                    void changeMeasure(e.target.checked);
-                  }}
-                />{' '}
-                Players may measure
-              </label>
-            </>
-          ) : (
-            <p>No scene selected.</p>
-          )}
-          <label>
-            <input type="checkbox" disabled aria-describedby={createHint} /> Players may create
-          </label>
-          <p id={createHint}>DM and Co-DM only</p>
+          {/* UI-SET-01 (UX-46, MV-251): no table-wide player toggles; permissions live per seat. */}
+          <p>Player permissions are set per seat in the Seats tab.</p>
           <button
             type="button"
             disabled={!isHost || !ready || exporting}
@@ -147,7 +103,6 @@ export function SettingsPanel({
           >
             {exporting ? 'Exporting…' : 'Export campaign'}
           </button>
-          {error && <p role="alert">{error}</p>}
           {exportError && <p role="alert">{exportError}</p>}
         </fieldset>
       )}

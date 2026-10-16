@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { makeCampaign } from '../actions/testing.js';
 import { storeMigrate } from './registry.js';
-import { Campaign } from '../schema/index.js';
+import { Campaign, DEFAULT_SEAT_TOOLS } from '../schema/index.js';
 
 it('migrates zero-scene snapshots to one deterministic blank active scene without losing data', () => {
   const state = { ...makeCampaign(), schemaVersion: 2, scenes: {}, activeSceneId: null };
@@ -19,7 +19,10 @@ it('migrates zero-scene snapshots to one deterministic blank active scene withou
   });
   expect(campaign.seats).toEqual(
     Object.fromEntries(
-      Object.entries(state.seats).map(([id, seat]) => [id, { ...seat, interactionEnabled: true }]),
+      Object.entries(state.seats).map(([id, seat]) => [
+        id,
+        { ...seat, interactionEnabled: true, tools: DEFAULT_SEAT_TOOLS },
+      ]),
     ),
   );
 });

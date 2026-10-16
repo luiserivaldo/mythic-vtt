@@ -276,6 +276,30 @@ describe('campaign export/import (HIST-03)', () => {
     },
   );
 
+  it('UX-46: folds a pre-v11 archive scene toggles into its seats on import', async () => {
+    const files = unzipSync(await exported(await seed(tmp()))) as Record<string, Uint8Array>;
+    const json = (name: string) =>
+      JSON.parse(Buffer.from(files[name] ?? new Uint8Array()).toString('utf8')) as {
+        seats?: Record<string, Record<string, unknown>>;
+      } & Record<string, unknown>;
+    const campaign = json('campaign.json');
+    for (const seat of Object.values(campaign.seats ?? {})) delete seat['tools'];
+    const scene = json(`scenes/${sceneId}.json`);
+    const zip = zipSync({
+      ...files,
+      'campaign.json': strToU8(JSON.stringify({ ...campaign, schemaVersion: 10 })),
+      [`scenes/${sceneId}.json`]: strToU8(
+        JSON.stringify({ ...scene, schemaVersion: 10, playerToggles: { pins: true } }),
+      ),
+    });
+    const target = stores(tmp());
+    await target.campaigns.import(Readable.from([Buffer.from(zip)]));
+    const loaded = await target.campaigns.load(campaignId);
+    for (const seat of Object.values(loaded.campaign.seats))
+      expect(seat.tools).toEqual({ measure: true, draw: false, pins: true });
+    expect(loaded.scenes[0]).not.toHaveProperty('playerToggles');
+  });
+
   it('leaves no staging directories behind', async () => {
     const root = tmp();
     const s = stores(root);

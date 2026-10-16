@@ -7,16 +7,19 @@ import {
   seatPermissionIntent,
   seatReleaseIntent,
   seatRoleIntent,
+  seatToolIntent,
 } from './intent-specs.js';
 import { SeatInvites } from './SeatInvites.js';
 import type { JoinUrl } from './share-panel.js';
 import {
   archiveImpact,
+  CODM_TOOLS_NOTE,
   connectedIdentityRows,
   isValidIdentityId,
   newSeatFields,
   rosterOptions,
   SEAT_TOGGLES,
+  SEAT_TOOL_TOGGLES,
   seatRows,
   seatTemplateOptions,
   type SeatRow,
@@ -167,6 +170,22 @@ export function SeatPanel({ campaign, presence, unseated, joinUrls }: Props) {
                         {toggle.label}
                       </label>
                     ))}
+                    {/* UI-SEAT-02 (UX-46): this seat's own tools; no table-wide toggle. */}
+                    {SEAT_TOOL_TOGGLES.map((tool) => (
+                      <label key={tool.key}>
+                        <input
+                          type="checkbox"
+                          checked={row.role === 'codm' || row.tools[tool.key]}
+                          disabled={row.role === 'codm'}
+                          title={row.role === 'codm' ? CODM_TOOLS_NOTE : undefined}
+                          onChange={(e) => {
+                            void send(seatToolIntent(row.id, tool.key, e.target.checked));
+                          }}
+                        />{' '}
+                        {tool.label}
+                      </label>
+                    ))}
+                    {row.role === 'codm' && <p>{CODM_TOOLS_NOTE}.</p>}
                     <label>
                       <input
                         type="checkbox"
@@ -264,11 +283,11 @@ export function SeatPanel({ campaign, presence, unseated, joinUrls }: Props) {
           e.preventDefault();
           const fields = newSeatFields(templateId, newName);
           if (!fields) return;
-          void send(seatCreateIntent(newId(), fields.label, fields.role, fields.permissions)).then(
-            (ok) => {
-              if (ok) setNewName('');
-            },
-          );
+          void send(
+            seatCreateIntent(newId(), fields.label, fields.role, fields.permissions, fields.tools),
+          ).then((ok) => {
+            if (ok) setNewName('');
+          });
         }}
       >
         <h3>Add a seat</h3>
@@ -306,6 +325,9 @@ export function SeatPanel({ campaign, presence, unseated, joinUrls }: Props) {
           </button>
         </div>
         <p>A template sets the seat's starting permissions. Adjust each seat after adding it.</p>
+        <p aria-label="Template defaults">
+          {templates.find((t) => t.id === templateId)?.description}
+        </p>
       </form>
       {error && <p role="alert">{error}</p>}
     </section>

@@ -189,6 +189,9 @@ export function visibleTo(audience: Audience, state: Campaign): Campaign {
         hideArchived = true;
         continue;
       }
+      // Known gap (UX-46): every seat's `tools`, like its `permissions`, reaches every player and
+      // spectator, so players can see what other seats may do. Same exposure as before
+      // UI-SEAT-02; not hidden here (no behaviour change).
       const seatView = viewSeat(audience, s);
       if (seatView !== s) hideArchived = true;
       seats[id] = seatView;

@@ -54,7 +54,7 @@ describe('drawing channels (LAY-05)', () => {
       expect(drawChannelOf(other)).toBeNull();
   });
 
-  it('names the channels the wire and the scene toggle both use', () => {
+  it('names the channels the wire and the seat-tool gate both use', () => {
     expect(DRAW_STROKE_CHANNEL).toBe('draw.stroke');
     expect(DRAW_ERASE_CHANNEL).toBe('draw.erase');
     expect(DRAW_CLEAR_CHANNEL).toBe('draw.clear');

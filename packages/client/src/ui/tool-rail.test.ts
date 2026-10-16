@@ -3,6 +3,7 @@ import type { SeatPermissions } from '@mythic/shared';
 import {
   INTERACTION_OFF_REASON,
   READ_ONLY_REASON,
+  SEAT_TOOL_OFF_REASON,
   SPECTATOR_REASON,
   railToolStates,
   resolveActiveTool,
@@ -98,16 +99,16 @@ describe('tool rail states', () => {
     expect(by(states, 'initiative').enabled).toBe(true);
   });
 
-  it('adds a scene-level reason to an otherwise allowed tool', () => {
+  it("adds the seat's own tool reason to an otherwise allowed tool (UX-46)", () => {
     const states = railToolStates({
       ...base,
       role: 'player',
       permissions: perms(),
-      sceneReasons: { measure: 'Measuring is disabled in this scene' },
+      toolReasons: { measure: SEAT_TOOL_OFF_REASON.measure },
     });
     expect(by(states, 'measure')).toMatchObject({
       enabled: false,
-      reason: 'Measuring is disabled in this scene',
+      reason: 'The DM has turned off Measure for your seat',
     });
   });
 
@@ -120,17 +121,17 @@ describe('tool rail states', () => {
     expect(by(states, 'draw')).toMatchObject({ enabled: false, reason: 'Your seat cannot draw' });
   });
 
-  it('lets the scene Draw toggle disable Draw, and leaves the host exempt', () => {
-    const reason = 'Drawing is disabled in this scene';
+  it("lets the seat's Draw tool disable Draw, and leaves the host exempt", () => {
+    const reason = SEAT_TOOL_OFF_REASON.draw;
     const player = railToolStates({
       ...base,
       role: 'player',
       permissions: perms(),
-      sceneReasons: { draw: reason },
+      toolReasons: { draw: reason },
     });
     expect(by(player, 'draw')).toMatchObject({ enabled: false, reason });
-    // PERM-05: the host never sees a scene-level reason, so the toggle cannot lock them out.
-    const host = railToolStates({ ...base, role: 'host', permissions: null, sceneReasons: {} });
+    // PERM-05: the host never gets a seat-tool reason, so no seat setting can lock them out.
+    const host = railToolStates({ ...base, role: 'host', permissions: null, toolReasons: {} });
     expect(by(host, 'draw').enabled).toBe(true);
   });
 

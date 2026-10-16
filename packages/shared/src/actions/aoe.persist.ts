@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { AoEEntity, DEFAULT_LASTING_AOE_LIMIT, Id } from '../schema/index.js';
 import { defineAction, seatOf } from './define.js';
 import { isAdminOn, isLayerLocked } from './entity-access.js';
-import { canUseSceneToggle } from './scene-toggles.js';
+import { canUseTool } from './seat-tools.js';
 import { viewEntity } from '../visibility/visible-to.js';
 
 /** Q27 / MEAS-03: promote the actor's measuring template; never overwrite another object. */
@@ -29,7 +29,7 @@ export const aoePersist = defineAction({
       !seat?.permissions.view ||
       source.layer !== 'effects' ||
       source.measuringAoE !== true ||
-      !canUseSceneToggle(state, actor, p.sceneId, 'measure') ||
+      !canUseTool(state, actor, p.sceneId, 'measure') ||
       viewEntity({ kind: 'seat', seatId: seat.id }, source, seat) === null
     )
       return false;

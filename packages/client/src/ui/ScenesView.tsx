@@ -11,7 +11,6 @@ import { sceneActivateIntent, sceneCreateIntent } from './intent-specs.js';
 import { folderNames, sceneFolders, scenePreviewAsset, type SceneRow } from './scene-list.js';
 import { SceneCreateForm } from './SceneCreateForm.js';
 import { SceneSettingsForm } from './SceneSettingsForm.js';
-import { SceneTogglesForm } from './SceneTogglesForm.js';
 import { useSubmit } from './submit.js';
 
 /**
@@ -225,7 +224,6 @@ function SceneSettings({
         skybox={scene.environment.skybox}
         send={send}
       />
-      <SceneTogglesForm key={JSON.stringify(scene.playerToggles ?? null)} scene={scene} />
     </section>
   );
 }

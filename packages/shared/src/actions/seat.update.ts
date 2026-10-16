@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { Id, SeatIcon } from '../schema/index.js';
+import {
+  DEFAULT_SEAT_TOOLS,
+  Id,
+  SEAT_TOOLS,
+  SeatIcon,
+  SeatTools,
+  resolveSeatTools,
+} from '../schema/index.js';
 import { defineAction, isHost } from './define.js';
 
 export const seatUpdate = defineAction({
@@ -13,6 +20,10 @@ export const seatUpdate = defineAction({
       interactionEnabled: z.boolean().optional(),
       /** UX-44: `null` removes the icon. */
       icon: SeatIcon.nullable().optional(),
+      /** UI-SEAT-02 (UX-46): a per-seat override of one or more board tools. */
+      tools: SeatTools.partial()
+        .refine((t) => Object.keys(t).length > 0, { message: 'at least one tool is required' })
+        .optional(),
     })
     .refine(
       (p) =>
@@ -20,7 +31,8 @@ export const seatUpdate = defineAction({
         p.binding !== undefined ||
         p.role !== undefined ||
         p.interactionEnabled !== undefined ||
-        p.icon !== undefined,
+        p.icon !== undefined ||
+        p.tools !== undefined,
       {
         message: 'at least one field to update is required',
       },
@@ -31,11 +43,30 @@ export const seatUpdate = defineAction({
     if (!seat) return;
     if (a.payload.label !== undefined) seat.label = a.payload.label;
     if (a.payload.binding !== undefined) seat.binding = a.payload.binding;
-    if (a.payload.role !== undefined) seat.role = a.payload.role;
+    if (a.payload.role !== undefined) {
+      // UX-46: a demoted Co-DM must not keep the every-tool set it was created with. Tools
+      // that are absent or still the Co-DM template's reset to the Player template; anything
+      // else is an explicit override (for example a migrated 0.0.1 value) and is kept.
+      if (seat.role === 'codm' && a.payload.role === 'player' && !hasOwnTools(seat.tools))
+        seat.tools = { ...DEFAULT_SEAT_TOOLS };
+      seat.role = a.payload.role;
+    }
     if (a.payload.interactionEnabled !== undefined)
       seat.interactionEnabled = a.payload.interactionEnabled;
     if (a.payload.icon === null) delete seat.icon;
     else if (a.payload.icon !== undefined) seat.icon = a.payload.icon;
+    // The override is stored whole, so the seat no longer depends on the template default.
+    const override = a.payload.tools;
+    if (override !== undefined) {
+      const tools = resolveSeatTools(seat);
+      for (const tool of SEAT_TOOLS) tools[tool] = override[tool] ?? tools[tool];
+      seat.tools = tools;
+    }
   },
   modExposed: false,
 });
+
+/** True when a Co-DM seat's tools differ from the Co-DM template's (every tool on). */
+function hasOwnTools(tools: SeatTools | undefined): boolean {
+  return tools !== undefined && SEAT_TOOLS.some((tool) => !tools[tool]);
+}

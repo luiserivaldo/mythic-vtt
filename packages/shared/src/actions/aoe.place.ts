@@ -3,7 +3,7 @@ import { AoEEntity, Id } from '../schema/index.js';
 import { defineAction } from './define.js';
 import { isAdminOn, isLayerLocked } from './entity-access.js';
 import { seatOf } from './define.js';
-import { canUseSceneToggle } from './scene-toggles.js';
+import { canUseTool } from './seat-tools.js';
 import { isWithinBounds } from '../geometry/bounds.js';
 import { resolveSceneBounds } from '../schema/index.js';
 
@@ -39,7 +39,7 @@ export const aoePlace = defineAction({
       p.entity.perms === undefined &&
       p.entity.owners.every((id) => id === seat.id) &&
       isWithinBounds(resolveSceneBounds(scene), p.entity.transform.position) &&
-      canUseSceneToggle(state, actor, p.sceneId, 'measure')
+      canUseTool(state, actor, p.sceneId, 'measure')
     );
   },
   reduce: (draft, a) => {

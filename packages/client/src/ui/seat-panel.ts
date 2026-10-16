@@ -1,4 +1,13 @@
-import { Id, SEAT_TEMPLATES, type Campaign, type Seat, type SeatTemplateId } from '@mythic/shared';
+import {
+  Id,
+  resolveSeatTools,
+  SEAT_TEMPLATES,
+  type Campaign,
+  type Seat,
+  type SeatTemplateId,
+  type SeatTool,
+  type SeatTools,
+} from '@mythic/shared';
 import { avatarHue, initialsOf, joinImageUrl } from './join-screen.js';
 
 export const PERMISSION_KEYS = ['view', 'move', 'edit', 'delete'] as const;
@@ -14,6 +23,18 @@ export const SEAT_TOGGLES: readonly { key: Exclude<PermissionKey, 'view'>; label
   { key: 'edit', label: 'Edit' },
   { key: 'delete', label: 'Delete' },
 ];
+
+/**
+ * UI-SEAT-02 (UX-46, MV-251): the per-seat board tools. They replace the old table-wide and
+ * per-scene "players may measure / draw / pin" toggles; co-DM seats may always use every tool.
+ */
+export const SEAT_TOOL_TOGGLES: readonly { key: SeatTool; label: string }[] = [
+  { key: 'measure', label: 'Measure' },
+  { key: 'draw', label: 'Draw' },
+  { key: 'pins', label: 'Place pins' },
+];
+
+export const CODM_TOOLS_NOTE = 'Co-DMs can always use every tool';
 
 /** UI-SEAT-01: the seat's badge: its DM-chosen icon, or initials of its name (UX-44). */
 export type SeatBadge =
@@ -40,6 +61,8 @@ export interface SeatRow {
   /** SES-07: the name the seated identity connected with, when the host has told us. */
   occupantName: string | undefined;
   permissions: Record<PermissionKey, boolean>;
+  /** UI-SEAT-02: the seat's own tools, with the Player template default filled in. */
+  tools: SeatTools;
   badge: SeatBadge;
   /** The occupant's player colour from presence, else a stable hue from the seat name. */
   color: string;
@@ -79,6 +102,7 @@ export function seatRows(campaign: Campaign, presence: readonly PresenceEntry[] 
         edit: seat.permissions.edit,
         delete: seat.permissions.delete,
       },
+      tools: resolveSeatTools(seat),
       badge: badgeOf(seat),
       color: colors.get(seat.id) ?? `hsl(${String(avatarHue(seat.label))} 55% 38%)`,
     }));
@@ -91,25 +115,43 @@ export interface SeatTemplateOption {
 }
 
 /**
- * UI-SEAT-01: the "Add seat" dropdown. Today the options are the built-in role presets with their
- * current defaults. MV-262 (UX-46) replaces this one function with the campaign's permission
- * templates; the panel only reads `id`, `label` and `description` and resolves the id with
- * `newSeatIntentPayload`.
+ * UI-SEAT-01 / UI-SEAT-02 (UX-46): the "Add seat" dropdown lists the permission templates. Each
+ * option's description says what a new seat starts with; the seat is then adjusted on its own.
  */
 export function seatTemplateOptions(): SeatTemplateOption[] {
-  return SEAT_TEMPLATES.map(({ id, label, description }) => ({ id, label, description }));
+  return SEAT_TEMPLATES.map(({ id, label, description, role, tools }) => ({
+    id,
+    label,
+    description: `${description} Starts with: ${templateToolsSummary(role, tools)}.`,
+  }));
+}
+
+function templateToolsSummary(role: Seat['role'], tools: SeatTools): string {
+  if (role === 'codm') return 'every tool';
+  const on = SEAT_TOOL_TOGGLES.filter((t) => tools[t.key]).map((t) => t.label);
+  return on.length === 0 ? 'no board tools' : on.join(', ');
 }
 
 /** The `seat.create` fields for a template: an empty name falls back to the template's label. */
 export function newSeatFields(
   templateId: SeatTemplateId,
   typedName: string,
-): { label: string; role: Seat['role']; permissions: Seat['permissions'] } | null {
+): {
+  label: string;
+  role: Seat['role'];
+  permissions: Seat['permissions'];
+  tools: SeatTools;
+} | null {
   const template = SEAT_TEMPLATES.find((t) => t.id === templateId);
   if (!template) return null;
   const label = typedName.trim() === '' ? template.label : typedName.trim();
   if (!isValidLabel(label)) return null;
-  return { label, role: template.role, permissions: { ...template.permissions } };
+  return {
+    label,
+    role: template.role,
+    permissions: { ...template.permissions },
+    tools: { ...template.tools },
+  };
 }
 
 export interface ArchiveImpact {

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { Campaign, CURRENT_SCHEMA_VERSION } from '../schema/index.js';
+import { Campaign, CURRENT_SCHEMA_VERSION, DEFAULT_SEAT_TOOLS } from '../schema/index.js';
 import { storeMigrate } from '../migrations/index.js';
 import { patchesFor, visibleTo } from '../visibility/index.js';
 import { checkIntent, reduceAction } from './run.js';
@@ -122,9 +122,19 @@ it('migrates campaign and nested snapshots without losing historical seat data',
     ...state,
     schemaVersion: CURRENT_SCHEMA_VERSION,
   });
+  // UX-46 (v11): the snapshot also gains each seat's tools, folded from its scenes' defaults.
   expect(storeMigrate('snapshot', 6, { seq: 10, state })).toEqual({
     seq: 10,
-    state: { ...state, schemaVersion: CURRENT_SCHEMA_VERSION },
+    state: {
+      ...state,
+      seats: Object.fromEntries(
+        Object.entries(state.seats).map(([id, seat]) => [
+          id,
+          { ...seat, tools: { ...DEFAULT_SEAT_TOOLS } },
+        ]),
+      ),
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+    },
   });
   expect(state).toEqual(before);
 });

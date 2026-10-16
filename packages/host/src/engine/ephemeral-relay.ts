@@ -4,7 +4,7 @@ import {
   canClearDrawings,
   canEraseDrawing,
   canSendCameraPose,
-  canUseSceneToggle,
+  canUseTool,
   checkIntent,
   drawChannelOf,
   DrawClearData,
@@ -15,7 +15,7 @@ import {
   PING_CHANNEL,
   seatOf,
   seesScene,
-  TOGGLE_FOR_CHANNEL,
+  TOOL_FOR_CHANNEL,
   viewEntity,
   type Actor,
   type Audience,
@@ -292,7 +292,7 @@ export function createEphemeralRelay(
   ): (() => void) | null {
     switch (kind) {
       case 'stroke': {
-        // The scene toggle gate above already proved the scene exists, for every sender.
+        // The seat-tool gate above already proved the scene exists, for every sender.
         const parsed = DrawStrokeData.safeParse(message.data);
         if (!parsed.success) {
           drop('invalid-drawing');
@@ -372,11 +372,11 @@ export function createEphemeralRelay(
         drop('forbidden');
         return;
       }
-      // PERM-05: scene toggles gate the channel (host and co-DM exempt, see canUseSceneToggle).
-      const toggle = TOGGLE_FOR_CHANNEL[message.channel];
-      if (toggle !== undefined) {
+      // PERM-05 / UI-SEAT-02: the sender's seat tools gate the channel (host and co-DM exempt).
+      const tool = TOOL_FOR_CHANNEL[message.channel];
+      if (tool !== undefined) {
         const sceneId = sceneIdOf(message.data);
-        if (sceneId === undefined || !canUseSceneToggle(state, senderActor, sceneId, toggle)) {
+        if (sceneId === undefined || !canUseTool(state, senderActor, sceneId, tool)) {
           drop('forbidden');
           return;
         }
@@ -411,7 +411,7 @@ export function createEphemeralRelay(
         return;
       }
 
-      // M4-14 / LAY-05: the `ping` channel is gated by a scene toggle, so the host — not only the
+      // M4-14 / LAY-05: the `ping` channel is gated by a seat tool, so the host — not only the
       // client that draws the marker — owns its shape. A strict parse keeps an arbitrary (up to the
       // payload cap) `data` blob, or a non-finite coordinate, from being fanned out to the table.
       if (message.channel === PING_CHANNEL && parsePingPayload(message.data) === null) {

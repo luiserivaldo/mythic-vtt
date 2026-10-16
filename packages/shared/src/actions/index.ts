@@ -38,12 +38,7 @@ export {
   ROLLBACK_MAX_PATCHES,
 } from './history.rollback.js';
 export { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
-export {
-  canUseSceneToggle,
-  PING_CHANNEL,
-  PING_TOGGLE,
-  TOGGLE_FOR_CHANNEL,
-} from './scene-toggles.js';
+export { canUseTool, PING_CHANNEL, PING_TOOL, TOOL_FOR_CHANNEL } from './seat-tools.js';
 
 export { aoePersist } from './aoe.persist.js';
 export { seatArchive } from './seat.archive.js';
