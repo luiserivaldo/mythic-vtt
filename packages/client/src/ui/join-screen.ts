@@ -16,8 +16,12 @@ export interface Profile {
   color?: string;
   /** Small image data URL; absent when the visitor chose none. */
   avatar?: string;
-  /** The visitor explicitly chose to watch; skips the seat picker on later visits. */
-  spectator?: boolean;
+  /**
+   * Connected under this name without a seat, waiting for the DM to seat it from the roster: the
+   * choices are folded into one button. Not a spectator: spectators are anonymous and store no
+   * profile (UX-45). Replaces the legacy `spectator: true` (MV-270, see `migrateLegacyProfile`).
+   */
+  awaitingSeat?: boolean;
   /** The seat this identity last sat in, so it can be marked and preselected (SES-06). */
   lastSeatId?: string;
 }
@@ -66,7 +70,8 @@ export function parseProfile(raw: string | null): Profile | null {
       displayName,
       ...(color.success ? { color: color.data.toLowerCase() } : {}),
       ...(typeof avatar === 'string' && isValidAvatar(avatar) ? { avatar } : {}),
-      ...(o['spectator'] === true ? { spectator: true } : {}),
+      // MV-270: the legacy `spectator: true` meant exactly this named, unseated wait.
+      ...(o['awaitingSeat'] === true || o['spectator'] === true ? { awaitingSeat: true } : {}),
       ...(typeof lastSeatId === 'string' && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(lastSeatId)
         ? { lastSeatId }
         : {}),
@@ -92,14 +97,56 @@ export function saveProfile(storage: Pick<KeyValueStore, 'setItem'>, profile: Pr
   }
 }
 
-/** Drops the explicit-spectator choice (the visitor sat down or asked for a seat again). */
-export function withoutSpectator(profile: Profile): Profile {
+/**
+ * MV-270: rewrites a legacy `spectator: true` profile once as `awaitingSeat: true`. Before UX-45 that
+ * flag meant "connected under my name, unseated, so the DM can seat me"; UX-45 made spectators
+ * anonymous, so the old name no longer fits what it does. Name, colour, avatar and last seat are
+ * kept. Returns true when a profile was rewritten.
+ */
+export function migrateLegacyProfile(storage: KeyValueStore): boolean {
+  try {
+    const raw = storage.getItem(PROFILE_KEY);
+    if (!raw) return false;
+    const v: unknown = JSON.parse(raw);
+    if (typeof v !== 'object' || v === null || !('spectator' in v)) return false;
+    // An unusable profile is ignored by `loadProfile` anyway; leave it as it is.
+    const profile = parseProfile(raw);
+    if (!profile) return false;
+    saveProfile(storage, profile);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Drops the waiting-for-a-seat mark (the visitor sat down or opened the choices again). */
+export function withoutAwaitingSeat(profile: Profile): Profile {
   return {
     displayName: profile.displayName,
     ...(profile.color !== undefined ? { color: profile.color } : {}),
     ...(profile.avatar !== undefined ? { avatar: profile.avatar } : {}),
     ...(profile.lastSeatId !== undefined ? { lastSeatId: profile.lastSeatId } : {}),
   };
+}
+
+/**
+ * MV-270: `GET /api/join` allows 60 requests a minute per address, and visitors behind one shared
+ * address (a home NAT, a school network) share that budget. 10 s keeps ten open join screens per
+ * address inside it; a 429 backs off for the host's `Retry-After`, or doubles the wait without one.
+ */
+export const JOIN_POLL_MS = 10_000;
+export const JOIN_POLL_MAX_MS = 120_000;
+
+/** Milliseconds until the next `/api/join` poll, given the last response's status. */
+export function nextJoinPollMs(
+  status: number,
+  retryAfter: string | null,
+  previousMs: number,
+): number {
+  if (status !== 429) return JOIN_POLL_MS;
+  const seconds = retryAfter !== null && /^\d+$/.test(retryAfter.trim()) ? Number(retryAfter) : NaN;
+  const wait = Number.isFinite(seconds) ? seconds * 1000 : Math.max(previousMs, JOIN_POLL_MS) * 2;
+  return Math.min(JOIN_POLL_MAX_MS, Math.max(JOIN_POLL_MS, wait));
 }
 
 export type JoinIcon = NonNullable<JoinPayload['campaign']['icon']>;
@@ -165,7 +212,7 @@ export interface JoinViewInput {
   naming: JoinRequest | null;
   /** A request sent (or about to be sent) on the current connection, not yet answered. */
   pending: JoinRequest | null;
-  /** Watching without a seat: an anonymous spectator, or a remembered unseated profile. */
+  /** Watching anonymously (UX-45), or connected by name awaiting a seat (`Profile.awaitingSeat`). */
   watching: boolean;
   /** From the join payload; null until it arrives. */
   sceneActive: boolean | null;

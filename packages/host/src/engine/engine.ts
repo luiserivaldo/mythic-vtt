@@ -242,6 +242,13 @@ export function createEngine(options: EngineOptions): Engine {
     }
   }
 
+  /** The co-DM seat this connection's identity already holds, if any (never for a spectator). */
+  function codmSeatOf(conn: GatewayConnection): string | undefined {
+    if (conn.isSpectator) return undefined;
+    const seatId = seatIdOf(state, conn.identityId);
+    return seatId !== undefined && state.seats[seatId]?.role === 'codm' ? seatId : undefined;
+  }
+
   let presenceLatencyTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** M1-11: the roster goes to host connections only; it carries identity ids (PERM-03). */
@@ -488,11 +495,9 @@ export function createEngine(options: EngineOptions): Engine {
         const member: Member = { conn, audience, key: audienceViewKey(state, placeOf(conn)) };
         members.set(conn.connectionId, member);
         greet(member);
-        if (
-          !conn.isHost &&
-          state.activeSceneId === null &&
-          (audience.kind !== 'seat' || state.seats[audience.seatId]?.role !== 'codm')
-        )
+        // MV-270: the same rule as `onJoin` and `session.join`: only the holder of a co-DM seat
+        // is at the table before a scene is active; everyone else is told to wait.
+        if (!conn.isHost && state.activeSceneId === null && codmSeatOf(conn) === undefined)
           conn.send({
             t: 'notice',
             level: 'warning',
@@ -540,7 +545,10 @@ export function createEngine(options: EngineOptions): Engine {
           }
           return;
         }
-        if (state.activeSceneId === null && !conn.isHost) {
+        // MV-270: a co-DM rejoining the seat it already holds (reconnect, restart, Join) is let
+        // through to `session.join`, which allows exactly that. A visitor never is (MV-269).
+        const codmRejoin = msg.seatId !== undefined && codmSeatOf(conn) === msg.seatId;
+        if (state.activeSceneId === null && !conn.isHost && !codmRejoin) {
           conn.send({
             t: 'error',
             code: 'seat-unavailable',

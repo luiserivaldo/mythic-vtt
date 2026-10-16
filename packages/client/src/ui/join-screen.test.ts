@@ -8,13 +8,17 @@ import {
   fitSize,
   initialsOf,
   isValidAvatar,
+  JOIN_POLL_MAX_MS,
+  JOIN_POLL_MS,
   joinSeatRows,
   joinView,
   loadProfile,
+  migrateLegacyProfile,
+  nextJoinPollMs,
   parseJoinPayload,
   parseProfile,
   saveProfile,
-  withoutSpectator,
+  withoutAwaitingSeat,
   type JoinViewInput,
 } from './join-screen.js';
 import { rosterOptions } from './seat-panel.js';
@@ -70,8 +74,12 @@ describe('profile persistence', () => {
       setItem: (k: string, v: string) => void store.set(k, v),
     };
     expect(loadProfile(kv)).toBeNull();
-    saveProfile(kv, { displayName: 'Ana', spectator: true, lastSeatId: tid(20) });
-    expect(loadProfile(kv)).toEqual({ displayName: 'Ana', spectator: true, lastSeatId: tid(20) });
+    saveProfile(kv, { displayName: 'Ana', awaitingSeat: true, lastSeatId: tid(20) });
+    expect(loadProfile(kv)).toEqual({
+      displayName: 'Ana',
+      awaitingSeat: true,
+      lastSeatId: tid(20),
+    });
     expect(parseProfile('{"displayName":"","avatar":"x"}')).toBeNull();
     expect(
       parseProfile('{"displayName":"Ana","avatar":"javascript:1","lastSeatId":"nope"}'),
@@ -168,8 +176,70 @@ it('validates and preserves the chosen colour across profile persistence', () =>
   );
   expect(profile?.color).toBe('#aabbcc');
   if (!profile) throw new Error('profile missing');
-  expect(withoutSpectator(profile)).toEqual({ displayName: 'Colour Guest', color: '#aabbcc' });
+  // MV-270: the legacy spectator flag is read as awaitingSeat.
+  expect(profile).toEqual({ displayName: 'Colour Guest', color: '#aabbcc', awaitingSeat: true });
+  expect(withoutAwaitingSeat(profile)).toEqual({ displayName: 'Colour Guest', color: '#aabbcc' });
   expect(parseProfile(JSON.stringify({ displayName: 'Guest', color: 'url(secret)' }))).toEqual({
     displayName: 'Guest',
+  });
+});
+
+describe('legacy spectator profiles (MV-270)', () => {
+  const kvWith = (raw: string | null) => {
+    const store = new Map<string, string>();
+    if (raw !== null) store.set('mythic.profile.v1', raw);
+    return {
+      store,
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+    };
+  };
+  it('rewrites a stored spectator flag as awaitingSeat and keeps the rest of the profile', () => {
+    const kv = kvWith(
+      JSON.stringify({
+        displayName: 'Ana',
+        color: '#AABBCC',
+        spectator: true,
+        lastSeatId: tid(20),
+      }),
+    );
+    expect(migrateLegacyProfile(kv)).toBe(true);
+    expect(JSON.parse(kv.store.get('mythic.profile.v1') ?? '{}')).toEqual({
+      displayName: 'Ana',
+      color: '#aabbcc',
+      awaitingSeat: true,
+      lastSeatId: tid(20),
+    });
+    expect(migrateLegacyProfile(kv)).toBe(false);
+  });
+  it('leaves a current, missing or unusable profile alone', () => {
+    const current = kvWith(JSON.stringify({ displayName: 'Ana' }));
+    expect(migrateLegacyProfile(current)).toBe(false);
+    expect(current.store.get('mythic.profile.v1')).toBe('{"displayName":"Ana"}');
+    expect(migrateLegacyProfile(kvWith(null))).toBe(false);
+    const broken = kvWith('{"spectator":true}');
+    expect(migrateLegacyProfile(broken)).toBe(false);
+    expect(broken.store.get('mythic.profile.v1')).toBe('{"spectator":true}');
+    expect(migrateLegacyProfile(kvWith('not json'))).toBe(false);
+  });
+});
+
+describe('join screen polling (MV-270)', () => {
+  it('polls every 10 s, which keeps ten screens behind one address under 60 a minute', () => {
+    expect(nextJoinPollMs(200, null, JOIN_POLL_MS)).toBe(JOIN_POLL_MS);
+    expect(10 * (60_000 / JOIN_POLL_MS)).toBeLessThanOrEqual(60);
+    // A recovered poll returns to the normal pace.
+    expect(nextJoinPollMs(200, null, JOIN_POLL_MAX_MS)).toBe(JOIN_POLL_MS);
+    expect(nextJoinPollMs(500, null, JOIN_POLL_MS)).toBe(JOIN_POLL_MS);
+  });
+  it('waits for the Retry-After seconds on a 429, within bounds', () => {
+    expect(nextJoinPollMs(429, '37', JOIN_POLL_MS)).toBe(37_000);
+    expect(nextJoinPollMs(429, '1', JOIN_POLL_MS)).toBe(JOIN_POLL_MS);
+    expect(nextJoinPollMs(429, '86400', JOIN_POLL_MS)).toBe(JOIN_POLL_MAX_MS);
+  });
+  it('doubles the wait on a 429 without a usable Retry-After, up to the cap', () => {
+    expect(nextJoinPollMs(429, null, JOIN_POLL_MS)).toBe(2 * JOIN_POLL_MS);
+    expect(nextJoinPollMs(429, 'Wed, 21 Oct 2026 07:28:00 GMT', 40_000)).toBe(80_000);
+    expect(nextJoinPollMs(429, null, 100_000)).toBe(JOIN_POLL_MAX_MS);
   });
 });

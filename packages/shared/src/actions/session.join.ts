@@ -7,7 +7,10 @@ export const sessionJoin = defineAction({
   schema: z.strictObject({ seatId: Id, identityId: Id }),
   permission: (state, actor, p) => {
     const seat = state.seats[p.seatId];
-    if (state.activeSceneId === null && !isHost(actor)) return false;
+    // MV-270: a co-DM works before any scene is active, so the identity that already holds a
+    // co-DM seat may rejoin it then (a no-op). Nobody else joins anything without an active scene.
+    const codmRejoin = seat?.role === 'codm' && !seat.archived && seat.identityId === p.identityId;
+    if (state.activeSceneId === null && !isHost(actor) && !codmRejoin) return false;
     if (!seat || seat.archived || (seat.identityId !== null && seat.identityId !== p.identityId))
       return false;
     // MV-269: only the host grants a co-DM seat (`seat.assign`, or a SES-04 invite). Anyone else

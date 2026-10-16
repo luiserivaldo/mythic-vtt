@@ -10,12 +10,13 @@ afterEach(async () => {
   app = undefined;
 });
 
-function build(maxPerMinute?: number) {
+function build(maxPerMinute?: number, now?: () => number) {
   app = Fastify({ logger: false });
   registerJoinRoutes(app, {
     state: () => fixtureCampaign(),
     host: () => Promise.resolve({ name: 'Dungeon Master' }),
     ...(maxPerMinute !== undefined ? { maxPerMinute } : {}),
+    ...(now !== undefined ? { now } : {}),
   });
   return app;
 }
@@ -45,5 +46,17 @@ describe('GET /api/join', () => {
     const limited = await server.inject({ method: 'GET', url: '/api/join' });
     expect(limited.statusCode).toBe(429);
     expect(limited.body).not.toContain('seats');
+  });
+
+  it('tells a limited address when its budget comes back (MV-270)', async () => {
+    let t = 1_000_000;
+    const server = build(1, () => t);
+    expect((await server.inject({ method: 'GET', url: '/api/join' })).statusCode).toBe(200);
+    t += 45_500;
+    const limited = await server.inject({ method: 'GET', url: '/api/join' });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.headers['retry-after']).toBe('15');
+    t += 14_500;
+    expect((await server.inject({ method: 'GET', url: '/api/join' })).statusCode).toBe(200);
   });
 });

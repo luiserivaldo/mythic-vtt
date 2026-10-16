@@ -250,6 +250,33 @@ describe('Co-DM seats are host-granted (MV-269)', () => {
     expect(snapshotsOf(bob).at(-1)).toMatchObject({ seatId: T.coDm });
   });
 
+  it('lets the holder rejoin its co-DM seat before a scene is active, with no notice (MV-270)', async () => {
+    const campaign = fixtureCampaign();
+    campaign.activeSceneId = null;
+    const coDm = campaign.seats[T.coDm];
+    if (coDm) coDm.identityId = T.bob;
+    const { engine } = setup(campaign);
+    const bob = named(T.bob, 'Bob');
+    await engine.onConnect(bob);
+    await engine.onJoin(bob, { t: 'join', seatId: T.coDm });
+    await engine.idle();
+    expect(engine.state().seats[T.coDm]?.identityId).toBe(T.bob);
+    expect(errorsOf(bob)).toEqual([]);
+    expect(bob.received.filter((m) => m.t === 'notice')).toEqual([]);
+    expect(snapshotsOf(bob).at(-1)).toMatchObject({ seatId: T.coDm });
+
+    // A visitor connecting to the same table is still told to wait, and still refused.
+    const carol = named(T.carol, 'Carol');
+    await engine.onConnect(carol);
+    await engine.onJoin(carol, { t: 'join', seatId: T.coDm });
+    await engine.idle();
+    expect(carol.received).toContainEqual(
+      expect.objectContaining({ t: 'notice', code: 'no-active-scene' }),
+    );
+    expect(errorsOf(carol)).toMatchObject([{ code: 'seat-unavailable' }]);
+    expect(engine.state().seats[T.coDm]?.identityId).toBe(T.bob);
+  });
+
   it('assigns a co-DM seat through a host-issued invite on the host authority', async () => {
     const campaign = fixtureCampaign();
     campaign.activeSceneId = null;

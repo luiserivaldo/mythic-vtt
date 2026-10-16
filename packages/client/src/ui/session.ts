@@ -9,6 +9,8 @@ import type { SubmitIntent } from './submit.js';
 export interface SessionDeps {
   url: string;
   identity: Identity;
+  /** MV-270: the identity "Join As Spectator" connects with; made on first use. */
+  spectatorIdentity: () => Identity;
   store: StoreApi<ClientStore>;
   hostToken?: HostTokenHolder;
   createSocket: GameClientOptions['createSocket'];
@@ -20,7 +22,11 @@ export interface SessionDeps {
  * Changing the name later stops the client and starts a new one.
  */
 export interface Session {
-  start: (profile: Pick<Profile, 'displayName' | 'avatar' | 'color'>) => void;
+  /** `spectator` connects with the separate spectator identity (MV-270), never the visitor's. */
+  start: (
+    profile: Pick<Profile, 'displayName' | 'avatar' | 'color'>,
+    opts?: { spectator?: boolean },
+  ) => void;
   stop: () => void;
   started: () => boolean;
   currentProfile: () => Pick<Profile, 'displayName' | 'avatar' | 'color'> | null;
@@ -54,12 +60,12 @@ export function createSession(deps: SessionDeps): Session {
     for (const l of listeners) l();
   };
   return {
-    start(profile) {
+    start(profile, opts) {
       client?.stop();
       currentProfile = profile;
       client = createGameClient({
         url: deps.url,
-        identity: deps.identity,
+        identity: opts?.spectator === true ? deps.spectatorIdentity() : deps.identity,
         displayName: profile.displayName,
         ...(profile.color !== undefined ? { color: profile.color } : {}),
         ...(profile.avatar !== undefined ? { avatar: profile.avatar } : {}),

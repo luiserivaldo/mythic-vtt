@@ -88,10 +88,24 @@ describe(`${T} co-DM seats (MV-269)`, () => {
     expect(sessionJoin.permission(withCoDm(null), { kind: 'host' }, coDmPayload)).toBe(true);
     expect(sessionJoin.permission(withCoDm(IDS.identity), joiningActor, coDmPayload)).toBe(true);
   });
-  it('applies the no-active-scene gate to a co-DM seat too', () => {
+  it('lets the holder rejoin its co-DM seat before a scene is active (MV-270)', () => {
     expect(sessionJoin.permission(withCoDm(IDS.identity, null), joiningActor, coDmPayload)).toBe(
+      true,
+    );
+  });
+  it('still refuses a visitor before a scene: a free co-DM seat or one held by someone else', () => {
+    const visitor = { kind: 'seat', identityId: IDS.otherIdentity } as const;
+    const visitorPayload = { seatId: IDS.coDm, identityId: IDS.otherIdentity };
+    expect(sessionJoin.permission(withCoDm(null, null), visitor, visitorPayload)).toBe(false);
+    expect(sessionJoin.permission(withCoDm(IDS.identity, null), visitor, visitorPayload)).toBe(
       false,
     );
+    // The bypass is for a co-DM seat only: a player seat still waits for a scene.
+    const player = makeCampaign();
+    player.activeSceneId = null;
+    const own = player.seats[IDS.owner];
+    if (own) own.identityId = IDS.identity;
+    expect(sessionJoin.permission(player, joiningActor, payload)).toBe(false);
   });
 });
 

@@ -11,20 +11,20 @@ import {
   fitSize,
   initialsOf,
   isValidAvatar,
+  JOIN_POLL_MS,
   joinImageUrl,
   joinSeatRows,
   joinView,
+  nextJoinPollMs,
   parseJoinPayload,
   saveProfile,
-  withoutSpectator,
+  withoutAwaitingSeat,
   type JoinIcon,
   type JoinRequest,
   type Profile,
 } from './join-screen.js';
 import { useJoinEnv, type JoinEnv } from './join-context.js';
 import './join-screen.css';
-
-const POLL_MS = 3000;
 
 /**
  * UI-JOIN-01 (MV-248): opening a join link shows the table before any socket opens: the DM, the
@@ -74,7 +74,7 @@ function JoinFlow({ env }: { env: JoinEnv }) {
     seatId,
     naming,
     pending: pending?.request ?? null,
-    watching: anonymous || profile?.spectator === true,
+    watching: anonymous || profile?.awaitingSeat === true,
     // An old or unreachable host gives no payload: still offer the choices; the host decides.
     sceneActive: payload?.sceneActive ?? (unreachable ? true : null),
     noScene,
@@ -86,13 +86,28 @@ function JoinFlow({ env }: { env: JoinEnv }) {
     setProfile(next);
   };
 
-  // The seat list and scene state change while the visitor looks at them; poll gently while shown.
+  // The seat list and scene state change while the visitor looks at them; poll gently while shown,
+  // back off when the host says the address is over its budget (MV-270), skip while the tab is
+  // hidden, and look again as soon as it is shown.
   useEffect(() => {
     if (!showsTable || env.hostVisitor) return;
     let cancelled = false;
-    const load = () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let delay = JOIN_POLL_MS;
+    const schedule = (ms: number) => {
+      clearTimeout(timer);
+      timer = setTimeout(load, ms);
+    };
+    function load() {
+      if (document.hidden) {
+        schedule(JOIN_POLL_MS);
+        return;
+      }
       fetch('/api/join', { cache: 'no-store' })
-        .then(async (res) => (res.ok ? parseJoinPayload(await res.json()) : undefined))
+        .then(async (res) => {
+          delay = nextJoinPollMs(res.status, res.headers.get('retry-after'), delay);
+          return res.ok ? parseJoinPayload(await res.json()) : undefined;
+        })
         .then((next) => {
           if (cancelled || next === undefined) return; // rate-limited: keep the last view
           if (next) setPayload(next);
@@ -100,13 +115,20 @@ function JoinFlow({ env }: { env: JoinEnv }) {
         })
         .catch(() => {
           if (!cancelled) setUnreachable(true);
+        })
+        .finally(() => {
+          if (!cancelled) schedule(delay);
         });
+    }
+    const onVisible = () => {
+      if (!document.hidden && delay === JOIN_POLL_MS) schedule(0);
     };
     load();
-    const timer = setInterval(load, POLL_MS);
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [showsTable, env.hostVisitor]);
 
@@ -140,16 +162,20 @@ function JoinFlow({ env }: { env: JoinEnv }) {
   // SES-06: remember the seat this identity ends up in, so a later visit can mark it.
   useEffect(() => {
     if (seatId === null || !profile || env.hostVisitor) return;
-    if (profile.lastSeatId === seatId && profile.spectator !== true) return;
-    update({ ...withoutSpectator(profile), lastSeatId: seatId });
-  }, [seatId, profile?.lastSeatId, profile?.spectator]);
+    if (profile.lastSeatId === seatId && profile.awaitingSeat !== true) return;
+    update({ ...withoutAwaitingSeat(profile), lastSeatId: seatId });
+  }, [seatId, profile?.lastSeatId, profile?.awaitingSeat]);
 
-  /** Every choice opens a fresh connection, so `hello` carries exactly what that choice allows. */
+  /**
+   * Every choice opens a fresh connection, so `hello` carries exactly what that choice allows. A
+   * spectator connects with the separate spectator identity, so a seat-bound identity is never put
+   * back in its seat under the name "Spectator" (MV-270).
+   */
   const connect = (request: JoinRequest, as: Pick<Profile, 'displayName' | 'avatar' | 'color'>) => {
     setRefused(null);
     setAnonymous(false);
     setPending({ request, sentAt: null });
-    session.start(as);
+    session.start(as, { spectator: request.kind === 'spectator' });
   };
 
   if (view === 'done') return null;
@@ -167,10 +193,7 @@ function JoinFlow({ env }: { env: JoinEnv }) {
           setNaming(null);
         }}
         onSubmit={(p) => {
-          const next: Profile = {
-            ...(profile ? withoutSpectator(profile) : {}),
-            ...p,
-          };
+          const next: Profile = { ...(profile ? withoutAwaitingSeat(profile) : {}), ...p };
           update(next);
           setNaming(null);
           connect(naming, next);
@@ -185,17 +208,17 @@ function JoinFlow({ env }: { env: JoinEnv }) {
       </Card>
     );
   }
-  if (view === 'watching' && profile?.spectator === true && !anonymous) {
-    // A remembered unseated visitor: connected under their name, so the DM can seat them.
+  if (view === 'watching' && !anonymous && profile?.awaitingSeat === true) {
+    // Connected under their name, unseated: the DM can seat them from the roster (MV-270).
     return (
       <button
         type="button"
         className="join-reopen"
         onClick={() => {
-          update(withoutSpectator(profile));
+          update(withoutAwaitingSeat(profile));
         }}
       >
-        Watching: choose a seat
+        Waiting for a seat: choose one
       </button>
     );
   }

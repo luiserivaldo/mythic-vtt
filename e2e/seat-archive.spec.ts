@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { RawClient, startTable, testUlid } from './harness.js';
+import { RawClient, startTable, testUlid, type Reply } from './harness.js';
+
+/** MV-270: a refused setup intent fails here, with the host's reason, not at a later timeout. */
+async function ok(reply: Promise<Reply>): Promise<void> {
+  const r = await reply;
+  expect(r, JSON.stringify(r)).toMatchObject({ t: 'ack' });
+}
 interface Campaign {
   seats: Record<string, { archived?: boolean; interactionEnabled?: boolean }>;
   scenes: Record<string, { entities: Record<string, { owners: string[] }> }>;
@@ -62,7 +68,7 @@ test('archive hands back entities and immediately removes co-DM access without l
     const guest = await RawClient.connect(table, { name: 'guest', ...guestIdentity });
     await guest.waitFor('snapshot', () => guest.state !== undefined);
     // MV-269: only the host grants a co-DM seat.
-    await host.intent('seat.assign', { seatId, identityId: guestIdentity.identityId });
+    await ok(host.intent('seat.assign', { seatId, identityId: guestIdentity.identityId }));
     await guest.waitFor('co-DM secret', () =>
       JSON.stringify(guest.state).includes('SECRET ARCHIVE TOKEN'),
     );
