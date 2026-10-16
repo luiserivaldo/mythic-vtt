@@ -129,8 +129,8 @@ test('the 3D Pan panel rotates and tilts the camera, stays open for its own cont
   expect(rotated.distance).toBeCloseTo(start.distance, 6);
   await expect(joystick).toBeVisible();
 
-  // Pushed back, it tilts toward the horizon.
-  await holdKnob(page, joystick, 0, 0.9, async () => {
+  // Pushed forward, it leans the camera toward the horizon (MV-274).
+  await holdKnob(page, joystick, 0, -0.9, async () => {
     await expect
       .poll(async () => (await cameraPose(page)).polar)
       .toBeGreaterThan(rotated.polar + 0.1);
@@ -139,8 +139,8 @@ test('the 3D Pan panel rotates and tilts the camera, stays open for its own cont
   expect(turn(rotated, tilted)).toBeCloseTo(0, 6);
   await expect(joystick).toBeVisible();
 
-  // Held forward, the tilt stops at the orbit's own limit (CAM-02).
-  await holdKnob(page, joystick, 0, -1, async () => {
+  // Held back, the tilt stops at the orbit's own top-down limit (CAM-02).
+  await holdKnob(page, joystick, 0, 1, async () => {
     await expect.poll(async () => (await cameraPose(page)).polar).toBeCloseTo(MIN_POLAR, 6);
   });
   const clamped = await waitForCameraToRest(page);
@@ -151,12 +151,21 @@ test('the 3D Pan panel rotates and tilts the camera, stays open for its own cont
   await expect.poll(async () => turn(clamped, await cameraPose(page))).toBeCloseTo(ROTATE_STEP, 6);
   await expect(joystick).toBeVisible();
 
-  // UI-CAM-03: a mouse orbit on the board closes the panel back to its bar.
+  // UI-CAM-03: the mouse wheel zooms without closing the panel.
   const canvas = page.locator('canvas');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('canvas has no box');
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
+  const beforeZoom = await cameraPose(page);
+  await page.mouse.move(x, y);
+  await page.mouse.wheel(0, -300);
+  await expect
+    .poll(async () => (await cameraPose(page)).distance)
+    .not.toBeCloseTo(beforeZoom.distance, 3);
+  await expect(joystick).toBeVisible();
+
+  // UI-CAM-03: a mouse orbit on the board closes the panel back to its bar.
   const beforeOrbit = await cameraPose(page);
   await page.mouse.move(x, y);
   await page.mouse.down({ button: 'right' });

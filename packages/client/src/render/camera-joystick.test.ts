@@ -66,12 +66,12 @@ describe('UI-CAM-02 joystick to camera', () => {
     expect(back.azimuth).toBeGreaterThan(base.azimuth);
   });
 
-  it('tilts forward toward the board and back toward the horizon', () => {
+  it('tilts forward toward the horizon and back toward top-down', () => {
     const forward = joystickOrbit(base, { rotate: 0, tilt: 1 }, 0.02);
-    expect(forward.polar).toBeCloseTo(base.polar - JOYSTICK_TILT_RATE * 0.02, 10);
+    expect(forward.polar).toBeCloseTo(base.polar + JOYSTICK_TILT_RATE * 0.02, 10);
     expect(forward.azimuth).toBeCloseTo(base.azimuth, 12);
     const back = joystickOrbit(base, { rotate: 0, tilt: -1 }, 0.02);
-    expect(back.polar).toBeGreaterThan(base.polar);
+    expect(back.polar).toBeLessThan(base.polar);
     expectOnlyRotateTilt(base, forward);
     expectOnlyRotateTilt(base, back);
   });
@@ -79,11 +79,11 @@ describe('UI-CAM-02 joystick to camera', () => {
   it('clamps the tilt to the orbit limits however long it is held', () => {
     let o = base;
     for (let i = 0; i < 500; i++) o = joystickOrbit(o, { rotate: 0, tilt: 1 }, 0.05);
-    expect(o.polar).toBe(MIN_POLAR);
-    for (let i = 0; i < 500; i++) o = joystickOrbit(o, { rotate: 0, tilt: -1 }, 0.05);
     expect(o.polar).toBe(MAX_POLAR);
-    expect(nudgeOrbit(base, 0, 10).polar).toBe(MIN_POLAR);
-    expect(nudgeOrbit(base, 0, -10).polar).toBe(MAX_POLAR);
+    for (let i = 0; i < 500; i++) o = joystickOrbit(o, { rotate: 0, tilt: -1 }, 0.05);
+    expect(o.polar).toBe(MIN_POLAR);
+    expect(nudgeOrbit(base, 0, 10).polar).toBe(MAX_POLAR);
+    expect(nudgeOrbit(base, 0, -10).polar).toBe(MIN_POLAR);
   });
 
   it('keeps every invariant for any input and frame time', () => {
