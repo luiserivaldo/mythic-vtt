@@ -20,7 +20,7 @@ test.afterAll(async () => {
 // UX-37 / UI-SHELL-05: a panel registered to the left pane opens there, beside the rail, and not
 // in the right dock. Initiative is registered there since UX-38 (MV-254); the development build's
 // routing hook call below is then a no-op, kept so the check survives future panel moves.
-test('a panel registered to the left pane renders there, collapses, and widens the board', async ({
+test('a panel registered to the left pane renders there over the board, and collapses', async ({
   browser,
 }) => {
   if (!table) throw new Error('table not started');
@@ -34,7 +34,8 @@ test('a panel registered to the left pane renders there, collapses, and widens t
   const board = page.getByLabel('Scene board');
   // With nothing registered to it the pane is absent and the board starts at the window edge.
   await expect(pane).toHaveCount(0);
-  expect(Math.round((await board.boundingBox())?.x ?? -1)).toBe(0);
+  const closed = await board.boundingBox();
+  expect(Math.round(closed?.x ?? -1)).toBe(0);
 
   await page.evaluate(() => {
     (globalThis as unknown as PanelRegions).__mythicPanelRegions?.set('initiative', 'left-pane');
@@ -46,18 +47,21 @@ test('a panel registered to the left pane renders there, collapses, and widens t
   await expect(dock.locator('[data-tool-panel]')).toHaveCount(0);
   await expect(dock.getByRole('region', { name: 'Rounds and initiative' })).toHaveCount(0);
 
-  // The pane is in normal flow: the board starts at its right edge, and the rail floats beside it.
+  // MV-279: the pane floats over the board's left edge, right of the rail; the board keeps its
+  // size and place.
   const paneBox = await pane.boundingBox();
-  const open = await board.boundingBox();
   const rail = await page.getByRole('toolbar', { name: 'Board controls' }).boundingBox();
-  expect(Math.round(open?.x ?? -1)).toBe(Math.round((paneBox?.x ?? 0) + (paneBox?.width ?? 0)));
-  expect(rail?.x ?? 0).toBeGreaterThanOrEqual(open?.x ?? Infinity);
+  expect(await board.boundingBox()).toEqual(closed);
+  expect(paneBox?.x ?? 0).toBeGreaterThanOrEqual((rail?.x ?? Infinity) + (rail?.width ?? 0));
 
+  // Collapsed, it shrinks to a strip at the same place; the board still does not move.
   await pane.getByRole('button', { name: 'Collapse left pane' }).click();
   await expect(pane.locator('[data-tool-panel="initiative"]')).toBeHidden();
   await expect
-    .poll(async () => (await board.boundingBox())?.width ?? 0)
-    .toBeGreaterThan((open?.width ?? 0) + 150);
+    .poll(async () => (await pane.boundingBox())?.width ?? Infinity)
+    .toBeLessThan((paneBox?.width ?? 0) - 150);
+  expect((await pane.boundingBox())?.x).toBe(paneBox?.x);
+  expect(await board.boundingBox()).toEqual(closed);
 
   // 2D and 3D share the pane; picking the tool again reveals it.
   await page.getByRole('button', { name: '3D view' }).click();
@@ -66,8 +70,9 @@ test('a panel registered to the left pane renders there, collapses, and widens t
   await expect(pane.locator('[data-tool-panel="initiative"]')).toBeVisible();
   await expect(dock.locator('[data-tool-panel]')).toHaveCount(0);
 
-  // Leaving the tool closes its panel, and the empty pane gives the width back to the board.
+  // Leaving the tool closes its panel and the empty pane.
   await page.getByRole('button', { name: 'Select', exact: true }).click();
   await expect(pane).toHaveCount(0);
+  expect(await board.boundingBox()).toEqual(closed);
   await context.close();
 });

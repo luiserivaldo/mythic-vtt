@@ -198,14 +198,12 @@ test('mouse mapping: marquee, pan, flying lock, context menu and orbit', async (
     const before = count();
     await page.getByRole('button', { name: 'Create Prop', exact: true }).click();
     await expect(page.getByRole('form', { name: 'Create prop' })).toBeVisible();
-    // MV-277: the pane moves the canvas at once and the renderer catches up a frame or more later;
-    // read the board and its labels only once both have stopped moving.
+    // MV-277: read the board and its labels only once both have stopped moving.
     const board = await stableBoardLayout(page);
     const at = { x: board.x + board.width / 2, y: board.y + board.height - 60 };
     await page.mouse.click(at.x, at.y);
     await expect.poll(() => selection(page)).toEqual([]);
-    // The pans above moved the view and the left pane narrows the board (Alpha is now at its
-    // edge): frame the marquee on where Bravo and Charlie are drawn now.
+    // The pans above moved the view: frame the marquee on where Bravo and Charlie are drawn now.
     const bravo = await labelCentre(page, 'Bravo');
     const charlie = await labelCentre(page, 'Charlie');
     await drag(

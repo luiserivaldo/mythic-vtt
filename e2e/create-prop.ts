@@ -46,9 +46,7 @@ export async function createProp(page: Page, options: PropOptions = {}): Promise
 
 /** Moves the selected entity through the 2D Transform panel's typed fields (scene units). */
 export async function moveSelectedTo(page: Page, x: number, z: number): Promise<void> {
-  // MV-239: a new selection starts with Transform collapsed to its chip; open it if so.
-  const chip = page.getByRole('button', { name: 'Restore Transform panel' });
-  if ((await chip.count()) > 0) await chip.click();
+  // UI-TOKEN-07 (MV-266): the selection's Transform panel is open in the left pane.
   const xField = page.getByLabel(/^X \(/);
   const zField = page.getByLabel(/^Z \(/);
   await xField.fill(String(x));
