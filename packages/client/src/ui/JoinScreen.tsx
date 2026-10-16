@@ -24,17 +24,40 @@ import {
   type Profile,
 } from './join-screen.js';
 import { useJoinEnv, type JoinEnv } from './join-context.js';
+import { dmLinkToken, HOST_SCREEN_KEY } from './host-screen.js';
+import { HostScreen } from './HostScreen.js';
 import './join-screen.css';
 
 /**
  * UI-JOIN-01 (MV-248): opening a join link shows the table before any socket opens: the DM, the
  * campaign branding and the seat list from `GET /api/join`, a Claim button per seat and the two
  * Join As choices. Only a claim or a temporary seat asks for a name. Shown to every visitor except
- * the host.
+ * the host, who gets the host screen (UI-HOST-01) when they came through "I'm the DM".
  */
 export function JoinScreen() {
   const env = useJoinEnv();
-  return env && !env.readOnlyVisitor ? <JoinFlow env={env} /> : null;
+  if (!env || env.readOnlyVisitor) return null;
+  if (env.hostVisitor) return env.hostScreen === true ? <HostScreen env={env} /> : null;
+  return <JoinFlow env={env} />;
+}
+
+/**
+ * UI-HOST-01 / D24: "I'm the DM" grants nothing by itself. It takes the DM link the host printed
+ * and opens it, exactly as following the link does: the token goes to the host in `hello`, once,
+ * and the host alone decides. The host screen is asked for through a one-shot session flag.
+ */
+function openDmLink(token: string): void {
+  try {
+    sessionStorage.setItem(HOST_SCREEN_KEY, '1');
+  } catch {
+    // Private mode: the DM still gets in, straight to the table.
+  }
+  history.replaceState(
+    null,
+    '',
+    `${location.pathname}${location.search}#${new URLSearchParams({ host: token }).toString()}`,
+  );
+  location.reload();
 }
 
 interface Pending {
@@ -60,6 +83,7 @@ function JoinFlow({ env }: { env: JoinEnv }) {
   const [pending, setPending] = useState<Pending | null>(null);
   const [anonymous, setAnonymous] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
+  const [dm, setDm] = useState(false);
 
   const noScene =
     started &&
@@ -179,6 +203,15 @@ function JoinFlow({ env }: { env: JoinEnv }) {
   };
 
   if (view === 'done') return null;
+  if (dm && !started) {
+    return (
+      <DmStep
+        onBack={() => {
+          setDm(false);
+        }}
+      />
+    );
+  }
   if (view === 'name' && naming) {
     return (
       <NameStep
@@ -258,7 +291,62 @@ function JoinFlow({ env }: { env: JoinEnv }) {
           }}
         />
       )}
+      {view !== 'loading' && (
+        <div className="join-actions">
+          <button
+            type="button"
+            onClick={() => {
+              setDm(true);
+            }}
+          >
+            I'm the DM
+          </button>
+        </div>
+      )}
       <IdentityTransfer />
+    </Card>
+  );
+}
+
+function DmStep({ onBack }: { onBack: () => void }) {
+  const [link, setLink] = useState('');
+  const token = dmLinkToken(link);
+  return (
+    <Card title="I'm the DM">
+      <form
+        className="join-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (token !== undefined) openDmLink(token);
+        }}
+      >
+        <p>
+          Paste the DM link the host printed when it started (it ends in <code>#host=</code>), or
+          open that link in this browser.
+        </p>
+        <label>
+          DM link
+          <input
+            type="text"
+            value={link}
+            autoComplete="off"
+            spellCheck={false}
+            autoFocus
+            onChange={(e) => {
+              setLink(e.target.value);
+            }}
+          />
+        </label>
+        {link.trim() !== '' && token === undefined && <p role="alert">That is not a DM link.</p>}
+        <div className="join-actions">
+          <button type="submit" disabled={token === undefined}>
+            Continue
+          </button>
+          <button type="button" onClick={onBack}>
+            Back
+          </button>
+        </div>
+      </form>
     </Card>
   );
 }

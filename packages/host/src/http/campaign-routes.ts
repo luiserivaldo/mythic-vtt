@@ -15,6 +15,22 @@ import type { HttpAuthenticator } from './http-auth.js';
 
 const CAMPAIGN_ID = /^[0-9A-Za-z_-]{1,64}$/;
 const DENIED = { 401: 'unauthorized', 403: 'forbidden', 429: 'too many requests' } as const;
+/** What the image pipeline stores. Anything else (an odd imported asset) is never rendered. */
+const THUMBNAIL_MIMES: ReadonlySet<string> = new Set(['image/webp', 'image/png', 'image/jpeg']);
+
+export interface ThumbnailAsset {
+  mime: string;
+  open: () => Promise<Readable>;
+}
+
+/** `If-None-Match` names this strong ETag (or is `*`). */
+function matchesEtag(header: unknown, etag: string): boolean {
+  if (typeof header !== 'string') return false;
+  return header.split(',').some((tag) => {
+    const t = tag.trim();
+    return t === '*' || t === etag || t === `W/${etag}`;
+  });
+}
 
 export interface CampaignRouteOptions {
   store: Pick<CampaignStore, 'list' | 'export'> & Pick<LocalCampaignStore, 'import'>;
@@ -24,8 +40,12 @@ export interface CampaignRouteOptions {
   maxPerMinute?: number;
   /** UX-05: the open campaign's live state (its thumbnail is newer than the index row). */
   current?: () => Pick<Campaign, 'id' | 'screenshot' | 'autoScreenshot'>;
-  /** UX-05: a campaign-scoped read of the asset pool (HOST-03). */
-  thumbnailAsset?: (campaignId: string, hash: string) => Promise<Readable>;
+  /**
+   * UX-05: a campaign-scoped read of the asset pool (HOST-03): the stored mime type, and the bytes
+   * on demand so a revalidation answers 304 without opening the file. Rejects with `not-found`
+   * when the hash is not linked to that campaign.
+   */
+  thumbnailAsset?: (campaignId: string, hash: string) => Promise<ThumbnailAsset>;
   now?: () => number;
 }
 
@@ -110,13 +130,19 @@ export function registerCampaignRoutes(app: FastifyInstance, options: CampaignRo
     if (hash === undefined || !options.thumbnailAsset)
       return reply.code(404).send({ error: 'no thumbnail' });
     try {
-      const data = await options.thumbnailAsset(id, hash);
-      return await reply
+      const asset = await options.thumbnailAsset(id, hash);
+      // #125 follow-up: ETag + 304, not no-store. The hash is the content address, so the ETag is
+      // exact and costs nothing, and `no-cache` makes the browser revalidate every reuse: each one
+      // passes `hostOnly` above (a 401/403 always wins over a 304), and a new capture is a new hash.
+      const etag = `"${hash}"`;
+      reply
         .header('Cache-Control', 'private, no-cache')
-        .header('ETag', `"${hash}"`)
-        .header('X-Content-Type-Options', 'nosniff')
-        .type('image/webp')
-        .send(data);
+        .header('ETag', etag)
+        .header('X-Content-Type-Options', 'nosniff');
+      if (matchesEtag(request.headers['if-none-match'], etag)) return await reply.code(304).send();
+      return await reply
+        .type(THUMBNAIL_MIMES.has(asset.mime) ? asset.mime : 'application/octet-stream')
+        .send(await asset.open());
     } catch (error) {
       if (error instanceof StorageDataError && error.code === 'not-found')
         return reply.code(404).send({ error: 'no thumbnail' });

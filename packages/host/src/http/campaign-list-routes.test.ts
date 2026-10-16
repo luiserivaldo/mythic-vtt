@@ -26,7 +26,11 @@ afterEach(async () => {
   app = undefined;
 });
 
-function build(principal: Principal | null, links: Record<string, string[]> = {}) {
+function build(
+  principal: Principal | null,
+  links: Record<string, string[]> = {},
+  mimes: Record<string, string> = {},
+) {
   app = Fastify({ logger: false });
   const auth: HttpAuthenticator = {
     authenticate: () =>
@@ -44,7 +48,10 @@ function build(principal: Principal | null, links: Record<string, string[]> = {}
     current: () => ({ id: A, screenshot: live }),
     thumbnailAsset: (campaignId, hash) =>
       links[campaignId]?.includes(hash)
-        ? Promise.resolve(Readable.from([Buffer.from(`${campaignId}:${hash}`)]))
+        ? Promise.resolve({
+            mime: mimes[hash] ?? 'image/webp',
+            open: () => Promise.resolve(Readable.from([Buffer.from(`${campaignId}:${hash}`)])),
+          })
         : Promise.reject(new StorageDataError('Asset not found', 'not-found')),
   });
   return app;
@@ -84,6 +91,49 @@ describe('GET /api/campaigns/:id/thumbnail', () => {
     expect(beta.body).toBe(`${B}:${stored}`);
     const alpha = await server.inject({ method: 'GET', url: `/api/campaigns/${A}/thumbnail` });
     expect(alpha.body).toBe(`${A}:${live}`);
+  });
+
+  it('serves the stored mime type, and never renders an unexpected one (#125)', async () => {
+    const server = build(
+      host,
+      { [B]: [stored], [A]: [live] },
+      {
+        [stored]: 'image/png',
+        [live]: 'text/html',
+      },
+    );
+    const beta = await server.inject({ method: 'GET', url: `/api/campaigns/${B}/thumbnail` });
+    expect(beta.headers['content-type']).toBe('image/png');
+    const alpha = await server.inject({ method: 'GET', url: `/api/campaigns/${A}/thumbnail` });
+    expect(alpha.headers['content-type']).toBe('application/octet-stream');
+    expect(alpha.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('answers a matching If-None-Match with 304, after the host check (#125)', async () => {
+    const server = build(host, { [B]: [stored] });
+    const url = `/api/campaigns/${B}/thumbnail`;
+    const first = await server.inject({ method: 'GET', url });
+    expect(first.headers.etag).toBe(`"${stored}"`);
+    expect(first.headers['cache-control']).toBe('private, no-cache');
+    for (const tag of [`"${stored}"`, `W/"${stored}", "x"`, '*']) {
+      const again = await server.inject({ method: 'GET', url, headers: { 'if-none-match': tag } });
+      expect(again.statusCode).toBe(304);
+      expect(again.body).toBe('');
+    }
+    const changed = await server.inject({
+      method: 'GET',
+      url,
+      headers: { 'if-none-match': `"${live}"` },
+    });
+    expect(changed.statusCode).toBe(200);
+    await app?.close();
+    // A revalidation is still a request: a co-DM holding the ETag gets 403, not 304.
+    const denied = await build(codm, { [B]: [stored] }).inject({
+      method: 'GET',
+      url,
+      headers: { 'if-none-match': `"${stored}"` },
+    });
+    expect(denied.statusCode).toBe(403);
   });
 
   it('is 404 for no thumbnail or an unlinked hash, and host only', async () => {

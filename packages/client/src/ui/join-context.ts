@@ -9,6 +9,8 @@ export interface JoinEnv {
   identityId: string;
   /** DM-link or remembered host: skips the join screen entirely. */
   hostVisitor: boolean;
+  /** UI-HOST-01: this host visitor came through "I'm the DM", so show the host screen first. */
+  hostScreen?: boolean;
   /** SES-11: credential-bound spectators cannot switch identities or claim seats. */
   readOnlyVisitor?: boolean;
   initialProfile: Profile | null;
