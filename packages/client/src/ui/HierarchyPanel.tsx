@@ -1,7 +1,7 @@
 import type { Actor, Campaign, LayerId, Scene } from '@mythic/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
-import { selectionActor } from '../tools/selection.js';
+import { selectionActor, type SelectionActor } from '../tools/selection.js';
 import { selectionStore } from '../tools/selection-store.js';
 import { useClientStore } from '../store/react.js';
 import { isValidEntityName, entityRenameIntent } from './entity-panel.js';
@@ -11,6 +11,12 @@ import { COLLIDABLE_LABEL, propCollidableIntent, propCollidableModel } from './p
 import { useSubmit, type SendIntent } from './submit.js';
 import { useUiStore } from './ui-store.js';
 import { viewerRole } from './viewer.js';
+
+/** The action actor for a selection viewer; a seat-less client is a seat with no seat id. */
+function intentActor(viewer: SelectionActor): Actor {
+  if (viewer.kind === 'host') return { kind: 'host' };
+  return viewer.kind === 'seat' ? { kind: 'seat', seatId: viewer.seat.id } : { kind: 'seat' };
+}
 
 /**
  * UI-ENT-01 (MV-245): a small popup for one object, not a long form: its name, and for a prop the
@@ -31,12 +37,18 @@ function ObjectPopup({
   send: SendIntent;
   onClose: () => void;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // MV-276: focus the name field on open, so Escape and typing work straight away.
+  useEffect(() => {
+    ref.current?.querySelector('input')?.focus();
+  }, [entityId]);
   const entity = scene.entities[entityId];
   if (!entity) return null;
   const shape = entity.shape;
   const collidable = propCollidableModel(campaign, scene.id, entity, actor);
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-label={`Edit ${entity.name}`}
       className="ui-hierarchy-popup"
@@ -144,18 +156,22 @@ export function HierarchyPanel({ campaign }: { campaign: Campaign }) {
   const { send, error } = useSubmit();
   const [collapsed, setCollapsed] = useState<ReadonlySet<LayerId>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   const scene = campaign.activeSceneId ? campaign.scenes[campaign.activeSceneId] : undefined;
   // The popup belongs to a selected object: picking something else on the board closes it.
   const editingSelected = useStore(
     selectionStore,
     (s) => editing !== null && s.sceneId === scene?.id && s.ids.includes(editing),
   );
+  const viewer = useMemo(
+    () => selectionActor(isHost, seatId, campaign.seats),
+    [isHost, seatId, campaign.seats],
+  );
   const groups = useMemo(() => {
     if (!scene) return [];
-    const actor = selectionActor(isHost, seatId, campaign.seats);
     const role = viewerRole({ isHost, seatId, campaign });
-    return hierarchyGroups(campaign, scene, { role, actor, activeLayer, hiddenLayers });
-  }, [campaign, scene, isHost, seatId, activeLayer, hiddenLayers]);
+    return hierarchyGroups(campaign, scene, { role, actor: viewer, activeLayer, hiddenLayers });
+  }, [campaign, scene, isHost, seatId, viewer, activeLayer, hiddenLayers]);
 
   if (!scene) {
     return (
@@ -165,15 +181,10 @@ export function HierarchyPanel({ campaign }: { campaign: Campaign }) {
       </section>
     );
   }
-  const actor: Actor = isHost
-    ? { kind: 'host' }
-    : seatId === null
-      ? { kind: 'seat' }
-      : { kind: 'seat', seatId };
   const editingRow = groups.flatMap((g) => g.rows).find((r) => r.id === editing);
 
   return (
-    <section aria-labelledby="ui-hierarchy-h" className="ui-panel ui-hierarchy">
+    <section ref={sectionRef} aria-labelledby="ui-hierarchy-h" className="ui-panel ui-hierarchy">
       <h2 id="ui-hierarchy-h">Hierarchy</h2>
       <ul className="ui-list" aria-label={`Objects in ${scene.name}`}>
         {groups.map((group) => {
@@ -223,10 +234,16 @@ export function HierarchyPanel({ campaign }: { campaign: Campaign }) {
           campaign={campaign}
           scene={scene}
           entityId={editingRow.id}
-          actor={actor}
+          actor={intentActor(viewer)}
           send={send}
           onClose={() => {
             setEditing(null);
+            // MV-276: an explicit close hands focus back to the row's edit button.
+            sectionRef.current
+              ?.querySelector<HTMLButtonElement>(
+                `li[data-entity-id="${editingRow.id}"] button[aria-expanded]`,
+              )
+              ?.focus();
           }}
         />
       )}

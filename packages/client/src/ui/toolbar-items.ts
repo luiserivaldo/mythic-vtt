@@ -1,6 +1,7 @@
 import type { ViewerRole } from './viewer.js';
 import type { SeatPermissions } from '@mythic/shared';
-import { dockTabs } from './registries.js';
+import type { ViewMode } from '../render/view-mode-store.js';
+import { visibleDockTabs } from './dock-tabs.js';
 
 export type PanelId = string;
 
@@ -9,10 +10,11 @@ export interface ToolbarItem {
   label: string;
 }
 
-/** Which panel toggles this viewer gets (pure, so it is unit-tested). */
+/** Which panel toggles this viewer gets in `view` (pure, so it is unit-tested). */
 export function toolbarItems(
   role: ViewerRole,
   permissions: SeatPermissions | null = null,
+  view: ViewMode = '2d',
 ): ToolbarItem[] {
-  return dockTabs.allowed(role, permissions).map(({ id, label }) => ({ id, label }));
+  return visibleDockTabs(role, permissions, view).map(({ id, label }) => ({ id, label }));
 }

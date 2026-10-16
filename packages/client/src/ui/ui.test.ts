@@ -125,7 +125,6 @@ describe('viewerRole', () => {
       'scenes',
       'layers',
       'entities',
-      'hierarchy',
       ...info,
     ]);
     expect(toolbarItems('host').map((i) => i.id)).toEqual([
@@ -133,11 +132,18 @@ describe('viewerRole', () => {
       'scenes',
       'layers',
       'entities',
-      'hierarchy',
       'seats',
       'share',
       ...info,
     ]);
+  });
+  it('lists the hierarchy only for admins in 3D (C16)', () => {
+    const ids = (role: Parameters<typeof toolbarItems>[0]) =>
+      toolbarItems(role, null, '3d').map((i) => i.id);
+    expect(ids('codm')).toContain('hierarchy');
+    expect(ids('host')).toContain('hierarchy');
+    expect(ids('player')).not.toContain('hierarchy');
+    expect(ids('observer')).not.toContain('hierarchy');
   });
   it('describes the current identity, role and seat', () => {
     expect(identitySummary({ displayName: 'DM', isHost: true, seatId: null, campaign })).toEqual({
