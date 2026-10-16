@@ -58,8 +58,8 @@ export function cameraPress(
 
 /**
  * What an unclaimed left drag on empty board does with the tool in effect: Pan pans, a tool that
- * claims the drag (`toolClaimsEmptyBoardDrag`, MV-272) keeps it (null), and every other tool
- * (Select, Create Prop, Initiative, …) draws the marquee. `claims` is injectable for tests.
+ * claims the drag (`toolClaimsEmptyBoardDrag`, MV-272) keeps it (null), and only the deliberately
+ * marquee-through tools (Select, Create Prop, Initiative; MV-275) draw the marquee. `claims` is injectable for tests.
  */
 export function emptyBoardLeftDrag(
   tool: string,
