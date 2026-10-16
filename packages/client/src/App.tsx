@@ -54,7 +54,7 @@ export function App() {
       <UndoHotkey />
       <TopBar />
       <div className="ui-app-body">
-        {/* UI-SHELL-05: the left pane portals in here; empty, the slot takes no width. */}
+        {/* UI-SHELL-05: the left pane portals in here and floats over the board (MV-279). */}
         <div className="ui-left-pane-slot" ref={leftPaneRef} />
         <BoardCanvas />
         <RightDock theme={theme} onThemeChange={changeTheme} />

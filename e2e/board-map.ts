@@ -12,10 +12,9 @@ export type CellMap = ((x: number, z: number) => ScreenPoint) & { zoom: number }
 /**
  * Maps scene cells to screen pixels on the 2D board as it stands once its size has settled.
  *
- * UI-TOKEN-07 (MV-266): selecting opens the left pane, which sits in flow and narrows the board;
- * deselecting closes it again. Until the user pans or zooms, the 2D view reframes the whole
- * default 40 x 30 canvas (1 cell padding) to the new size (D37), so the mapping must be taken
- * after the board stops changing size, not before the selection.
+ * Until the user pans or zooms, the 2D view reframes the whole default 40 x 30 canvas (1 cell
+ * padding) to the board's size (D37), so the mapping is taken once the board's size and the
+ * camera's framing have settled. The left pane floats over the board (MV-279) and never resizes it.
  */
 export async function settledCellToPixel(page: Page): Promise<CellMap> {
   let box = await stableBoardLayout(page);

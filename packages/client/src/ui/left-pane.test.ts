@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { leftPaneStore, panelRegion } from './left-pane.js';
+import { leftPaneStore, panelRegion, paneShift } from './left-pane.js';
 import { createRegistry, toolPanels, type ToolPanel } from './registries.js';
 import { TOOL_PANEL_ORDER } from './tool-panel-layout.js';
 
@@ -37,5 +37,27 @@ describe('UI-SHELL-05 left pane', () => {
     expect(leftPaneStore.getState().collapsed).toBe(true);
     leftPaneStore.getState().expand();
     expect(leftPaneStore.getState().collapsed).toBe(false);
+  });
+});
+
+describe('MV-279 pane shift', () => {
+  // A 288 x 560 pane right of a 154 px rail, over a 900 px wide board.
+  const pane = { left: 162, top: 8, width: 288, height: 560 };
+  const at = (x: number, y: number) => ({ left: x - 10, right: x + 10, y });
+
+  it('stays beside the rail with nothing selected or the selection clear of it', () => {
+    expect(paneShift(null, pane, 900)).toBe(0);
+    expect(paneShift(at(700, 100), pane, 900)).toBe(0);
+    expect(paneShift(at(300, 680), pane, 900)).toBe(0);
+  });
+
+  it('moves just past the selection and its handles when it would cover them', () => {
+    expect(paneShift(at(300, 100), pane, 900)).toBe(300 + 10 + 64 - 162);
+    // Under the rail, but its handles reach under the pane.
+    expect(paneShift(at(120, 100), pane, 900)).toBe(120 + 10 + 64 - 162);
+  });
+
+  it('stays when moving would push it off the board', () => {
+    expect(paneShift(at(300, 100), pane, 600)).toBe(0);
   });
 });

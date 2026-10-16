@@ -71,9 +71,7 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   await setup.close();
 
   // The browser reuses the host identity (the gateway keeps recognising it) so it sees host UI.
-  // Wide enough that the open left pane (UI-TOKEN-07) leaves the board at the same zoom as the
-  // default 1280 x 720 window without it, so the handles stay clear of the floating rail.
-  const context = await browser.newContext({ viewport: { width: 1600, height: 720 } });
+  const context = await browser.newContext();
   await context.addInitScript((identity) => {
     localStorage.setItem('mythic.identity.v1', JSON.stringify(identity));
     localStorage.setItem('mythic.host', '1');
@@ -86,38 +84,28 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   await expect(page.getByTestId('token-label')).toHaveText('Goblin');
-  const measure = async () => {
-    const found = await canvas.boundingBox();
-    if (!found) throw new Error('no canvas box');
-    return found;
-  };
-  let box = await measure();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('no canvas box');
   // D37: the 2D view opens framing the whole default 40 x 30 canvas (1 cell padding): the
   // canvas centre is at the viewport centre and zoom fits the padded canvas.
-  let zoom = Math.min(box.width / 42, box.height / 32);
+  const zoom = Math.min(box.width / 42, box.height / 32);
   const at = (x: number, z: number) => ({
     x: box.x + box.width / 2 + (x - 20) * zoom,
     y: box.y + box.height / 2 + (z - 15) * zoom,
   });
 
   const panel = page.getByRole('region', { name: /Transform/ });
-  // UI-TOKEN-07 (MV-266): selecting expands the Transform panel in the left pane, off the board.
+  // UI-TOKEN-07 (MV-266): selecting expands the Transform panel in the left pane, which floats
+  // over the board's left edge clear of this token (MV-279).
   const pane = page.getByRole('complementary', { name: 'Left pane' });
   await expect(panel).toHaveCount(0);
-  let start = at(2.5, 3.5);
+  const start = at(2.5, 3.5);
   // The view frames the canvas once the orthographic camera mounts, so retry the click until then.
   await expect(async () => {
     await page.mouse.click(start.x, start.y);
     await expect(pane.locator('[data-tool-panel="transform"]')).toBeVisible({ timeout: 1000 });
   }).toPass();
   await expect(panel).toBeVisible();
-  // The pane narrows the board, and the untouched view reframes the canvas to fit it (D37), so
-  // map scene points on the narrowed board.
-  const before = box.x;
-  await expect.poll(async () => (await measure()).x).toBeGreaterThan(before);
-  box = await measure();
-  zoom = Math.min(box.width / 42, box.height / 32);
-  start = at(2.5, 3.5);
 
   const labelBefore = await page.getByTestId('token-label').boundingBox();
 

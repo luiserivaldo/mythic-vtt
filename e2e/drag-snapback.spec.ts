@@ -47,9 +47,8 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
 }) => {
   test.setTimeout(120_000);
   if (!table) throw new Error('table not started');
-  // UI-TOKEN-07: the selection opens the left pane beside the board; the extra width keeps the
-  // board the size a 1280 px window gave it before, so the framing and the cells near its left
-  // edge (clear of the floating rail) are unchanged.
+  // A wide window keeps the cells near the board's left edge clear of the floating rail and of
+  // the left pane that floats beside it (UI-TOKEN-07, MV-279).
   const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   const page = await context.newPage();
   const viewerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -128,14 +127,13 @@ test('DM link drags every token size, elevation, layer, ownership and edge spawn
     const panel = page.getByRole('region', { name: `Transform: ${name}` });
     // MV-244: each token is picked while its own layer is the active one.
     await setActiveLayer(page, LAYER_LABELS[entry.layer]);
-    // Map the board as it stands before each click: the previous case's delete closed the pane,
-    // and a retried click must not land on a board the opening pane has since narrowed.
+    // Map the board once its framing has settled; a retried click maps it again.
     await expect(async () => {
       const at = (await settledCellToPixel(page))(from.x, from.z);
       await page.mouse.click(at.x, at.y);
       await expect(panel).toBeVisible({ timeout: 3000 });
     }).toPass();
-    // The pane narrowed the board; press the token where it now sits.
+    // Press the token where it sits.
     const screen = await settledCellToPixel(page);
     const start = screen(from.x, from.z);
     const zoom = screen.zoom;

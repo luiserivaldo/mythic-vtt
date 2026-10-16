@@ -126,34 +126,25 @@ test('the selected token reads the range to a hovered token in 2D and 3D', async
   viewer.page.on('pageerror', (error) => errors.push(error.message));
   await expect(viewer.page.locator('canvas')).toBeVisible();
 
-  // UI-TOKEN-07 (MV-266): selecting opens the left pane, which narrows the board, so the cells
-  // are mapped on the board as it stands each time it changes.
-  const cells = async () => {
-    const at = await settledCellToPixel(dm);
-    return {
-      aria: at(15.5, 12.5),
-      ogre: at(21.5, 12.5),
-      wyvern: at(15.5, 18.5),
-      wall: at(8.5, 8.5),
-      empty: at(2.5, 2.5),
-    };
-  };
-  const unselected = await cells();
+  const at = await settledCellToPixel(dm);
+  const aria = at(15.5, 12.5);
+  const ogre = at(21.5, 12.5);
+  const wyvern = at(15.5, 18.5);
+  const wall = at(8.5, 8.5);
+  const empty = at(2.5, 2.5);
 
   // Hovering without a selected token shows nothing.
-  await dm.mouse.move(unselected.ogre.x, unselected.ogre.y);
+  await dm.mouse.move(ogre.x, ogre.y);
   await expect(dm.getByTestId('range-readout')).toHaveCount(0);
 
-  await dm.mouse.click(unselected.aria.x, unselected.aria.y);
-  // The Transform panel opens in the left pane, off the board, so it never covers the hovered
-  // token.
-  const transform = dm
-    .getByRole('complementary', { name: 'Left pane' })
-    .getByRole('region', { name: 'Transform: Aria' });
+  await dm.mouse.click(aria.x, aria.y);
+  // UI-TOKEN-07 / MV-279: the Transform panel opens in the left pane, which floats over the
+  // board's left edge and here would cover the hovered tokens; collapse it to its strip.
+  const pane = dm.getByRole('complementary', { name: 'Left pane' });
+  const transform = pane.getByRole('region', { name: 'Transform: Aria' });
   await expect(transform).toBeVisible();
-  const narrowed = await cells();
-  let aria = narrowed.aria;
-  const { ogre, wyvern, wall, empty } = narrowed;
+  await pane.getByRole('button', { name: 'Collapse left pane' }).click();
+  await expect(transform).toBeHidden();
 
   // 2D: H 6 cells (30 ft), no vertical leg.
   await dm.mouse.move(ogre.x, ogre.y);
@@ -179,9 +170,10 @@ test('the selected token reads the range to a hovered token in 2D and 3D', async
   await expect(dm.getByTestId('range-readout')).toHaveCount(0);
 
   // 3D: the same readout through the standee, projected through the live pose.
-  ({ aria } = await cells());
   await dm.mouse.click(aria.x, aria.y);
   await expect(transform).toBeVisible();
+  await pane.getByRole('button', { name: 'Collapse left pane' }).click();
+  await expect(transform).toBeHidden();
   await dm.getByRole('button', { name: '3D view' }).click();
   await expect(dm.getByRole('button', { name: 'Reset view' })).toBeVisible();
   await dm.getByRole('button', { name: 'Reset view' }).click();

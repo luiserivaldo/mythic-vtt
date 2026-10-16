@@ -36,14 +36,17 @@ test('no tool or token panel renders inside the right dock', async ({ browser })
   await page.getByLabel('Token name').fill('Aria');
   await page.getByRole('button', { name: 'Create token' }).click();
 
-  // The new token is selected: its Transform panel is open in the left pane, beside the board.
+  // The new token is selected: its Transform panel is open in the left pane, which floats over
+  // the board's left edge, right of the rail (MV-279).
   const pane = page.getByRole('complementary', { name: 'Left pane' });
   await expect(pane.locator('[data-tool-panel="transform"]')).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Selection panels' })).toHaveCount(0);
   const board = await page.getByLabel('Scene board').boundingBox();
+  const rail = await page.getByRole('toolbar', { name: 'Board controls' }).boundingBox();
   const panes = await pane.boundingBox();
-  if (!board || !panes) throw new Error('board and left pane must be visible');
-  expect(panes.x + panes.width).toBeLessThanOrEqual(board.x + 1);
+  if (!board || !rail || !panes) throw new Error('board, rail and left pane must be visible');
+  expect(panes.x).toBeGreaterThanOrEqual(rail.x + rail.width);
+  expect(panes.x + panes.width).toBeLessThan(board.x + board.width);
   await pane.getByRole('button', { name: 'Restore Token panel' }).click();
   await expect(pane.locator('[data-tool-panel="token"]')).toBeVisible();
   await expectDockHoldsTabsOnly(page);

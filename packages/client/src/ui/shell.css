@@ -893,25 +893,37 @@ main .ui-hierarchy-head {
   min-height: 0;
   width: auto;
 }
-/* UI-SHELL-05: the left pane mirrors the right dock's chrome, narrower, in normal flow left of the
-   board. The slot is empty (no width) until a panel registered to the pane is open. */
+/* UI-SHELL-05 / MV-279: the left pane floats over the board's left edge, right of the rail, so the
+   board keeps its size and position whether or not the pane is open. The slot is a zero-width
+   anchor at the board's left edge. The pane sits above the board's labels (z-index up to 5) and
+   below its menus, readouts and the active tool's rail popover. */
 .ui-left-pane-slot {
-  display: flex;
-  flex: 0 0 auto;
-  min-height: 0;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 6;
+  width: 0;
 }
 .ui-left-pane {
-  flex: 0 0 18rem;
+  position: absolute;
+  top: 0.5rem;
+  /* LeftPane sets the rail's width and, to keep a selected entity uncovered, a shift right. */
+  left: calc(var(--ui-rail-clearance, 0px) + 0.5rem + var(--ui-pane-shift, 0px));
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  width: 18rem;
+  max-width: calc(100vw - var(--ui-rail-clearance, 0px) - 1rem);
+  max-height: calc(100% - 1rem);
+  box-sizing: border-box;
   min-height: 0;
   background: var(--ui-bg);
-  border-right: 1px solid var(--ui-border);
-  transition: flex-basis 150ms ease;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
 }
 .ui-left-pane[data-collapsed='true'] {
-  flex-basis: 3rem;
+  width: 3rem;
 }
 .ui-left-pane-head {
   display: flex;
@@ -1199,13 +1211,12 @@ main .ui-shape-picker button {
   }
   /* Phone width: a bottom-left sheet, clear of the rail at the board's top-left. */
   .ui-left-pane {
-    position: absolute;
+    top: auto;
     left: 0;
     bottom: 0;
-    z-index: 5;
     width: min(18rem, 75vw);
     max-height: 60%;
-    border-top: 1px solid var(--ui-border);
+    border-radius: 0;
   }
   .ui-left-pane[data-collapsed='true'] {
     width: 3rem;
@@ -1451,7 +1462,8 @@ main .ui-shape-picker button {
 /* UI-MEAS-01: a tool panel beside its rail button floats over the board instead of narrowing it. */
 .ui-rail-popover {
   position: absolute;
-  z-index: 2;
+  /* Above the left pane (MV-279), which opens beside the rail too: the active tool's panel wins. */
+  z-index: 7;
   display: flex;
   flex-direction: column;
   width: min(16rem, calc(100% - 1rem));

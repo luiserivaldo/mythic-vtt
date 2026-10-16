@@ -48,11 +48,20 @@ test('selection opens Transform in the left pane, 2D and 3D; deselect hides it',
   const pane = page.getByRole('complementary', { name: 'Left pane' });
   const transform = pane.locator('[data-tool-panel="transform"]');
   const dock = page.getByRole('complementary', { name: 'Right dock' });
+  const board = page.getByLabel('Scene board');
+
+  // MV-279: the pane floats over the board, so the board's box is the same with and without a
+  // selection.
+  await board.focus();
+  await page.keyboard.press('Escape');
+  await expect(pane).toHaveCount(0);
+  const unselected = await board.boundingBox();
 
   // 2D: selecting Goblin opens its Transform, expanded, in the left pane.
   await list.getByRole('button', { name: 'Goblin', exact: true }).click();
   await expect(transform).toBeVisible();
   await expect(transform).toHaveCount(1);
+  expect(await board.boundingBox()).toEqual(unselected);
   await expect(transform.getByRole('region', { name: 'Transform: Goblin' })).toBeVisible();
   // Default scene: 40 x 30 cells, 5 ft per cell; the second spawn steps one cell diagonally.
   await expect(transform.getByLabel('X (ft)')).toHaveValue('102.5');
@@ -87,6 +96,7 @@ test('selection opens Transform in the left pane, 2D and 3D; deselect hides it',
   );
   await expect(transform).toHaveCount(0);
   await expect(pane).toHaveCount(0);
+  expect(await board.boundingBox()).toEqual(unselected);
 
   // Choosing Select with something selected shows that selection's Transform.
   await list.getByRole('button', { name: 'Goblin', exact: true }).click();

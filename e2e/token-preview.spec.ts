@@ -56,9 +56,11 @@ async function selectCell(page: Page, x: number, z: number) {
     await page.mouse.click(point.x, point.y);
     await expect(page.getByTestId('token-preview')).toBeVisible({ timeout: 1000 });
   }).toPass();
-  // UI-TOKEN-07: a selection the viewer may edit opens the left pane once the double-click window
-  // (400 ms) has passed, narrowing the board; let that land so the next cell maps where it shows.
-  await page.waitForTimeout(500);
+  // UI-TOKEN-07 / MV-279: every selection here is editable, so it opens the left pane over the
+  // board's left edge; collapse it to its strip so the next cells there stay reachable.
+  const pane = page.getByRole('complementary', { name: 'Left pane' });
+  await pane.getByRole('button', { name: 'Collapse left pane' }).click();
+  await expect(pane.getByRole('button', { name: 'Expand left pane' })).toBeVisible();
 }
 
 const valueSpan = (page: Page, field: string) =>
@@ -143,8 +145,7 @@ test('the card shows the fields it may, follows the token, and leaks nothing', a
     }),
   );
 
-  // UI-TOKEN-07: the selection's left pane narrows the board; the extra width keeps the board the
-  // size a 1280 px window gave it, so cells near its left edge stay clear of the floating rail.
+  // A wide window keeps cells near the board's left edge clear of the floating rail.
   const dmContext = await browser.newContext({ viewport: { width: 1600, height: 800 } });
   await dmContext.addInitScript((value) => {
     localStorage.setItem('mythic.identity.v1', JSON.stringify(value));
@@ -238,7 +239,7 @@ test('the card shows the fields it may, follows the token, and leaks nothing', a
   // --- a player who owns the token: the fields they may see, nothing they may not ---------
   const playerIdentity = { identityId: testUlid('PLAYER', 1), identitySecret: 'preview-player' };
   await ok(host.intent('seat.assign', { seatId: SEAT, identityId: playerIdentity.identityId }));
-  // As for the DM: the owned token's left pane must not push cells under the rail.
+  // As for the DM: cells near the board's left edge stay clear of the rail.
   const playerContext = await browser.newContext({ viewport: { width: 1600, height: 720 } });
   await playerContext.addInitScript(
     ({ identity: who, seatId }) => {

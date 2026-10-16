@@ -186,11 +186,15 @@ test('marquee gathers tokens and AoEs, and the map only on the Map layer', async
     const initiative = page.getByRole('button', { name: 'Initiative', exact: true });
     await initiative.click();
     await expect(initiative).toHaveAttribute('aria-pressed', 'true');
-    // The left pane narrows the board and moves the view: frame the marquee on where the hero's
-    // label (above its centre, at (6.5, 6.5)) is drawn now, as an offset in scene cells. MV-277:
-    // wait for the renderer to resize and re-frame first; the untouched view re-zooms to fit.
-    const narrowed = await stableBoardLayout(page);
-    const paneZoom = fitZoom(narrowed);
+    // Initiative's panel opens in the left pane, which floats over the board's left edge where
+    // the hero stands (MV-279); collapse it to its strip to reach the board there.
+    const pane = page.getByRole('complementary', { name: 'Left pane' });
+    await pane.getByRole('button', { name: 'Collapse left pane' }).click();
+    await expect(pane.getByRole('button', { name: 'Expand left pane' })).toBeVisible();
+    // Frame the marquee on where the hero's label (above its centre, at (6.5, 6.5)) is drawn, as
+    // an offset in scene cells. MV-277: wait for a stable layout and framing first.
+    const settled = await stableBoardLayout(page);
+    const paneZoom = fitZoom(settled);
     const hero = await labelCentre(page, 'Marquee hero');
     const at = (x: number, z: number) => ({
       x: hero.x + (x - 6.5) * paneZoom,

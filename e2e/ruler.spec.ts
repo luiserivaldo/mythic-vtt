@@ -219,10 +219,10 @@ test('the ruler measures in scene units and a second client sees it with the sen
     .getByRole('complementary', { name: 'Left pane' })
     .locator('[data-tool-panel="transform"]');
   await expect(selected).toBeVisible();
-  // The pane narrowed the board, so measure between the same cells where they now sit.
-  const narrowed = await settledCellToPixel(dm);
-  const narrowA = narrowed(5.5, 5.5);
-  const narrowB = narrowed(11.5, 5.5);
+  // Measure between the same cells, mapped once the board's framing has settled.
+  const settled = await settledCellToPixel(dm);
+  const settledA = settled(5.5, 5.5);
+  const settledB = settled(11.5, 5.5);
 
   // A finished ruler consumes the first Escape and broadcasts its cancel. The selected token
   // remains until a second Escape reaches BoardCanvas. Broadcast was turned off above.
@@ -230,9 +230,9 @@ test('the ruler measures in scene units and a second client sees it with the sen
   // Arming the tool brings its panel back (UI-MEAS-01).
   await dm.getByLabel('Broadcast to others').check();
   await tuckMeasurePanel(dm);
-  await dm.mouse.move(narrowA.x, narrowA.y);
+  await dm.mouse.move(settledA.x, settledA.y);
   await dm.mouse.down();
-  await dm.mouse.move(narrowB.x, narrowB.y, { steps: 5 });
+  await dm.mouse.move(settledB.x, settledB.y, { steps: 5 });
   await dm.mouse.up();
   await expect(player.getByTestId('remote-ruler-total')).toHaveText('DM: 30 ft');
   await dm.getByLabel('Scene board').focus();

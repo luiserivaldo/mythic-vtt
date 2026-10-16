@@ -94,9 +94,8 @@ test('selected tokens fade blocking primitives locally in 3D and restore materia
     }
   }
   for (const reply of await Promise.all(population)) expect(reply.t).toBe('ack');
-  // UI-TOKEN-07: the selection opens the left pane beside the board; the extra width keeps the
-  // board the size a 1280 px window gave it before, so the framing and the cells near its left
-  // edge (clear of the floating rail) are unchanged.
+  // A wide window keeps the cells near the board's left edge clear of the floating rail and of
+  // the left pane that floats beside it (UI-TOKEN-07, MV-279).
   const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   await context.addInitScript((value) => {
     localStorage.setItem('mythic.identity.v1', JSON.stringify(value));

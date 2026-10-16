@@ -137,7 +137,7 @@ test('elevated tokens keep their height; flying locks it; a spectator cannot tog
     await page.mouse.click(start.x, start.y);
     await expect(panel).toBeVisible({ timeout: 1000 });
   }).toPass();
-  // The pane narrowed the board, so map scene cells on the board as it now stands.
+  // Map scene cells once the board's framing has settled.
   screen = await settledCellToPixel(page);
 
   // 1. Moving over bare ground keeps the height (it used to fall to the ground).

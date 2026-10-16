@@ -14,7 +14,7 @@ test.afterAll(async () => {
   await table?.stop();
 });
 
-test('spawns at the scene centre, offsets the next spawn, and keeps panels beside the board', async ({
+test('spawns at the scene centre, offsets the next spawn, and keeps the board still', async ({
   browser,
 }, testInfo) => {
   if (!table) throw new Error('table not started');
@@ -63,9 +63,13 @@ test('spawns at the scene centre, offsets the next spawn, and keeps panels besid
   const selectedBoard = await board.boundingBox();
   const selectedPanels = await dock.boundingBox();
   if (!selectedBoard || !selectedPanels) throw new Error('Selected token panels must be visible');
-  // UI-TOKEN-07 / UI-SHELL-05: the selected token's panels open in the left pane, in flow beside
-  // the board (never over it), and not in the dock.
-  expect(selectedPanels.x + selectedPanels.width).toBeLessThanOrEqual(selectedBoard.x + 1);
+  // UI-TOKEN-07 / UI-SHELL-05 / MV-279: the selected token's panels open in the left pane, which
+  // floats over the board's left edge, and not in the dock. The board keeps its size and place.
+  expect(selectedBoard).toEqual(closedBox);
+  expect(selectedPanels.x).toBeGreaterThanOrEqual(selectedBoard.x);
+  expect(selectedPanels.x + selectedPanels.width).toBeLessThan(
+    selectedBoard.x + selectedBoard.width,
+  );
   await list.getByRole('button', { name: 'Orc', exact: true }).click();
   await expect(x).toHaveValue('107.5');
   await expect(z).toHaveValue('82.5');

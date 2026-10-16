@@ -1,7 +1,7 @@
 import { TokenStatusPanel } from './TokenStatusPanel.js';
 import { TokenRingsPanel } from './TokenRingsPanel.js';
 import type { Campaign, Scene } from '@mythic/shared';
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
 import { useClientStore } from '../store/react.js';
@@ -14,7 +14,6 @@ import { AoEAffectedPanel } from './AoEAffectedPanel.js';
 import { AoEToolPanel } from './AoEToolPanel.js';
 import { isCollapsible, toolPanelLayoutStore, type ToolPanelId } from './tool-panel-layout.js';
 import { isReadOnlyViewer } from './viewer.js';
-import { whenRevealable } from './selection-reveal.js';
 import { rulerStore } from '../tools/ruler-store.js';
 import { RulerPanel } from './RulerPanel.js';
 import { CreatePropPanel } from './RailPanels.js';
@@ -96,9 +95,9 @@ function PanelFrame({
  *
  * UI-TOKEN-07 (MV-266): the selection's panels (Transform, AoE, Token) live in the left pane. The
  * active rail tool's panel (Create Prop, Draw, Initiative) stacks above them; under Select the
- * pane holds only the selection's panels. A new selection expands the pane once the pointer is
- * up and the double-click window has passed (selection-reveal.ts); deselecting hides them at once;
- * selecting something else while they show swaps in that selection's values at once.
+ * pane holds only the selection's panels. The pane floats over the board's left edge (MV-279), so
+ * the board never moves: a new selection expands it at once, deselecting hides the panels, and
+ * selecting something else swaps in that selection's values.
  */
 export function ToolPanelDock({
   campaign,
@@ -141,27 +140,11 @@ export function ToolPanelDock({
   // UI-CAM-01: in 3D only, the Pan tool's panel holds the camera joystick. It moves this viewer's
   // own camera, so read-only viewers get it too; 2D Pan has no panel.
   const showCamera = scene !== null && mode3d && !measuring && activeTool === 'pan';
-  const showsSelection = !readOnly && (showTransform || showAoE || showToken);
-  const [revealed, setRevealed] = useState(false);
-  const selectionOpen = showsSelection && revealed;
-  useEffect(() => {
-    if (!showsSelection) {
-      setRevealed(false);
-      return;
-    }
-    if (revealed) return;
-    return whenRevealable(() => {
-      setRevealed(true);
-    });
-  }, [showsSelection, revealed]);
+  const selectionOpen = !readOnly && (showTransform || showAoE || showToken);
   // UI-TOKEN-07: each new selection expands the left pane to show its panels, even if the user
-  // had collapsed it. Collapsing it again keeps it collapsed until the selection changes. The
-  // re-expand moves the board too, so it waits for the same pointer gate as the first reveal.
+  // had collapsed it. Collapsing it again keeps it collapsed until the selection changes.
   useEffect(() => {
-    if (!selectionOpen || !leftPaneStore.getState().collapsed) return;
-    return whenRevealable(() => {
-      leftPaneStore.getState().expand();
-    });
+    if (selectionOpen) leftPaneStore.getState().expand();
   }, [selectionKey, selectionOpen]);
   const panels: { id: ToolPanelId; node: ReactNode }[] = [];
   const add = (id: ToolPanelId, node: ReactNode) => {
@@ -175,14 +158,14 @@ export function ToolPanelDock({
   if (showInitiative) add('initiative', <InitiativeTools />);
   if (showCamera) add('camera', <CameraJoystickPanel />);
   if (!readOnly) {
-    if (showTransform && selectionOpen)
+    if (showTransform)
       add(
         'transform',
         <Suspense fallback={<span role="status">Loading transform tools…</span>}>
           {mode3d ? <TransformPanel3D /> : <TransformPanel />}
         </Suspense>,
       );
-    if (showAoE && selectionOpen)
+    if (showAoE)
       add(
         'aoe',
         <>
@@ -190,7 +173,7 @@ export function ToolPanelDock({
           <AoEAffectedPanel scene={scene} />
         </>,
       );
-    if (showToken && selectionOpen)
+    if (showToken)
       add(
         'token',
         <>
@@ -220,7 +203,7 @@ export function ToolPanelDock({
           <RulerPanel scene={scene} />
           {/* MEAS-04: a live readout of every stored AoE, for any viewer the ruler panel is open to
               (the AoE frame above already carries it whenever an AoE is selected). */}
-          {!(showAoE && selectionOpen) && <AoEAffectedPanel scene={scene} />}
+          {!showAoE && <AoEAffectedPanel scene={scene} />}
         </>,
       );
   }
@@ -256,7 +239,12 @@ export function ToolPanelDock({
     <>
       {besideToken.length > 0 && <BesideToken>{besideToken}</BesideToken>}
       {beside}
-      {left.length > 0 && leftContainer && createPortal(<LeftPane>{left}</LeftPane>, leftContainer)}
+      {left.length > 0 &&
+        leftContainer &&
+        createPortal(
+          <LeftPane avoidSelection={showToken && !readOnly}>{left}</LeftPane>,
+          leftContainer,
+        )}
     </>
   );
 }
