@@ -46,7 +46,7 @@ it('recovers an unclean session from the checkpoint and complete log tail', asyn
     sessionId,
     store,
     onApplied: async (state, seq) => {
-      if (seq === 2) await saveCampaignCheckpoint(store, state, sessionId, seq, 'autosave');
+      if (seq === 2) await saveCampaignCheckpoint(store, state, sessionId, seq, 'autosave', seq);
     },
   });
   const dm = fakeConnection(T.host, { isHost: true });
@@ -101,7 +101,7 @@ it('checkpoint removes deleted scene files and preserves the remaining private s
   for (const entry of Object.values(campaign.scenes)) await store.saveScene(campaign.id, entry);
   Reflect.deleteProperty(campaign.scenes, T.scene);
   campaign.activeSceneId = null;
-  await saveCampaignCheckpoint(store, campaign, tid(25), 1, 'autosave');
+  await saveCampaignCheckpoint(store, campaign, tid(25), 1, 'autosave', 1);
   const loaded = await store.load(campaign.id);
   expect(loaded.scenes.map((entry) => entry.id)).toEqual([privateId]);
   expect(loaded.campaign.activeSceneId).toBeNull();

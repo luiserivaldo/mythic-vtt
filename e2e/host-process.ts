@@ -19,7 +19,11 @@ export interface Running {
   hostToken: string;
 }
 
-export function start(dataDir: string, args: string[]): Promise<Running> {
+export function start(
+  dataDir: string,
+  args: string[],
+  env: Record<string, string> = {},
+): Promise<Running> {
   const child = spawn(process.execPath, ['dist/main.js', ...args], {
     cwd: hostDir,
     env: {
@@ -27,6 +31,7 @@ export function start(dataDir: string, args: string[]): Promise<Running> {
       MYTHIC_PORT: '0',
       MYTHIC_DATA_DIR: dataDir,
       MYTHIC_CLIENT_DIR: clientDir,
+      ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

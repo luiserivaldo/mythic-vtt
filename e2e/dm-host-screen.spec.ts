@@ -71,10 +71,12 @@ test('the DM picks a campaign by last played, opens Invite, seats a player and s
   const dataDir = await mkdtemp(join(tmpdir(), 'mythic-host-screen-'));
   let running: Running | undefined;
   try {
-    // Played in this order: Beta, Gamma (with a thumbnail), then Alpha is open now.
+    // Played in this order: Beta, Gamma (with a thumbnail), then Alpha, which is open again now.
+    // UX-05b: last played is each run's end-of-session save, not when the host opened it.
     await playOnce(dataDir, 'Beta', false);
     await playOnce(dataDir, 'Gamma', true);
-    running = await start(dataDir, ['--new-campaign', 'Alpha']);
+    await playOnce(dataDir, 'Alpha', false);
+    running = await start(dataDir, ['--campaign', 'Alpha']);
     const dmLink = `${base(running)}/#host=${running.hostToken}`;
 
     const dm = await visitor(browser, running);
