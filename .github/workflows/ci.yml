@@ -41,7 +41,7 @@ jobs:
       - name: Unit tests
         run: pnpm test
       - name: Review-gate policy tests
-        run: node --test .github/policy/
+        run: node --test '.github/policy/*.test.mjs'
 
   e2e:
     name: e2e

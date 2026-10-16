@@ -47,7 +47,7 @@ if (lintable.length > 0) run('pnpm', ['exec', 'eslint', ...lintable]);
 if (formattable.length > 0) run('pnpm', ['exec', 'prettier', '--check', ...formattable]);
 if (sources.length > 0) run('pnpm', ['exec', 'vitest', 'related', '--run', ...sources]);
 if (changed.some((f) => f.startsWith('.github/policy/')))
-  run('node', ['--test', '.github/policy/']);
+  run('node', ['--test', '.github/policy/*.test.mjs']);
 
 console.log(
   specs.length > 0
