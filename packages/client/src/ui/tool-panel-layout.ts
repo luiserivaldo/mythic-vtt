@@ -1,5 +1,4 @@
 import { createStore } from 'zustand/vanilla';
-import { selectionStore } from '../tools/selection-store.js';
 
 // UI-DOCK-01: Entities is now a dock tab, so this stack only holds the selection-driven panels.
 export const TOOL_PANEL_ORDER = [
@@ -14,18 +13,25 @@ export const TOOL_PANEL_ORDER = [
 ] as const;
 export type ToolPanelId = (typeof TOOL_PANEL_ORDER)[number];
 
+/**
+ * UI-TOKEN-07 (MV-266): Transform follows the selection. It shows while something is selected and
+ * hides on deselect, with no Close or Restore of its own, so it has no collapse state.
+ */
+export type CollapsibleToolPanelId = Exclude<ToolPanelId, 'transform'>;
+
+export function isCollapsible(panel: ToolPanelId): panel is CollapsibleToolPanelId {
+  return panel !== 'transform';
+}
+
 interface ToolPanelLayoutState {
-  collapsed: Record<ToolPanelId, boolean>;
-  collapse(panel: ToolPanelId): void;
-  restore(panel: ToolPanelId): void;
+  collapsed: Record<CollapsibleToolPanelId, boolean>;
+  collapse(panel: CollapsibleToolPanelId): void;
+  restore(panel: CollapsibleToolPanelId): void;
 }
 
 export const toolPanelLayoutStore = createStore<ToolPanelLayoutState>()((set) => ({
-  // Keep optional token details tucked away so selection does not obscure the table. Transform
-  // starts as its chip too (owner ruling on MV-239): open beside the token it covered the
-  // neighbour the user hovers for the range readout (MEAS-05).
+  // Keep optional token details tucked away so a selection does not crowd the left pane.
   collapsed: {
-    transform: true,
     aoe: false,
     token: true,
     ruler: false,
@@ -42,18 +48,3 @@ export const toolPanelLayoutStore = createStore<ToolPanelLayoutState>()((set) =>
     set((state) => ({ collapsed: { ...state.collapsed, [panel]: false } }));
   },
 }));
-
-/**
- * MV-239: each new selection starts with Transform tucked to its chip, so opening it for one token
- * does not leave it covering the board around the next. Only Transform: the user's choice for the
- * other panels carries over, as before.
- */
-selectionStore.subscribe((state, previous) => {
-  const same =
-    state.sceneId === previous.sceneId &&
-    state.ids.length === previous.ids.length &&
-    state.ids.every((id, index) => id === previous.ids[index]);
-  if (!same && !toolPanelLayoutStore.getState().collapsed.transform) {
-    toolPanelLayoutStore.getState().collapse('transform');
-  }
-});

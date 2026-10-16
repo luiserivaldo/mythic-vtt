@@ -1,0 +1,214 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+import {
+  compileTierMap,
+  evaluate,
+  fileTier,
+  filesTier,
+  globToRegExp,
+  loadTierMap,
+  prFilePaths,
+} from './risk-tier.mjs';
+
+const compiled = compileTierMap(loadTierMap());
+const fixture = (n) =>
+  JSON.parse(readFileSync(new URL(`./fixtures/pr-${n}.json`, import.meta.url), 'utf8')).files;
+
+test('globs: ** spans directories, * stays in a segment, braces alternate', () => {
+  assert.ok(globToRegExp('packages/protocol/**').test('packages/protocol/src/version.ts'));
+  assert.ok(globToRegExp('**/package.json').test('package.json'));
+  assert.ok(globToRegExp('**/package.json').test('packages/host/package.json'));
+  assert.ok(!globToRegExp('packages/*/x.ts').test('packages/a/b/x.ts'));
+  assert.ok(globToRegExp('a/{b,c}*').test('a/cat.ts'));
+  assert.ok(!globToRegExp('a/{b,c}*').test('a/dog.ts'));
+  assert.ok(!globToRegExp('docs/**').test('docsx/a.md'));
+});
+
+test('globs: a comma outside braces, nested or unbalanced braces are refused', () => {
+  // `a/b,**` would compile to `^a/b|.*$` and make every path match.
+  assert.throws(() => globToRegExp('a/b,**'), /comma outside braces/);
+  assert.throws(() => globToRegExp('a/{b,{c,d}}'), /nested braces/);
+  assert.throws(() => globToRegExp('a/{b,c'), /unbalanced \{/);
+  assert.throws(() => globToRegExp('a/b}'), /unbalanced \}/);
+  assert.throws(() => compileTierMap({ C: ['x,y'], A: [] }), /comma outside braces/);
+  // Every glob in the real map compiles.
+  assert.doesNotThrow(() => compileTierMap(loadTierMap()));
+});
+
+test('host engine, server, storage, seat and join paths carry PERM-03 / identity / save risk: C', () => {
+  for (const path of [
+    'packages/host/src/engine/join-payload.ts',
+    'packages/host/src/engine/join-payload.test.ts',
+    'packages/host/src/engine/engine.ts',
+    'packages/host/src/engine/engine.test.ts',
+    'packages/host/src/engine/presence.ts',
+    'packages/host/src/engine/presence-latency.integration.test.ts',
+    'packages/host/src/engine/recovery.ts',
+    'packages/host/src/engine/rollback.ts',
+    'packages/host/src/engine/rollback.integration.test.ts',
+    'packages/host/src/engine/spectator-view.test.ts',
+    'packages/host/src/server.ts',
+    'packages/host/src/server.join-payload.test.ts',
+    'packages/host/src/storage/local-campaign-store.ts',
+    'packages/host/src/storage/io.ts',
+    'packages/host/src/storage/nested/new-file.ts',
+    'packages/shared/src/seat-templates.ts',
+    'packages/shared/src/history.ts',
+    'packages/client/src/ui/HostScreen.tsx',
+    'packages/client/src/ui/JoinScreen.tsx',
+    'packages/client/src/ui/host-screen.ts',
+  ]) {
+    assert.equal(fileTier(path, compiled), 'C', path);
+  }
+});
+
+test('unrelated UI and engine paths stay B', () => {
+  for (const path of [
+    'packages/client/src/ui/TopBar.tsx',
+    'packages/client/src/ui/RightDock.tsx',
+    'packages/client/src/ui/RulerPanel.tsx',
+    'packages/client/src/ui/LayerPanel.tsx',
+    'packages/client/src/ui/join-screen.ts',
+    'packages/client/src/render/BoardCanvas.tsx',
+    'packages/host/src/engine/initiative.test.ts',
+    'packages/host/src/engine/undo.ts',
+    'packages/host/src/cli.ts',
+    'packages/shared/src/drawing.ts',
+    'packages/shared/src/geometry/distance.ts',
+  ]) {
+    assert.equal(fileTier(path, compiled), 'B', path);
+  }
+  assert.equal(fileTier('packages/client/src/ui/join-screen.css', compiled), 'A');
+});
+
+test('critical paths are C even when they are markdown or css', () => {
+  assert.equal(fileTier('.github/pull_request_template.md', compiled), 'C');
+  assert.equal(fileTier('.github/policy/risk-tier.mjs', compiled), 'C');
+  assert.equal(fileTier('packages/shared/src/visibility/visible-to.ts', compiled), 'C');
+  assert.equal(fileTier('packages/client/src/render/token-labels.ts', compiled), 'C');
+  assert.equal(fileTier('packages/client/src/net/identity-qr.ts', compiled), 'C');
+  assert.equal(fileTier('packages/host/src/engine/ephemeral-relay.ts', compiled), 'C');
+  assert.equal(fileTier('README.md', compiled), 'A');
+  assert.equal(fileTier('packages/client/src/ui/shell.css', compiled), 'A');
+  assert.equal(fileTier('packages/client/src/ui/TopBar.tsx', compiled), 'B');
+  assert.equal(fileTier('e2e/view-as.spec.ts', compiled), 'B');
+});
+
+test('the 12 PRs open at cutover classify as reviewed by hand (2026-10-14)', () => {
+  // #60 is C by path (token-labels.ts); #90 by its identity-credential code; #89 is plain UI.
+  const expected = {
+    14: 'C',
+    26: 'C',
+    45: 'C',
+    48: 'C',
+    56: 'C',
+    60: 'C',
+    89: 'B',
+    90: 'C',
+    92: 'C',
+    94: 'C',
+    95: 'C',
+    96: 'C',
+  };
+  for (const [pr, tier] of Object.entries(expected)) {
+    assert.equal(filesTier(fixture(pr), compiled), tier, `PR #${pr}`);
+  }
+});
+
+test('an empty file list is never cheaper than B', () => {
+  assert.equal(filesTier([], compiled), 'B');
+});
+
+test('a rename out of a critical path is classified by its old path too', () => {
+  const renamed = [
+    {
+      filename: 'packages/client/src/ui/visible-to.ts',
+      previous_filename: 'packages/shared/src/visibility/visible-to.ts',
+      status: 'renamed',
+    },
+  ];
+  assert.deepEqual(prFilePaths(renamed), [
+    'packages/client/src/ui/visible-to.ts',
+    'packages/shared/src/visibility/visible-to.ts',
+  ]);
+  assert.equal(filesTier(prFilePaths(renamed), compiled), 'C');
+  const workflow = [
+    {
+      filename: 'scripts/ci.yml',
+      previous_filename: '.github/workflows/ci.yml',
+      status: 'renamed',
+    },
+  ];
+  assert.equal(filesTier(prFilePaths(workflow), compiled), 'C');
+});
+
+test('a rename between two B paths stays B', () => {
+  const renamed = [
+    {
+      filename: 'packages/client/src/ui/TopBarNew.tsx',
+      previous_filename: 'packages/client/src/ui/TopBar.tsx',
+      status: 'renamed',
+    },
+    { filename: 'e2e/view-as.spec.ts', status: 'modified' },
+  ];
+  assert.equal(filesTier(prFilePaths(renamed), compiled), 'B');
+});
+
+const head = 'a'.repeat(40);
+const base = 'b'.repeat(40);
+const trustedCreator = 'mythic-vtt-critical[bot]';
+const run = (over) =>
+  evaluate({
+    files: ['packages/client/src/ui/TopBar.tsx'],
+    compiled,
+    currentLabels: ['tier-b'],
+    everLabels: ['tier-b'],
+    critical: undefined,
+    trustedCreator,
+    head,
+    base,
+    ...over,
+  });
+const review = (over) => ({
+  state: 'success',
+  creator: trustedCreator,
+  description: `reviewed base=${base}`,
+  ...over,
+});
+
+test('fails closed until a tier label is synced from Jira', () => {
+  const v = run({ currentLabels: [], everLabels: [] });
+  assert.equal(v.state, 'pending');
+  assert.match(v.description, /awaiting tier label/);
+});
+
+test('a tier B PR passes without a critical review', () => {
+  assert.equal(run({}).state, 'success');
+});
+
+test('a tier label can raise the tier but removing it never lowers it', () => {
+  const removed = run({ currentLabels: ['tier-b'], everLabels: ['tier-c', 'tier-b'] });
+  assert.equal(removed.tier, 'C');
+  assert.equal(removed.state, 'pending');
+  // A tier-a label never lowers a B diff.
+  assert.equal(run({ currentLabels: ['tier-a'], everLabels: ['tier-a'] }).tier, 'B');
+});
+
+test('tier C needs a review/critical from the trusted App on the current base', () => {
+  const files = ['packages/shared/src/visibility/visible-to.ts'];
+  assert.equal(run({ files }).state, 'pending');
+  assert.equal(run({ files, critical: review() }).state, 'success');
+  assert.equal(run({ files, critical: review({ creator: 'mythic-vtt-bot' }) }).state, 'failure');
+  assert.equal(
+    run({ files, critical: review({ description: `reviewed base=${'c'.repeat(40)}` }) }).state,
+    'pending',
+  );
+  assert.equal(run({ files, critical: review({ state: 'failure' }) }).state, 'failure');
+});
+
+test('the verdict description names tier, head and base and fits a status (140 chars)', () => {
+  const v = run({ files: ['packages/protocol/src/version.ts'] });
+  assert.match(v.description, /^tier=C head=aaaaaaa base=bbbbbbb: /);
+  assert.ok(v.description.length <= 140);
+});

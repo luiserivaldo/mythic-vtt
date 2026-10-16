@@ -1,0 +1,31 @@
+{
+  "files": [
+    "e2e/drawing.spec.ts",
+    "e2e/tool-rail.spec.ts",
+    "packages/client/src/render/BoardCanvas.tsx",
+    "packages/client/src/render/DrawTool.tsx",
+    "packages/client/src/render/DrawingLayer.tsx",
+    "packages/client/src/tools/drawing-store.test.ts",
+    "packages/client/src/tools/drawing-store.ts",
+    "packages/client/src/tools/drawing.test.ts",
+    "packages/client/src/tools/drawing.ts",
+    "packages/client/src/ui/DrawPanel.tsx",
+    "packages/client/src/ui/ToolPanelDock.tsx",
+    "packages/client/src/ui/ToolRail.tsx",
+    "packages/client/src/ui/registries.ts",
+    "packages/client/src/ui/session.test.ts",
+    "packages/client/src/ui/session.ts",
+    "packages/client/src/ui/tool-panel-layout.test.ts",
+    "packages/client/src/ui/tool-panel-layout.ts",
+    "packages/client/src/ui/tool-rail.test.ts",
+    "packages/client/src/ui/tool-rail.ts",
+    "packages/host/src/engine/ephemeral-relay.test.ts",
+    "packages/host/src/engine/ephemeral-relay.ts",
+    "packages/shared/src/actions/scene-toggles.test.ts",
+    "packages/shared/src/actions/scene-toggles.ts",
+    "packages/shared/src/drawing.test.ts",
+    "packages/shared/src/drawing.ts",
+    "packages/shared/src/index.ts"
+  ],
+  "pr": 92
+}

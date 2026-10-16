@@ -1,0 +1,48 @@
+name: review-gate
+
+# Alpha Pipeline v2 trusted gate. pull_request_target always runs this file and .github/policy from
+# the default branch (develop), never from the PR, so a PR cannot rewrite the gate that judges it.
+# The job never checks out or runs PR code: gate.mjs reads the PR through the API only.
+# The App key lives in the `policy` environment, limited to the develop deployment branch, so a
+# PR's own `pull_request` workflow cannot read it. The verdict is posted as the mythic-vtt-gate App,
+# which is the only source the ruleset accepts for `review-gate`.
+on:
+  pull_request_target:
+    branches: [develop]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number to re-evaluate (after a critical review or a base update)
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: review-gate-${{ github.event.pull_request.number || github.event.inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: policy
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/policy
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Evaluate and post review-gate
+        run: node .github/policy/gate.mjs
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr }}
+          GATE_APP_ID: ${{ vars.GATE_APP_ID }}
+          GATE_APP_KEY: ${{ secrets.GATE_APP_KEY }}
+          CRITICAL_APP_SLUG: ${{ vars.CRITICAL_APP_SLUG }}

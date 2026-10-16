@@ -186,8 +186,9 @@ export const dockTabs = createRegistry<DockTab>([
 // Who sees a panel is decided where it renders (selection, the active rail tool, read-only seats)
 // and the host re-checks every intent, so the predicate here only places it. Moving a panel to
 // another region is a one-word change to `region` (MV-254, MV-255). No panel opens in the right
-// dock (MV-239): selection panels open beside the token, rail panels beside their button or in
-// the left pane.
+// dock (MV-239): rail panels open beside their button or in the left pane. UI-TOKEN-07 (MV-266):
+// the selection's panels (Transform, AoE, Token) open in the left pane too, under the active
+// tool's panel, so they never cover the board.
 export const toolPanels = createRegistry<ToolPanel>([
   {
     id: 'transform',
@@ -195,7 +196,7 @@ export const toolPanels = createRegistry<ToolPanel>([
     icon: 'move',
     group: 'selection',
     allowed: everyone,
-    region: 'beside-token',
+    region: 'left-pane',
   },
   {
     id: 'aoe',
@@ -203,7 +204,7 @@ export const toolPanels = createRegistry<ToolPanel>([
     icon: 'aoe',
     group: 'selection',
     allowed: everyone,
-    region: 'beside-token',
+    region: 'left-pane',
   },
   {
     id: 'token',
@@ -211,7 +212,7 @@ export const toolPanels = createRegistry<ToolPanel>([
     icon: 'token',
     group: 'selection',
     allowed: everyone,
-    region: 'beside-token',
+    region: 'left-pane',
   },
   {
     id: 'ruler',

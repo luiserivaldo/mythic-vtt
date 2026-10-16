@@ -1,0 +1,11 @@
+{
+  "files": [
+    "e2e/seat-avatars.spec.ts",
+    "packages/client/src/ui/SeatAvatars.tsx",
+    "packages/client/src/ui/TopBar.tsx",
+    "packages/client/src/ui/seat-avatars.test.ts",
+    "packages/client/src/ui/seat-avatars.ts",
+    "packages/client/src/ui/shell.css"
+  ],
+  "pr": 89
+}

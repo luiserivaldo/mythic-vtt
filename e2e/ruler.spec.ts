@@ -1,3 +1,4 @@
+import { settledCellToPixel } from './board-map.js';
 import { expect, test, type Page } from '@playwright/test';
 import {
   RawClient,
@@ -208,14 +209,20 @@ test('the ruler measures in scene units and a second client sees it with the sen
   );
 
   // A short token click while idle exits the tool, then the normal selection click selects it
-  // (MV-239: shown by the Transform chip; the panel starts tucked).
+  // (UI-TOKEN-07, MV-266: its Transform panel opens in the left pane).
   await dm.mouse.click(tokenAt.x, tokenAt.y);
   await expect(dm.getByRole('button', { name: 'Measure', exact: true })).toHaveAttribute(
     'aria-pressed',
     'false',
   );
-  const chip = dm.getByRole('button', { name: 'Restore Transform panel' });
-  await expect(chip).toBeVisible();
+  const selected = dm
+    .getByRole('complementary', { name: 'Left pane' })
+    .locator('[data-tool-panel="transform"]');
+  await expect(selected).toBeVisible();
+  // Measure between the same cells, mapped once the board's framing has settled.
+  const settled = await settledCellToPixel(dm);
+  const settledA = settled(5.5, 5.5);
+  const settledB = settled(11.5, 5.5);
 
   // A finished ruler consumes the first Escape and broadcasts its cancel. The selected token
   // remains until a second Escape reaches BoardCanvas. Broadcast was turned off above.
@@ -223,18 +230,24 @@ test('the ruler measures in scene units and a second client sees it with the sen
   // Arming the tool brings its panel back (UI-MEAS-01).
   await dm.getByLabel('Broadcast to others').check();
   await tuckMeasurePanel(dm);
-  await dm.mouse.move(a.x, a.y);
+  await dm.mouse.move(settledA.x, settledA.y);
   await dm.mouse.down();
-  await dm.mouse.move(b.x, b.y, { steps: 5 });
+  await dm.mouse.move(settledB.x, settledB.y, { steps: 5 });
   await dm.mouse.up();
   await expect(player.getByTestId('remote-ruler-total')).toHaveText('DM: 30 ft');
   await dm.getByLabel('Scene board').focus();
   await dm.keyboard.press('Escape');
   await expect(dm.getByTestId('ruler-total')).toHaveCount(0);
   await expect(player.getByTestId('remote-ruler-total')).toHaveCount(0);
-  await expect(chip).toBeVisible();
+  // The tool stays armed, so the pane is still tucked to its strip (MV-267): the selection's
+  // panel is there, collapsed.
+  await expect(selected).toHaveCount(1);
+  await expect(dm.getByRole('complementary', { name: 'Left pane' })).toHaveAttribute(
+    'data-collapsed',
+    'true',
+  );
   await dm.keyboard.press('Escape');
-  await expect(chip).toHaveCount(0);
+  await expect(selected).toHaveCount(0);
 
   expect(errors).toEqual([]);
   await setup.close();
