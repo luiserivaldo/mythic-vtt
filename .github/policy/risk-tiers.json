@@ -1,0 +1,31 @@
+{
+  "$comment": "Alpha Pipeline v2 risk tiers. A file is C if any C glob matches, else A if any A glob matches, else B. A PR takes its highest file tier, raised (never lowered) by any tier-* label ever applied. Changing this file is itself tier C.",
+  "C": [
+    "packages/protocol/**",
+    "packages/shared/src/schema/**",
+    "packages/shared/src/migrations/**",
+    "packages/shared/src/visibility/**",
+    "packages/shared/src/actions/**",
+    "packages/shared/src/ephemeral*",
+    "packages/host/src/gateway/**",
+    "packages/host/src/http/**",
+    "packages/host/src/engine/ephemeral-relay*",
+    "packages/host/src/engine/audience*",
+    "packages/host/src/engine/{join-payload,engine,presence,recovery,rollback,spectator-view}*",
+    "packages/host/src/server*",
+    "packages/host/src/storage/**",
+    "packages/shared/src/{seat-templates,history}*",
+    "packages/client/src/render/{token-labels,PickableEntities}*",
+    "packages/client/src/tools/selection*",
+    "packages/client/src/ui/{viewer,ephemeral-context,spectator-*,viewer-preferences,ViewerPreferencesProvider,IdentityTransfer}*",
+    "packages/client/src/ui/{HostScreen,JoinScreen,host-screen}*",
+    "packages/client/src/net/identity*",
+    "fixtures/saves/**",
+    ".github/**",
+    "package.json",
+    "**/package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml"
+  ],
+  "A": ["docs/**", "**/*.md", "**/*.css", "**/icons/**"]
+}

@@ -1,0 +1,24 @@
+{
+  "files": [
+    "e2e/camera-pull.spec.ts",
+    "e2e/range-readout.spec.ts",
+    "packages/client/src/render/BoardCanvas.tsx",
+    "packages/client/src/render/CameraLink.tsx",
+    "packages/client/src/render/camera-link-store.ts",
+    "packages/client/src/render/camera-link.test.ts",
+    "packages/client/src/render/camera-link.ts",
+    "packages/client/src/render/use-view-director.ts",
+    "packages/client/src/store/store.ts",
+    "packages/client/src/store/view-as.test.ts",
+    "packages/client/src/ui/TopBar.tsx",
+    "packages/client/src/vite-env.d.ts",
+    "packages/host/src/engine/ephemeral-relay.test.ts",
+    "packages/host/src/engine/ephemeral-relay.ts",
+    "packages/shared/src/camera-pose.test.ts",
+    "packages/shared/src/camera-pose.ts",
+    "packages/shared/src/index.ts",
+    "packages/shared/src/visibility/visibility.test.ts",
+    "packages/shared/src/visibility/visible-to.ts"
+  ],
+  "pr": 94
+}
