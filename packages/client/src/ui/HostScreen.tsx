@@ -2,13 +2,16 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { parseIdentityFile } from '../net/identity-file.js';
 import { IDENTITY_STORAGE_KEY } from '../net/identity.js';
 import { useClientStore } from '../store/react.js';
+import { ErrorNotice } from './ErrorNotice.js';
 import {
   campaignRows,
   fetchCampaignList,
   fetchCampaignThumbnail,
   hostScreenView,
-  leaveHostScreen,
   pickCampaign,
+  refusedCause,
+  refusedDetails,
+  refusedLinkMessage,
   type HostStep,
   type ListState,
 } from './host-screen.js';
@@ -26,16 +29,6 @@ function storedCredential(env: JoinEnv) {
   } catch {
     return null;
   }
-}
-
-/**
- * MV-285: back to the join screen. The DM link was already scrubbed from the address bar, so the
- * reload cannot send the refused token again.
- */
-function backToJoinScreen(): void {
-  leaveHostScreen(sessionStorage, localStorage);
-  history.replaceState(null, '', `${location.pathname}${location.search}`);
-  location.reload();
 }
 
 const formatTime = (ms: number) =>
@@ -75,7 +68,13 @@ export function HostScreen({ env }: { env: JoinEnv }) {
   }, [ready]);
 
   const view = hostScreenView({ fatalError, ready, list, step, campaign: campaign !== null });
+  // When the refusal arrived, for the error details.
+  const [refusedAt, setRefusedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (view === 'refused') setRefusedAt((at) => at ?? Date.now());
+  }, [view]);
   if (view === 'done') return null;
+  const cause = refusedCause(fatalError, list);
   return (
     <div className="join-backdrop">
       <section
@@ -96,27 +95,22 @@ export function HostScreen({ env }: { env: JoinEnv }) {
         {view === 'refused' && (
           <>
             <h2 id="host-h">I'm the DM</h2>
-            <p role="alert">
-              The host refused this DM link. It may have been used already (each link works once) or
-              be for another host.
-            </p>
-            <p>
-              Ask the host for a new DM link: it prints one each time it starts. Reload connects
-              again without the link.
-            </p>
-            <div className="join-actions">
-              <button type="button" onClick={backToJoinScreen}>
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  location.reload();
-                }}
-              >
-                Reload
-              </button>
-            </div>
+            {/* MV-285: Reload connects again; the DM link was scrubbed, so it is not sent again. */}
+            <ErrorNotice
+              message={refusedLinkMessage(cause)}
+              details={refusedDetails(cause, refusedAt ?? Date.now())}
+            >
+              <div className="join-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    location.reload();
+                  }}
+                >
+                  Reload
+                </button>
+              </div>
+            </ErrorNotice>
           </>
         )}
         {view === 'error' && (

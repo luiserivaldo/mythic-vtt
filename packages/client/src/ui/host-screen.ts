@@ -10,28 +10,6 @@ export const HOST_SCREEN_KEY = 'mythic.host.screen';
 /** Set once a DM link has bound this browser as host, so a reload skips the join screen. */
 export const HOST_HINT_KEY = 'mythic.host';
 
-/** The slice of Storage that leaving the host screen clears. */
-export interface HintStore {
-  removeItem(key: string): void;
-}
-
-/**
- * MV-285: Back from a refused DM link. Both hints only steer the UI; with them gone the next load
- * shows the join screen again, where "I'm the DM" takes a new link. The host binding is untouched.
- */
-export function leaveHostScreen(session: HintStore, local: HintStore): void {
-  for (const [store, key] of [
-    [session, HOST_SCREEN_KEY],
-    [local, HOST_HINT_KEY],
-  ] as const) {
-    try {
-      store.removeItem(key);
-    } catch {
-      // Private mode: nothing was stored.
-    }
-  }
-}
-
 /** The slice of `fetch` these calls need, so a test can stand in for the host. */
 export type HostFetch = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -106,7 +84,10 @@ export function campaignRows(
 }
 
 export type ListState =
-  { kind: 'loading' } | { kind: 'denied' } | { kind: 'error' } | { kind: 'ok'; list: CampaignList };
+  | { kind: 'loading' }
+  | { kind: 'denied'; status: number }
+  | { kind: 'error' }
+  | { kind: 'ok'; list: CampaignList };
 
 export type HostStep = 'campaigns' | 'table' | 'done';
 
@@ -148,6 +129,49 @@ export function hostScreenView(i: {
   return i.step;
 }
 
+/**
+ * Why the host screen ended on `refused`, as far as this client can see: the fatal error the host
+ * sent (`code: message`, or a connection failure without one), or the list route's 401/403.
+ */
+export type RefusedCause =
+  { kind: 'error'; code: string; message: string } | { kind: 'denied'; status: number };
+
+export function refusedCause(fatalError: string | null, list: ListState): RefusedCause {
+  if (fatalError === null && list.kind === 'denied') return { kind: 'denied', status: list.status };
+  const text = fatalError ?? '';
+  const split = text.indexOf(': ');
+  return split === -1
+    ? { kind: 'error', code: '', message: text }
+    : { kind: 'error', code: text.slice(0, split), message: text.slice(split + 2) };
+}
+
+/**
+ * MV-285: plain words for a refusal. D24 makes the host answer a wrong, used or unconfigured
+ * token the same way, so they share one line; only a protocol mismatch is told apart.
+ */
+export function refusedLinkMessage(cause: RefusedCause): string {
+  if (cause.kind === 'error' && cause.code === 'protocol-mismatch')
+    return 'This page is out of date for this host. Please reload.';
+  return "This DM link can't be used. Please make a new link.";
+}
+
+/**
+ * The technical detail behind the friendly line, for debugging. Built only from what the host
+ * sent or the route answered, so it never carries the host token or the identity secret.
+ */
+export function refusedDetails(cause: RefusedCause, receivedAt: number): string {
+  const lines =
+    cause.kind === 'denied'
+      ? [`GET /api/campaigns: HTTP ${String(cause.status)}`]
+      : [
+          `Code: ${cause.code || 'none'}`,
+          `Message: ${cause.message}`,
+          // The client only keeps an error that ended the connection.
+          'Fatal: true',
+        ];
+  return [...lines, `Time: ${new Date(receivedAt).toISOString()}`].join('\n');
+}
+
 /** `GET /api/campaigns` as this identity; host only (D36), so anyone else gets `denied`. */
 export async function fetchCampaignList(
   fetchFn: HostFetch,
@@ -158,7 +182,8 @@ export async function fetchCampaignList(
       headers: { Authorization: authorizationHeader(credential) },
       cache: 'no-store',
     });
-    if (response.status === 401 || response.status === 403) return { kind: 'denied' };
+    if (response.status === 401 || response.status === 403)
+      return { kind: 'denied', status: response.status };
     if (!response.ok) return { kind: 'error' };
     const parsed = CampaignList.safeParse(await response.json());
     return parsed.success ? { kind: 'ok', list: parsed.data } : { kind: 'error' };
