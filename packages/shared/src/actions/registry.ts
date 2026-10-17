@@ -40,6 +40,7 @@ import { tokenMove } from './token.move.js';
 import { tokenSetElevation } from './token.setElevation.js';
 import { tokenSetFlying } from './token.setFlying.js';
 import { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
+import { wallSetDoor } from './wall.setDoor.js';
 
 /** Append-only: add new actions at the end to keep merges painless. */
 export const allActions: readonly AnyAction[] = [
@@ -84,6 +85,7 @@ export const allActions: readonly AnyAction[] = [
   seatJoinTemporary,
   seatDiscardTemporary,
   campaignSetBranding,
+  wallSetDoor,
 ];
 
 const byType = new Map(allActions.map((a) => [a.type, a]));

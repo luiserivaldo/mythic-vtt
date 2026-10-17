@@ -74,7 +74,7 @@ describe('golden save v1 through the shared migrate hook', () => {
       await store.close();
     }
   });
-  it.each(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10', 'v11'])(
+  it.each(['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10', 'v11', 'v12'])(
     'loads and saves %s through the lasting-AoE, archive and initiative migration chain',
     async (version) => {
       const store = new LocalCampaignStore(await copyFixture(version), storeMigrate);
@@ -107,9 +107,19 @@ describe('golden save v1 through the shared migrate hook', () => {
         // gets the 0.0.1 defaults; the v11 fixture keeps its own per-seat override.
         expect(loaded.campaign.seats['01J8Z0000000000000000SEAT2']?.tools).toEqual(
           since(11)
-            ? { measure: false, draw: true, pins: true }
+            ? // FOG-01: the v12 fixture also lets this seat open doors.
+              { measure: false, draw: true, pins: true, ...(since(12) ? { interact: true } : {}) }
             : { measure: true, draw: false, pins: false },
         );
+        // FOG-01 (save v12): the vision data survives load and save; older saves have none.
+        const entities = loaded.scenes.flatMap((scene) => Object.values(scene.entities));
+        expect(loaded.scenes[0]?.vision).toEqual(since(12) ? { dynamicLighting: true } : undefined);
+        expect(entities.filter((entity) => entity.wall)).toHaveLength(since(12) ? 3 : 0);
+        expect(entities.filter((entity) => entity.wall?.door?.secret)).toHaveLength(
+          since(12) ? 1 : 0,
+        );
+        expect(entities.filter((entity) => entity.blocksSight)).toHaveLength(since(12) ? 1 : 0);
+        expect(entities.filter((entity) => entity.fogRegion)).toHaveLength(since(12) ? 2 : 0);
         for (const scene of loaded.scenes) {
           expect(scene).not.toHaveProperty('playerToggles');
           expect(scene.maxLastingAoEsPerPlayer).toBe(1);

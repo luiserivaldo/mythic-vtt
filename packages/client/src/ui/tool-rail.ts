@@ -45,7 +45,9 @@ export const SPECTATOR_REASON = 'Spectators can only look around';
 export const READ_ONLY_REASON = 'Your seat is view-only';
 
 /** UI-TOOL-07 / UI-SEAT-02 (UX-46): why a seat tool is off. The DM sets it per seat in Seats. */
-export const SEAT_TOOL_OFF_REASON: Readonly<Record<SeatTool, string>> = {
+// MV-310 Q4: `interact` is not a rail tool (it is the interact button in an object's context
+// window), so it has no rail reason.
+export const SEAT_TOOL_OFF_REASON: Readonly<Record<Exclude<SeatTool, 'interact'>, string>> = {
   measure: 'The DM has turned off Measure for your seat',
   draw: 'The DM has turned off Draw for your seat',
   pins: 'The DM has turned off Ping for your seat',

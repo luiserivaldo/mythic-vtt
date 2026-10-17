@@ -28,10 +28,10 @@ function campaign() {
   return state;
 }
 
-function setup() {
+function setup(state = campaign()) {
   const log = memoryLog();
   const engine = createEngine({
-    campaign: campaign(),
+    campaign: state,
     sessionId: SESSION,
     store: log,
     clock: fakeClock(),
@@ -70,8 +70,8 @@ const move = (entityId: string, x: number) => ({
 const x = (engine: ReturnType<typeof setup>['engine'], entityId = T.token) =>
   engine.state().scenes[T.scene]?.entities[entityId]?.transform.position.x;
 
-async function ready() {
-  const s = setup();
+async function ready(state?: ReturnType<typeof campaign>) {
+  const s = setup(state);
   await s.engine.onConnect(s.host);
   await s.engine.onConnect(s.alice);
   await s.engine.onConnect(s.watcher);
@@ -289,5 +289,126 @@ describe('history.undo', () => {
     const missing = await send(engine, alice, 'history.undo', { targetSeqs: [4242] });
     expect(probe).toMatchObject({ t: 'reject', reason: 'forbidden' });
     expect({ ...probe, clientRef: '' }).toEqual({ ...missing, clientRef: '' });
+  });
+});
+
+describe('history.undo of a door toggle (FOG-01, D47)', () => {
+  const DOOR = tid(15);
+  const OTHER_DOOR = tid(16);
+
+  /** Two closed doors on the map layer; seat A holds the interact permission. */
+  function withDoors() {
+    const state = campaign();
+    const scene = state.scenes[T.scene];
+    const seat = state.seats[T.seatA];
+    if (!scene || !seat) throw new Error('fixture');
+    for (const id of [DOOR, OTHER_DOOR])
+      scene.entities[id] = {
+        id,
+        layer: 'map',
+        name: '',
+        owners: [],
+        transform: {
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0, w: 1 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+        wall: {
+          points: [
+            { x: 0, z: 0 },
+            { x: 1, z: 0 },
+          ],
+          door: { open: false },
+        },
+      };
+    seat.tools = { measure: true, draw: true, pins: true, interact: true };
+    return state;
+  }
+  const toggle = (entityId: string, open: boolean) => ({ sceneId: T.scene, entityId, open });
+  const doorOf = (engine: ReturnType<typeof setup>['engine'], id = DOOR) =>
+    engine.state().scenes[T.scene]?.entities[id]?.wall?.door;
+
+  it('a door-tool player undoes their own toggle', async () => {
+    const { engine, alice } = await ready(withDoors());
+    expect((await send(engine, alice, 'wall.setDoor', toggle(DOOR, true))).t).toBe('ack');
+    expect(doorOf(engine)).toEqual({ open: true });
+
+    expect((await send(engine, alice, 'history.undo', {})).t).toBe('ack');
+    expect(doorOf(engine)).toEqual({ open: false });
+
+    // Picking the seq explicitly works too.
+    const opened = await send(engine, alice, 'wall.setDoor', toggle(DOOR, true));
+    if (opened.t !== 'ack') throw new Error('setup');
+    expect((await send(engine, alice, 'history.undo', { targetSeqs: [opened.seq] })).t).toBe('ack');
+    expect(doorOf(engine)).toEqual({ open: false });
+  });
+
+  it('Ctrl+Z skips a toggle the seat may no longer make and undoes the older move', async () => {
+    const { engine, host, alice } = await ready(withDoors());
+    expect((await send(engine, alice, 'token.move', move(T.token, 3))).t).toBe('ack');
+    const opened = await send(engine, alice, 'wall.setDoor', toggle(DOOR, true));
+    if (opened.t !== 'ack') throw new Error('setup');
+    expect(
+      (await send(engine, host, 'seat.update', { seatId: T.seatA, tools: { interact: false } })).t,
+    ).toBe('ack');
+
+    expect((await send(engine, alice, 'history.undo', {})).t).toBe('ack');
+    expect(x(engine)).toBe(0); // the move is undone
+    expect(doorOf(engine)).toEqual({ open: true }); // the door stays as it is
+    // Asking for the toggle by seq is refused; nothing else is left to undo.
+    expect(await send(engine, alice, 'history.undo', { targetSeqs: [opened.seq] })).toMatchObject({
+      t: 'reject',
+      reason: 'forbidden',
+    });
+    expect(await send(engine, alice, 'history.undo', {})).toMatchObject({
+      t: 'reject',
+      reason: 'forbidden',
+    });
+    // The DM may still undo it.
+    expect((await send(engine, host, 'history.undo', { targetSeqs: [opened.seq] })).t).toBe('ack');
+    expect(doorOf(engine)).toEqual({ open: false });
+  });
+
+  it('a door made secret is skipped exactly like a revoked tool, so nothing leaks', async () => {
+    const replies = async (hide: 'secret' | 'revoke') => {
+      const { engine, host, alice } = await ready(withDoors());
+      expect((await send(engine, alice, 'token.move', move(T.token, 3))).t).toBe('ack');
+      const opened = await send(engine, alice, 'wall.setDoor', toggle(DOOR, true));
+      if (opened.t !== 'ack') throw new Error('setup');
+      const changed =
+        hide === 'secret'
+          ? await send(engine, host, 'entity.update', {
+              sceneId: T.scene,
+              entityId: DOOR,
+              changes: {
+                wall: {
+                  points: [
+                    { x: 0, z: 0 },
+                    { x: 1, z: 0 },
+                  ],
+                  door: { open: true, secret: true },
+                },
+              },
+            })
+          : await send(engine, host, 'seat.update', {
+              seatId: T.seatA,
+              tools: { interact: false },
+            });
+      expect(changed.t).toBe('ack');
+      alice.clear();
+      const bySeq = await send(engine, alice, 'history.undo', { targetSeqs: [opened.seq] });
+      const ctrlZ = await send(engine, alice, 'history.undo', {});
+      expect(ctrlZ.t).toBe('ack');
+      expect(x(engine)).toBe(0);
+      const last = await send(engine, alice, 'history.undo', {});
+      const strip = (m: object) => ({ ...m, clientRef: '' });
+      return { bySeq: strip(bySeq), last: strip(last), wire: alice.wire() };
+    };
+    const secret = await replies('secret');
+    const revoked = await replies('revoke');
+    expect(secret.bySeq).toMatchObject({ t: 'reject', reason: 'forbidden' });
+    expect(secret.bySeq).toEqual(revoked.bySeq);
+    expect(secret.last).toEqual(revoked.last);
+    expect(secret.wire).not.toContain('secret');
   });
 });

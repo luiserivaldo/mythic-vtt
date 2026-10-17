@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { Entity } from './entity.js';
+import { EntityFields } from './entity.js';
 import { Id } from './ids.js';
 
 // ENV-09: keep source visibility metadata; placed copies clear ownership and grants
 // except a hidden view (MV-177), and keep character links.
-export const PrefabEntity = Entity.omit({ id: true })
+export const PrefabEntity = EntityFields.omit({ id: true })
   .extend({ owners: z.array(Id).optional() })
   .strict();
 export const Prefab = z.strictObject({

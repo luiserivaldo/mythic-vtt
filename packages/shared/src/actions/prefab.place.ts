@@ -1,12 +1,13 @@
 import type { Actor } from './envelope.js';
 import { canReadPrefab } from './prefab-access.js';
 import { z } from 'zod';
-import { Entity, Id, Vec3, type Prefab } from '../schema/index.js';
+import { EntityFields, Id, Vec3, type Prefab } from '../schema/index.js';
 import { defineAction } from './define.js';
 import { entityCreate } from './entity.create.js';
 
 function copy(prefab: Prefab, id: string, to: z.infer<typeof Vec3>, actor: Actor) {
-  return Entity.parse({
+  // FOG-01: the vision rules are checked by entity.create's permission, not thrown here.
+  return EntityFields.parse({
     ...Object.fromEntries(
       Object.entries(prefab.entity).filter(
         ([key]) => !['owners', 'perms', 'lastingAoE', 'measuringAoE'].includes(key),

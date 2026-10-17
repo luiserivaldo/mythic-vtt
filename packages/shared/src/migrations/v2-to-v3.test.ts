@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { makeCampaign } from '../actions/testing.js';
 import { storeMigrate } from './registry.js';
-import { Campaign, DEFAULT_SEAT_TOOLS } from '../schema/index.js';
+import { Campaign } from '../schema/index.js';
 
 it('migrates zero-scene snapshots to one deterministic blank active scene without losing data', () => {
   const state = { ...makeCampaign(), schemaVersion: 2, scenes: {}, activeSceneId: null };
@@ -21,7 +21,8 @@ it('migrates zero-scene snapshots to one deterministic blank active scene withou
     Object.fromEntries(
       Object.entries(state.seats).map(([id, seat]) => [
         id,
-        { ...seat, interactionEnabled: true, tools: DEFAULT_SEAT_TOOLS },
+        // The v10-to-v11 fold's frozen 0.0.1 defaults (no `interact`: that key is v12).
+        { ...seat, interactionEnabled: true, tools: { measure: true, draw: false, pins: false } },
       ]),
     ),
   );

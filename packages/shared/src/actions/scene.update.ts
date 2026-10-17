@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { AssetRef, Id, SceneBounds, SceneFolder, LastingAoELimit } from '../schema/index.js';
+import {
+  AssetRef,
+  Id,
+  SceneBounds,
+  SceneFolder,
+  SceneVision,
+  LastingAoELimit,
+} from '../schema/index.js';
 import { defineAction, isCoDm, isHost } from './define.js';
 
 export const sceneUpdate = defineAction({
@@ -18,6 +25,8 @@ export const sceneUpdate = defineAction({
       maxLastingAoEsPerPlayer: LastingAoELimit.optional(),
       // UI-SCN-01: null takes the scene out of its folder.
       folder: SceneFolder.nullable().optional(),
+      // FOG-01 (MV-303 Q2b): the dynamic-lighting switch; null removes it (off, as before v12).
+      vision: SceneVision.nullable().optional(),
     })
     .refine(
       (p) =>
@@ -27,7 +36,8 @@ export const sceneUpdate = defineAction({
         p.skybox !== undefined ||
         p.bounds !== undefined ||
         p.maxLastingAoEsPerPlayer !== undefined ||
-        p.folder !== undefined,
+        p.folder !== undefined ||
+        p.vision !== undefined,
       {
         message: 'at least one field to update is required',
       },
@@ -46,6 +56,8 @@ export const sceneUpdate = defineAction({
     else if (a.payload.zenith !== undefined) scene.environment.zenith = a.payload.zenith;
     if (a.payload.folder === null) delete scene.folder;
     else if (a.payload.folder !== undefined) scene.folder = a.payload.folder;
+    if (a.payload.vision === null) delete scene.vision;
+    else if (a.payload.vision !== undefined) scene.vision = a.payload.vision;
     if (a.payload.skybox === null) delete scene.environment.skybox;
     else if (a.payload.skybox !== undefined) scene.environment.skybox = a.payload.skybox;
   },

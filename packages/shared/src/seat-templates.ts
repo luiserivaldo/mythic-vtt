@@ -12,7 +12,9 @@ export interface SeatTemplate {
   tools: SeatTools;
 }
 
-const ALL_TOOLS: SeatTools = { measure: true, draw: true, pins: true };
+// MV-303 Q1 / MV-310 Q4: no template may interact with objects (doors are the first); the DM grants
+// `interact` per seat (co-DMs ignore tools).
+const ALL_TOOLS: SeatTools = { measure: true, draw: true, pins: true, interact: false };
 
 /**
  * UX-46 (MV-251): these are the permission templates. A new seat copies its template's
@@ -54,7 +56,7 @@ export const SEAT_TEMPLATES: readonly SeatTemplate[] = [
     description: 'Read-only player view; seat-less spectating remains available.',
     role: 'player',
     permissions: { view: true, move: false, edit: false, delete: false },
-    tools: { measure: false, draw: false, pins: false },
+    tools: { measure: false, draw: false, pins: false, interact: false },
   },
 ];
 

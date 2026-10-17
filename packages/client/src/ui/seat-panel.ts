@@ -5,6 +5,7 @@ import {
   type Campaign,
   type Seat,
   type SeatTemplateId,
+  type ResolvedSeatTools,
   type SeatTool,
   type SeatTools,
 } from '@mythic/shared';
@@ -32,6 +33,7 @@ export const SEAT_TOOL_TOGGLES: readonly { key: SeatTool; label: string }[] = [
   { key: 'measure', label: 'Measure' },
   { key: 'draw', label: 'Draw' },
   { key: 'pins', label: 'Ping' },
+  { key: 'interact', label: 'Interact with objects' },
 ];
 
 export const CODM_TOOLS_NOTE = 'Co-DMs can always use every tool';
@@ -62,7 +64,7 @@ export interface SeatRow {
   occupantName: string | undefined;
   permissions: Record<PermissionKey, boolean>;
   /** UI-SEAT-02: the seat's own tools, with the `DEFAULT_SEAT_TOOLS` fallback filled in. */
-  tools: SeatTools;
+  tools: ResolvedSeatTools;
   badge: SeatBadge;
   /** The occupant's player colour from presence, else a stable hue from the seat name. */
   color: string;
