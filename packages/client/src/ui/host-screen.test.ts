@@ -113,6 +113,14 @@ describe('foreignDmLinkHost', () => {
     expect(foreignDmLinkHost(`#host=${token}`, page)).toBeNull();
   });
 
+  it('says nothing for a relative link, which is for this page', () => {
+    expect(foreignDmLinkHost(`/#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(`/play?x=1#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(`./#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(`?x=1#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(`//table.example.com/#host=${token}`, page)).toBe('table.example.com');
+  });
+
   it('names the other host', () => {
     expect(foreignDmLinkHost(`https://table.example.com/#host=${token}`, page)).toBe(
       'table.example.com',

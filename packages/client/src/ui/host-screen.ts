@@ -24,7 +24,7 @@ export function dmLinkToken(text: string): string | undefined {
 
 /**
  * MV-284: the host a pasted DM link points at, when that is not this page's origin; null for a
- * bare token, a bare `#host=` fragment or a link to this page. The token would go to this page's
+ * bare token, a bare `#host=` fragment, a relative link or a link to this page. The token would go to this page's
  * host, so a link for another one is worth a second look. Not refused: the printed link may be the
  * public URL while the DM opens the host on localhost or the LAN.
  */
@@ -35,7 +35,10 @@ export function foreignDmLinkHost(text: string, pageOrigin: string): string | nu
   if (address === '') return null;
   let url: URL;
   try {
-    url = new URL(/^https?:\/\//i.test(address) ? address : `http://${address}`);
+    // A relative link (`/`, `./play`, `?x=1`) is for this page; `//host/` still names one.
+    url = /^[/.?]/.test(address)
+      ? new URL(address, pageOrigin)
+      : new URL(/^https?:\/\//i.test(address) ? address : `http://${address}`);
   } catch {
     return address;
   }
