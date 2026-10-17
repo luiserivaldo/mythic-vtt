@@ -7,7 +7,7 @@ import { SPECTATOR_IDENTITY_STORAGE_KEY, loadOrCreateIdentity } from './net/iden
 import { extractSeatInvite, redeemSeatInvite, seatInviteMessage } from './net/seat-invite.js';
 import { ClientStoreContext } from './store/react.js';
 import { createClientStore } from './store/store.js';
-import { HOST_SCREEN_KEY } from './ui/host-screen.js';
+import { HOST_HINT_KEY, HOST_SCREEN_KEY } from './ui/host-screen.js';
 import { JoinContext, RETURNING_KEY } from './ui/join-context.js';
 import { loadProfile, migrateLegacyProfile } from './ui/join-screen.js';
 import { createSession } from './ui/session.js';
@@ -37,10 +37,9 @@ const uiStore = createUiStore();
 
 // The server sends no role, so remember a successful host claim (the token is scrubbed from the
 // URL, but the gateway keeps recognising this identity as host). UI hint only; the host re-checks.
-const HOST_HINT = 'mythic.host';
 const remembered = (() => {
   try {
-    return localStorage.getItem(HOST_HINT) === '1';
+    return localStorage.getItem(HOST_HINT_KEY) === '1';
   } catch {
     return false;
   }
@@ -53,7 +52,7 @@ if (hostToken !== undefined && !watchVisitor) {
     unsubscribe();
     s.setHost(true);
     try {
-      localStorage.setItem(HOST_HINT, '1');
+      localStorage.setItem(HOST_HINT_KEY, '1');
     } catch {
       // Private mode: the hint just won't survive a reload.
     }

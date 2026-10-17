@@ -6,8 +6,13 @@ import {
   fetchCampaignList,
   fetchCampaignThumbnail,
   foreignDmLinkHost,
+  forgetStaleHostHint,
+  HOST_HINT_KEY,
   hostScreenView,
   pickCampaign,
+  refusedCause,
+  refusedDetails,
+  refusedLinkMessage,
   sortCampaigns,
   type HostFetch,
 } from './host-screen.js';
@@ -159,7 +164,12 @@ describe('pickCampaign', () => {
 });
 
 describe('hostScreenView', () => {
-  const base = { fatalError: null, ready: true, list: { kind: 'ok', list } as const };
+  const base = {
+    fatalError: null,
+    ready: true,
+    list: { kind: 'ok', list } as const,
+    campaign: true,
+  };
   it('follows the steps once the host has listed the campaigns', () => {
     expect(hostScreenView({ ...base, step: 'campaigns' })).toBe('campaigns');
     expect(hostScreenView({ ...base, step: 'table' })).toBe('table');
@@ -175,10 +185,75 @@ describe('hostScreenView', () => {
   });
 
   it('shows nothing of the table to an identity the host refuses', () => {
-    expect(hostScreenView({ ...base, list: { kind: 'denied' }, step: 'table' })).toBe('refused');
+    expect(hostScreenView({ ...base, list: { kind: 'denied', status: 403 }, step: 'table' })).toBe(
+      'refused',
+    );
     expect(
       hostScreenView({ ...base, fatalError: 'unauthorized: host token rejected', step: 'table' }),
     ).toBe('refused');
+  });
+
+  it('says the campaign is loading rather than showing a blank table step (MV-285)', () => {
+    expect(hostScreenView({ ...base, campaign: false, step: 'table' })).toBe('table-loading');
+    expect(hostScreenView({ ...base, campaign: false, step: 'campaigns' })).toBe('campaigns');
+    expect(
+      hostScreenView({ ...base, campaign: false, fatalError: 'connection failed', step: 'table' }),
+    ).toBe('refused');
+  });
+});
+
+describe('refused DM link (MV-285)', () => {
+  const at = Date.UTC(2026, 9, 17, 12, 0, 0);
+
+  it('splits the fatal error the host sent into its code and message', () => {
+    expect(refusedCause('unauthorized: host token rejected', { kind: 'loading' })).toEqual({
+      kind: 'error',
+      code: 'unauthorized',
+      message: 'host token rejected',
+    });
+    expect(refusedCause('connection failed', { kind: 'loading' })).toEqual({
+      kind: 'error',
+      code: '',
+      message: 'connection failed',
+    });
+    expect(refusedCause(null, { kind: 'denied', status: 403 })).toEqual({
+      kind: 'denied',
+      status: 403,
+    });
+  });
+
+  it('gives one plain line for every refusal the host does not tell apart (D24)', () => {
+    const generic = "This DM link can't be used. Please make a new link.";
+    for (const fatal of [
+      'unauthorized: host token rejected',
+      'unauthorized: identity secret mismatch',
+      'server-error: boom',
+      'connection failed',
+    ])
+      expect(refusedLinkMessage(refusedCause(fatal, { kind: 'loading' }))).toBe(generic);
+    expect(refusedLinkMessage({ kind: 'denied', status: 401 })).toBe(generic);
+  });
+
+  it('tells a protocol mismatch apart: reloading fetches the matching page', () => {
+    expect(
+      refusedLinkMessage(refusedCause('protocol-mismatch: v2 required', { kind: 'loading' })),
+    ).toBe('This page is out of date for this host. Please reload.');
+  });
+
+  it('details carry code, message, fatal flag and time, never the token', () => {
+    const details = refusedDetails(
+      refusedCause('unauthorized: host token rejected', { kind: 'loading' }),
+      at,
+    );
+    expect(details).toBe(
+      'Code: unauthorized\nMessage: host token rejected\nFatal: true\nTime: 2026-10-17T12:00:00.000Z',
+    );
+    expect(refusedDetails({ kind: 'denied', status: 403 }, at)).toBe(
+      'GET /api/campaigns: HTTP 403\nTime: 2026-10-17T12:00:00.000Z',
+    );
+    expect(refusedDetails({ kind: 'error', code: '', message: 'connection failed' }, at)).toContain(
+      'Code: none',
+    );
   });
 });
 
@@ -205,8 +280,14 @@ describe('fetchCampaignList', () => {
   });
 
   it('maps refusals, failures and malformed replies', async () => {
-    expect(await fetchCampaignList(respond(403, {}), credential)).toEqual({ kind: 'denied' });
-    expect(await fetchCampaignList(respond(401, {}), credential)).toEqual({ kind: 'denied' });
+    expect(await fetchCampaignList(respond(403, {}), credential)).toEqual({
+      kind: 'denied',
+      status: 403,
+    });
+    expect(await fetchCampaignList(respond(401, {}), credential)).toEqual({
+      kind: 'denied',
+      status: 401,
+    });
     expect(await fetchCampaignList(respond(404, {}), credential)).toEqual({ kind: 'error' });
     expect(await fetchCampaignList(respond(200, { current: 'x' }), credential)).toEqual({
       kind: 'error',
@@ -214,6 +295,36 @@ describe('fetchCampaignList', () => {
     expect(await fetchCampaignList(() => Promise.reject(new Error('offline')), credential)).toEqual(
       { kind: 'error' },
     );
+  });
+});
+
+describe('forgetStaleHostHint (MV-285)', () => {
+  const store = () => {
+    const removed: string[] = [];
+    return { removed, removeItem: (key: string) => void removed.push(key) };
+  };
+
+  it('forgets the host hint when the list is denied: this browser is not the host', () => {
+    const storage = store();
+    forgetStaleHostHint({ kind: 'denied', status: 403 }, storage);
+    expect(storage.removed).toEqual([HOST_HINT_KEY]);
+  });
+
+  it('keeps it for a refused token (no list), an error and a listed host', () => {
+    const storage = store();
+    forgetStaleHostHint({ kind: 'loading' }, storage);
+    forgetStaleHostHint({ kind: 'error' }, storage);
+    forgetStaleHostHint({ kind: 'ok', list }, storage);
+    expect(storage.removed).toEqual([]);
+  });
+
+  it('does not throw when storage refuses (private mode)', () => {
+    const removeItem = () => {
+      throw new Error('SecurityError');
+    };
+    expect(() => {
+      forgetStaleHostHint({ kind: 'denied', status: 401 }, { removeItem });
+    }).not.toThrow();
   });
 });
 

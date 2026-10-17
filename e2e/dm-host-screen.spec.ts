@@ -253,11 +253,26 @@ test('a visitor on the join link cannot reach the DM path', async ({ browser }) 
     await expect(stranger.page.getByRole('button', { name: 'Continue' })).toBeDisabled();
     await stranger.page.getByLabel('DM link').fill(`${base(host)}/#host=guessed-token-1234`);
     await stranger.page.getByRole('button', { name: 'Continue' }).click();
-    await expect(stranger.page.getByRole('dialog', { name: "I'm the DM" })).toContainText(
-      'did not accept this browser',
-    );
+    const refused = stranger.page.getByRole('dialog', { name: "I'm the DM" });
+    const friendly = "This DM link can't be used. Please make a new link.";
+    await expect(refused.getByRole('alert')).toHaveText(friendly);
     await expect(stranger.page.getByRole('list', { name: 'Campaigns' })).toHaveCount(0);
     await expect(stranger.page.getByText('Secret Saga')).toHaveCount(0);
+
+    // MV-285: only Reload; the raw reason sits collapsed under "Error details", never the token.
+    await expect(refused.getByRole('button', { name: 'Back' })).toHaveCount(0);
+    const raw = refused.getByText('Code: unauthorized', { exact: false });
+    await expect(raw).toBeHidden();
+    await refused.getByText('Error details').click();
+    await expect(raw).toBeVisible();
+    await expect(refused.locator('details pre')).toContainText('Message: host token rejected');
+    await expect(refused.locator('details pre')).toContainText('Fatal: true');
+    await expect(refused.locator('details pre')).not.toContainText('guessed-token-1234');
+
+    // MV-285: Reload does not send the refused token again; it lands on the join screen.
+    await refused.getByRole('button', { name: 'Reload' }).click();
+    await expect(stranger.page.getByRole('heading', { name: 'Join the table' })).toBeVisible();
+    await expect(stranger.page.getByRole('button', { name: "I'm the DM" })).toBeVisible();
 
     // Forging the UI hints (host screen flag, remembered host) without a token gets no further:
     // the socket connects as a visitor and the host refuses the list.
@@ -266,13 +281,22 @@ test('a visitor on the join link cannot reach the DM path', async ({ browser }) 
       localStorage.setItem('mythic.host', '1');
     });
     await stranger.page.reload();
-    await expect(stranger.page.getByRole('dialog', { name: "I'm the DM" })).toContainText(
-      'did not accept this browser',
-    );
+    await expect(refused.getByRole('alert')).toHaveText(friendly);
     await expect(stranger.page.getByRole('list', { name: 'Campaigns' })).toHaveCount(0);
     await expect(stranger.page.getByText('Secret Saga')).toHaveCount(0);
     expect(listed.length).toBeGreaterThan(0);
     expect(listed.every((status) => status === 401 || status === 403)).toBe(true);
+
+    await refused.getByText('Error details').click();
+    await expect(refused.locator('details pre')).toContainText(/GET \/api\/campaigns: HTTP 40[13]/);
+    await expect(refused.getByRole('button', { name: 'Back' })).toHaveCount(0);
+
+    // MV-285: the denied list proves this browser is not the host, so the stale hint is gone and
+    // Reload reaches the join screen instead of the same refusal.
+    expect(await stranger.page.evaluate(() => localStorage.getItem('mythic.host'))).toBeNull();
+    await refused.getByRole('button', { name: 'Reload' }).click();
+    await expect(stranger.page.getByRole('heading', { name: 'Join the table' })).toBeVisible();
+    await expect(stranger.page.getByText(friendly)).toHaveCount(0);
 
     // The visitor's own credential is refused by the list and the thumbnail routes.
     const identity = await storedIdentity(stranger.page);

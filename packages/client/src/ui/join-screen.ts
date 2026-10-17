@@ -235,6 +235,14 @@ export function joinView(i: JoinViewInput): JoinView {
   return 'pick';
 }
 
+/**
+ * MV-285: "I'm the DM" opens the DM step, which only a visitor who has not connected yet can
+ * use; once started (waiting for a scene, or picking a seat) the button would do nothing.
+ */
+export function offersDmLink(view: JoinView, started: boolean): boolean {
+  return !started && view !== 'loading';
+}
+
 /** Down-scaled image size that keeps the aspect ratio and fits a square of `max` pixels. */
 export function fitSize(width: number, height: number, max: number): { w: number; h: number } {
   const scale = Math.min(1, max / Math.max(width, height, 1));

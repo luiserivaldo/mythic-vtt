@@ -7,6 +7,9 @@ import { authorizationHeader, type UploadCredential } from '../assets/image-uplo
  */
 export const HOST_SCREEN_KEY = 'mythic.host.screen';
 
+/** Set once a DM link has bound this browser as host, so a reload skips the join screen. */
+export const HOST_HINT_KEY = 'mythic.host';
+
 /** The slice of `fetch` these calls need, so a test can stand in for the host. */
 export type HostFetch = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -81,7 +84,10 @@ export function campaignRows(
 }
 
 export type ListState =
-  { kind: 'loading' } | { kind: 'denied' } | { kind: 'error' } | { kind: 'ok'; list: CampaignList };
+  | { kind: 'loading' }
+  | { kind: 'denied'; status: number }
+  | { kind: 'error' }
+  | { kind: 'ok'; list: CampaignList };
 
 export type HostStep = 'campaigns' | 'table' | 'done';
 
@@ -101,23 +107,69 @@ export function pickCampaign(
   };
 }
 
-export type HostScreenView = 'connecting' | 'refused' | 'error' | HostStep;
+export type HostScreenView = 'connecting' | 'refused' | 'error' | 'table-loading' | HostStep;
 
 /**
  * The host decides: the list is fetched with this identity and only a 200 shows anything. A
- * refused DM link (fatal `hello`) or a 401/403 from the list both end on `refused`.
+ * refused DM link (fatal `hello`) or a 401/403 from the list both end on `refused`. The table step
+ * waits for the campaign itself (MV-285), so its card is never blank.
  */
 export function hostScreenView(i: {
   fatalError: string | null;
   ready: boolean;
   list: ListState;
   step: HostStep;
+  campaign: boolean;
 }): HostScreenView {
   if (i.step === 'done') return 'done';
   if (i.fatalError !== null || i.list.kind === 'denied') return 'refused';
   if (!i.ready || i.list.kind === 'loading') return 'connecting';
   if (i.list.kind === 'error') return 'error';
+  if (i.step === 'table' && !i.campaign) return 'table-loading';
   return i.step;
+}
+
+/**
+ * Why the host screen ended on `refused`, as far as this client can see: the fatal error the host
+ * sent (`code: message`, or a connection failure without one), or the list route's 401/403.
+ */
+export type RefusedCause =
+  { kind: 'error'; code: string; message: string } | { kind: 'denied'; status: number };
+
+export function refusedCause(fatalError: string | null, list: ListState): RefusedCause {
+  if (fatalError === null && list.kind === 'denied') return { kind: 'denied', status: list.status };
+  const text = fatalError ?? '';
+  const split = text.indexOf(': ');
+  return split === -1
+    ? { kind: 'error', code: '', message: text }
+    : { kind: 'error', code: text.slice(0, split), message: text.slice(split + 2) };
+}
+
+/**
+ * MV-285: plain words for a refusal. D24 makes the host answer a wrong, used or unconfigured
+ * token the same way, so they share one line; only a protocol mismatch is told apart.
+ */
+export function refusedLinkMessage(cause: RefusedCause): string {
+  if (cause.kind === 'error' && cause.code === 'protocol-mismatch')
+    return 'This page is out of date for this host. Please reload.';
+  return "This DM link can't be used. Please make a new link.";
+}
+
+/**
+ * The technical detail behind the friendly line, for debugging. Built only from what the host
+ * sent or the route answered, so it never carries the host token or the identity secret.
+ */
+export function refusedDetails(cause: RefusedCause, receivedAt: number): string {
+  const lines =
+    cause.kind === 'denied'
+      ? [`GET /api/campaigns: HTTP ${String(cause.status)}`]
+      : [
+          `Code: ${cause.code || 'none'}`,
+          `Message: ${cause.message}`,
+          // The client only keeps an error that ended the connection.
+          'Fatal: true',
+        ];
+  return [...lines, `Time: ${new Date(receivedAt).toISOString()}`].join('\n');
 }
 
 /** `GET /api/campaigns` as this identity; host only (D36), so anyone else gets `denied`. */
@@ -130,12 +182,27 @@ export async function fetchCampaignList(
       headers: { Authorization: authorizationHeader(credential) },
       cache: 'no-store',
     });
-    if (response.status === 401 || response.status === 403) return { kind: 'denied' };
+    if (response.status === 401 || response.status === 403)
+      return { kind: 'denied', status: response.status };
     if (!response.ok) return { kind: 'error' };
     const parsed = CampaignList.safeParse(await response.json());
     return parsed.success ? { kind: 'ok', list: parsed.data } : { kind: 'error' };
   } catch {
     return { kind: 'error' };
+  }
+}
+
+/**
+ * MV-285: a 401/403 from the list means this browser is not the host, so a remembered host hint
+ * is stale and would bring every reload back to the refusal. Any other result keeps it: a refused
+ * token, a protocol mismatch or a network error says nothing about this identity.
+ */
+export function forgetStaleHostHint(list: ListState, storage: Pick<Storage, 'removeItem'>): void {
+  if (list.kind !== 'denied') return;
+  try {
+    storage.removeItem(HOST_HINT_KEY);
+  } catch {
+    // Private mode: nothing was kept to forget.
   }
 }
 

@@ -2,12 +2,17 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { parseIdentityFile } from '../net/identity-file.js';
 import { IDENTITY_STORAGE_KEY } from '../net/identity.js';
 import { useClientStore } from '../store/react.js';
+import { ErrorNotice } from './ErrorNotice.js';
 import {
   campaignRows,
   fetchCampaignList,
   fetchCampaignThumbnail,
+  forgetStaleHostHint,
   hostScreenView,
   pickCampaign,
+  refusedCause,
+  refusedDetails,
+  refusedLinkMessage,
   type HostStep,
   type ListState,
 } from './host-screen.js';
@@ -56,15 +61,23 @@ export function HostScreen({ env }: { env: JoinEnv }) {
       return;
     }
     void fetchCampaignList(fetch, credential).then((next) => {
-      if (current) setList(next);
+      if (!current) return;
+      forgetStaleHostHint(next, localStorage);
+      setList(next);
     });
     return () => {
       current = false;
     };
   }, [ready]);
 
-  const view = hostScreenView({ fatalError, ready, list, step });
+  const view = hostScreenView({ fatalError, ready, list, step, campaign: campaign !== null });
+  // When the refusal arrived, for the error details.
+  const [refusedAt, setRefusedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (view === 'refused') setRefusedAt((at) => at ?? Date.now());
+  }, [view]);
   if (view === 'done') return null;
+  const cause = refusedCause(fatalError, list);
   return (
     <div className="join-backdrop">
       <section
@@ -85,16 +98,34 @@ export function HostScreen({ env }: { env: JoinEnv }) {
         {view === 'refused' && (
           <>
             <h2 id="host-h">I'm the DM</h2>
-            <p role="alert">
-              The host did not accept this browser as the DM. Use the DM link the host printed when
-              it started; each link works once.
-            </p>
+            {/* MV-285: Reload connects again; the DM link was scrubbed, so it is not sent again. */}
+            <ErrorNotice
+              message={refusedLinkMessage(cause)}
+              details={refusedDetails(cause, refusedAt ?? Date.now())}
+            >
+              <div className="join-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    location.reload();
+                  }}
+                >
+                  Reload
+                </button>
+              </div>
+            </ErrorNotice>
           </>
         )}
         {view === 'error' && (
           <>
             <h2 id="host-h">I'm the DM</h2>
             <p role="alert">Could not load the campaigns. Reload the page to try again.</p>
+          </>
+        )}
+        {view === 'table-loading' && (
+          <>
+            <h2 id="host-h">I'm the DM</h2>
+            <p>Loading the campaign...</p>
           </>
         )}
         {view === 'campaigns' && list.kind === 'ok' && (

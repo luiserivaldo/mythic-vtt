@@ -15,6 +15,7 @@ import {
   loadProfile,
   migrateLegacyProfile,
   nextJoinPollMs,
+  offersDmLink,
   parseJoinPayload,
   parseProfile,
   saveProfile,
@@ -158,6 +159,19 @@ describe('joinView', () => {
     [{ started: true, ready: true, seatId: tid(20), noScene: true }, 'waiting'],
   ] as const)('%j -> %s', (over, view) => {
     expect(joinView({ ...base, ...over })).toBe(view);
+  });
+});
+
+describe('offersDmLink (MV-285)', () => {
+  it.each([
+    ['pick', false, true],
+    ['waiting', false, true],
+    ['loading', false, false],
+    ['pick', true, false],
+    ['waiting', true, false],
+    ['watching', true, false],
+  ] as const)('%s, started %s -> %s', (view, started, offered) => {
+    expect(offersDmLink(view, started)).toBe(offered);
   });
 });
 
