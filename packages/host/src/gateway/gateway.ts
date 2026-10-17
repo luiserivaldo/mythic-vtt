@@ -293,6 +293,8 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
         avatar: hello.avatar,
         ...(hello.color !== undefined ? { color: hello.color } : {}),
         isHost,
+        // D46 / MV-280: passed through as-is; the engine applies the spectator rule.
+        ...(hello.as !== undefined ? { declaredAs: hello.as } : {}),
         lastSeq: hello.lastSeq,
         get latencyMs() {
           return latencyMs;

@@ -69,7 +69,13 @@ export function createSession(deps: SessionDeps): Session {
         displayName: profile.displayName,
         ...(profile.color !== undefined ? { color: profile.color } : {}),
         ...(profile.avatar !== undefined ? { avatar: profile.avatar } : {}),
-        ...(deps.hostToken !== undefined ? { hostToken: deps.hostToken } : {}),
+        // D46 / MV-280: the spectator intent rides on hello, before the host publishes any
+        // presence. A spectator hello may not carry the host token, so it never sees the holder.
+        ...(opts?.spectator === true
+          ? { spectator: true }
+          : deps.hostToken !== undefined
+            ? { hostToken: deps.hostToken }
+            : {}),
         store: deps.store,
         createSocket: deps.createSocket,
       });

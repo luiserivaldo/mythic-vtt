@@ -14,7 +14,7 @@ afterEach(() => {
 
 const backoff = { baseMs: 100, maxMs: 800, factor: 2, jitter: 0 };
 
-function setup(extra: { hostToken?: HostTokenHolder } = {}) {
+function setup(extra: { hostToken?: HostTokenHolder; spectator?: boolean } = {}) {
   const sockets = socketFactory();
   const store = createClientStore();
   const client = createGameClient({
@@ -98,6 +98,24 @@ describe('game client against a mock host', () => {
     const third = sockets.last();
     third.serverOpen();
     expect(third.sent[0]).not.toHaveProperty('hostToken');
+  });
+
+  it('D46: a spectator client declares as=spectator on every hello, a normal one never', () => {
+    const plain = setup();
+    plain.client.start();
+    plain.sockets.last().serverOpen();
+    expect(plain.sockets.last().sent[0]).not.toHaveProperty('as');
+
+    const watcher = setup({ spectator: true, hostToken: createHostTokenHolder('tok') });
+    watcher.client.start();
+    const first = watcher.sockets.last();
+    first.serverOpen();
+    expect(first.sent[0]).toMatchObject({ t: 'hello', as: 'spectator' });
+    expect(first.sent[0]).not.toHaveProperty('hostToken');
+    first.serverClose();
+    vi.advanceTimersByTime(100);
+    watcher.sockets.last().serverOpen();
+    expect(watcher.sockets.last().sent[0]).toMatchObject({ t: 'hello', as: 'spectator' });
   });
 
   it('surfaces rejects', async () => {

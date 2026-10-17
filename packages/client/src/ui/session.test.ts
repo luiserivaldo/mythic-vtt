@@ -80,4 +80,34 @@ describe('session identities', () => {
     expect(sockets.last().sent[0]).toMatchObject({ t: 'hello', identityId: tid(3) });
     expect(JSON.stringify(sockets.last().sent)).not.toContain(tid(2));
   });
+
+  // D46 / MV-280: the spectator intent rides on hello, so the host never lists it as unseated.
+  it('declares as=spectator on hello only when watching', () => {
+    const { sockets, session } = setup();
+    session.start({ displayName: 'Ana' });
+    sockets.last().serverOpen();
+    expect(sockets.last().sent[0]).not.toHaveProperty('as');
+    session.start({ displayName: 'Spectator' }, { spectator: true });
+    sockets.last().serverOpen();
+    expect(sockets.last().sent[0]).toMatchObject({ t: 'hello', as: 'spectator' });
+    expect(sockets.last().sent.filter((m) => (m as { t: string }).t === 'join')).toEqual([]);
+  });
+
+  it('never sends a host token alongside as=spectator', () => {
+    const sockets = socketFactory();
+    const take = vi.fn(() => 'host-token');
+    const session = createSession({
+      url: 'ws://test/ws',
+      identity: { identityId: tid(2), identitySecret: 'secret' },
+      spectatorIdentity: () => ({ identityId: tid(3), identitySecret: 'watcher' }),
+      hostToken: { take, confirm: () => undefined },
+      store: createClientStore(),
+      createSocket: sockets.createSocket,
+    });
+    session.start({ displayName: 'Spectator' }, { spectator: true });
+    sockets.last().serverOpen();
+    expect(sockets.last().sent[0]).toMatchObject({ as: 'spectator' });
+    expect(sockets.last().sent[0]).not.toHaveProperty('hostToken');
+    expect(take).not.toHaveBeenCalled();
+  });
 });

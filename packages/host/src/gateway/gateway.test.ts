@@ -189,6 +189,40 @@ describe('gateway', () => {
     await c.closed;
   });
 
+  it('D46: rejects a v11 hello with supportedVersion 12', async () => {
+    await start();
+    const c = await connect();
+    c.send(hello({ v: 11 }));
+    expect(await c.next()).toMatchObject({
+      t: 'error',
+      code: 'protocol-mismatch',
+      supportedVersion: 12,
+      fatal: true,
+    });
+    await c.closed;
+  });
+
+  it('D46: passes hello.as through to the engine as declaredAs', async () => {
+    const r = recorder();
+    await start(r.handler);
+    const a = await connect();
+    a.send(hello({ as: 'spectator' }));
+    const b = await connect();
+    b.send(hello({ identityId: ID_B, identitySecret: 'secret-two', displayName: 'Bo' }));
+    await expect.poll(() => r.conns.length).toBe(2);
+    expect(r.conns.find((c) => c.identityId === ID_A)?.declaredAs).toBe('spectator');
+    expect(r.conns.find((c) => c.identityId === ID_B)?.declaredAs).toBeUndefined();
+  });
+
+  it('D46: refuses a hello that declares a spectator and claims host authority', async () => {
+    const r = recorder();
+    await start(r.handler, { hostToken: 'host-token' });
+    const c = await connect();
+    c.send(hello({ as: 'spectator', hostToken: 'host-token' }));
+    expect(await c.next()).toMatchObject({ t: 'error', code: 'bad-message' });
+    expect(r.conns).toHaveLength(0);
+  });
+
   it('closes even when a client never reads an HTTP response (M0-16)', async () => {
     gw = createGateway({ heartbeatMs: 0 });
     // An endless body: the request stays in flight until the connection is cut.

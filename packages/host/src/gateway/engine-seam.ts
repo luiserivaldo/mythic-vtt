@@ -13,6 +13,11 @@ export interface GatewayConnection {
   readonly isHost: boolean;
   /** M4-01: credential-bound read-only connection, independent of identity/seat bindings. */
   readonly isSpectator?: boolean;
+  /**
+   * D46 / MV-280: `hello.as`. `spectator` asks the engine to treat this connection as a declared
+   * spectator (UX-44) from the start; the engine ignores it for the host or a seated identity.
+   */
+  readonly declaredAs?: 'spectator';
   /** Last `seq` the client reported in `hello`, for replay or snapshot. */
   readonly lastSeq: number | undefined;
   /** UX-06: most recent host-measured transport RTT; absent until measured. */

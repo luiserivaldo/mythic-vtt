@@ -15,6 +15,12 @@ export interface GameClientOptions {
   color?: string;
   /** D24/D29: host token, resent in hello until the first snapshot confirms the bind. */
   hostToken?: HostTokenHolder;
+  /**
+   * D46 / MV-280: "Join As Spectator". The hello declares `as: 'spectator'`, so the host counts
+   * this connection as a spectator before its first presence and never lists it as unseated.
+   * It never carries a host token (the protocol forbids both together).
+   */
+  spectator?: boolean;
   store: StoreApi<ClientStore>;
   createSocket(url: string): SocketLike;
   random?: () => number;
@@ -51,6 +57,15 @@ export function createGameClient(options: GameClientOptions) {
     url: options.url,
     createSocket: (url) => options.createSocket(url),
     hello: () => {
+      if (options.spectator === true)
+        return {
+          identityId: options.identity.identityId,
+          identitySecret: options.identity.identitySecret,
+          displayName: options.displayName,
+          ...(options.color !== undefined ? { color: options.color } : {}),
+          ...(options.avatar !== undefined ? { avatar: options.avatar } : {}),
+          as: 'spectator' as const,
+        };
       const hostToken = options.hostToken?.take();
       return {
         identityId: options.identity.identityId,
