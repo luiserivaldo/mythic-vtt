@@ -38,6 +38,7 @@ async function start(
     hostToken?: string;
     identities?: IdentityStore;
     heartbeatMs?: number;
+    spectatorTokenValid?: (token: string) => boolean;
   } = {},
 ) {
   gw = createGateway({ ...(handler ? { handler } : {}), heartbeatMs: 0, ...opts });
@@ -511,4 +512,120 @@ describe('transport RTT (UX-06)', () => {
       await c.closed;
     },
   );
+});
+
+describe('host error messages (MV-292)', () => {
+  /** Every `message` the gateway may send in a `t:'error'`: fixed literals, never client input. */
+  const KNOWN_MESSAGES = [
+    'invalid message',
+    'binary frames are not supported',
+    'hello required first',
+    'hello timeout',
+    'already authenticated',
+    'unsupported protocol version',
+    'identity secret mismatch',
+    'host token rejected',
+    'spectator link unavailable',
+    'spectator connections are read-only',
+    'internal error',
+  ];
+  const S = {
+    token: 'SENTINEL-TOKEN-7f3a',
+    secret: 'SENTINEL-SECRET-91c2',
+    name: 'SENTINEL-NAME-55d0',
+    payload: 'SENTINEL-PAYLOAD-0b8e',
+    watch: 'SENTINEL-WATCH-c4e1',
+    thrown: 'SENTINEL-THROWN-a6f9',
+  };
+  const sentinels = Object.values(S);
+
+  it('sends only fixed error strings that echo no client-supplied token, secret, name or payload', async () => {
+    await start(
+      {
+        ...recorder().handler,
+        onIntent: () => {
+          throw new Error(`boom ${S.payload} ${S.thrown}`);
+        },
+      },
+      {
+        hostToken: 'real-host-token',
+        helloTimeoutMs: 300,
+        spectatorTokenValid: (token) => token === 'good-watch',
+      },
+    );
+    const errors: ServerMessage[] = [];
+    const expectError = async (c: Client) => {
+      const m = await c.next();
+      expect(m.t).toBe('error');
+      errors.push(m);
+    };
+    const named = { displayName: S.name };
+
+    // Malformed JSON before hello, carrying the payload sentinel.
+    const badJson = await connect();
+    badJson.send(`{"t":"hello","displayName":"${S.payload}"`);
+    await expectError(badJson);
+
+    // A binary frame before hello.
+    const binary = await connect();
+    binary.ws.send(Buffer.from(S.payload));
+    await expectError(binary);
+
+    // Anything but hello first.
+    const early = await connect();
+    early.send({ t: 'intent', type: S.payload, payload: { x: S.payload }, clientRef: S.payload });
+    await expectError(early);
+
+    // Never says hello at all.
+    const silent = await connect();
+    await expectError(silent);
+
+    // An unsupported protocol version, with sentinels in every free-text hello field.
+    const old = await connect();
+    old.send(
+      hello({ v: PROTOCOL_VERSION + 1, identitySecret: S.secret, hostToken: S.token, ...named }),
+    );
+    await expectError(old);
+
+    // Register ID_A, then: invalid message after hello, a second hello, and a throwing handler.
+    const ana = await connect();
+    ana.send(hello(named));
+    ana.send({ t: 'intent', type: '', clientRef: S.payload, payload: S.payload });
+    await expectError(ana);
+    ana.send(hello({ identitySecret: S.secret, hostToken: S.token, ...named }));
+    await expectError(ana);
+    ana.send({ t: 'intent', type: 'x.y', payload: { x: S.payload }, clientRef: S.payload });
+    await expectError(ana);
+
+    // A wrong identity secret for a known identity.
+    const impostor = await connect();
+    impostor.send(hello({ identitySecret: S.secret, ...named }));
+    await expectError(impostor);
+
+    // A wrong host token.
+    const pretender = await connect();
+    pretender.send(
+      hello({ identityId: ID_B, identitySecret: S.secret, hostToken: S.token, ...named }),
+    );
+    await expectError(pretender);
+
+    // A spectator link that is not valid, and a valid spectator trying to join a seat.
+    const stale = await connect(`${WS_PATH}?watch=${S.watch}`);
+    stale.send(hello(named));
+    await expectError(stale);
+    const watcher = await connect(`${WS_PATH}?watch=good-watch`);
+    watcher.send(hello(named));
+    watcher.send({ t: 'join', as: 'temporary', label: S.payload });
+    await expectError(watcher);
+
+    const messages = errors.map((m) => (m.t === 'error' ? m.message : ''));
+    // Every path above was reached, so the allowlist below is not checked vacuously.
+    expect(new Set(messages)).toEqual(new Set(KNOWN_MESSAGES));
+    for (const m of errors) {
+      if (m.t !== 'error') continue;
+      expect(KNOWN_MESSAGES).toContain(m.message);
+      const wire = JSON.stringify(m);
+      for (const sentinel of sentinels) expect(wire).not.toContain(sentinel);
+    }
+  });
 });

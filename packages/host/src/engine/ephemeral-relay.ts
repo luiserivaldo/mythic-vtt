@@ -153,7 +153,7 @@ interface FrameReferences {
  * the gateway lets reach 1 MiB, so it must not recurse as deep as the data goes. No relayed
  * channel nests anywhere near this; a deeper frame is malformed.
  */
-const MAX_FRAME_DEPTH = 32;
+export const MAX_FRAME_DEPTH = 32;
 
 /**
  * PERM-03: everything a frame's data points at. Any `sceneId` key, however deep, names a scene the
@@ -217,7 +217,7 @@ type ChannelScene = 'contract' | 'required';
  * channel here is scene-scoped; there is deliberately no scene-less channel today. Adding one
  * means listing it here with the reason it can never carry world coordinates.
  */
-const RELAY_CHANNELS: Readonly<Record<string, ChannelScene>> = {
+export const RELAY_CHANNELS: Readonly<Record<string, ChannelScene>> = {
   // MEAS-01: measured points on a scene; the measure tool gate requires `sceneId`.
   'ruler.preview': 'contract',
   // M4-14: a marker on a scene; the pins tool gate requires `sceneId`.
