@@ -6,6 +6,8 @@ import {
   fetchCampaignList,
   fetchCampaignThumbnail,
   foreignDmLinkHost,
+  forgetStaleHostHint,
+  HOST_HINT_KEY,
   hostScreenView,
   pickCampaign,
   refusedCause,
@@ -293,6 +295,36 @@ describe('fetchCampaignList', () => {
     expect(await fetchCampaignList(() => Promise.reject(new Error('offline')), credential)).toEqual(
       { kind: 'error' },
     );
+  });
+});
+
+describe('forgetStaleHostHint (MV-285)', () => {
+  const store = () => {
+    const removed: string[] = [];
+    return { removed, removeItem: (key: string) => void removed.push(key) };
+  };
+
+  it('forgets the host hint when the list is denied: this browser is not the host', () => {
+    const storage = store();
+    forgetStaleHostHint({ kind: 'denied', status: 403 }, storage);
+    expect(storage.removed).toEqual([HOST_HINT_KEY]);
+  });
+
+  it('keeps it for a refused token (no list), an error and a listed host', () => {
+    const storage = store();
+    forgetStaleHostHint({ kind: 'loading' }, storage);
+    forgetStaleHostHint({ kind: 'error' }, storage);
+    forgetStaleHostHint({ kind: 'ok', list }, storage);
+    expect(storage.removed).toEqual([]);
+  });
+
+  it('does not throw when storage refuses (private mode)', () => {
+    const removeItem = () => {
+      throw new Error('SecurityError');
+    };
+    expect(() => {
+      forgetStaleHostHint({ kind: 'denied', status: 401 }, { removeItem });
+    }).not.toThrow();
   });
 });
 

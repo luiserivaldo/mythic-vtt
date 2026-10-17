@@ -291,6 +291,13 @@ test('a visitor on the join link cannot reach the DM path', async ({ browser }) 
     await expect(refused.locator('details pre')).toContainText(/GET \/api\/campaigns: HTTP 40[13]/);
     await expect(refused.getByRole('button', { name: 'Back' })).toHaveCount(0);
 
+    // MV-285: the denied list proves this browser is not the host, so the stale hint is gone and
+    // Reload reaches the join screen instead of the same refusal.
+    expect(await stranger.page.evaluate(() => localStorage.getItem('mythic.host'))).toBeNull();
+    await refused.getByRole('button', { name: 'Reload' }).click();
+    await expect(stranger.page.getByRole('heading', { name: 'Join the table' })).toBeVisible();
+    await expect(stranger.page.getByText(friendly)).toHaveCount(0);
+
     // The visitor's own credential is refused by the list and the thumbnail routes.
     const identity = await storedIdentity(stranger.page);
     for (const path of ['/api/campaigns', '/api/campaigns/x/thumbnail']) {

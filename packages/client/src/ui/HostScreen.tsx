@@ -7,6 +7,7 @@ import {
   campaignRows,
   fetchCampaignList,
   fetchCampaignThumbnail,
+  forgetStaleHostHint,
   hostScreenView,
   pickCampaign,
   refusedCause,
@@ -60,7 +61,9 @@ export function HostScreen({ env }: { env: JoinEnv }) {
       return;
     }
     void fetchCampaignList(fetch, credential).then((next) => {
-      if (current) setList(next);
+      if (!current) return;
+      forgetStaleHostHint(next, localStorage);
+      setList(next);
     });
     return () => {
       current = false;

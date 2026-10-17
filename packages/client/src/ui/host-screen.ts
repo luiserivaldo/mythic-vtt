@@ -193,6 +193,20 @@ export async function fetchCampaignList(
 }
 
 /**
+ * MV-285: a 401/403 from the list means this browser is not the host, so a remembered host hint
+ * is stale and would bring every reload back to the refusal. Any other result keeps it: a refused
+ * token, a protocol mismatch or a network error says nothing about this identity.
+ */
+export function forgetStaleHostHint(list: ListState, storage: Pick<Storage, 'removeItem'>): void {
+  if (list.kind !== 'denied') return;
+  try {
+    storage.removeItem(HOST_HINT_KEY);
+  } catch {
+    // Private mode: nothing was kept to forget.
+  }
+}
+
+/**
  * The thumbnail route needs the Authorization header, which an `<img>` cannot send, so it is
  * fetched and shown from a blob. The browser's cache revalidates it with the ETag (304).
  */
