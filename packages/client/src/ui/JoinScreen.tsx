@@ -24,7 +24,7 @@ import {
   type Profile,
 } from './join-screen.js';
 import { useJoinEnv, type JoinEnv } from './join-context.js';
-import { dmLinkToken, HOST_SCREEN_KEY } from './host-screen.js';
+import { dmLinkToken, foreignDmLinkHost, HOST_SCREEN_KEY } from './host-screen.js';
 import { HostScreen } from './HostScreen.js';
 import './join-screen.css';
 
@@ -310,14 +310,19 @@ function JoinFlow({ env }: { env: JoinEnv }) {
 
 function DmStep({ onBack }: { onBack: () => void }) {
   const [link, setLink] = useState('');
+  // MV-284: a link for another host is held back until the DM continues a second time.
+  const [warned, setWarned] = useState(false);
   const token = dmLinkToken(link);
+  const foreignHost = token === undefined ? null : foreignDmLinkHost(link, location.origin);
   return (
     <Card title="I'm the DM">
       <form
         className="join-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (token !== undefined) openDmLink(token);
+          if (token === undefined) return;
+          if (foreignHost !== null && !warned) setWarned(true);
+          else openDmLink(token);
         }}
       >
         <p>
@@ -334,13 +339,20 @@ function DmStep({ onBack }: { onBack: () => void }) {
             autoFocus
             onChange={(e) => {
               setLink(e.target.value);
+              setWarned(false);
             }}
           />
         </label>
         {link.trim() !== '' && token === undefined && <p role="alert">That is not a DM link.</p>}
+        {warned && foreignHost !== null && (
+          <p role="alert">
+            This link is for {foreignHost}, not this page. Open it there, or continue to use it
+            here.
+          </p>
+        )}
         <div className="join-actions">
           <button type="submit" disabled={token === undefined}>
-            Continue
+            {warned ? 'Continue anyway' : 'Continue'}
           </button>
           <button type="button" onClick={onBack}>
             Back

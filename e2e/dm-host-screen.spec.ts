@@ -151,6 +151,57 @@ test('the DM picks a campaign by last played, opens Invite, seats a player and s
   }
 });
 
+test('a DM link for another host is held back until the DM continues', async ({ browser }) => {
+  test.setTimeout(60_000);
+  const dataDir = await mkdtemp(join(tmpdir(), 'mythic-host-screen-origin-'));
+  let running: Running | undefined;
+  try {
+    running = await start(dataDir, ['--new-campaign', 'Far Table']);
+    const token = running.hostToken;
+    const dm = await visitor(browser, running);
+    const page = dm.page;
+    const sent: string[] = [];
+    page.on('websocket', (ws) => {
+      ws.on('framesent', (frame) => {
+        if (typeof frame.payload === 'string') sent.push(frame.payload);
+      });
+    });
+
+    // MV-284: the printed link names localhost while this page is 127.0.0.1 (another origin).
+    await page.getByRole('button', { name: "I'm the DM" }).click();
+    const step = page.getByRole('dialog', { name: "I'm the DM" });
+    await page
+      .getByLabel('DM link')
+      .fill(`http://localhost:${String(running.hostPort)}/#host=${token}`);
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(step.getByRole('alert')).toHaveText(
+      `This link is for localhost:${String(running.hostPort)}, not this page. Open it there, or continue to use it here.`,
+    );
+    expect(page.url()).not.toContain('host=');
+    expect(sent.some((frame) => frame.includes(token))).toBe(false);
+
+    // Editing the link clears the warning, so the next Continue warns again before sending.
+    await page
+      .getByLabel('DM link')
+      .fill(` http://localhost:${String(running.hostPort)}/#host=${token} `);
+    await expect(step.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(step.getByRole('alert')).toBeVisible();
+    expect(sent.some((frame) => frame.includes(token))).toBe(false);
+
+    await page.getByRole('button', { name: 'Continue anyway' }).click();
+    await expect(page.getByRole('dialog', { name: 'Choose a campaign' })).toContainText(
+      'Far Table',
+    );
+    expect(sent.some((frame) => frame.includes(token))).toBe(true);
+    await dm.done();
+  } finally {
+    if (running) await stop(running);
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
 test('a visitor on the join link cannot reach the DM path', async ({ browser }) => {
   test.setTimeout(90_000);
   const dataDir = await mkdtemp(join(tmpdir(), 'mythic-host-screen-deny-'));
