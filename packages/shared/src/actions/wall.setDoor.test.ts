@@ -143,7 +143,7 @@ describe(`${T} permissions (D47 + MV-303)`, () => {
     expect(canPerform(archived, ACTORS.owner, T, payload())).toBe(false);
   });
 
-  it('rejects non-doors, missing entities, no-op changes and a locked map layer', () => {
+  it('rejects non-doors, missing entities and no-op changes', () => {
     expect(canPerform(withDoor(null), ACTORS.host, T, payload())).toBe(false);
     const prop = withDoor();
     const scene = prop.scenes[IDS.scene];
@@ -157,12 +157,53 @@ describe(`${T} permissions (D47 + MV-303)`, () => {
       false,
     );
     expect(canPerform(withDoor({ open: true }), ACTORS.host, T, payload(true))).toBe(false);
-    // The existing locked-layer rule (entity.update) blocks the host and co-DMs too.
-    const locked = withDoor({ open: false }, true);
-    const lockedScene = locked.scenes[IDS.scene];
-    if (lockedScene) lockedScene.layers.map = { locked: true };
-    for (const actor of [ACTORS.host, ACTORS.coDm, ACTORS.owner])
-      expect(canPerform(locked, actor, T, payload())).toBe(false);
+  });
+
+  it('a locked map layer does not block a door, but still blocks moving or editing the wall', () => {
+    const lock = (state: Campaign) => {
+      const scene = state.scenes[IDS.scene];
+      if (scene) scene.layers.map = { locked: true };
+      return state;
+    };
+    // Opening a door is play state, not map editing.
+    expect(permissionMatrix(lock(withDoor({ open: false }, true)), T, payload())).toEqual({
+      host: true,
+      coDm: true,
+      owner: true,
+      otherSeat: false,
+      spectator: false,
+      mod: false,
+    });
+    // Secret doors stay admin-only, with the same PERM-03 rejection.
+    const secret = lock(withDoor({ open: false, secret: true }, true));
+    expect(checkIntent(secret, ACTORS.owner, T, payload())).toEqual({
+      ok: false,
+      reason: 'forbidden',
+    });
+    expect(canPerform(secret, ACTORS.host, T, payload())).toBe(true);
+    // Moving or editing the wall still follows the locked-layer rule, for everyone.
+    const locked = lock(withDoor({ open: false }, true));
+    const move = {
+      sceneId: IDS.scene,
+      entityId: DOOR,
+      changes: {
+        transform: {
+          position: { x: 3, y: 0, z: 3 },
+          rotation: { x: 0, y: 0, z: 0, w: 1 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+      },
+    };
+    const edit = { sceneId: IDS.scene, entityId: DOOR, changes: { name: 'Gate' } };
+    for (const actor of [ACTORS.host, ACTORS.coDm, ACTORS.owner]) {
+      expect(canPerform(locked, actor, 'entity.update', move)).toBe(false);
+      expect(canPerform(locked, actor, 'entity.update', edit)).toBe(false);
+    }
+    // Unlocked, the host may move and edit the same wall, so the lock is what rejects above.
+    const unlocked = withDoor({ open: false }, true);
+    expect(canPerform(unlocked, ACTORS.host, 'entity.update', move)).toBe(true);
+    expect(canPerform(unlocked, ACTORS.host, 'entity.update', edit)).toBe(true);
+    expect(canPerform(unlocked, ACTORS.owner, 'entity.update', move)).toBe(false);
   });
 });
 
