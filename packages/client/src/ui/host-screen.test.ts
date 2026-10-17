@@ -6,7 +6,10 @@ import {
   fetchCampaignList,
   fetchCampaignThumbnail,
   foreignDmLinkHost,
+  HOST_HINT_KEY,
+  HOST_SCREEN_KEY,
   hostScreenView,
+  leaveHostScreen,
   pickCampaign,
   sortCampaigns,
   type HostFetch,
@@ -159,7 +162,12 @@ describe('pickCampaign', () => {
 });
 
 describe('hostScreenView', () => {
-  const base = { fatalError: null, ready: true, list: { kind: 'ok', list } as const };
+  const base = {
+    fatalError: null,
+    ready: true,
+    list: { kind: 'ok', list } as const,
+    campaign: true,
+  };
   it('follows the steps once the host has listed the campaigns', () => {
     expect(hostScreenView({ ...base, step: 'campaigns' })).toBe('campaigns');
     expect(hostScreenView({ ...base, step: 'table' })).toBe('table');
@@ -179,6 +187,40 @@ describe('hostScreenView', () => {
     expect(
       hostScreenView({ ...base, fatalError: 'unauthorized: host token rejected', step: 'table' }),
     ).toBe('refused');
+  });
+
+  it('says the campaign is loading rather than showing a blank table step (MV-285)', () => {
+    expect(hostScreenView({ ...base, campaign: false, step: 'table' })).toBe('table-loading');
+    expect(hostScreenView({ ...base, campaign: false, step: 'campaigns' })).toBe('campaigns');
+    expect(
+      hostScreenView({ ...base, campaign: false, fatalError: 'connection failed', step: 'table' }),
+    ).toBe('refused');
+  });
+});
+
+describe('leaveHostScreen (MV-285)', () => {
+  const store = (entries: Record<string, string>) => {
+    const map = new Map(Object.entries(entries));
+    return { map, removeItem: (key: string) => map.delete(key) };
+  };
+
+  it('clears the host screen flag and the remembered host hint, nothing else', () => {
+    const session = store({ [HOST_SCREEN_KEY]: '1', other: 'x' });
+    const local = store({ [HOST_HINT_KEY]: '1', 'mythic.identity.v1': '{}' });
+    leaveHostScreen(session, local);
+    expect([...session.map.keys()]).toEqual(['other']);
+    expect([...local.map.keys()]).toEqual(['mythic.identity.v1']);
+  });
+
+  it('survives storage that throws', () => {
+    const broken = {
+      removeItem: () => {
+        throw new Error('denied');
+      },
+    };
+    expect(() => {
+      leaveHostScreen(broken, broken);
+    }).not.toThrow();
   });
 });
 

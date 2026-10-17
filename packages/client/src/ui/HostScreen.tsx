@@ -7,6 +7,7 @@ import {
   fetchCampaignList,
   fetchCampaignThumbnail,
   hostScreenView,
+  leaveHostScreen,
   pickCampaign,
   type HostStep,
   type ListState,
@@ -25,6 +26,16 @@ function storedCredential(env: JoinEnv) {
   } catch {
     return null;
   }
+}
+
+/**
+ * MV-285: back to the join screen. The DM link was already scrubbed from the address bar, so the
+ * reload cannot send the refused token again.
+ */
+function backToJoinScreen(): void {
+  leaveHostScreen(sessionStorage, localStorage);
+  history.replaceState(null, '', `${location.pathname}${location.search}`);
+  location.reload();
 }
 
 const formatTime = (ms: number) =>
@@ -63,7 +74,7 @@ export function HostScreen({ env }: { env: JoinEnv }) {
     };
   }, [ready]);
 
-  const view = hostScreenView({ fatalError, ready, list, step });
+  const view = hostScreenView({ fatalError, ready, list, step, campaign: campaign !== null });
   if (view === 'done') return null;
   return (
     <div className="join-backdrop">
@@ -86,15 +97,38 @@ export function HostScreen({ env }: { env: JoinEnv }) {
           <>
             <h2 id="host-h">I'm the DM</h2>
             <p role="alert">
-              The host did not accept this browser as the DM. Use the DM link the host printed when
-              it started; each link works once.
+              The host refused this DM link. It may have been used already (each link works once) or
+              be for another host.
             </p>
+            <p>
+              Ask the host for a new DM link: it prints one each time it starts. Reload connects
+              again without the link.
+            </p>
+            <div className="join-actions">
+              <button type="button" onClick={backToJoinScreen}>
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  location.reload();
+                }}
+              >
+                Reload
+              </button>
+            </div>
           </>
         )}
         {view === 'error' && (
           <>
             <h2 id="host-h">I'm the DM</h2>
             <p role="alert">Could not load the campaigns. Reload the page to try again.</p>
+          </>
+        )}
+        {view === 'table-loading' && (
+          <>
+            <h2 id="host-h">I'm the DM</h2>
+            <p>Loading the campaign...</p>
           </>
         )}
         {view === 'campaigns' && list.kind === 'ok' && (

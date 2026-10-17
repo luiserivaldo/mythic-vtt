@@ -7,6 +7,31 @@ import { authorizationHeader, type UploadCredential } from '../assets/image-uplo
  */
 export const HOST_SCREEN_KEY = 'mythic.host.screen';
 
+/** Set once a DM link has bound this browser as host, so a reload skips the join screen. */
+export const HOST_HINT_KEY = 'mythic.host';
+
+/** The slice of Storage that leaving the host screen clears. */
+export interface HintStore {
+  removeItem(key: string): void;
+}
+
+/**
+ * MV-285: Back from a refused DM link. Both hints only steer the UI; with them gone the next load
+ * shows the join screen again, where "I'm the DM" takes a new link. The host binding is untouched.
+ */
+export function leaveHostScreen(session: HintStore, local: HintStore): void {
+  for (const [store, key] of [
+    [session, HOST_SCREEN_KEY],
+    [local, HOST_HINT_KEY],
+  ] as const) {
+    try {
+      store.removeItem(key);
+    } catch {
+      // Private mode: nothing was stored.
+    }
+  }
+}
+
 /** The slice of `fetch` these calls need, so a test can stand in for the host. */
 export type HostFetch = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -101,22 +126,25 @@ export function pickCampaign(
   };
 }
 
-export type HostScreenView = 'connecting' | 'refused' | 'error' | HostStep;
+export type HostScreenView = 'connecting' | 'refused' | 'error' | 'table-loading' | HostStep;
 
 /**
  * The host decides: the list is fetched with this identity and only a 200 shows anything. A
- * refused DM link (fatal `hello`) or a 401/403 from the list both end on `refused`.
+ * refused DM link (fatal `hello`) or a 401/403 from the list both end on `refused`. The table step
+ * waits for the campaign itself (MV-285), so its card is never blank.
  */
 export function hostScreenView(i: {
   fatalError: string | null;
   ready: boolean;
   list: ListState;
   step: HostStep;
+  campaign: boolean;
 }): HostScreenView {
   if (i.step === 'done') return 'done';
   if (i.fatalError !== null || i.list.kind === 'denied') return 'refused';
   if (!i.ready || i.list.kind === 'loading') return 'connecting';
   if (i.list.kind === 'error') return 'error';
+  if (i.step === 'table' && !i.campaign) return 'table-loading';
   return i.step;
 }
 

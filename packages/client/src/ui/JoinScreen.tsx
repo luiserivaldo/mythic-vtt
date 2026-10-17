@@ -16,6 +16,7 @@ import {
   joinSeatRows,
   joinView,
   nextJoinPollMs,
+  offersDmLink,
   parseJoinPayload,
   saveProfile,
   withoutAwaitingSeat,
@@ -294,7 +295,7 @@ function JoinFlow({ env }: { env: JoinEnv }) {
           }}
         />
       )}
-      {view !== 'loading' && (
+      {offersDmLink(view, started) && (
         <div className="join-actions">
           <button
             type="button"

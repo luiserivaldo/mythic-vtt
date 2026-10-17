@@ -313,6 +313,11 @@ test('the DM seats a remembered visitor from the roster; spectators stay anonymo
   await expect(quinn.page.getByRole('button', { name: 'Watching: choose a seat' })).toHaveCount(0);
   expect(await storedProfile()).toEqual({ displayName: 'Quinn', awaitingSeat: true });
   await expect.poll(() => quinn.sockets()).toBe(1);
+  // MV-285: once connected, "I'm the DM" would do nothing, so the seat choice does not offer it.
+  await quinn.page.getByRole('button', { name: 'Waiting for a seat: choose one' }).click();
+  await expect(quinn.page.getByRole('heading', { name: 'Join the table' })).toBeVisible();
+  await expect(quinn.page.getByRole('button', { name: 'Temporary Player' })).toBeVisible();
+  await expect(quinn.page.getByRole('button', { name: "I'm the DM" })).toHaveCount(0);
 
   // The DM seats Quinn from the dropdown, not by typing an identity id.
   const roster = dm.getByRole('list', { name: 'Connected identities' });
