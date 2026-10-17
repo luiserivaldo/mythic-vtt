@@ -3,6 +3,7 @@ import { useClientStore } from '../store/react.js';
 import { IDENTITY_STORAGE_KEY } from '../net/identity.js';
 import { parseIdentityFile } from '../net/identity-file.js';
 import { CampaignThumbnailControls } from './CampaignThumbnailControls.js';
+import { GameExitButton } from './GameExit.js';
 import { useJoinEnv } from './join-context.js';
 import { isAdminRole, viewerRole } from './viewer.js';
 import { useViewerPreferences } from './ViewerPreferencesProvider.js';
@@ -111,6 +112,8 @@ export function SettingsPanel({
       <button type="button" disabled title="Game log is a work in progress">
         Game log (WIP)
       </button>
+      {/* UX-05b: End Game for the host DM, Leave Game for everyone else. */}
+      <GameExitButton />
     </section>
   );
 }

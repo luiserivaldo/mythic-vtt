@@ -58,6 +58,13 @@ test('viewer settings persist locally, DM permissions work, and export downloads
         page.getByRole('button', { name: 'Game log (WIP)', exact: true }),
       ).toBeDisabled();
     }
+    // UX-05b (MV-273): the host DM ends the game; anyone else leaves it. Nobody signs out.
+    await expect(dm.getByRole('button', { name: 'End Game', exact: true })).toBeVisible();
+    await expect(player.getByRole('button', { name: 'Leave Game', exact: true })).toBeVisible();
+    await expect(dm.getByRole('button', { name: 'Leave Game', exact: true })).toHaveCount(0);
+    await expect(player.getByRole('button', { name: 'End Game', exact: true })).toHaveCount(0);
+    for (const page of [dm, player])
+      await expect(page.getByRole('button', { name: /sign out/i })).toHaveCount(0);
     await expect(player.getByRole('group', { name: 'Table settings', exact: true })).toHaveCount(0);
     await expect(player.getByLabel('Players may measure')).toHaveCount(0);
     await expect(player.getByLabel('Players may create')).toHaveCount(0);
@@ -101,6 +108,15 @@ test('viewer settings persist locally, DM permissions work, and export downloads
             .scenes?.[sceneId]?.entities?.[tokenId],
       )
       .toBeUndefined();
+
+    // Leaving drops only the player's connection; the DM's table carries on.
+    await player.getByRole('tab', { name: 'Settings', exact: true }).click();
+    await player.getByRole('button', { name: 'Leave Game', exact: true }).click();
+    await expect(player.getByRole('dialog', { name: 'Left the game' })).toBeVisible();
+    await expect(player.getByRole('status')).not.toHaveText(/^Connected/);
+    await expect(dm.getByRole('status')).toHaveText('Connected to New campaign');
+    await player.getByRole('button', { name: 'Rejoin', exact: true }).click();
+    await expect(player.getByRole('dialog', { name: 'Left the game' })).toHaveCount(0);
   } finally {
     await setup?.close();
     await dmContext.close();

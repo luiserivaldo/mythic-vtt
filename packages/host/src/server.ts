@@ -144,7 +144,7 @@ export async function startHost(
       hostJoinUrls: () => reportedJoinUrls,
       onApplied: async (state, appliedSeq) => {
         if (appliedSeq % config.autosaveEvery === 0)
-          await saveCampaignCheckpoint(store, state, sessionId, appliedSeq, 'autosave');
+          await saveCampaignCheckpoint(store, state, sessionId, appliedSeq, 'autosave', clock());
       },
     });
   } catch (error) {
@@ -287,6 +287,7 @@ export async function startHost(
             engine.sessionId,
             engine.seq(),
             'end',
+            clock(),
           );
         } finally {
           spectatorLinks.close();

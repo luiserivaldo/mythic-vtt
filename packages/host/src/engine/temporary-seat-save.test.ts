@@ -48,7 +48,14 @@ it('never writes a temporary seat, its name or its ownership to a saved file', a
     store,
     // Checkpoint after every action, as the strictest autosave setting would.
     onApplied: async (state, seq) => {
-      await saveCampaignCheckpoint(store as LocalCampaignStore, state, sessionId, seq, 'autosave');
+      await saveCampaignCheckpoint(
+        store as LocalCampaignStore,
+        state,
+        sessionId,
+        seq,
+        'autosave',
+        seq,
+      );
     },
   });
   const host = fakeConnection(T.host, { isHost: true });
@@ -70,7 +77,7 @@ it('never writes a temporary seat, its name or its ownership to a saved file', a
   expect(engine.state().scenes[T.scene]?.entities[T.token]?.owners).toEqual([seat?.id]);
 
   // Mid-session checkpoint (autosave) and the end-of-session save.
-  await saveCampaignCheckpoint(store, engine.state(), sessionId, engine.seq(), 'end');
+  await saveCampaignCheckpoint(store, engine.state(), sessionId, engine.seq(), 'end', 2);
   const files = await savedFiles(dir);
   expect(files.length).toBeGreaterThan(2);
   for (const file of files) {

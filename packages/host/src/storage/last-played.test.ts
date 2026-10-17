@@ -1,17 +1,19 @@
 import Database from 'better-sqlite3';
 import { storeMigrate, type Campaign } from '@mythic/shared';
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, utimes, writeFile } from 'node:fs/promises';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { formatCampaignList } from '../campaign-picker.js';
 import { newCampaign } from '../engine/campaign.js';
+import { saveCampaignCheckpoint } from '../engine/recovery.js';
 import { byLastPlayed, LocalCampaignStore } from './local-campaign-store.js';
 import { CampaignFile, CURRENT_SCHEMA_VERSION, type CampaignMeta } from './types.js';
 
-// UX-05 / UI-HOST-02: last played (session start) and the thumbnail live in the host-local
-// campaigns index, rebuilt from the campaign folders; the save format is unchanged.
+// UX-05 / UI-HOST-02: last played and the thumbnail live in the host-local campaigns index,
+// rebuilt from the campaign folders; the save format is unchanged. UX-05b (MV-273): last played
+// is the newest autosave or session-end save, never the moment the host opened the campaign.
 
 const A = '01J00000000000000000000A01';
 const B = '01J00000000000000000000B01';
@@ -44,7 +46,7 @@ async function save(store: LocalCampaignStore, id: string, extra: Partial<Campai
   return campaign;
 }
 
-async function play(store: LocalCampaignStore, id: string, n: number, startedAt: number) {
+async function openOnly(store: LocalCampaignStore, id: string, n: number, startedAt: number) {
   const state = (await store.load(id)).campaign as Campaign;
   await store.startSession(
     id,
@@ -53,29 +55,62 @@ async function play(store: LocalCampaignStore, id: string, n: number, startedAt:
   );
 }
 
+/** A session that opens the campaign and checkpoints it once (`autosave` or `end`) at `at`. */
+async function play(
+  store: LocalCampaignStore,
+  campaign: Campaign,
+  n: number,
+  at: number,
+  label: 'autosave' | 'end' = 'autosave',
+) {
+  await openOnly(store, campaign.id, n, at - 500);
+  await saveCampaignCheckpoint(store, campaign, SESSION(n), 1, label, at);
+}
+
+/** Sets a checkpoint file's time, as the host clock would have when it wrote it. */
+const touch = (dir: string, id: string, n: number, label: string, at: number) =>
+  utimes(
+    join(dir, 'campaigns', id, 'sessions', SESSION(n), 'snapshots', `${label}.json`),
+    at / 1000,
+    at / 1000,
+  );
+
 const ids = (list: CampaignMeta[]) => list.map((c) => c.id);
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
 describe('last played (UX-05)', () => {
-  it('is set when a session starts, and the list is newest-played first', async () => {
+  it('is set by an autosave or the end save, and the list is newest-played first', async () => {
     const store = open(root());
-    await save(store, A);
+    const a = await save(store, A);
     await tick();
-    await save(store, B);
+    const b = await save(store, B);
     await tick();
     await save(store, C);
     // C was saved last but never played; B was played after A.
-    await play(store, A, 1, 1_000);
-    await play(store, B, 2, 2_000);
+    await play(store, a, 1, 1_000);
+    await play(store, b, 2, 2_000, 'end');
     const list = await store.list();
     expect(ids(list)).toEqual([B, A, C]);
     expect(list.find((c) => c.id === A)?.lastPlayedAt).toBe(1_000);
+    expect(list.find((c) => c.id === B)?.lastPlayedAt).toBe(2_000);
     expect(list.find((c) => c.id === C)).not.toHaveProperty('lastPlayedAt');
-    // Saving does not count as playing: an autosave of A keeps B first.
+    // A plain file save (an import, a migration) is not playing: B stays first.
     await save(store, A);
     expect(ids(await store.list())).toEqual([B, A, C]);
-    await play(store, A, 3, 3_000);
+    // Opening A is not playing either; its first autosave is.
+    await openOnly(store, A, 3, 3_000);
+    expect(ids(await store.list())).toEqual([B, A, C]);
+    expect((await store.list()).find((c) => c.id === A)?.lastPlayedAt).toBe(1_000);
+    await saveCampaignCheckpoint(store, a, SESSION(3), 1, 'autosave', 3_500);
     expect(ids(await store.list())).toEqual([A, B, C]);
+    expect((await store.list())[0]?.lastPlayedAt).toBe(3_500);
+  });
+
+  it('is never set for a campaign that was only opened', async () => {
+    const store = open(root());
+    await save(store, A);
+    await openOnly(store, A, 1, 1_000);
+    expect((await store.list())[0]).not.toHaveProperty('lastPlayedAt');
   });
 
   it('orders never-played campaigns by their last save', () => {
@@ -93,10 +128,14 @@ describe('last played (UX-05)', () => {
   it('is rebuilt from session folders when the index is lost', async () => {
     const dir = root();
     const store = open(dir);
-    await save(store, A);
+    const a = await save(store, A);
     await save(store, B);
-    await play(store, A, 1, 5_000);
-    await play(store, A, 2, 7_000);
+    await play(store, a, 1, 5_000);
+    await play(store, a, 2, 7_000, 'end');
+    // Session 3 crashed before its first autosave: it does not count.
+    await openOnly(store, A, 3, 9_000);
+    await touch(dir, A, 1, 'autosave', 5_000);
+    await touch(dir, A, 2, 'end', 7_000);
     await store.close();
     await rm(join(dir, 'index.sqlite'));
     const rebuilt = open(dir);
@@ -104,6 +143,7 @@ describe('last played (UX-05)', () => {
     const list = await rebuilt.list();
     expect(ids(list)).toEqual([A, B]);
     expect(list[0]?.lastPlayedAt).toBe(7_000);
+    expect(list[1]).not.toHaveProperty('lastPlayedAt');
   });
 });
 
@@ -121,7 +161,7 @@ describe('campaign thumbnail in the index (UX-05)', () => {
   it('fills both columns for an index written before UX-05, without rewriting files', async () => {
     const dir = root();
     const folder = join(dir, 'campaigns', A);
-    await mkdir(join(folder, 'sessions', SESSION(1)), { recursive: true });
+    await mkdir(join(folder, 'sessions', SESSION(1), 'snapshots'), { recursive: true });
     await writeFile(
       join(folder, 'campaign.json'),
       JSON.stringify(CampaignFile.parse({ ...newCampaign(A, 'Old'), screenshot: upload })),
@@ -131,9 +171,12 @@ describe('campaign thumbnail in the index (UX-05)', () => {
       JSON.stringify({
         schemaVersion: CURRENT_SCHEMA_VERSION,
         sessionId: SESSION(1),
-        startedAt: 4_000,
+        startedAt: 3_000,
       }),
     );
+    // Only the file time of the checkpoint is read, never its contents.
+    await writeFile(join(folder, 'sessions', SESSION(1), 'snapshots', 'end.json'), '{}');
+    await touch(dir, A, 1, 'end', 4_000);
     // The MV-168 index: no last_played_at or thumbnail columns.
     const legacy = new Database(join(dir, 'index.sqlite'));
     legacy.exec(
