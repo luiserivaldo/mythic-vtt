@@ -3,17 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { Campaign, DoorComponent } from '../schema/index.js';
 import { diffPatchesFor, patchesFor, visibleTo } from '../visibility/index.js';
 import type { Actor, ActionEnvelope } from './envelope.js';
-import { canPerform, reduceAction } from './run.js';
+import { canPerform, checkIntent, reduceAction } from './run.js';
 import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix, testId } from './testing.js';
 import { wallSetDoor } from './wall.setDoor.js';
 
 const T = 'wall.setDoor';
 const DOOR = IDS.entity;
-const payload = (state: DoorComponent['state'] = 'open') => ({
-  sceneId: IDS.scene,
-  entityId: DOOR,
-  state,
-});
+const payload = (open = true) => ({ sceneId: IDS.scene, entityId: DOOR, open });
 const envelope = (p: unknown, actor: Actor = ACTORS.host): ActionEnvelope => ({
   id: IDS.action,
   type: T,
@@ -26,7 +22,7 @@ const envelope = (p: unknown, actor: Actor = ACTORS.host): ActionEnvelope => ({
   ts: 1_000,
 });
 
-function withDoor(door: DoorComponent | null = { state: 'closed' }, doorsTool = false) {
+function withDoor(door: DoorComponent | null = { open: false }, doorsTool = false) {
   const state = makeCampaign();
   const scene = state.scenes[IDS.scene];
   if (!scene) throw new Error('scene');
@@ -55,14 +51,13 @@ function withDoor(door: DoorComponent | null = { state: 'closed' }, doorsTool = 
 const doorOf = (state: Campaign) => state.scenes[IDS.scene]?.entities[DOOR]?.wall?.door;
 
 describe(`${T} schema`, () => {
-  it('accepts open, closed and locked; rejects anything else', () => {
-    for (const s of ['open', 'closed', 'locked'] as const)
-      expect(wallSetDoor.schema.safeParse(payload(s)).success).toBe(true);
+  it('accepts open true or false; rejects anything else', () => {
+    for (const open of [true, false])
+      expect(wallSetDoor.schema.safeParse(payload(open)).success).toBe(true);
     for (const bad of [
       { sceneId: IDS.scene, entityId: DOOR },
-      { ...payload(), state: 'ajar' },
-      { ...payload(), state: true },
-      { sceneId: IDS.scene, entityId: DOOR, open: true },
+      { ...payload(), open: 'yes' },
+      { sceneId: IDS.scene, entityId: DOOR, state: 'open' },
       { ...payload(), secret: false },
       { ...payload(), entityId: 'nope' },
     ])
@@ -70,7 +65,7 @@ describe(`${T} schema`, () => {
   });
 });
 
-describe(`${T} permissions (MV-303 Q1)`, () => {
+describe(`${T} permissions (D47 + MV-303)`, () => {
   it('without the doors tool only the host and co-DM may toggle, whatever the player grants', () => {
     expect(permissionMatrix(withDoor(), T, payload())).toEqual({
       host: true,
@@ -82,8 +77,8 @@ describe(`${T} permissions (MV-303 Q1)`, () => {
     });
   });
 
-  it('a seat with the doors tool may open and close an ordinary door, and nothing more', () => {
-    expect(permissionMatrix(withDoor({ state: 'closed' }, true), T, payload('open'))).toEqual({
+  it('a seat with the doors tool may open and close a non-secret door', () => {
+    expect(permissionMatrix(withDoor({ open: false }, true), T, payload(true))).toEqual({
       host: true,
       coDm: true,
       owner: true,
@@ -91,57 +86,58 @@ describe(`${T} permissions (MV-303 Q1)`, () => {
       spectator: false,
       mod: false,
     });
-    expect(canPerform(withDoor({ state: 'open' }, true), ACTORS.owner, T, payload('closed'))).toBe(
-      true,
-    );
-    // Never lock or unlock.
+    expect(canPerform(withDoor({ open: true }, true), ACTORS.owner, T, payload(false))).toBe(true);
     expect(
-      canPerform(withDoor({ state: 'closed' }, true), ACTORS.owner, T, payload('locked')),
-    ).toBe(false);
-    expect(canPerform(withDoor({ state: 'open' }, true), ACTORS.owner, T, payload('locked'))).toBe(
-      false,
-    );
-    expect(canPerform(withDoor({ state: 'locked' }, true), ACTORS.owner, T, payload('open'))).toBe(
-      false,
-    );
-    expect(
-      canPerform(withDoor({ state: 'locked' }, true), ACTORS.owner, T, payload('closed')),
-    ).toBe(false);
-    // Never touch a secret door, in any state.
-    for (const state of ['open', 'closed'] as const) {
-      const secret = withDoor({ state, secret: true }, true);
-      const to = state === 'open' ? 'closed' : 'open';
-      expect(canPerform(secret, ACTORS.owner, T, payload(to))).toBe(false);
-      expect(canPerform(secret, ACTORS.host, T, payload(to))).toBe(true);
-      expect(canPerform(secret, ACTORS.coDm, T, payload(to))).toBe(true);
+      canPerform(withDoor({ open: false, secret: false }, true), ACTORS.owner, T, payload(true)),
+    ).toBe(true);
+  });
+
+  it('a secret door is admin-only, open or closed', () => {
+    for (const open of [true, false]) {
+      const secret = withDoor({ open, secret: true }, true);
+      expect(canPerform(secret, ACTORS.owner, T, payload(!open))).toBe(false);
+      expect(canPerform(secret, ACTORS.host, T, payload(!open))).toBe(true);
+      expect(canPerform(secret, ACTORS.coDm, T, payload(!open))).toBe(true);
     }
   });
 
-  it('admins may set any state, including locking and unlocking secret doors', () => {
-    for (const from of ['open', 'closed', 'locked'] as const)
-      for (const to of ['open', 'closed', 'locked'] as const) {
-        if (from === to) continue;
-        for (const actor of [ACTORS.host, ACTORS.coDm])
-          expect(canPerform(withDoor({ state: from, secret: true }), actor, T, payload(to))).toBe(
-            true,
-          );
-      }
+  it('PERM-03: a player gets the same rejection for a secret door, a wall, a prop and an unknown id', () => {
+    const secret = withDoor({ open: false, secret: true }, true);
+    const wall = withDoor(null, true);
+    const prop = withDoor(null, true);
+    const propScene = prop.scenes[IDS.scene];
+    if (propScene)
+      propScene.entities[DOOR] = makeEntity(DOOR, {
+        layer: 'props',
+        shape: { kind: 'box', color: '#888888', walkable: false },
+      });
+    const unknown = withDoor({ open: false }, true);
+    const results = [
+      checkIntent(secret, ACTORS.owner, T, payload()),
+      checkIntent(wall, ACTORS.owner, T, payload()),
+      checkIntent(prop, ACTORS.owner, T, payload()),
+      checkIntent(unknown, ACTORS.owner, T, { ...payload(), entityId: testId(30) }),
+    ];
+    for (const result of results) expect(result).toEqual(results[0]);
+    expect(results[0]).toEqual({ ok: false, reason: 'forbidden' });
+    // The same tool-holding seat may open an ordinary door, so the rejections above are the rule.
+    expect(checkIntent(unknown, ACTORS.owner, T, payload()).ok).toBe(true);
   });
 
   it('the tool is bound by the seat switches, the active scene and view permission', () => {
-    const disabled = withDoor({ state: 'closed' }, true);
+    const disabled = withDoor({ open: false }, true);
     const owner = disabled.seats[IDS.owner];
     if (owner) owner.interactionEnabled = false;
     expect(canPerform(disabled, ACTORS.owner, T, payload())).toBe(false);
-    const blind = withDoor({ state: 'closed' }, true);
+    const blind = withDoor({ open: false }, true);
     const blindSeat = blind.seats[IDS.owner];
     if (blindSeat) blindSeat.permissions.view = false;
     expect(canPerform(blind, ACTORS.owner, T, payload())).toBe(false);
-    const inactive = withDoor({ state: 'closed' }, true);
+    const inactive = withDoor({ open: false }, true);
     inactive.activeSceneId = null;
     expect(canPerform(inactive, ACTORS.owner, T, payload())).toBe(false);
     expect(canPerform(inactive, ACTORS.host, T, payload())).toBe(true);
-    const archived = withDoor({ state: 'closed' }, true);
+    const archived = withDoor({ open: false }, true);
     const archivedSeat = archived.seats[IDS.owner];
     if (archivedSeat) archivedSeat.archived = true;
     expect(canPerform(archived, ACTORS.owner, T, payload())).toBe(false);
@@ -160,8 +156,9 @@ describe(`${T} permissions (MV-303 Q1)`, () => {
     expect(canPerform(withDoor(), ACTORS.host, T, { ...payload(), entityId: testId(30) })).toBe(
       false,
     );
-    expect(canPerform(withDoor({ state: 'open' }), ACTORS.host, T, payload('open'))).toBe(false);
-    const locked = withDoor({ state: 'closed' }, true);
+    expect(canPerform(withDoor({ open: true }), ACTORS.host, T, payload(true))).toBe(false);
+    // The existing locked-layer rule (entity.update) blocks the host and co-DMs too.
+    const locked = withDoor({ open: false }, true);
     const lockedScene = locked.scenes[IDS.scene];
     if (lockedScene) lockedScene.layers.map = { locked: true };
     for (const actor of [ACTORS.host, ACTORS.coDm, ACTORS.owner])
@@ -170,24 +167,24 @@ describe(`${T} permissions (MV-303 Q1)`, () => {
 });
 
 describe(`${T} reducer, undo and visibility`, () => {
-  it('sets only the door state, keeping secret and points', () => {
-    const before = withDoor({ state: 'closed', secret: true });
-    const { state, patches } = reduceAction(before, envelope(payload('locked')));
-    expect(doorOf(state)).toEqual({ state: 'locked', secret: true });
+  it('sets only the door flag, keeping secret and points', () => {
+    const before = withDoor({ open: false, secret: true });
+    const { state, patches } = reduceAction(before, envelope(payload(true)));
+    expect(doorOf(state)).toEqual({ open: true, secret: true });
     expect(state.scenes[IDS.scene]?.entities[DOOR]?.wall?.points).toHaveLength(2);
     expect(patches).toEqual([
       {
         op: 'replace',
-        path: ['scenes', IDS.scene, 'entities', DOOR, 'wall', 'door', 'state'],
-        value: 'locked',
+        path: ['scenes', IDS.scene, 'entities', DOOR, 'wall', 'door', 'open'],
+        value: true,
       },
     ]);
-    expect(doorOf(before)).toEqual({ state: 'closed', secret: true });
+    expect(doorOf(before)).toEqual({ open: false, secret: true });
   });
 
   it('is deterministic and undoes through the ordinary inverse patches', () => {
-    const before = withDoor({ state: 'closed' }, true);
-    const e = envelope(payload('open'), ACTORS.owner);
+    const before = withDoor({ open: false }, true);
+    const e = envelope(payload(true), ACTORS.owner);
     const result = reduceAction(before, e);
     expect(reduceAction(before, e)).toEqual(result);
     expect(applyPatches(result.state, result.inversePatches)).toEqual(before);
@@ -196,37 +193,35 @@ describe(`${T} reducer, undo and visibility`, () => {
       type: 'history.undo',
       payload: { targetSeqs: [1], patches: result.inversePatches },
     });
-    expect(doorOf(undo.state)).toEqual({ state: 'closed' });
+    expect(doorOf(undo.state)).toEqual({ open: false });
   });
 
   it('a player or spectator never sees a closed secret door, before or after any toggle', () => {
-    let state = withDoor({ state: 'closed', secret: true });
+    let state = withDoor({ open: false, secret: true });
     const audiences = [{ kind: 'seat', seatId: IDS.owner }, { kind: 'spectators' }] as const;
     const check = (s: Campaign) => {
       for (const audience of audiences) {
         const view = visibleTo(audience, s).scenes[IDS.scene]?.entities[DOOR];
-        const door = doorOf(s);
-        if (door?.state === 'open') expect(view?.wall?.door).toEqual({ state: 'open' });
+        if (doorOf(s)?.open) expect(view?.wall?.door).toEqual({ open: true });
         else
           expect(view?.wall).toEqual({ points: s.scenes[IDS.scene]?.entities[DOOR]?.wall?.points });
         expect(JSON.stringify(visibleTo(audience, s))).not.toContain('secret');
       }
     };
     check(state);
-    for (const next of ['open', 'closed', 'locked', 'open', 'locked'] as const) {
+    for (const next of [true, false, true, false]) {
       const result = reduceAction(state, envelope(payload(next)));
       for (const audience of audiences) {
         const patches = patchesFor(audience, state, result.state, result.patches);
         expect(patches).toEqual(diffPatchesFor(audience, state, result.state));
         expect(JSON.stringify(patches)).not.toContain('secret');
-        if (next !== 'open' && doorOf(state)?.state !== 'open') expect(patches).toEqual([]);
       }
       // The co-DM sees the true state on every step.
       expect(
         visibleTo({ kind: 'seat', seatId: IDS.coDm }, result.state).scenes[IDS.scene]?.entities[
           DOOR
         ]?.wall?.door,
-      ).toEqual({ state: next, secret: true });
+      ).toEqual({ open: next, secret: true });
       state = result.state;
       check(state);
     }

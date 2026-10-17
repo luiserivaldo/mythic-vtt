@@ -229,46 +229,7 @@
           }
         ],
         "door": {
-          "state": "closed"
-        }
-      }
-    },
-    "01J8Z0000000000000000ENT06": {
-      "id": "01J8Z0000000000000000ENT06",
-      "layer": "map",
-      "name": "Crypt door",
-      "owners": [],
-      "transform": {
-        "position": {
-          "x": 5,
-          "y": 0,
-          "z": 8
-        },
-        "rotation": {
-          "x": 0,
-          "y": 0,
-          "z": 0,
-          "w": 1
-        },
-        "scale": {
-          "x": 1,
-          "y": 1,
-          "z": 1
-        }
-      },
-      "wall": {
-        "points": [
-          {
-            "x": 0,
-            "z": 0
-          },
-          {
-            "x": 1,
-            "z": 0
-          }
-        ],
-        "door": {
-          "state": "locked"
+          "open": false
         }
       }
     },
@@ -307,14 +268,14 @@
           }
         ],
         "door": {
-          "state": "closed",
+          "open": false,
           "secret": true
         }
       }
     },
     "01J8Z0000000000000000ENT08": {
       "id": "01J8Z0000000000000000ENT08",
-      "layer": "dm",
+      "layer": "map",
       "name": "Unexplored crypt",
       "owners": [],
       "transform": {
@@ -353,8 +314,48 @@
             "x": 0,
             "z": 3
           }
+        ]
+      }
+    },
+    "01J8Z0000000000000000ENT09": {
+      "id": "01J8Z0000000000000000ENT09",
+      "layer": "map",
+      "name": "Revealed chapel",
+      "owners": [],
+      "transform": {
+        "position": {
+          "x": 8,
+          "y": 0,
+          "z": 10
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "fogRegion": {
+        "points": [
+          {
+            "x": 6,
+            "z": 0
+          },
+          {
+            "x": 9,
+            "z": 0
+          },
+          {
+            "x": 9,
+            "z": 4
+          }
         ],
-        "hidden": true
+        "revealed": true
       }
     }
   },

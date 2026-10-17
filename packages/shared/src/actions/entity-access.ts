@@ -45,7 +45,7 @@ export function validWallEntity(entity: Entity): boolean {
   return isWall(entity) && visionRuleViolation(entity) === undefined;
 }
 
-/** MV-303 Q2a: a fog region that satisfies every vision rule (dm layer, no other components). */
+/** D47 (MV-303): a fog region that satisfies every vision rule (map layer, no other components). */
 export function validFogRegionEntity(entity: Entity): boolean {
   return isFogRegion(entity) && visionRuleViolation(entity) === undefined;
 }

@@ -31,13 +31,8 @@ const square = [
 const grants = { owners: [IDS.owner], perms: { view: true, move: true, edit: true, delete: true } };
 const wall = (): Entity => makeEntity(WALL, { layer: 'map', ...grants, wall: { points: seg } });
 const box = (): Entity => makeEntity(BOX, { layer: 'props', ...grants, shape, blocksSight: true });
-// No entity grants here: on the dm layer they would open it to a co-DM (D32), tested below.
 const fog = (): Entity =>
-  makeEntity(FOG, {
-    layer: 'dm',
-    owners: [IDS.owner],
-    fogRegion: { points: square, hidden: true },
-  });
+  makeEntity(FOG, { layer: 'map', name: 'Dragon lair', ...grants, fogRegion: { points: square } });
 const token = (): Entity =>
   makeEntity(TOKEN, {
     ...grants,
@@ -85,16 +80,16 @@ describe('helpers', () => {
     expect(validWallEntity({ ...wall(), layer: 'props' })).toBe(false);
     expect(validWallEntity(box())).toBe(false);
     expect(validFogRegionEntity(fog())).toBe(true);
-    expect(validFogRegionEntity({ ...fog(), layer: 'map' })).toBe(false);
+    expect(validFogRegionEntity({ ...fog(), layer: 'dm' })).toBe(false);
   });
 });
 
 describe('creating', () => {
-  it('walls and sight blockers: host and co-DM; fog regions: host (dm layer, D32)', () => {
+  it('walls, sight blockers and fog regions: host and co-DM only', () => {
     const create = (entity: Entity) => ({ sceneId: s, entity: { ...entity, id: NEW } });
     expect(permissionMatrix(makeCampaign(), 'entity.create', create(wall()))).toEqual(ADMINS_ONLY);
     expect(permissionMatrix(makeCampaign(), 'entity.create', create(box()))).toEqual(ADMINS_ONLY);
-    expect(permissionMatrix(makeCampaign(), 'entity.create', create(fog()))).toEqual(HOST_ONLY);
+    expect(permissionMatrix(makeCampaign(), 'entity.create', create(fog()))).toEqual(ADMINS_ONLY);
   });
 
   it('rejects invalid vision entities from everyone, the host included', () => {
@@ -105,7 +100,8 @@ describe('creating', () => {
       { ...wall(), id: NEW, perms: { view: false } },
       { ...box(), id: NEW, layer: 'dm' },
       { ...token(), id: NEW, blocksSight: true },
-      { ...fog(), id: NEW, layer: 'map' },
+      { ...fog(), id: NEW, layer: 'dm' },
+      { ...fog(), id: NEW, shape },
     ])
       expect(canPerform(makeCampaign(), ACTORS.host, 'entity.create', create(bad))).toBe(false);
   });
@@ -134,7 +130,7 @@ describe('moving, editing and deleting', () => {
       permissionMatrix(
         table(),
         'entity.update',
-        update(WALL, { wall: { points: seg, door: { state: 'open' } } }),
+        update(WALL, { wall: { points: seg, door: { open: true } } }),
       ),
     ).toEqual(ADMINS_ONLY);
     expect(permissionMatrix(table(), 'entity.update', update(WALL, { name: 'x' }))).toEqual(
@@ -206,7 +202,7 @@ describe('moving, editing and deleting', () => {
         table(),
         ACTORS.host,
         'entity.update',
-        update(WALL, { wall: { points: seg, door: { state: 'locked', secret: true } } }),
+        update(WALL, { wall: { points: seg, door: { open: false, secret: true } } }),
       ),
     ).toBe(true);
   });
@@ -231,38 +227,53 @@ describe('moving, editing and deleting', () => {
     ).toBe(true);
   });
 
-  it('fog regions are the host’s: edit, reveal, move and delete; never off the dm layer', () => {
-    const reveal = update(FOG, { fogRegion: { points: square, hidden: false } });
-    expect(permissionMatrix(table(), 'entity.update', reveal)).toEqual(HOST_ONLY);
+  it('fog regions are admin data: create, edit, reveal, move and delete; never off the map layer', () => {
+    const reveal = update(FOG, { fogRegion: { points: square, revealed: true } });
+    expect(permissionMatrix(table(), 'entity.update', reveal)).toEqual(ADMINS_ONLY);
     expect(permissionMatrix(table(), 'entity.update', update(FOG, { transform: moveTo }))).toEqual(
-      HOST_ONLY,
-    );
-    expect(permissionMatrix(table(), 'entity.delete', { sceneId: s, entityId: FOG })).toEqual(
-      HOST_ONLY,
-    );
-    expect(
-      permissionMatrix(table(), 'entity.setLayer', { sceneId: s, entityId: FOG, layer: 'map' }),
-    ).toEqual(NOBODY);
-    // Entity grants follow D32 like any DM-layer entity: they let a co-DM move it, never a
-    // player; the region itself stays host-only to change, and never leaves the dm layer.
-    const granted = table();
-    const grantedFog = granted.scenes[s]?.entities[FOG];
-    if (grantedFog) grantedFog.perms = grants.perms;
-    expect(permissionMatrix(granted, 'entity.update', update(FOG, { transform: moveTo }))).toEqual(
       ADMINS_ONLY,
     );
-    expect(permissionMatrix(granted, 'entity.update', reveal)).toEqual(HOST_ONLY);
+    expect(permissionMatrix(table(), 'entity.update', update(FOG, { name: 'x' }))).toEqual(
+      ADMINS_ONLY,
+    );
+    expect(permissionMatrix(table(), 'entity.delete', { sceneId: s, entityId: FOG })).toEqual(
+      ADMINS_ONLY,
+    );
+    for (const layer of ['dm', 'props'] as const)
+      expect(
+        permissionMatrix(table(), 'entity.setLayer', { sceneId: s, entityId: FOG, layer }),
+      ).toEqual(NOBODY);
+    // Re-hiding drops `revealed` (absent means active).
+    const revealed = reduceAction(table(), {
+      id: IDS.action,
+      type: 'entity.update',
+      payload: reveal,
+      actor: ACTORS.host,
+      campaignId: IDS.campaign,
+      sessionId: IDS.session,
+      seq: 1,
+      ts: 1,
+    });
+    expect(revealed.state.scenes[s]?.entities[FOG]?.fogRegion).toEqual({
+      points: square,
+      revealed: true,
+    });
     expect(
-      permissionMatrix(granted, 'entity.setLayer', { sceneId: s, entityId: FOG, layer: 'map' }),
-    ).toEqual(NOBODY);
+      canPerform(
+        revealed.state,
+        ACTORS.coDm,
+        'entity.update',
+        update(FOG, { fogRegion: { points: square } }),
+      ),
+    ).toBe(true);
   });
 
-  it('a fog region and its edits never reach a player or spectator', () => {
+  it('a fog region reaches players and spectators with a blank name, its edits included', () => {
     const before = table();
     const after = reduceAction(before, {
       id: IDS.action,
       type: 'entity.update',
-      payload: update(FOG, { fogRegion: { points: square, hidden: false } }),
+      payload: update(FOG, { name: 'Throne room', fogRegion: { points: square, revealed: true } }),
       actor: ACTORS.host,
       campaignId: IDS.campaign,
       sessionId: IDS.session,
@@ -270,18 +281,21 @@ describe('moving, editing and deleting', () => {
       ts: 1,
     });
     for (const audience of [{ kind: 'seat', seatId: IDS.owner }, { kind: 'spectators' }] as const) {
-      expect(JSON.stringify(visibleTo(audience, before))).not.toContain('fogRegion');
-      expect(JSON.stringify(visibleTo(audience, before))).not.toContain(FOG);
-      expect(patchesFor(audience, before, after.state, after.patches)).toEqual([]);
-      expect(diffPatchesFor(audience, before, after.state)).toEqual([]);
+      expect(visibleTo(audience, before).scenes[s]?.entities[FOG]?.name).toBe('');
+      const patches = patchesFor(audience, before, after.state, after.patches);
+      expect(patches).toEqual(diffPatchesFor(audience, before, after.state));
+      expect(JSON.stringify(patches)).not.toContain('Throne room');
+      expect(JSON.stringify(visibleTo(audience, after.state))).not.toMatch(
+        /Dragon lair|Throne room/,
+      );
     }
     expect(
-      visibleTo({ kind: 'seat', seatId: IDS.coDm }, before).scenes[s]?.entities[FOG],
-    ).toBeDefined();
+      visibleTo({ kind: 'seat', seatId: IDS.coDm }, before).scenes[s]?.entities[FOG]?.name,
+    ).toBe('Dragon lair');
   });
 });
 
-describe('scene.update vision (MV-303 Q2b)', () => {
+describe('scene.update vision (D47 + MV-303)', () => {
   const envelope = (payload: unknown): ActionEnvelope => ({
     id: IDS.action,
     type: 'scene.update',

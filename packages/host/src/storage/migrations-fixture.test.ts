@@ -114,12 +114,12 @@ describe('golden save v1 through the shared migrate hook', () => {
         // FOG-01 (save v12): the vision data survives load and save; older saves have none.
         const entities = loaded.scenes.flatMap((scene) => Object.values(scene.entities));
         expect(loaded.scenes[0]?.vision).toEqual(since(12) ? { dynamicLighting: true } : undefined);
-        expect(entities.filter((entity) => entity.wall)).toHaveLength(since(12) ? 4 : 0);
+        expect(entities.filter((entity) => entity.wall)).toHaveLength(since(12) ? 3 : 0);
         expect(entities.filter((entity) => entity.wall?.door?.secret)).toHaveLength(
           since(12) ? 1 : 0,
         );
         expect(entities.filter((entity) => entity.blocksSight)).toHaveLength(since(12) ? 1 : 0);
-        expect(entities.filter((entity) => entity.fogRegion)).toHaveLength(since(12) ? 1 : 0);
+        expect(entities.filter((entity) => entity.fogRegion)).toHaveLength(since(12) ? 2 : 0);
         for (const scene of loaded.scenes) {
           expect(scene).not.toHaveProperty('playerToggles');
           expect(scene.maxLastingAoEsPerPlayer).toBe(1);

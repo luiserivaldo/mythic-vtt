@@ -7,8 +7,8 @@ import type { MigrationStep } from './runner.js';
  * apart from the snapshot's `schemaVersion`.
  *
  * The bump exists for older hosts, not for this one: a v11 host does not know walls, secret doors
- * or fog regions, so it would load a v12 save, strip nothing and send a closed secret door and a
- * DM fog region's outline straight to players. Bumping the version makes it refuse the save
+ * or fog regions, so it would load a v12 save, strip nothing and send a closed secret door and the
+ * names of walls and fog regions straight to players. Bumping the version makes it refuse the save
  * (`newer-version`) instead.
  */
 export const v11ToV12: MigrationStep = {

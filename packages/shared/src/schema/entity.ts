@@ -124,10 +124,8 @@ const PinComponent = z.object({
 const LocalPoint = z.strictObject({ x: z.number(), z: z.number() });
 export const MAX_VISION_POINTS = 64;
 
-/** MV-303 Q1: a door is open, closed or locked; `secret` is orthogonal (hidden while not open). */
-export const DoorState = z.enum(['open', 'closed', 'locked']);
-export type DoorState = z.infer<typeof DoorState>;
-export const DoorComponent = z.strictObject({ state: DoorState, secret: z.boolean().optional() });
+/** VIS-01: a door is open or closed; a secret door is sent to players as a plain wall while closed. */
+export const DoorComponent = z.strictObject({ open: z.boolean(), secret: z.boolean().optional() });
 export type DoorComponent = z.infer<typeof DoorComponent>;
 
 /** VIS-01: a wall polyline; a door is a single 2-point segment. */
@@ -143,13 +141,13 @@ export const WallComponent = z
 export type WallComponent = z.infer<typeof WallComponent>;
 
 /**
- * MV-303 Q2a: a DM fog region hides everything inside it from players while `hidden` (FOG-03
- * filters; this is data only). `hidden: false` keeps a revealed region for re-hiding.
+ * D47 (MV-303): a DM fog region on the map layer. Absent `revealed` means active (FOG-03 hides its
+ * contents from players; this is data only); `revealed: true` keeps a revealed region for re-hiding.
  */
 export const FogRegionComponent = z
   .strictObject({
     points: z.array(LocalPoint).min(3).max(MAX_VISION_POINTS),
-    hidden: z.boolean(),
+    revealed: z.literal(true).optional(),
   })
   .refine((region) => isSimplePolygon(region.points), {
     message: 'a fog region must be a simple polygon',
@@ -182,7 +180,7 @@ export const EntityFields = z.object({
   wall: WallComponent.optional(),
   /** VIS-02 (FOG-01): a shape or model prop that blocks dynamic-lighting sight. */
   blocksSight: z.literal(true).optional(),
-  /** MV-303 Q2a: a DM fog region on the dm layer, with no other components. */
+  /** D47 (MV-303): a DM fog region on the map layer, with no other components. */
   fogRegion: FogRegionComponent.optional(),
 });
 
@@ -210,8 +208,7 @@ function hasAny(entity: EntityShape, keys: readonly (keyof EntityShape)[]): bool
  * One rule set for the schema refine and for every action that creates an entity or changes its
  * layer or components (`entity.create`, `entity.update`, `entity.setLayer`, `prefab.place`).
  * Occluders (walls, sight blockers) are data every player receives (D47 (4)), so they may never be
- * on the dm layer or hidden by `perms.view`; a fog region always is on the dm layer, because its
- * outline would reveal where hidden things are.
+ * on the dm layer or hidden by `perms.view`. Fog regions live on the map layer like walls.
  */
 export function visionRuleViolation(entity: EntityShape): string | undefined {
   if (entity.wall) {
@@ -223,7 +220,7 @@ export function visionRuleViolation(entity: EntityShape): string | undefined {
   if (entity.fogRegion) {
     if (hasAny(entity, [...PLACEABLE_COMPONENTS, 'wall', 'blocksSight']))
       return 'a fog region has no other components';
-    if (entity.layer !== 'dm') return 'a fog region lives on the dm layer';
+    if (entity.layer !== 'map') return 'a fog region lives on the map layer';
   }
   if (entity.blocksSight) {
     if (!entity.shape && !entity.model) return 'only a shape or model prop can block sight';
@@ -246,7 +243,7 @@ export function isWall(entity: Pick<Entity, 'wall'>): boolean {
   return entity.wall !== undefined;
 }
 
-/** MV-303 Q2a: is this entity a DM fog region? */
+/** D47 (MV-303): is this entity a DM fog region? */
 export function isFogRegion(entity: Pick<Entity, 'fogRegion'>): boolean {
   return entity.fogRegion !== undefined;
 }

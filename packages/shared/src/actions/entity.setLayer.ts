@@ -17,8 +17,8 @@ export const entitySetLayer = defineAction({
       !isLayerLocked(scene, p.layer) &&
       // D32: only the host may move entities onto the DM layer among admins.
       !(p.layer === 'dm' && isCoDm(state, actor)) &&
-      // FOG-01: walls stay on the map layer, fog regions on the dm layer, and a sight blocker
-      // cannot move onto the dm layer (occluders are data every player receives, D47 (4)).
+      // FOG-01: walls and fog regions stay on the map layer, and a sight
+      // blocker cannot move onto the dm layer (occluders are data every player receives, D47 (4)).
       visionRuleViolation({ ...entity, layer: p.layer }) === undefined &&
       canUseEntity(state, actor, entity, 'move')
     );

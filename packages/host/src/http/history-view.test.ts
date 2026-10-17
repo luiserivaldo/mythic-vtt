@@ -299,12 +299,17 @@ it('keeps archived seat records out of historical diffs for every non-host audie
   ).toContain('PRIVATE ARCHIVED SEAT');
 });
 
-describe('FOG-01 history projection (MV-303 Q1/Q2a)', () => {
+describe('FOG-01 history projection (D47 + MV-303)', () => {
   const DOOR = '0'.repeat(25) + 'D';
   const FOG = '0'.repeat(25) + 'F';
   const points = [
     { x: 0, z: 0 },
     { x: 1, z: 0 },
+  ];
+  const regionPoints = [
+    { x: 0, z: 0 },
+    { x: 2, z: 0 },
+    { x: 0, z: 2 },
   ];
   function doorFixture() {
     const f = fixture();
@@ -312,72 +317,59 @@ describe('FOG-01 history projection (MV-303 Q1/Q2a)', () => {
       sceneId: IDS.scene,
       entity: makeEntity(DOOR, {
         layer: 'map',
-        name: 'Panel',
-        wall: { points, door: { state: 'closed', secret: true } },
+        name: 'Secret panel',
+        wall: { points, door: { open: false, secret: true } },
       }),
     });
     f.apply('entity.create', {
       sceneId: IDS.scene,
       entity: makeEntity(FOG, {
-        layer: 'dm',
-        name: 'Crypt fog',
-        fogRegion: {
-          points: [
-            { x: 0, z: 0 },
-            { x: 2, z: 0 },
-            { x: 0, z: 2 },
-          ],
-          hidden: true,
-        },
+        layer: 'map',
+        name: 'Dragon lair',
+        fogRegion: { points: regionPoints },
       }),
     });
-    f.apply('wall.setDoor', { sceneId: IDS.scene, entityId: DOOR, state: 'open' });
+    f.apply('wall.setDoor', { sceneId: IDS.scene, entityId: DOOR, open: true });
     f.apply('entity.update', {
       sceneId: IDS.scene,
       entityId: FOG,
-      changes: {
-        fogRegion: {
-          points: [
-            { x: 0, z: 0 },
-            { x: 2, z: 0 },
-            { x: 0, z: 2 },
-          ],
-          hidden: false,
-        },
-      },
+      changes: { name: 'Throne room', fogRegion: { points: regionPoints, revealed: true } },
     });
+    f.apply('entity.update', { sceneId: IDS.scene, entityId: DOOR, changes: { name: 'Lever' } });
     return f;
   }
   const players: Audience[] = [spectator, { kind: 'seat', seatId: IDS.owner }];
   const page = (f: ReturnType<typeof fixture>, audience: Audience) =>
     historyPage(f.state, f.log.length, f.log, audience, { limit: 50 });
+  const NAMES = ['Secret panel', 'Dragon lair', 'Throne room', 'Lever'];
 
-  it('never sends a fog region, nor a secret flag, to a player or spectator', () => {
+  it('sends fog regions, but never a secret flag or a wall or region name, to non-admins', () => {
     const f = doorFixture();
     for (const audience of players) {
       const json = JSON.stringify(page(f, audience));
-      expect(json).not.toContain(FOG);
-      expect(json).not.toContain('fogRegion');
+      expect(json).toContain(FOG);
       expect(json).not.toContain('secret');
+      for (const name of NAMES) expect(json).not.toContain(name);
       // The door stands open now, so its opening is public, without the secret flag.
-      expect(json).toContain('"wall","door"],"value":{"state":"open"}');
+      expect(json).toContain('"wall","door"],"value":{"open":true}');
     }
-    const host = JSON.stringify(page(f, { kind: 'host' }));
-    expect(host).toContain('fogRegion');
-    expect(host).toContain('secret');
+    for (const audience of [{ kind: 'host' }, { kind: 'seat', seatId: IDS.coDm }] as Audience[]) {
+      const json = JSON.stringify(page(f, audience));
+      expect(json).toContain('secret');
+      for (const name of NAMES) expect(json).toContain(name);
+    }
   });
 
   it('an older open state does not reveal a door that is a closed secret door today', () => {
     const f = doorFixture();
-    f.apply('wall.setDoor', { sceneId: IDS.scene, entityId: DOOR, state: 'locked' });
+    f.apply('wall.setDoor', { sceneId: IDS.scene, entityId: DOOR, open: false });
     for (const audience of players) {
       const json = JSON.stringify(page(f, audience));
       expect(json).not.toContain('"door"');
       expect(json).not.toContain('secret');
-      expect(json).not.toContain(FOG);
       // The wall itself is public map data and its creation stays in the log.
       expect(json).toContain(DOOR);
     }
-    expect(JSON.stringify(page(f, { kind: 'seat', seatId: IDS.coDm }))).toContain('"locked"');
+    expect(JSON.stringify(page(f, { kind: 'seat', seatId: IDS.coDm }))).toContain('"secret":true');
   });
 });

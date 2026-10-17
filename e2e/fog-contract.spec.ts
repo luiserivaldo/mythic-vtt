@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { RawClient, startTable, testUlid, type Reply, type Table } from './harness.js';
 
-// FOG-01 (MV-295; D47 as amended by MV-303) / PERM-03: the vision contract over the wire. A closed
-// secret door reaches players and spectators only as a plain wall, an open one only as an ordinary
-// open door, and the `secret` flag never at all; a DM fog region never reaches them; walls and
-// sight blocking are DM data; and doors open for a player only with the per-seat `doors` tool.
+// FOG-01 (MV-295; D47 2bde4e3) / PERM-03: the vision contract over the wire. A closed secret door
+// reaches players and spectators only as a plain wall, an open one only as an ordinary open door,
+// and the `secret` flag never at all; wall and fog-region names never reach them; walls, fog
+// regions and sight blocking are DM data; and doors open for a player only with the Doors tool.
 // Frames are captured raw at the transport level, so the check does not depend on the app.
 
 let table: Table;
@@ -19,6 +19,8 @@ const FOG = testUlid('FOGREGN', 1);
 const CRATE = testUlid('CRATE', 1);
 const MINE = testUlid('TOKEN', 1);
 const RAW_WALL = testUlid('RAWWAL', 1);
+const RAW_FOG = testUlid('RAWFOG', 1);
+const PLAIN_WALL = testUlid('WALL', 1);
 
 const transform = (x: number, z: number) => ({
   position: { x, y: 0, z },
@@ -29,6 +31,14 @@ const segment = [
   { x: 0, z: 0 },
   { x: 1, z: 0 },
 ];
+const region = [
+  { x: 0, z: 0 },
+  { x: 4, z: 0 },
+  { x: 4, z: 3 },
+  { x: 0, z: 3 },
+];
+// DM notes that must never reach a player or spectator socket (renames included).
+const NAMES = ['Hidden panel', 'Vestry door', 'North wall', 'Dragon lair', 'Lever', 'Throne room'];
 const base = (id: string, layer: string, name: string, x: number) => ({
   id,
   layer,
@@ -69,7 +79,7 @@ function secretDoorFragments(raw: string): { op: string; path: string; json: str
     .map((p) => ({ op: p.op, path: p.path.join('/'), json: JSON.stringify(p) }));
 }
 
-/** While the secret door is closed or locked, a frame may only take away an already-open door. */
+/** While the secret door is closed, a frame may only take away an already-open door. */
 function expectNoClosedSecretDoor(frames: readonly string[], who: string): void {
   for (const raw of frames)
     for (const fragment of secretDoorFragments(raw)) {
@@ -102,7 +112,7 @@ test.afterAll(async () => {
   await table.stop();
 });
 
-test('secret doors, fog regions and DM-only vision data never reach players or spectators', async () => {
+test('secret doors, vision names and DM-only vision data never reach players or spectators', async () => {
   test.setTimeout(60_000);
   // --- setup ------------------------------------------------------------------------------------
   await ok(host.intent('scene.create', { sceneId: SCENE, name: 'Crypt' }));
@@ -121,15 +131,16 @@ test('secret doors, fog regions and DM-only vision data never reach players or s
   await ok(
     create({
       ...base(SECRET, 'map', 'Hidden panel', 2),
-      wall: { points: segment, door: { state: 'closed', secret: true } },
+      wall: { points: segment, door: { open: false, secret: true } },
     }),
   );
   await ok(
     create({
       ...base(DOOR, 'map', 'Vestry door', 4),
-      wall: { points: segment, door: { state: 'closed' } },
+      wall: { points: segment, door: { open: false } },
     }),
   );
+  await ok(create({ ...base(PLAIN_WALL, 'map', 'North wall', 0), wall: { points: segment } }));
   await ok(
     create({
       ...base(CRATE, 'props', 'Crate', 6),
@@ -144,16 +155,8 @@ test('secret doors, fog regions and DM-only vision data never reach players or s
   );
   await ok(
     create({
-      ...base(FOG, 'dm', 'Unexplored crypt', 10),
-      fogRegion: {
-        points: [
-          { x: 0, z: 0 },
-          { x: 4, z: 0 },
-          { x: 4, z: 3 },
-          { x: 0, z: 3 },
-        ],
-        hidden: true,
-      },
+      ...base(FOG, 'map', 'Dragon lair', 10),
+      fogRegion: { points: region },
     }),
   );
 
@@ -181,24 +184,34 @@ test('secret doors, fog regions and DM-only vision data never reach players or s
   await settle([player, spectator]);
   const allFrames: { who: string; frames: string[] }[] = [];
 
-  // Players see the switch and walls (D47 (4)), the secret door as a plain wall.
+  // Players see the switch, walls (D47 (4)) and fog regions (map layer), the secret door as a plain
+  // wall, and every wall and region name blank.
+  const entityOf = (c: RawClient, id: string) =>
+    (c.state as Snapshot | undefined)?.scenes?.[SCENE]?.entities?.[id] as
+      { name?: string; fogRegion?: unknown } | undefined;
   for (const c of [player, spectator]) {
     expect(wallOf(c, SECRET)).toEqual({ points: segment });
-    expect(wallOf(c, DOOR)).toEqual({ points: segment, door: { state: 'closed' } });
+    expect(wallOf(c, DOOR)).toEqual({ points: segment, door: { open: false } });
+    expect(entityOf(c, FOG)?.fogRegion).toEqual({ points: region });
+    for (const id of [SECRET, DOOR, PLAIN_WALL, FOG]) expect(entityOf(c, id)?.name).toBe('');
     expect(
       (c.state as { scenes: Record<string, { vision?: unknown }> }).scenes[SCENE]?.vision,
     ).toEqual({ dynamicLighting: true });
   }
-  expect(wallOf(host, SECRET)).toEqual({
-    points: segment,
-    door: { state: 'closed', secret: true },
-  });
+  expect(wallOf(host, SECRET)).toEqual({ points: segment, door: { open: false, secret: true } });
+  expect(entityOf(host, FOG)?.name).toBe('Dragon lair');
 
   // --- the player's raw intents: walls, sight blocking and doors are DM data ----------------------
   await rejected(
     player.intent('entity.create', {
       sceneId: SCENE,
       entity: { ...base(RAW_WALL, 'map', 'My wall', 12), wall: { points: segment } },
+    }),
+  );
+  await rejected(
+    player.intent('entity.create', {
+      sceneId: SCENE,
+      entity: { ...base(RAW_FOG, 'map', 'My fog', 12), fogRegion: { points: region } },
     }),
   );
   await rejected(
@@ -226,32 +239,39 @@ test('secret doors, fog regions and DM-only vision data never reach players or s
     player.intent('entity.update', {
       sceneId: SCENE,
       entityId: DOOR,
-      changes: { wall: { points: segment, door: { state: 'open' } } },
+      changes: { wall: { points: segment, door: { open: true } } },
     }),
   );
   await rejected(player.intent('entity.delete', { sceneId: SCENE, entityId: DOOR }));
-  // MV-303 Q1: without the doors tool, no door at all.
-  await rejected(player.intent('wall.setDoor', { sceneId: SCENE, entityId: DOOR, state: 'open' }));
   await rejected(
-    player.intent('wall.setDoor', { sceneId: SCENE, entityId: SECRET, state: 'open' }),
+    player.intent('entity.update', { sceneId: SCENE, entityId: FOG, changes: { name: 'x' } }),
   );
+  await rejected(player.intent('entity.delete', { sceneId: SCENE, entityId: FOG }));
+  // Without the Doors tool, no door at all.
+  const setDoor = (entityId: string, open: boolean) =>
+    player.intent('wall.setDoor', { sceneId: SCENE, entityId, open });
+  await rejected(setDoor(DOOR, true));
+  await rejected(setDoor(SECRET, true));
 
-  // --- the DM grants the doors tool: open and close a normal door, never lock it ------------------
+  // --- the DM grants Doors: open and close a normal door --------------------------------------------
   await ok(host.intent('seat.update', { seatId: SEAT, tools: { doors: true } }));
   await settle([player]);
-  await ok(player.intent('wall.setDoor', { sceneId: SCENE, entityId: DOOR, state: 'open' }));
+  await ok(setDoor(DOOR, true));
   await settle([player, spectator]);
-  expect(wallOf(spectator, DOOR)).toEqual({ points: segment, door: { state: 'open' } });
-  await ok(player.intent('wall.setDoor', { sceneId: SCENE, entityId: DOOR, state: 'closed' }));
-  await rejected(
-    player.intent('wall.setDoor', { sceneId: SCENE, entityId: DOOR, state: 'locked' }),
+  expect(wallOf(spectator, DOOR)).toEqual({ points: segment, door: { open: true } });
+  await ok(setDoor(DOOR, false));
+  // A secret door stays out of reach even with the tool, and its rejection is word for word the one
+  // for a plain wall, a non-wall entity and an unknown id, so it reveals nothing.
+  const reasons = await Promise.all(
+    [SECRET, PLAIN_WALL, CRATE, testUlid('NOSUCH', 1)].map(async (id) => {
+      const r = await setDoor(id, true);
+      expect(r, JSON.stringify(r)).toMatchObject({ t: 'reject' });
+      return r.reason;
+    }),
   );
-  // A secret door stays out of reach even with the tool.
-  await rejected(
-    player.intent('wall.setDoor', { sceneId: SCENE, entityId: SECRET, state: 'open' }),
-  );
+  expect(new Set(reasons).size, JSON.stringify(reasons)).toBe(1);
   await settle([player, spectator]);
-  expect(wallOf(player, DOOR)).toEqual({ points: segment, door: { state: 'closed' } });
+  expect(wallOf(player, DOOR)).toEqual({ points: segment, door: { open: false } });
 
   // --- closed window 1: everything so far, plus a fresh reconnect --------------------------------
   const mark = () => [player.frames.length, spectator.frames.length] as const;
@@ -269,31 +289,24 @@ test('secret doors, fog regions and DM-only vision data never reach players or s
   expectNoClosedSecretDoor(player.frames, 'player after reconnect');
 
   // --- the DM opens it: an ordinary open door, never `secret` -----------------------------------
-  await ok(host.intent('wall.setDoor', { sceneId: SCENE, entityId: SECRET, state: 'open' }));
+  await ok(host.intent('wall.setDoor', { sceneId: SCENE, entityId: SECRET, open: true }));
   await settle([player, spectator]);
   for (const c of [player, spectator])
-    expect(wallOf(c, SECRET)).toEqual({ points: segment, door: { state: 'open' } });
+    expect(wallOf(c, SECRET)).toEqual({ points: segment, door: { open: true } });
 
-  // --- the DM closes and locks it: back to a plain wall -----------------------------------------
-  await ok(host.intent('wall.setDoor', { sceneId: SCENE, entityId: SECRET, state: 'closed' }));
+  // --- the DM closes it, renames it and reveals the region: plain wall, blank names ------------
+  await ok(host.intent('wall.setDoor', { sceneId: SCENE, entityId: SECRET, open: false }));
   const [playerMark, spectatorMark] = mark();
   const keptSeq = spectator.lastSeq;
   const keptState = structuredClone(spectator.state);
-  await ok(host.intent('wall.setDoor', { sceneId: SCENE, entityId: SECRET, state: 'locked' }));
+  await ok(
+    host.intent('entity.update', { sceneId: SCENE, entityId: SECRET, changes: { name: 'Lever' } }),
+  );
   await ok(
     host.intent('entity.update', {
       sceneId: SCENE,
       entityId: FOG,
-      changes: {
-        fogRegion: {
-          points: [
-            { x: 0, z: 0 },
-            { x: 4, z: 0 },
-            { x: 4, z: 3 },
-          ],
-          hidden: false,
-        },
-      },
+      changes: { name: 'Throne room', fogRegion: { points: region, revealed: true } },
     }),
   );
   await settle([player, spectator]);
@@ -301,7 +314,12 @@ test('secret doors, fog regions and DM-only vision data never reach players or s
   expectNoClosedSecretDoor(player.frames.slice(playerMark), 'player after close');
   expectNoClosedSecretDoor(spectator.frames.slice(spectatorMark), 'spectator after close');
 
-  // Reconnects while it is locked: a fresh snapshot and a replay from before the lock.
+  for (const c of [player, spectator]) {
+    expect(entityOf(c, FOG)?.fogRegion).toEqual({ points: region, revealed: true });
+    expect(entityOf(c, FOG)?.name).toBe('');
+  }
+
+  // Reconnects while it is closed: a fresh snapshot and a replay from before the rename.
   await player.close();
   const fresh = await RawClient.connect(table, {
     name: 'player-fresh',
@@ -330,22 +348,24 @@ test('secret doors, fog regions and DM-only vision data never reach players or s
 
   // --- over every frame any player or spectator socket received ---------------------------------
   for (const { who, frames } of allFrames) {
-    for (const needle of ['"secret"', FOG, '"fogRegion"', 'Unexplored crypt'])
+    for (const needle of ['"secret"', ...NAMES])
       expect(
         frames.filter((f) => f.includes(needle)),
         `${who}: ${needle} leaked`,
       ).toEqual([]);
-    // Detector control: every socket that got a snapshot did receive the wall itself. (The replay
-    // gets only post-lock patches, and locking a closed secret door changes nothing it may see.)
+    // Detector control: every socket that got a snapshot did receive the wall and the region. (The
+    // replay gets only post-close patches: the region reveal, and nothing for the renamed wall.)
     if (frames.some((f) => f.includes('"t":"snapshot"')))
-      expect(
-        frames.some((f) => f.includes(SECRET)),
-        `${who}: saw the wall`,
-      ).toBe(true);
+      for (const id of [SECRET, FOG])
+        expect(
+          frames.some((f) => f.includes(id)),
+          `${who}: saw ${id}`,
+        ).toBe(true);
   }
   expect(replay.frames.some((f) => f.includes('"t":"snapshot"'))).toBe(false);
+  expect(replay.frames.some((f) => f.includes('"revealed"'))).toBe(true);
   // Positive control: the host's unfiltered socket did receive all of it.
-  for (const needle of ['"secret"', FOG, '"fogRegion"'])
+  for (const needle of ['"secret"', ...NAMES])
     expect(
       host.frames.some((f) => f.includes(needle)),
       needle,

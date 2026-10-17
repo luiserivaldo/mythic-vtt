@@ -76,15 +76,15 @@ describe('v11 to v12 vision contract migration (FOG-01)', () => {
     expect(scene.vision).toEqual({ dynamicLighting: true });
     expect(entities.filter((e) => e.wall && !e.wall.door)).toHaveLength(1);
     const doors = entities.flatMap((e) => (e.wall?.door ? [e.wall.door] : []));
-    expect(doors).toEqual(
-      expect.arrayContaining([
-        { state: 'closed' },
-        { state: 'locked' },
-        { state: 'closed', secret: true },
-      ]),
-    );
+    expect(doors).toHaveLength(2);
+    expect(doors).toEqual(expect.arrayContaining([{ open: false }, { open: false, secret: true }]));
     expect(entities.filter((e) => e.blocksSight && e.shape?.kind === 'box')).toHaveLength(1);
-    expect(entities.filter((e) => e.fogRegion?.hidden && e.layer === 'dm')).toHaveLength(1);
+    const regions = entities.filter((e) => e.fogRegion);
+    expect(regions).toHaveLength(2);
+    expect(regions.every((e) => e.layer === 'map' && e.name !== '')).toBe(true);
+    expect(regions.map((e) => e.fogRegion?.revealed)).toEqual(
+      expect.arrayContaining([undefined, true]),
+    );
     const campaign = Campaign.parse({ ...(fixture('v12', 'campaign.json') as object), scenes: {} });
     const tools = Object.values(campaign.seats).map((seat) => seat.tools);
     expect(tools.some((t) => t?.doors === true)).toBe(true);

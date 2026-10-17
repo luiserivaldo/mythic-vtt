@@ -29,8 +29,8 @@ const wall = (overrides: Partial<Entity> = {}, wallFields: Record<string, unknow
   ...overrides,
 });
 const fogRegion = (overrides: Partial<Entity> = {}, points: unknown = square) => ({
-  ...makeEntity(id, { layer: 'dm' }),
-  fogRegion: { points, hidden: true },
+  ...makeEntity(id, { layer: 'map' }),
+  fogRegion: { points },
   ...overrides,
 });
 const ok = (value: unknown) => Entity.safeParse(value).success;
@@ -40,14 +40,14 @@ const reason = (value: unknown) => {
 };
 
 describe('Entity.wall (VIS-01)', () => {
-  it('accepts a 2-64 point wall and doors in every state, secret or not', () => {
+  it('accepts a 2-64 point wall and open or closed doors, secret or not', () => {
     expect(ok(wall())).toBe(true);
     expect(ok(wall({}, { points: Array.from({ length: 64 }, (_, i) => ({ x: i, z: 0 })) }))).toBe(
       true,
     );
-    for (const state of ['open', 'closed', 'locked'])
+    for (const open of [true, false])
       for (const secret of [undefined, true, false])
-        expect(ok(wall({}, { door: { state, ...(secret === undefined ? {} : { secret }) } }))).toBe(
+        expect(ok(wall({}, { door: { open, ...(secret === undefined ? {} : { secret }) } }))).toBe(
           true,
         );
   });
@@ -101,15 +101,14 @@ describe('Entity.wall (VIS-01)', () => {
         ),
       ),
     ).toBe(false);
-    expect(ok(wall({}, { points: [...seg, { x: 2, z: 0 }], door: { state: 'closed' } }))).toBe(
-      false,
-    );
-    expect(reason(wall({}, { points: [...seg, { x: 2, z: 0 }], door: { state: 'open' } }))).toMatch(
+    expect(ok(wall({}, { points: [...seg, { x: 2, z: 0 }], door: { open: false } }))).toBe(false);
+    expect(reason(wall({}, { points: [...seg, { x: 2, z: 0 }], door: { open: true } }))).toMatch(
       /a door has exactly 2 points/,
     );
-    // MV-303 Q1: the door is an enum, not the D47 boolean.
-    expect(ok(wall({}, { door: { open: true } }))).toBe(false);
-    expect(ok(wall({}, { door: { state: 'ajar' } }))).toBe(false);
+    // D47: the door is a boolean; there is no state enum and no locked state.
+    expect(ok(wall({}, { door: { state: 'open' } }))).toBe(false);
+    expect(ok(wall({}, { door: { open: true, locked: true } }))).toBe(false);
+    expect(ok(wall({}, { door: {} }))).toBe(false);
   });
 
   it.each([
@@ -179,10 +178,13 @@ describe('Entity.blocksSight (VIS-02)', () => {
   });
 });
 
-describe('Entity.fogRegion (MV-303 Q2a)', () => {
-  it('accepts a 3-64 point simple polygon on the dm layer, hidden or revealed', () => {
+describe('Entity.fogRegion (D47 + MV-303)', () => {
+  it('accepts a 3-64 point simple polygon on the map layer, active or revealed', () => {
     expect(ok(fogRegion())).toBe(true);
-    expect(ok({ ...fogRegion(), fogRegion: { points: square, hidden: false } })).toBe(true);
+    expect(ok({ ...fogRegion(), fogRegion: { points: square, revealed: true } })).toBe(true);
+    // Absent `revealed` is active; it is only ever `true`, and there is no `hidden` field.
+    expect(ok({ ...fogRegion(), fogRegion: { points: square, revealed: false } })).toBe(false);
+    expect(ok({ ...fogRegion(), fogRegion: { points: square, hidden: true } })).toBe(false);
   });
 
   it('rejects too few points, self-intersections, other components and other layers', () => {
@@ -208,8 +210,16 @@ describe('Entity.fogRegion (MV-303 Q2a)', () => {
     expect(reason(fogRegion({ shape }))).toMatch(/a fog region has no other components/);
     expect(reason(fogRegion({ blocksSight: true }))).toMatch(/no other components/);
     expect(reason({ ...fogRegion(), wall: { points: seg } })).toMatch(/no other components/);
-    for (const layer of ['map', 'props', 'tokens', 'effects'] as const)
-      expect(reason(fogRegion({ layer }))).toMatch(/a fog region lives on the dm layer/);
+    for (const extra of [
+      { token: { sizeCells: 1, heightCells: 1, labelVisibility: 'all' as const } },
+      { image: { asset, calibrated: false } },
+      { aoe: { kind: 'sphere' as const, radius: 1, color: '#ffffff' } },
+      { pin: { text: 'x', reveal: 'hover' as const } },
+      { aura: { radius: 1, color: '#ffffff' } },
+    ])
+      expect(reason(fogRegion(extra))).toMatch(/no other components/);
+    for (const layer of ['dm', 'props', 'tokens', 'effects'] as const)
+      expect(reason(fogRegion({ layer }))).toMatch(/a fog region lives on the map layer/);
   });
 
   it('visionRuleViolation is the single rule set and passes ordinary entities', () => {

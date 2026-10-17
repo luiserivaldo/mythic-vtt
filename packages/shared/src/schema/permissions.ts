@@ -29,8 +29,8 @@ export const SeatTools = z.strictObject({
   pins: z.boolean(),
   /**
    * MV-303 Q1 (FOG-01, save v12): may this seat open and close ordinary doors (`wall.setDoor`)?
-   * Optional so v11 seats load unchanged; absent means off. Never locking, unlocking or secret
-   * doors: those stay admin-only.
+   * Optional so v11 seats load unchanged; absent means off. Never secret doors: those stay
+   * admin-only. Co-DMs ignore it (they may always toggle doors).
    */
   doors: z.boolean().optional(),
 });
