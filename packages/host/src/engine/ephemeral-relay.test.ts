@@ -42,14 +42,14 @@ describe('ephemeral relay', () => {
     const host = fakeConnection(T.host, { isHost: true });
     const relay = createEphemeralRelay(() => 1000);
     seat.interactionEnabled = false;
-    for (const channel of ['cursor', 'ping', 'ruler', 'token.drag-preview'])
+    for (const channel of ['cursor', 'ping', 'ruler.preview', 'token.drag-preview'])
       relay.relay(alice, { t: 'ephemeral', channel, data: {} }, state, recipients(state, [host]));
     expect(host.received).toEqual([]);
     expect(relay.stats().dropped.forbidden).toBe(4);
     seat.interactionEnabled = true;
     relay.relay(
       alice,
-      { t: 'ephemeral', channel: 'cursor', data: {} },
+      { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene } },
       state,
       recipients(state, [host]),
     );
@@ -614,7 +614,7 @@ describe('ephemeral relay', () => {
 
     relay.relay(
       alice,
-      { t: 'ephemeral', channel: 'cursor', data: { text: 'x'.repeat(300) } },
+      { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene, text: 'x'.repeat(300) } },
       state,
       targets,
     );
@@ -632,8 +632,18 @@ describe('ephemeral relay', () => {
       state,
       targets,
     );
-    relay.relay(spectator, { t: 'ephemeral', channel: 'cursor', data: { x: 1 } }, state, targets);
-    relay.relay(spectator, { t: 'ephemeral', channel: 'cursor', data: { x: 2 } }, state, targets);
+    relay.relay(
+      spectator,
+      { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene, x: 1 } },
+      state,
+      targets,
+    );
+    relay.relay(
+      spectator,
+      { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene, x: 2 } },
+      state,
+      targets,
+    );
 
     expect(alice.received.filter((m) => m.t === 'error')).toEqual([]);
     expect(spectator.received.filter((m) => m.t === 'error')).toEqual([]);
@@ -646,7 +656,12 @@ describe('ephemeral relay', () => {
       },
     });
 
-    relay.relay(alice, { t: 'ephemeral', channel: 'cursor', data: { x: 3 } }, state, targets);
+    relay.relay(
+      alice,
+      { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene, x: 3 } },
+      state,
+      targets,
+    );
     expect(relay.stats().dropped['spectator-rate-limited']).toBe(1);
   });
 });
@@ -1131,7 +1146,7 @@ it('shares the validated profile colour for rulers, cursors and pings instead of
           }
         : channel === PING_CHANNEL
           ? { sceneId: T.scene, x: 1, y: 0, z: 2, color: '#ffffff' }
-          : { x: 1, color: '#ffffff' };
+          : { sceneId: T.scene, x: 1, color: '#ffffff' };
     relay.relay(alice, { t: 'ephemeral', channel, data }, state, recipients(state, [host]));
     expect(host.received.at(-1)).toMatchObject({
       t: 'ephemeral',
@@ -1261,7 +1276,11 @@ describe('scene gate for every scene-scoped ephemeral (MV-232, PERM-03)', () => 
     const everyone = recipients(state, [coDm, player, spectator]);
     relay.relay(
       host,
-      { t: 'ephemeral', channel: 'cursor', data: { at: { sceneId: T.newScene, x: 7.875 } } },
+      {
+        t: 'ephemeral',
+        channel: 'cursor',
+        data: { sceneId: T.scene, at: { sceneId: T.newScene, x: 7.875 } },
+      },
       state,
       everyone,
     );
@@ -1274,16 +1293,104 @@ describe('scene gate for every scene-scoped ephemeral (MV-232, PERM-03)', () => 
     // A scene id the gate cannot read is malformed and reaches nobody.
     relay.relay(
       host,
-      { t: 'ephemeral', channel: 'cursor', data: { at: { sceneId: [T.newScene] } } },
+      {
+        t: 'ephemeral',
+        channel: 'cursor',
+        data: { sceneId: T.scene, at: { sceneId: [T.newScene] } },
+      },
       state,
       everyone,
     );
     expect(coDm.received).toHaveLength(1);
     expect(relay.stats().dropped['invalid-entity-reference']).toBe(1);
 
-    // A scene-less cursor is unaffected by the scene gate.
-    relay.relay(host, { t: 'ephemeral', channel: 'cursor', data: { x: 1 } }, state, everyone);
+    // Control: a cursor naming only the active scene reaches every viewer.
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene, x: 1 } },
+      state,
+      everyone,
+    );
     expect(player.received).toHaveLength(1);
     expect(spectator.received).toHaveLength(1);
+  });
+
+  it('drops a frame on a channel the relay does not know, whatever key names its scene (MV-282)', () => {
+    const { state, host, coDm, player, spectator, relay } = table({ dmOnly: true });
+    const everyone = recipients(state, [coDm, player, spectator]);
+    const unknown = [
+      { channel: 'ruler', data: { sceneId: T.scene } },
+      { channel: 'cursor.preview', data: { scene: T.newScene, x: 7.875 } },
+      { channel: 'measure', data: { targetSceneId: T.newScene, x: 7.875 } },
+      // Inherited object keys are not channels.
+      { channel: 'toString', data: { sceneId: T.scene } },
+      { channel: '__proto__', data: { sceneId: T.scene } },
+    ];
+    for (const frame of unknown) relay.relay(host, { t: 'ephemeral', ...frame }, state, everyone);
+    expect(coDm.received).toEqual([]);
+    expect(player.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({
+      relayed: 0,
+      dropped: { 'unknown-channel': unknown.length, 'hidden-scene': 0 },
+    });
+  });
+
+  it('drops a cursor that does not name its scene by a string sceneId (MV-282)', () => {
+    const { state, host, coDm, player, spectator, relay } = table({ dmOnly: true });
+    const everyone = recipients(state, [coDm, player, spectator]);
+    const sceneless = [
+      { x: 7.875, z: 1 },
+      { scene: T.newScene, x: 7.875 },
+      { targetSceneId: T.newScene, x: 7.875 },
+      { at: { sceneId: T.newScene }, x: 7.875 },
+      { sceneId: [T.newScene], x: 7.875 },
+      { sceneId: 7, x: 7.875 },
+      null,
+      [T.newScene, 7.875],
+    ];
+    for (const data of sceneless)
+      relay.relay(host, { t: 'ephemeral', channel: 'cursor', data }, state, everyone);
+    expect(coDm.received).toEqual([]);
+    expect(player.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({
+      relayed: 0,
+      dropped: { 'invalid-payload': sceneless.length },
+    });
+  });
+
+  it('relays a cursor on a DM-only scene to the co-DM only (MV-282)', () => {
+    const { state, host, coDm, player, spectator, relay } = table({ dmOnly: true });
+    const everyone = recipients(state, [coDm, player, spectator]);
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.newScene, x: 1.125, z: 7.875 } },
+      state,
+      everyone,
+    );
+    expect(coDm.received).toHaveLength(1);
+    expect(coDm.received[0]).toMatchObject({
+      t: 'ephemeral',
+      channel: 'cursor',
+      from: T.host,
+      data: { sceneId: T.newScene },
+    });
+    expect(player.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    const nonDmWire = player.wire() + spectator.wire();
+    expect(nonDmWire).not.toContain(T.newScene);
+    expect(nonDmWire).not.toContain('7.875');
+    expect(relay.stats().dropped['hidden-scene']).toBe(2);
+
+    // A player cannot point at a scene they do not see.
+    relay.relay(
+      player,
+      { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.newScene, x: 1 } },
+      state,
+      recipients(state, [host, coDm]),
+    );
+    expect(coDm.received).toHaveLength(1);
+    expect(relay.stats().dropped.forbidden).toBe(1);
   });
 });

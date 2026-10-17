@@ -334,15 +334,17 @@ describe('intent pipeline', () => {
     for (const c of [alice, bob]) await engine.onConnect(c);
     bob.clear();
 
-    const cursor = (x: number) => ({ t: 'ephemeral', channel: 'cursor', data: { x } }) as const;
+    const cursor = (x: number) =>
+      ({ t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene, x } }) as const;
+    const xs = () => ofType(bob, 'ephemeral').map((m) => (m.data as { x: number }).x);
     await engine.onEphemeral(alice, cursor(1));
     await engine.onEphemeral(alice, cursor(2));
-    expect(ofType(bob, 'ephemeral').map((m) => m.data)).toEqual([{ x: 1 }]);
+    expect(xs()).toEqual([1]);
     expect(engine.ephemeralStats().dropped['rate-limited']).toBe(1);
 
     now += 1_000;
     await engine.onEphemeral(alice, cursor(3));
-    expect(ofType(bob, 'ephemeral').map((m) => m.data)).toEqual([{ x: 1 }, { x: 3 }]);
+    expect(xs()).toEqual([1, 3]);
   });
 });
 

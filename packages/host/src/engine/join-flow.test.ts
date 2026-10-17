@@ -172,14 +172,22 @@ describe('Join As Spectator (UI-JOIN-01, C10)', () => {
     expect(presenceOf(host).at(-1)?.spectators).toBe(0);
 
     host.clear();
-    await engine.onEphemeral(bob, { t: 'ephemeral', channel: 'cursor', data: {} });
+    await engine.onEphemeral(bob, {
+      t: 'ephemeral',
+      channel: 'cursor',
+      data: { sceneId: T.scene },
+    });
     await engine.idle();
     const before = host.received.filter((m) => m.t === 'ephemeral').length;
     expect(before).toBeGreaterThan(0);
 
     await engine.onJoin(bob, { t: 'join', as: 'spectator' });
     host.clear();
-    await engine.onEphemeral(bob, { t: 'ephemeral', channel: 'cursor', data: {} });
+    await engine.onEphemeral(bob, {
+      t: 'ephemeral',
+      channel: 'cursor',
+      data: { sceneId: T.scene },
+    });
     await engine.onIntent(bob, {
       t: 'intent',
       type: 'scene.rename',

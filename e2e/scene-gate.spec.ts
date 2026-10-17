@@ -4,8 +4,9 @@ import { RawClient, startTable, testUlid, type Reply } from './harness.js';
 // MV-232 / PERM-03: every scene-scoped ephemeral passes one host-side scene gate. A DM measuring
 // or drawing on a DM-only prep scene must never hand that scene's id or coordinates to a player or
 // a spectator, while a co-DM — who may see the scene (D32) — still gets the frame. Pings have their
-// own spec (`pings.spec.ts`); this one covers the ruler preview the leak was first reported on, and
-// a drawing stroke, at the transport level.
+// own spec (`pings.spec.ts`); this one covers the ruler preview the leak was first reported on, a
+// drawing stroke and a cursor, at the transport level. MV-282: the relay fans out only the channels
+// it knows, and a cursor must name its scene, so neither can slip past the gate.
 
 const ok = async (promise: Promise<Reply>) => {
   expect(await promise).toMatchObject({ t: 'ack' });
@@ -14,7 +15,7 @@ const ok = async (promise: Promise<Reply>) => {
 const framesOn = (frames: string[], channel: string, from: string) =>
   frames.filter((raw) => raw.includes(`"channel":"${channel}"`) && raw.includes(from)).length;
 
-test('a ruler or a stroke on a DM-only scene reaches the co-DM, never a player or spectator', async () => {
+test('a ruler, a stroke or a cursor on a DM-only scene reaches the co-DM, never a player or spectator', async () => {
   test.setTimeout(60_000);
   const table = await startTable();
   const publicScene = testUlid('SCENE', 5);
@@ -87,6 +88,7 @@ test('a ruler or a stroke on a DM-only scene reaches the co-DM, never a player o
           points,
         }),
       },
+      { channel: 'cursor', data: (sceneId) => ({ sceneId, x: 1, z: 1 }) },
     ];
 
     for (const { channel, data } of frames) {
@@ -110,6 +112,24 @@ test('a ruler or a stroke on a DM-only scene reaches the co-DM, never a player o
         `the public ${channel} reached the co-DM`,
         () => framesOn(coDm.frames, channel, hostId) === 2,
       );
+    }
+
+    // MV-282: a channel the relay does not know, and a cursor that names no scene by `sceneId`,
+    // reach nobody — not even the co-DM — whatever key carries the scene.
+    host.ephemeral('pointer', { scene: prepScene, x: 1, z: 1 });
+    host.ephemeral('cursor', { targetSceneId: prepScene, x: 2, z: 2 });
+    host.ephemeral('cursor', { sceneId: publicScene, x: 3, z: 3 });
+    for (const [client, count] of [
+      [player, 2],
+      [spectator, 2],
+      [coDm, 3],
+    ] as const) {
+      await client.waitFor(
+        'the control cursor after the dropped frames',
+        () => framesOn(client.frames, 'cursor', hostId) === count,
+      );
+      expect(framesOn(client.frames, 'pointer', hostId)).toBe(0);
+      expect(client.frames.join('\n')).not.toContain('targetSceneId');
     }
 
     expect(player.frames.join('\n')).not.toContain(prepScene);

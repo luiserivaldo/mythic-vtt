@@ -1,6 +1,9 @@
 import { encodeServerMessage, type ClientMessage, type ServerMessage } from '@mythic/protocol';
 import {
   CAMERA_POSE_CHANNEL,
+  DRAW_CLEAR_CHANNEL,
+  DRAW_ERASE_CHANNEL,
+  DRAW_STROKE_CHANNEL,
   canClearDrawings,
   canEraseDrawing,
   canSendCameraPose,
@@ -52,6 +55,7 @@ export interface EphemeralRelayOptions {
 }
 
 export type EphemeralDropReason =
+  | 'unknown-channel'
   | 'rate-limited'
   | 'spectator-rate-limited'
   | 'payload-too-large'
@@ -172,6 +176,41 @@ function frameReferences(data: unknown): FrameReferences | undefined {
   return visit(data) ? { entities, scenes } : undefined;
 }
 
+/**
+ * MV-282: how a relayed channel names its scene. `contract` — the channel's own check below (seat
+ * tool gate, pose or drawing parse, move intent) already refuses a frame without a string
+ * `sceneId`. `required` — the channel has no contract of its own, so the relay demands a top-level
+ * string `sceneId` before anything else; any channel carrying world coordinates belongs here.
+ */
+type ChannelScene = 'contract' | 'required';
+
+/**
+ * MV-282: the only channels the relay fans out. `Ephemeral.channel` is an open string on the wire,
+ * and the scene gate only sees a scene named by a `sceneId` key, so a channel the relay does not
+ * know — or one naming its scene under another key — would reach everyone unfiltered. Every
+ * channel here is scene-scoped; there is deliberately no scene-less channel today. Adding one
+ * means listing it here with the reason it can never carry world coordinates.
+ */
+const RELAY_CHANNELS: Readonly<Record<string, ChannelScene>> = {
+  // MEAS-01: measured points on a scene; the measure tool gate requires `sceneId`.
+  'ruler.preview': 'contract',
+  // M4-14: a marker on a scene; the pins tool gate requires `sceneId`.
+  [PING_CHANNEL]: 'contract',
+  // CAM-06: the DM's camera on a scene; `parseCameraPose` requires `sceneId`.
+  [CAMERA_POSE_CHANNEL]: 'contract',
+  // TOK-02: a token moving on a scene; the `token.move` intent check requires `sceneId`.
+  'token.drag-preview': 'contract',
+  // LAY-05: drawings on a scene; their schemas require `sceneId`.
+  [DRAW_STROKE_CHANNEL]: 'contract',
+  [DRAW_ERASE_CHANNEL]: 'contract',
+  [DRAW_CLEAR_CHANNEL]: 'contract',
+  // A pointer position is world coordinates on a scene, so it must say which scene.
+  cursor: 'required',
+};
+
+const relayChannel = (channel: string): ChannelScene | undefined =>
+  Object.hasOwn(RELAY_CHANNELS, channel) ? RELAY_CHANNELS[channel] : undefined;
+
 function sceneIdOf(data: unknown): string | undefined {
   if (data === null || typeof data !== 'object') return undefined;
   const sceneId = (data as { sceneId?: unknown }).sceneId;
@@ -179,8 +218,8 @@ function sceneIdOf(data: unknown): string | undefined {
 }
 
 /**
- * PERM-03: does this audience see every scene a frame names? An empty set is vacuously true, so
- * channels that carry no scene (cursors) are never filtered by scene.
+ * PERM-03: does this audience see every scene a frame names? An empty set is vacuously true, but
+ * every relayed channel names a scene (MV-282), so a relayed frame never has one.
  */
 function seesEveryScene(
   state: Campaign,
@@ -248,6 +287,7 @@ export function createEphemeralRelay(
   let cameraPoseDelivery: TokenBucket | undefined;
   let relayed = 0;
   const dropped: Record<EphemeralDropReason, number> = {
+    'unknown-channel': 0,
     'rate-limited': 0,
     'spectator-rate-limited': 0,
     'payload-too-large': 0,
@@ -383,11 +423,23 @@ export function createEphemeralRelay(
 
   return {
     relay(sender, message, state, recipients) {
+      // MV-282: a channel the relay does not know is never fanned out; see `RELAY_CHANNELS`.
+      const channelScene = relayChannel(message.channel);
+      if (channelScene === undefined) {
+        drop('unknown-channel');
+        return;
+      }
       const now = clock();
       const senderActor = actorFor(state, sender);
       // UI-SEAT-05: tool previews, rulers and pings cannot bypass the durable gate.
       if (seatOf(state, senderActor)?.interactionEnabled === false) {
         drop('forbidden');
+        return;
+      }
+      // MV-282: a channel with no contract of its own names its scene at the top level, so the
+      // scene gate below always has one to check.
+      if (channelScene === 'required' && sceneIdOf(message.data) === undefined) {
+        drop('invalid-payload');
         return;
       }
       // PERM-05 / UI-SEAT-02: the sender's seat tools gate the channel (host and co-DM exempt).
