@@ -1302,7 +1302,8 @@ describe('scene gate for every scene-scoped ephemeral (MV-232, PERM-03)', () => 
       everyone,
     );
     expect(coDm.received).toHaveLength(1);
-    expect(relay.stats().dropped['invalid-entity-reference']).toBe(1);
+    expect(relay.stats().dropped['invalid-scene-id']).toBe(1);
+    expect(relay.stats().dropped['invalid-entity-reference']).toBe(0);
 
     // Control: a cursor naming only the active scene reaches every viewer.
     relay.relay(
@@ -1313,6 +1314,62 @@ describe('scene gate for every scene-scoped ephemeral (MV-232, PERM-03)', () => 
     );
     expect(player.received).toHaveLength(1);
     expect(spectator.received).toHaveLength(1);
+  });
+
+  it('drops a frame nested past the walk depth cap without throwing, then relays again (MV-283)', () => {
+    const { state, host, coDm, player, spectator, relay } = table({ dmOnly: true });
+    const everyone = recipients(state, [coDm, player, spectator]);
+    // Far deeper than any stack would take unbounded; objects and arrays alternate.
+    let nested: unknown = { sceneId: T.newScene, x: 7.875 };
+    for (let level = 0; level < 10_000; level += 1)
+      nested = level % 2 === 0 ? { at: nested } : [nested];
+    expect(() => {
+      relay.relay(
+        host,
+        { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene, at: nested } },
+        state,
+        everyone,
+      );
+    }).not.toThrow();
+    expect(host.received).toEqual([]);
+    expect(coDm.received).toEqual([]);
+    expect(player.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({
+      relayed: 0,
+      dropped: { 'invalid-payload': 1, 'payload-too-large': 0 },
+    });
+
+    // Control: an ordinary cursor still reaches every viewer.
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene, x: 1 } },
+      state,
+      everyone,
+    );
+    expect(coDm.received).toHaveLength(1);
+    expect(player.received).toHaveLength(1);
+    expect(spectator.received).toHaveLength(1);
+    expect(relay.stats().relayed).toBe(3);
+  });
+
+  it('counts a nested non-string scene id under its own drop reason (MV-283)', () => {
+    const { state, host, coDm, player, spectator, relay } = table({ dmOnly: true });
+    const everyone = recipients(state, [coDm, player, spectator]);
+    for (const sceneId of [7, null, { id: T.newScene }])
+      relay.relay(
+        host,
+        { t: 'ephemeral', channel: 'cursor', data: { sceneId: T.scene, at: { sceneId } } },
+        state,
+        everyone,
+      );
+    expect(coDm.received).toEqual([]);
+    expect(player.received).toEqual([]);
+    expect(spectator.received).toEqual([]);
+    expect(relay.stats()).toMatchObject({
+      relayed: 0,
+      dropped: { 'invalid-scene-id': 3, 'invalid-entity-reference': 0 },
+    });
   });
 
   it('drops a frame on a channel the relay does not know, whatever key names its scene (MV-282)', () => {

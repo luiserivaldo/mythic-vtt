@@ -61,6 +61,7 @@ export type EphemeralDropReason =
   | 'payload-too-large'
   | 'invalid-payload'
   | 'invalid-entity-reference'
+  | 'invalid-scene-id'
   | 'invalid-drawing'
   | 'invalid-camera-pose'
   | 'forbidden'
@@ -148,32 +149,57 @@ interface FrameReferences {
 }
 
 /**
+ * MV-283: how deep `frameReferences` walks. The walk runs before the encoded size check, on a frame
+ * the gateway lets reach 1 MiB, so it must not recurse as deep as the data goes. No relayed
+ * channel nests anywhere near this; a deeper frame is malformed.
+ */
+const MAX_FRAME_DEPTH = 32;
+
+/**
  * PERM-03: everything a frame's data points at. Any `sceneId` key, however deep, names a scene the
  * scene gate must check — so a scene-scoped channel cannot slip a hidden scene's id past the relay
- * by nesting it. `undefined` means the data is malformed: an `entityId` with no scene to resolve it
- * in, or a `sceneId` that is not a string (which no gate could check).
+ * by nesting it. A drop reason means the data is malformed: nested past `MAX_FRAME_DEPTH`, a
+ * `sceneId` that is not a string (which no gate could check), or an `entityId` with no scene to
+ * resolve it in.
  */
-function frameReferences(data: unknown): FrameReferences | undefined {
+function frameReferences(data: unknown): FrameReferences | EphemeralDropReason {
   const entities: EntityReference[] = [];
   const scenes = new Set<string>();
-  const visit = (value: unknown, inheritedSceneId?: string): boolean => {
-    if (value === null || typeof value !== 'object') return true;
-    if (Array.isArray(value)) return value.every((item) => visit(item, inheritedSceneId));
+  const visit = (
+    value: unknown,
+    depth: number,
+    inheritedSceneId?: string,
+  ): EphemeralDropReason | undefined => {
+    if (value === null || typeof value !== 'object') return undefined;
+    if (depth > MAX_FRAME_DEPTH) return 'invalid-payload';
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const invalid = visit(item, depth + 1, inheritedSceneId);
+        if (invalid !== undefined) return invalid;
+      }
+      return undefined;
+    }
 
     const record = value as Record<string, unknown>;
     let sceneId = inheritedSceneId;
     if (Object.hasOwn(record, 'sceneId')) {
-      if (typeof record.sceneId !== 'string') return false;
+      if (typeof record.sceneId !== 'string') return 'invalid-scene-id';
       sceneId = record.sceneId;
       scenes.add(sceneId);
     }
     if (Object.hasOwn(record, 'entityId')) {
-      if (typeof record.entityId !== 'string' || sceneId === undefined) return false;
+      if (typeof record.entityId !== 'string' || sceneId === undefined) {
+        return 'invalid-entity-reference';
+      }
       entities.push({ sceneId, entityId: record.entityId });
     }
-    return Object.values(record).every((item) => visit(item, sceneId));
+    for (const item of Object.values(record)) {
+      const invalid = visit(item, depth + 1, sceneId);
+      if (invalid !== undefined) return invalid;
+    }
+    return undefined;
   };
-  return visit(data) ? { entities, scenes } : undefined;
+  return visit(data, 0) ?? { entities, scenes };
 }
 
 /**
@@ -293,6 +319,7 @@ export function createEphemeralRelay(
     'payload-too-large': 0,
     'invalid-payload': 0,
     'invalid-entity-reference': 0,
+    'invalid-scene-id': 0,
     'invalid-drawing': 0,
     'invalid-camera-pose': 0,
     forbidden: 0,
@@ -501,8 +528,8 @@ export function createEphemeralRelay(
       if (commitDrawing === null) return;
 
       const references = frameReferences(message.data);
-      if (references === undefined) {
-        drop('invalid-entity-reference');
+      if (typeof references === 'string') {
+        drop(references);
         return;
       }
       const refs = references.entities;
