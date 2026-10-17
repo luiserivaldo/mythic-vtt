@@ -193,7 +193,6 @@ export function OrbitControls3D({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       apply(dolly(orbit.current, wheelFactor(e)));
-      cameraJoystickStore.getState().mouseMoved();
     };
 
     const onPointerDown = (e: PointerEvent) => {

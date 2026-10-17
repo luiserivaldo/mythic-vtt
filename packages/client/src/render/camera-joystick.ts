@@ -10,9 +10,9 @@ import { clampOrbit, type Orbit3D } from './camera-3d.js';
  * the tilt keeps the orbit camera's own [MIN_POLAR, MAX_POLAR] limits.
  *
  * Directions follow the mouse orbit (OrbitControls3D): pushing the knob right swings the camera the
- * same way a right-drag to the right does (clockwise seen from above, azimuth decreasing). Pushing
- * it forward (up) tilts the camera forward, down toward the board (polar decreasing); back tilts it
- * toward the horizon.
+ * same way a right-drag to the right does (clockwise seen from above, azimuth decreasing). Tilt is
+ * the reverse of the mouse (MV-274): pushing it forward (up) leans the camera forward, toward the
+ * horizon (polar increasing); back tilts it toward top-down.
  */
 
 /** Radians per second of rotation at full deflection. */
@@ -65,7 +65,7 @@ export function nudgeOrbit(o: Orbit3D, rotate: number, tilt: number): Orbit3D {
   return clampOrbit({
     ...o,
     azimuth: o.azimuth - finite(rotate),
-    polar: o.polar - finite(tilt),
+    polar: o.polar + finite(tilt),
   });
 }
 

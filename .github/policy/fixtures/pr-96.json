@@ -1,0 +1,10 @@
+{
+  "files": [
+    "e2e/view-as.spec.ts",
+    "packages/client/src/render/token-labels.test.ts",
+    "packages/client/src/render/token-labels.ts",
+    "packages/client/src/render/token-preview.test.ts",
+    "packages/client/src/ui/token-menu.test.ts"
+  ],
+  "pr": 96
+}

@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { selectionStore } from '../tools/selection-store.js';
-import { TOOL_PANEL_ORDER, toolPanelLayoutStore } from './tool-panel-layout.js';
+import { isCollapsible, TOOL_PANEL_ORDER, toolPanelLayoutStore } from './tool-panel-layout.js';
 
 describe('tool panel layout', () => {
   beforeEach(() => {
     toolPanelLayoutStore.setState({
       collapsed: {
-        transform: false,
         aoe: false,
         token: true,
         ruler: false,
@@ -32,23 +30,21 @@ describe('tool panel layout', () => {
   });
 
   it('collapses active panels without hiding their restore control', () => {
-    toolPanelLayoutStore.getState().collapse('transform');
     toolPanelLayoutStore.getState().collapse('aoe');
+    toolPanelLayoutStore.getState().collapse('ruler');
     expect(toolPanelLayoutStore.getState().collapsed).toEqual({
-      transform: true,
       aoe: true,
       token: true,
-      ruler: false,
+      ruler: true,
       draw: false,
       'create-prop': false,
       initiative: false,
       camera: true,
     });
 
-    toolPanelLayoutStore.getState().restore('transform');
     toolPanelLayoutStore.getState().restore('aoe');
+    toolPanelLayoutStore.getState().restore('ruler');
     expect(toolPanelLayoutStore.getState().collapsed).toEqual({
-      transform: false,
       aoe: false,
       token: true,
       ruler: false,
@@ -59,23 +55,12 @@ describe('tool panel layout', () => {
     });
   });
 
-  it('starts Transform and Token as their chips (MV-239)', () => {
-    const initial = toolPanelLayoutStore.getInitialState().collapsed;
-    expect(initial.transform).toBe(true);
-    expect(initial.token).toBe(true);
+  it('gives Transform no collapse state: it follows the selection (UI-TOKEN-07, MV-266)', () => {
+    expect(isCollapsible('transform')).toBe(false);
+    expect('transform' in toolPanelLayoutStore.getInitialState().collapsed).toBe(false);
+    for (const id of TOOL_PANEL_ORDER) if (id !== 'transform') expect(isCollapsible(id)).toBe(true);
+    expect(toolPanelLayoutStore.getInitialState().collapsed.token).toBe(true);
     // UI-CAM-01: the Pan tool's camera panel starts as its expandable bar.
-    expect(initial.camera).toBe(true);
-  });
-
-  it('tucks Transform again when the selection changes, and only then', () => {
-    selectionStore.getState().pick('scene-1', 'a', false);
-    toolPanelLayoutStore.getState().restore('transform');
-    toolPanelLayoutStore.getState().restore('token');
-    selectionStore.getState().pick('scene-1', 'a', false);
-    expect(toolPanelLayoutStore.getState().collapsed.transform).toBe(false);
-    selectionStore.getState().pick('scene-1', 'b', false);
-    expect(toolPanelLayoutStore.getState().collapsed.transform).toBe(true);
-    expect(toolPanelLayoutStore.getState().collapsed.token).toBe(false);
-    selectionStore.getState().clear();
+    expect(toolPanelLayoutStore.getInitialState().collapsed.camera).toBe(true);
   });
 });

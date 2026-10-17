@@ -6,9 +6,11 @@ on:
   push:
     branches: [main, develop]
 
+# A newer push to a PR makes its older run obsolete, so cancel that. A develop or main push is a
+# merge whose validation must complete: the merge lane waits for it before the next merge.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Read-only token, and no secrets are used: safe to run on pull requests from forks.
 permissions:
@@ -38,6 +40,8 @@ jobs:
         run: pnpm typecheck
       - name: Unit tests
         run: pnpm test
+      - name: Review-gate policy tests
+        run: node --test '.github/policy/*.test.mjs'
 
   e2e:
     name: e2e

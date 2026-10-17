@@ -11,7 +11,7 @@ test.afterAll(async () => {
   await table.stop();
 });
 
-test('selection panels stack beside the token and tool panels collapse to restore buttons', async ({
+test('selection panels stack in the left pane and tool panels collapse to restore buttons', async ({
   browser,
 }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -26,17 +26,15 @@ test('selection panels stack beside the token and tool panels collapse to restor
   await page.getByLabel('Token name').fill('Dock token');
   await page.getByRole('button', { name: 'Create token' }).click();
 
-  // MV-239 / UI-TOKEN-02: the selected token's panels open beside it, over the board. Transform
-  // and Token both start as chips (owner ruling): selecting covers nothing.
-  const dock = page.getByRole('complementary', { name: 'Selection panels' });
+  // UI-TOKEN-07 (MV-266): the selected token's panels open in the left pane. Transform is
+  // expanded with no Close of its own; the optional Token details start as their chip.
+  const dock = page.getByRole('complementary', { name: 'Left pane' });
   const panels = dock.locator('[data-tool-panel]');
-  await expect(dock.getByRole('button', { name: 'Restore Transform panel' })).toBeVisible();
   await expect(dock.getByRole('button', { name: 'Restore Token panel' })).toBeVisible();
-  await expect(panels).toHaveCount(0);
-  // The chip is how the user calls up the Transform tool.
-  await dock.getByRole('button', { name: 'Restore Transform panel' }).click();
   await expect(panels).toHaveCount(1);
   await expect(panels.nth(0)).toHaveAttribute('data-tool-panel', 'transform');
+  await expect(page.getByRole('button', { name: 'Restore Transform panel' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Close Transform panel' })).toHaveCount(0);
   await dock.getByRole('button', { name: 'Restore Token panel' }).click();
   await expect(panels).toHaveCount(2);
   await expect(panels.nth(1)).toHaveAttribute('data-tool-panel', 'token');
@@ -45,10 +43,7 @@ test('selection panels stack beside the token and tool panels collapse to restor
 
   await dock.getByRole('button', { name: 'Close Token panel' }).click();
   await expect(dock.getByRole('button', { name: 'Restore Token panel' })).toBeVisible();
-
-  await dock.getByRole('button', { name: 'Close Transform panel' }).click();
-  await expect(page.getByRole('button', { name: 'Restore Transform panel' })).toBeVisible();
-  await page.getByRole('button', { name: 'Restore Transform panel' }).click();
+  await expect(panels).toHaveCount(1);
 
   // UI-MEAS-01: the Measure panel opens beside its rail button, never in the dock.
   await page.getByRole('button', { name: 'Measure', exact: true }).click();

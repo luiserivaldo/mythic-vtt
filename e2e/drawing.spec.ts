@@ -72,8 +72,8 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
 }) => {
   test.setTimeout(120_000);
   const table = await startTable();
-  // MV-239: the Draw panel opens in the left pane, which narrows the board; a wider window keeps
-  // the strokes below clear of the floating rail.
+  // MV-239 / MV-279: the Draw panel opens in the left pane, which floats over the board's left
+  // edge; the strokes below keep to the board's middle, clear of it and of the rail.
   const dmContext = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   const playerContext = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   try {
@@ -140,9 +140,9 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
     // One drag: the stroke reaches the DM before the button is released (shared live), and the
     // wire carries the chosen colour and a scene-unit width the host accepted.
     const at = await cellToPixel(player);
-    const start = at(8.5, 8.5);
-    const mid = at(11.5, 10.5);
-    const end = at(14.5, 12.5);
+    const start = at(14.5, 8.5);
+    const mid = at(17.5, 10.5);
+    const end = at(20.5, 12.5);
     await player.mouse.move(start.x, start.y);
     await player.mouse.down();
     await player.mouse.move(mid.x, mid.y, { steps: 4 });
@@ -174,8 +174,8 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
     await expect(dmPanel).toBeVisible();
     await dmPanel.getByLabel('Stroke width').press('End');
     const dmAt = await cellToPixel(dm);
-    const dmStart = dmAt(6.5, 20.5);
-    const dmEnd = dmAt(18.5, 20.5);
+    const dmStart = dmAt(12.5, 20.5);
+    const dmEnd = dmAt(24.5, 20.5);
     await dm.mouse.move(dmStart.x, dmStart.y);
     await dm.mouse.down();
     await dm.mouse.move(dmEnd.x, dmEnd.y, { steps: 6 });
@@ -186,7 +186,7 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
     // The player arms the eraser and clicks the DM's drawing: it is not theirs to erase, so
     // nothing happens locally and nothing is sent.
     await panel.getByRole('button', { name: 'Eraser' }).click();
-    const middle = at(12.5, 20.5);
+    const middle = at(18.5, 20.5);
     await player.mouse.click(middle.x, middle.y);
     await player.waitForTimeout(200);
     expect(await strips(player)).toBe(2);
@@ -194,7 +194,7 @@ test('a freehand drawing is shared live, erased by its author, and cleared by th
     expect(framesOf(dmFrames, DRAW_ERASE_CHANNEL)).toHaveLength(0);
 
     // Their own drawing is theirs to erase, and the erase reaches the DM.
-    const own = at(11.5, 10.5);
+    const own = at(17.5, 10.5);
     await player.mouse.click(own.x, own.y);
     await expect.poll(() => strips(player), { timeout: 10_000 }).toBe(1);
     await expect.poll(() => strips(dm), { timeout: 10_000 }).toBe(1);

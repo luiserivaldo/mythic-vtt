@@ -94,7 +94,9 @@ test('selected tokens fade blocking primitives locally in 3D and restore materia
     }
   }
   for (const reply of await Promise.all(population)) expect(reply.t).toBe('ack');
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  // A wide window keeps the cells near the board's left edge clear of the floating rail and of
+  // the left pane that floats beside it (UI-TOKEN-07, MV-279).
+  const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   await context.addInitScript((value) => {
     localStorage.setItem('mythic.identity.v1', JSON.stringify(value));
     localStorage.setItem('mythic.host', '1');

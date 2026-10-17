@@ -71,8 +71,11 @@ test('the DM measures a 3D surface and shares the H/V/T readout', async ({ brows
   await expect(page.getByRole('button', { name: 'High platform', exact: true })).toBeVisible();
   // Pin the platform to the scene centre (20, 15 cells), wherever Create Prop placed it (MV-266).
   await moveSelectedTo(page, 100, 75);
-  // Leave the tool so its left pane closes before the canvas pose below is projected.
+  // Leave the tool and deselect the platform (UI-TOKEN-07: its Transform panel would hold the
+  // left pane open) so the pane closes before the canvas pose below is projected.
   await page.getByRole('button', { name: 'Select', exact: true }).click();
+  await page.getByLabel('Scene board').focus();
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('complementary', { name: 'Left pane' })).toHaveCount(0);
 
   const viewer = await openClient(browser, table, 'viewer');

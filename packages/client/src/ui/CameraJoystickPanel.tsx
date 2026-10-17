@@ -14,7 +14,7 @@ import './camera-joystick.css';
  * forward or back to tilt) with rotate buttons beside it; there is deliberately no elevation and
  * no sideways pan. The panel only asks; the orbit camera applies and clamps (camera-joystick.ts).
  * The mouse stays the main way to move the camera, so a mouse move closes the panel back to its
- * bar, while its own controls leave it open.
+ * bar (orbit or pan, not the wheel zoom), while its own controls leave it open.
  */
 export function CameraJoystickPanel() {
   const baseRef = useRef<HTMLDivElement>(null);

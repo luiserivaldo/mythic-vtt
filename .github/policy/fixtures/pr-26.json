@@ -1,0 +1,33 @@
+{
+  "files": [
+    "README.md",
+    "e2e/initiative-dock.spec.ts",
+    "e2e/initiative.spec.ts",
+    "e2e/tool-rail.spec.ts",
+    "fixtures/saves/v2/campaigns/01J8Z0000000000000000CAMP1/scenes/01J8Z0000000000000000SCN01.json",
+    "packages/client/src/ui/InitiativeTools.tsx",
+    "packages/client/src/ui/RailPanels.tsx",
+    "packages/client/src/ui/ToolPanelDock.tsx",
+    "packages/client/src/ui/ToolRail.tsx",
+    "packages/client/src/ui/registries.ts",
+    "packages/client/src/ui/tool-rail.test.ts",
+    "packages/host/src/engine/engine.ts",
+    "packages/host/src/engine/initiative.test.ts",
+    "packages/host/src/http/history-view.test.ts",
+    "packages/host/src/http/history-view.ts",
+    "packages/host/src/storage/migrations-fixture.test.ts",
+    "packages/shared/src/actions/entity.delete.ts",
+    "packages/shared/src/actions/initiative.advance.test.ts",
+    "packages/shared/src/actions/initiative.advance.ts",
+    "packages/shared/src/actions/initiative.set.test.ts",
+    "packages/shared/src/actions/initiative.set.ts",
+    "packages/shared/src/actions/registry.ts",
+    "packages/shared/src/schema/index.ts",
+    "packages/shared/src/schema/initiative.test.ts",
+    "packages/shared/src/schema/initiative.ts",
+    "packages/shared/src/schema/scene.ts",
+    "packages/shared/src/visibility/patches-for.ts",
+    "packages/shared/src/visibility/visible-to.ts"
+  ],
+  "pr": 26
+}
