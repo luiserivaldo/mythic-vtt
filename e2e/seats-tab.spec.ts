@@ -69,7 +69,7 @@ test('the DM manages a seat from the Seats tab and the player sees the effect', 
     await expect(seat).toContainText('Online');
     await expect(rail(player, 'Create Prop')).toHaveAttribute('aria-disabled', 'true');
 
-    // Turning Edit on for this seat lets the player create props.
+    // Turning Edit on for this seat covers its tokens only: Create Prop stays DM-only (MV-290).
     // The box is controlled by host state, so it flips on the ack rather than on the click.
     await toggle('Edit').click();
     await expect(toggle('Edit')).toBeChecked();
@@ -77,7 +77,11 @@ test('the DM manages a seat from the Seats tab and the player sees the effect', 
       'edit on',
       () => (setup.state as Campaign).seats[seatId]?.permissions.edit === true,
     );
-    await expect(rail(player, 'Create Prop')).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(rail(player, 'Create Prop')).toHaveAttribute('aria-disabled', 'true');
+    await expect(rail(player, 'Create Prop')).toHaveAttribute(
+      'title',
+      'Only the DM can create props',
+    );
 
     // UI-SEAT-05: Enable Interaction off locks every tool for that seat.
     await toggle('Enable Interaction').click();

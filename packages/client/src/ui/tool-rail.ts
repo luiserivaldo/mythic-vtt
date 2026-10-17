@@ -37,7 +37,7 @@ const DENIED: Readonly<Record<string, string>> = {
   select: 'Your seat cannot move tokens',
   measure: 'Your seat cannot measure',
   draw: 'Your seat cannot draw',
-  'create-prop': 'Your seat cannot create props',
+  'create-prop': 'Only the DM can create props',
 };
 
 export const INTERACTION_OFF_REASON = 'Interaction is turned off for your seat';

@@ -69,8 +69,6 @@ const everyone: Allowed = () => true;
 const hiddenInAlpha: Allowed = () => false;
 const canMove: Allowed = (role, permissions) =>
   admin(role, permissions) || permissions?.move === true;
-const canEdit: Allowed = (role, permissions) =>
-  admin(role, permissions) || permissions?.edit === true;
 const canView: Allowed = (role, permissions) =>
   admin(role, permissions) || permissions?.view === true;
 
@@ -105,7 +103,8 @@ export const railTools = createRegistry<RailTool>([
     label: 'Create Prop',
     icon: 'cube',
     group: 'create',
-    allowed: canEdit,
+    // MV-290: creating props is DM work (entity.create is admin-only); a seat's Edit covers tokens.
+    allowed: admin,
     panel: 'create-prop',
   },
   {

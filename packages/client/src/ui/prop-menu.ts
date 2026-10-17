@@ -1,4 +1,12 @@
-import { canPerform, isLayerLocked, type Actor, type Campaign, type Entity } from '@mythic/shared';
+import {
+  canPerform,
+  isAdmin,
+  isLayerLocked,
+  isProp,
+  type Actor,
+  type Campaign,
+  type Entity,
+} from '@mythic/shared';
 import type { IntentSpec } from './intent-specs.js';
 
 // MV-243 / UI-TOKEN-05: a prop is ground or not. The right-click menu and (later) object-edit mode
@@ -6,6 +14,8 @@ import type { IntentSpec } from './intent-specs.js';
 // `shape.walkable` is the stored collidable flag (ENV-04): walkable surfaces are what tokens stand on.
 
 export const COLLIDABLE_LABEL = 'Collidable';
+/** MV-290: a seat's Edit permission covers its tokens; props are DM work. */
+export const PROP_DM_ONLY_REASON = 'Only the DM can edit props.';
 
 export interface PropCollidableModel {
   checked: boolean;
@@ -34,7 +44,11 @@ export function propCollidableModel(
   return {
     checked: shape.walkable,
     enabled,
-    reason: enabled ? null : 'You cannot edit this prop.',
+    reason: enabled
+      ? null
+      : isProp(entity) && !isAdmin(campaign, actor)
+        ? PROP_DM_ONLY_REASON
+        : 'You cannot edit this prop.',
   };
 }
 

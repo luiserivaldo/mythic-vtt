@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { patchesFor } from '../visibility/index.js';
 import type { ActionEnvelope } from './envelope.js';
+import { isProp } from './entity-access.js';
 import { entityUpdate } from './entity.update.js';
 import { reduceAction } from './run.js';
 import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix } from './testing.js';
@@ -84,6 +85,44 @@ describe(`${T} permissions`, () => {
     expect(entityUpdate.permission(state, ACTORS.otherSeat, editPayload)).toBe(true);
   });
 
+  it("MV-290: a seat with Edit edits its own token but not another seat's", () => {
+    const state = stateWithEntity();
+    const editPayload = { sceneId: IDS.scene, entityId: IDS.entity, changes: { name: 'Edited' } };
+    for (const id of [IDS.owner, IDS.other]) {
+      const seat = state.seats[id];
+      if (seat) seat.permissions.edit = true;
+    }
+    expect(entityUpdate.permission(state, ACTORS.owner, editPayload)).toBe(true);
+    expect(entityUpdate.permission(state, ACTORS.otherSeat, editPayload)).toBe(false);
+  });
+
+  it('MV-290: only admins edit a prop, whatever the seat permissions, owners or grants', () => {
+    const state = makeCampaign();
+    const scene = state.scenes[IDS.scene];
+    if (scene)
+      scene.entities[IDS.entity] = makeEntity(IDS.entity, {
+        layer: 'props',
+        owners: [IDS.owner],
+        perms: { edit: true, move: true },
+        shape: { kind: 'box', color: '#888888', walkable: true },
+      });
+    for (const id of [IDS.owner, IDS.other]) {
+      const seat = state.seats[id];
+      if (seat) Object.assign(seat.permissions, { move: true, edit: true });
+    }
+    const editPayload = { sceneId: IDS.scene, entityId: IDS.entity, changes: { name: 'Edited' } };
+    expect(permissionMatrix(state, T, editPayload)).toEqual({
+      host: true,
+      owner: false,
+      otherSeat: false,
+      coDm: true,
+      spectator: false,
+      mod: false,
+    });
+    // Moving stays the ordinary move rule (owner or grant plus the seat's Move permission).
+    expect(entityUpdate.permission(state, ACTORS.owner, payload)).toBe(true);
+  });
+
   it('rejects missing entities and locked layers', () => {
     expect(entityUpdate.permission(makeCampaign(), ACTORS.host, payload)).toBe(false);
     const state = stateWithEntity();
@@ -129,5 +168,27 @@ describe(`${T} bounds (D37)`, () => {
     const state = stateWithEntity();
     expect(entityUpdate.permission(state, ACTORS.owner, to(40, 30))).toBe(true);
     expect(entityUpdate.permission(state, ACTORS.owner, to(41, 3))).toBe(false);
+  });
+});
+
+describe('isProp (MV-290)', () => {
+  it('is true for a shape, model or image that is not a token, AoE or pin', () => {
+    const shape = { kind: 'box' as const, color: '#888888', walkable: true };
+    const asset = (kind: 'image' | 'model') => ({
+      source: 'local' as const,
+      hash: 'a'.repeat(64),
+      kind,
+    });
+    expect(isProp(makeEntity(IDS.entity, { shape }))).toBe(true);
+    expect(isProp(makeEntity(IDS.entity, { model: { asset: asset('model') } }))).toBe(true);
+    const image = { asset: asset('image'), calibrated: true };
+    expect(isProp(makeEntity(IDS.entity, { image }))).toBe(true);
+    const token = { sizeCells: 1, heightCells: 1, labelVisibility: 'all' as const };
+    expect(isProp(makeEntity(IDS.entity, { token }))).toBe(false);
+    expect(isProp(makeEntity(IDS.entity, { token, shape }))).toBe(false);
+    expect(isProp(makeEntity(IDS.entity, { pin: { text: 'x', reveal: 'hover' }, shape }))).toBe(
+      false,
+    );
+    expect(isProp(makeEntity(IDS.entity))).toBe(false);
   });
 });

@@ -50,16 +50,25 @@ describe('tool rail states', () => {
     const states = railToolStates({ ...base, role: 'player', permissions: perms() });
     expect(by(states, 'create-prop')).toMatchObject({
       enabled: false,
-      reason: 'Your seat cannot create props',
+      reason: 'Only the DM can create props',
     });
     expect(by(states, 'select').enabled).toBe(true);
     expect(by(states, 'measure').enabled).toBe(true);
     expect(by(states, 'pan').enabled).toBe(true);
   });
 
-  it('lets a seat granted edit create props', () => {
-    const states = railToolStates({ ...base, role: 'player', permissions: perms({ edit: true }) });
-    expect(by(states, 'create-prop').enabled).toBe(true);
+  it('keeps Create Prop for the DM and co-DMs, even for a player seat with Edit (MV-290)', () => {
+    const player = railToolStates({
+      ...base,
+      role: 'player',
+      permissions: perms({ edit: true, delete: true }),
+    });
+    expect(by(player, 'create-prop')).toMatchObject({
+      enabled: false,
+      reason: 'Only the DM can create props',
+    });
+    const coDm = railToolStates({ ...base, role: 'codm', permissions: perms() });
+    expect(by(coDm, 'create-prop').enabled).toBe(true);
   });
 
   it('disables every tool, with one reason, when Enable Interaction is off', () => {

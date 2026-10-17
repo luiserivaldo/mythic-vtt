@@ -14,7 +14,21 @@ export function isLayerLocked(scene: Scene, layer: LayerId): boolean {
   return scene.layers[layer]?.locked ?? false;
 }
 
-/** PERM-01/02: a player needs both a seat capability and ownership/an entity grant. */
+/**
+ * MV-290: a prop is a placed board object (a shape, model or image) that is not a token, an AoE or
+ * a pin. Creating, editing and deleting props is admin work; a seat's Edit permission covers only
+ * tokens.
+ */
+export function isProp(entity: Entity): boolean {
+  if (entity.token || entity.aoe || entity.pin) return false;
+  return entity.shape !== undefined || entity.model !== undefined || entity.image !== undefined;
+}
+
+/**
+ * PERM-01/02: a player needs both a seat capability and ownership/an entity grant. MV-290: a
+ * player may never edit or delete a prop, whatever its owners or grants; moving one still follows
+ * the ordinary move rule.
+ */
 export function canUseEntity(
   state: Campaign,
   actor: Actor,
@@ -33,6 +47,7 @@ export function canUseEntity(
     return entity.perms?.[capability] === true || (owns && seat.permissions[capability]);
   }
   if (!seat || entity.layer === 'dm' || !seat.permissions.view) return false;
+  if (capability !== 'move' && isProp(entity)) return false;
 
   const owns = entity.owners.includes(seat.id);
   const canView = owns || entity.perms?.view !== false;
