@@ -1,10 +1,8 @@
 import type { Audience } from '@mythic/shared';
-import { createStore } from 'zustand/vanilla';
 import type { ImageUploader } from '../assets/image-upload.js';
 import type { IntentSpec } from './intent-specs.js';
-import type { Profile } from './join-screen.js';
 
-/** UI-HOST-02: the sign-out capture is a list thumbnail, not a full-resolution board image. */
+/** UI-HOST-02: the End Game capture is a list thumbnail, not a full-resolution board image. */
 export const THUMBNAIL_BOX = { width: 640, height: 360 } as const;
 /** Far above a 640x360 WebP; anything bigger means the encoder misbehaved, so it is not sent. */
 export const THUMBNAIL_MAX_BYTES = 512 * 1024;
@@ -75,20 +73,20 @@ export async function capturePublicBoard(
   }
 }
 
-export type SignOutOutcome = 'captured' | 'skipped' | 'failed';
+export type EndGameOutcome = 'captured' | 'skipped' | 'failed';
 
 /**
- * UI-HOST-02: the DM signs out. The capture is best effort: whatever happens to it, the DM is
- * signed out. It goes through the normal upload route, so it keeps the host's size, type and
+ * UI-HOST-02 / UX-05b: the DM ends the game. The capture is best effort: whatever happens to it,
+ * the DM's session stops. It goes through the normal upload route, so it keeps the host's size, type and
  * permission limits, and is stored as `autoScreenshot` (the DM's upload still wins).
  */
-export async function signOutWithThumbnail(deps: {
+export async function endGameWithThumbnail(deps: {
   capture: () => Promise<Blob | null>;
   upload: ImageUploader;
   send: (spec: IntentSpec) => Promise<boolean>;
   stop: () => void;
-}): Promise<SignOutOutcome> {
-  let outcome: SignOutOutcome = 'skipped';
+}): Promise<EndGameOutcome> {
+  let outcome: EndGameOutcome = 'skipped';
   try {
     const blob = await deps.capture();
     if (blob && isUploadableThumbnail(blob)) {
@@ -101,8 +99,3 @@ export async function signOutWithThumbnail(deps: {
   deps.stop();
   return outcome;
 }
-
-/** Set after the DM signs out: the table is replaced by a sign-back-in card. */
-export const signOutStore = createStore<{
-  signedOut: Pick<Profile, 'displayName' | 'avatar' | 'color'> | null;
-}>()(() => ({ signedOut: null }));

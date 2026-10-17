@@ -90,13 +90,37 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       this.index.select().from(campaigns).all().map(toMeta).sort(byLastPlayed),
     );
   }
-  /** UX-05: the newest session start on disk, or null if the campaign was never opened. */
-  private async lastSessionStart(id: string): Promise<number | null> {
+  /**
+   * UX-05b (MV-273): last played is the newest autosave or end-of-session checkpoint on disk (its
+   * file time), or null if no session ever saved one. Opening a campaign does not count.
+   */
+  private async lastCheckpoint(id: string): Promise<number | null> {
     try {
-      return (await this.readSessions(id)).at(-1)?.startedAt ?? null;
+      for (const { sessionId } of (await this.readSessions(id)).reverse()) {
+        const dir = join(this.folder(id), 'sessions', sessionId, 'snapshots');
+        const times = await Promise.all(
+          ['autosave.json', 'end.json'].map((name) =>
+            stat(join(dir, name)).then(
+              (s) => Math.trunc(s.mtimeMs),
+              () => null,
+            ),
+          ),
+        );
+        const newest = Math.max(...times.map((t) => t ?? -1));
+        if (newest >= 0) return newest;
+      }
+      return null;
     } catch {
       return null;
     }
+  }
+  /** UX-05b (MV-273): an autosave or the end-of-session save is when the campaign was played. */
+  markPlayed(campaignId: Id, at: number): void {
+    this.index
+      .update(campaigns)
+      .set({ lastPlayedAt: at })
+      .where(eq(campaigns.id, safeId(campaignId)))
+      .run();
   }
   /**
    * HOST-03: the `campaigns` table is a cache of the folders. Adds a row for every readable
@@ -114,7 +138,7 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       const thumbnail =
         row.thumbnail ??
         (await this.read(file, 'campaign', CampaignFile).then(campaignThumbnail, () => undefined));
-      const lastPlayedAt = row.lastPlayedAt ?? (await this.lastSessionStart(row.id));
+      const lastPlayedAt = row.lastPlayedAt ?? (await this.lastCheckpoint(row.id));
       this.index
         .update(campaigns)
         .set({ lastPlayedAt, thumbnail: thumbnail ?? null })
@@ -143,7 +167,7 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
             name: campaign.name,
             schemaVersion: campaign.schemaVersion,
             updatedAt: Math.trunc((await stat(file)).mtimeMs),
-            lastPlayedAt: await this.lastSessionStart(id),
+            lastPlayedAt: await this.lastCheckpoint(id),
             thumbnail: campaignThumbnail(campaign) ?? null,
           })
           .onConflictDoNothing()
@@ -357,12 +381,6 @@ export class LocalCampaignStore implements CampaignStore, ArchiveHost {
       JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION, ...Snapshot.parse(snapshot) }),
     );
     await atomicWrite(join(dir, 'meta.json'), JSON.stringify(SessionMeta.parse(meta)));
-    // UX-05 / UI-HOST-02: "last played" is when a session opened the campaign.
-    this.index
-      .update(campaigns)
-      .set({ lastPlayedAt: meta.startedAt })
-      .where(eq(campaigns.id, campaignId))
-      .run();
   }
   async readSessions(campaignId: Id, max?: number): Promise<SessionMeta[]> {
     const dir = join(this.folder(campaignId), 'sessions');

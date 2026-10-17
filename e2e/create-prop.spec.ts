@@ -164,9 +164,17 @@ test('the DM creates every shape with one click, at the view centre in 2D and 3D
       expect(Math.abs(z - centre.z), shape).toBeLessThanOrEqual(1);
     }
 
-    // Leaving the tool closes its panel and gives the width back to the board.
+    // Leaving the tool closes its panel. UI-TOKEN-07 (MV-266): under Select the pane holds the
+    // selected prop's Transform; deselecting gives the width back to the board.
+    const pane = page.getByRole('complementary', { name: 'Left pane' });
     await page.getByRole('button', { name: 'Select', exact: true }).click();
-    await expect(page.getByRole('complementary', { name: 'Left pane' })).toHaveCount(0);
+    await expect(pane.getByRole('form', { name: 'Create prop' })).toHaveCount(0);
+    await expect(
+      pane.getByRole('region', { name: `Transform: Prop ${String(SHAPES.length)}` }),
+    ).toBeVisible();
+    await page.getByLabel('Scene board').focus();
+    await page.keyboard.press('Escape');
+    await expect(pane).toHaveCount(0);
     expect(errors).toEqual([]);
   } finally {
     await reader?.close();

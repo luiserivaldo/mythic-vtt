@@ -18,8 +18,10 @@ describe('MV-239 / UI-TOKEN-02 panels beside the token', () => {
 
   it('never registers a tool or token panel in the right dock', () => {
     for (const entry of toolPanels.all()) expect(entry.region).not.toBe('right-dock');
+    // UI-TOKEN-07 (MV-266): the selection's panels moved to the left pane; this region stays
+    // available to other panels.
     for (const id of ['transform', 'aoe', 'token'])
-      expect(toolPanels.get(id)?.region).toBe('beside-token');
+      expect(toolPanels.get(id)?.region).toBe('left-pane');
   });
 
   it("opens on the token's left, vertically centred on it", () => {

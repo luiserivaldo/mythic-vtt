@@ -6,7 +6,7 @@ import {
   capturePublicBoard,
   fitThumbnail,
   isUploadableThumbnail,
-  signOutWithThumbnail,
+  endGameWithThumbnail,
   THUMBNAIL_BOX,
   THUMBNAIL_MAX_BYTES,
 } from './campaign-thumbnail.js';
@@ -139,7 +139,7 @@ describe('capturing the board as spectators see it (UX-05, PERM-03)', () => {
   });
 });
 
-describe('signing out (UI-HOST-02)', () => {
+describe('ending the game (UI-HOST-02, UX-05b)', () => {
   const hash = 'f'.repeat(64);
   const deps = (capture: Blob | null | Error, sent = true) => {
     const calls = { upload: 0, send: [] as unknown[], stop: 0 };
@@ -163,9 +163,9 @@ describe('signing out (UI-HOST-02)', () => {
     };
   };
 
-  it('uploads the capture and stores it as the auto screenshot before signing out', async () => {
+  it('uploads the capture and stores it as the auto screenshot before ending the game', async () => {
     const { calls, deps: d } = deps(new Blob(['x'], { type: 'image/webp' }));
-    expect(await signOutWithThumbnail(d)).toBe('captured');
+    expect(await endGameWithThumbnail(d)).toBe('captured');
     expect(calls.upload).toBe(1);
     expect(calls.send).toEqual([
       { type: 'campaign.setBranding', payload: { autoScreenshot: hash } },
@@ -173,19 +173,19 @@ describe('signing out (UI-HOST-02)', () => {
     expect(calls.stop).toBe(1);
   });
 
-  it('still signs out when there is nothing to capture, it is too big, or it fails', async () => {
+  it('still ends the game when there is nothing to capture, it is too big, or it fails', async () => {
     for (const [capture, outcome] of [
       [null, 'skipped'],
       [new Blob([new Uint8Array(THUMBNAIL_MAX_BYTES + 1)], { type: 'image/webp' }), 'skipped'],
       [new Error('no frame'), 'failed'],
     ] as const) {
       const { calls, deps: d } = deps(capture);
-      expect(await signOutWithThumbnail(d)).toBe(outcome);
+      expect(await endGameWithThumbnail(d)).toBe(outcome);
       expect(calls.upload).toBe(0);
       expect(calls.stop).toBe(1);
     }
     const rejected = deps(new Blob(['x'], { type: 'image/webp' }), false);
-    expect(await signOutWithThumbnail(rejected.deps)).toBe('failed');
+    expect(await endGameWithThumbnail(rejected.deps)).toBe('failed');
     expect(rejected.calls.stop).toBe(1);
   });
 });

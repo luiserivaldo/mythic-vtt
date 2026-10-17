@@ -95,16 +95,17 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   });
 
   const panel = page.getByRole('region', { name: /Transform/ });
-  // MV-239: selecting shows the Transform chip, not the open panel, so it does not cover the board.
-  const chip = page.getByRole('button', { name: 'Restore Transform panel' });
-  await expect(chip).toHaveCount(0);
+  // UI-TOKEN-07 (MV-266): selecting expands the Transform panel in the left pane, which floats
+  // over the board's left edge clear of this token (MV-279).
+  const pane = page.getByRole('complementary', { name: 'Left pane' });
+  await expect(panel).toHaveCount(0);
   const start = at(2.5, 3.5);
   // The view frames the canvas once the orthographic camera mounts, so retry the click until then.
   await expect(async () => {
     await page.mouse.click(start.x, start.y);
-    await expect(chip).toBeVisible({ timeout: 1000 });
+    await expect(pane.locator('[data-tool-panel="transform"]')).toBeVisible({ timeout: 1000 });
   }).toPass();
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toBeVisible();
 
   const labelBefore = await page.getByTestId('token-label').boundingBox();
 
@@ -123,7 +124,7 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   await expect.poll(() => position()?.x, { timeout: 10_000 }).toBeCloseTo(4.5);
   expect(position()?.z).toBeCloseTo(3.5);
   // The token is still selected (the drag's click was swallowed) and the gizmo follows it.
-  await expect(chip).toBeVisible();
+  await expect(panel).toBeVisible();
 
   // UI-TOKEN-07 handles (px from the token centre, 1-cell token): the Y ring circles the
   // footprint 14 px outside its corners; the X/Z arrows run from 6 to 44 px outside the ring.
@@ -183,8 +184,7 @@ test('host drives every 2D handle type on a token and types values', async ({ br
   expect(labelAfterPan?.x).toBeGreaterThan((labelBefore?.x ?? 0) + 2 * zoom);
   await page.getByRole('button', { name: 'Select', exact: true }).click();
 
-  // The chip opens the panel, which reads the gizmo's commits.
-  await chip.click();
+  // The panel stayed open in the left pane and reads the gizmo's commits.
   await expect(panel).toBeVisible();
   await expect(panel.getByLabel('Size (cells)')).toHaveValue('2');
 

@@ -28,7 +28,7 @@ export type CampaignMeta = {
   name: string;
   schemaVersion: number;
   updatedAt: number;
-  /** UX-05: start of the newest session (ms); absent if the campaign was never opened. */
+  /** UX-05b: time of the newest autosave or session-end save (ms); absent if never saved. */
   lastPlayedAt?: number;
   /** UX-05: the list thumbnail, an image hash linked to this campaign. */
   thumbnail?: string;

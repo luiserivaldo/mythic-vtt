@@ -69,7 +69,9 @@ export function ToolRail() {
     if (id === 'initiative') toolPanelLayoutStore.getState().restore('initiative');
     // UI-SHELL-05: choosing a tool reveals the region its panel opens in, even if collapsed.
     const panel = railTools.get(id)?.panel;
-    if (panel && panelRegion(panel) === 'left-pane') leftPaneStore.getState().expand();
+    // UI-TOKEN-07 (MV-266): Select's panel is the selection's Transform, in the left pane.
+    const paneTool = id === 'select' || (panel && panelRegion(panel) === 'left-pane');
+    if (paneTool) leftPaneStore.getState().expand();
     else if (id === 'initiative' && dockStore.getState().collapsed)
       dockStore.getState().toggleCollapsed();
     activeToolStore.getState().setTool(id);

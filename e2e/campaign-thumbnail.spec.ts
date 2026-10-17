@@ -7,8 +7,9 @@ import { RawClient, testUlid } from './harness.js';
 import { hostDir, PNG, start, stop, type Running } from './host-process.js';
 
 // UX-05 / UI-HOST-02: campaigns are listed last played first, each with a thumbnail: the DM's
-// upload, else a capture of the board taken when the DM signs out. The capture may be shown on
-// the public join screen, so it must never contain DM-only content (PERM-03).
+// upload, else a capture of the board taken when the DM ends the game. The capture may be shown
+// on the public join screen, so it must never contain DM-only content (PERM-03). UX-05b
+// (MV-273): last played is the newest autosave or session-end save, not opening the campaign.
 //
 // Like texture-tiling.spec, the host serves the built client so the upload is same-origin (D36).
 
@@ -149,10 +150,11 @@ test('the campaign list is last played first and shows the DM thumbnail or a pub
     expect(before.indexOf('Beta')).toBeLessThan(before.indexOf('Alpha'));
     expect(before).not.toContain('thumbnail');
 
-    // Playing Alpha again puts it first.
-    running = await start(dataDir, ['--campaign', 'Alpha']);
+    // Opening Alpha again is not playing it; its first autosave (here after every action) is.
+    running = await start(dataDir, ['--campaign', 'Alpha'], { MYTHIC_AUTOSAVE_ACTIONS: '1' });
     await openAsDm('Alpha');
-    expect((await list()).campaigns.map((c) => c.name)).toEqual(['Alpha', 'Beta']);
+    const names = async () => (await list()).campaigns.map((c) => c.name);
+    expect(await names()).toEqual(['Beta', 'Alpha']);
 
     // The DM uploads a thumbnail.
     await page.getByRole('tab', { name: 'Settings', exact: true }).click();
@@ -163,6 +165,7 @@ test('the campaign list is last played first and shows the DM thumbnail or a pub
     });
     const shown = page.getByRole('img', { name: 'Campaign thumbnail' });
     await expect(shown).toHaveAttribute('src', /^\/assets\/[0-9a-f]{64}$/);
+    await expect.poll(names).toEqual(['Alpha', 'Beta']);
     const uploaded = ((await shown.getAttribute('src')) ?? '').slice('/assets/'.length);
     const listed = await list();
     expect(listed.current).toBe(alphaId);
@@ -181,7 +184,7 @@ test('the campaign list is last played first and shows the DM thumbnail or a pub
       ).campaign.screenshot,
     ).toBe(uploaded);
 
-    // The DM's own board shows the secret; the sign-out capture must not.
+    // The DM's own board shows the secret; the End Game capture must not.
     const dmView = await page.locator('.ui-board canvas').screenshot();
     const dmColours = await colourCounts(
       page,
@@ -190,8 +193,10 @@ test('the campaign list is last played first and shows the DM thumbnail or a pub
     expect(dmColours.magenta).toBeGreaterThan(0);
     expect(dmColours.green).toBeGreaterThan(0);
     expect(dmColours.cyan).toBeGreaterThan(0);
-    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: 'Signed out' })).toBeVisible();
+    // UX-05b: the host DM cannot sign out or leave, only end the game.
+    await expect(page.getByRole('button', { name: /sign out|leave game/i })).toHaveCount(0);
+    await page.getByRole('button', { name: 'End Game', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Game ended' })).toBeVisible();
 
     const watcher = await RawClient.connect(running, { name: 'watcher', ...(await identity()) });
     await watcher.waitFor(

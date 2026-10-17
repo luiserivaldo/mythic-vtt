@@ -53,6 +53,8 @@ export async function saveCampaignCheckpoint(
   sessionId: string,
   seq: number,
   label: 'autosave' | 'end',
+  /** UX-05b: host clock time of this save; it becomes the campaign's "last played". */
+  savedAt: number,
 ): Promise<void> {
   // UX-44: temporary seats are session-only, so no file on disk may hold one.
   const campaign = withoutTemporarySeats(live);
@@ -62,4 +64,5 @@ export async function saveCampaignCheckpoint(
   await store.saveCampaign(campaign.id, CampaignFile.parse(campaign));
   for (const scene of Object.values(campaign.scenes)) await store.saveScene(campaign.id, scene);
   await store.pruneScenes(campaign.id, new Set(Object.keys(campaign.scenes)));
+  store.markPlayed(campaign.id, savedAt);
 }
