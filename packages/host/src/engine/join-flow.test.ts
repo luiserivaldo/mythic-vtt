@@ -286,12 +286,33 @@ describe('Spectator declared on hello (D46, MV-280)', () => {
   it('cannot relay tool ephemerals, like a joined spectator', async () => {
     const { engine } = setup();
     const host = named(T.host, 'DM', { isHost: true });
+    const alice = named(T.alice, 'Alice');
+    const carol = named(T.carol, 'Carol');
     const bob = declared(T.bob, 'Spectator');
     await engine.onConnect(host);
+    await engine.onConnect(alice);
+    await engine.onConnect(carol);
     await engine.onConnect(bob);
     await engine.idle();
+    // A cursor naming the active scene passes every relay check (MV-282 allowlist, required
+    // `sceneId`, no seat tool gate), whoever sends it, so only the spectator gate can stop it.
+    const cursor = (n: number) => ({
+      t: 'ephemeral' as const,
+      channel: 'cursor',
+      data: { sceneId: T.scene, x: n, z: 0 },
+    });
+    const relayedFrom = (from: string) =>
+      host.received.filter((m) => m.t === 'ephemeral' && m.from === from);
+
+    // Controls: a seated player and an undeclared unseated visitor both relay the same frame.
+    await engine.onEphemeral(alice, cursor(1));
+    await engine.onEphemeral(carol, cursor(2));
+    await engine.idle();
+    expect(relayedFrom(T.alice)).toHaveLength(1);
+    expect(relayedFrom(T.carol)).toHaveLength(1);
+
     host.clear();
-    await engine.onEphemeral(bob, { t: 'ephemeral', channel: 'cursor', data: {} });
+    await engine.onEphemeral(bob, cursor(3));
     await engine.idle();
     expect(host.received.filter((m) => m.t === 'ephemeral')).toEqual([]);
   });

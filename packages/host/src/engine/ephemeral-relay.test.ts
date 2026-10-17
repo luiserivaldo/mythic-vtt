@@ -1,6 +1,11 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import * as shared from '@mythic/shared';
 import {
   appendDrawPoint,
+  CAMERA_POSE_CHANNEL,
   DEFAULT_DRAW_COLOR,
   DEFAULT_DRAW_WIDTH,
   DRAW_CLEAR_CHANNEL,
@@ -17,7 +22,12 @@ import {
   type SeatTools,
 } from '@mythic/shared';
 import { audienceFor } from './audience.js';
-import { createEphemeralRelay, type EphemeralRecipient } from './ephemeral-relay.js';
+import {
+  createEphemeralRelay,
+  MAX_FRAME_DEPTH,
+  RELAY_CHANNELS,
+  type EphemeralRecipient,
+} from './ephemeral-relay.js';
 import { T, fakeConnection, fixtureCampaign, tid, type FakeConnection } from './testing.js';
 
 /** UI-SEAT-02 (UX-46): override board tools on every seat, as the DM does per seat. */
@@ -1353,6 +1363,35 @@ describe('scene gate for every scene-scoped ephemeral (MV-232, PERM-03)', () => 
     expect(relay.stats().relayed).toBe(3);
   });
 
+  it('relays a frame nested exactly to the walk depth cap and drops one level deeper (MV-283)', () => {
+    const { state, host, player, relay } = table({ dmOnly: true });
+    const watchers = recipients(state, [player]);
+    /** Cursor data whose innermost object sits at walk depth `depth` (the data itself is 0). */
+    const nestedTo = (depth: number) => {
+      let inner: unknown = { x: 1 };
+      for (let level = 1; level < depth; level += 1) inner = { at: inner };
+      return { sceneId: T.scene, at: inner };
+    };
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: 'cursor', data: nestedTo(MAX_FRAME_DEPTH) },
+      state,
+      watchers,
+    );
+    expect(player.received).toHaveLength(1);
+    relay.relay(
+      host,
+      { t: 'ephemeral', channel: 'cursor', data: nestedTo(MAX_FRAME_DEPTH + 1) },
+      state,
+      watchers,
+    );
+    expect(player.received).toHaveLength(1);
+    expect(relay.stats()).toMatchObject({
+      relayed: 1,
+      dropped: { 'invalid-payload': 1, 'payload-too-large': 0 },
+    });
+  });
+
   it('counts a nested non-string scene id under its own drop reason (MV-283)', () => {
     const { state, host, coDm, player, spectator, relay } = table({ dmOnly: true });
     const everyone = recipients(state, [coDm, player, spectator]);
@@ -1449,5 +1488,58 @@ describe('scene gate for every scene-scoped ephemeral (MV-232, PERM-03)', () => 
     );
     expect(coDm.received).toHaveLength(1);
     expect(relay.stats().dropped.forbidden).toBe(1);
+  });
+});
+
+describe('client ephemeral channels (MV-292)', () => {
+  /**
+   * Every channel the client sends. A channel missing from `RELAY_CHANNELS` is dropped as
+   * `unknown-channel`, so the feature behind it silently stops working across the table.
+   */
+  const CLIENT_CHANNELS = [
+    'ruler.preview',
+    'token.drag-preview',
+    PING_CHANNEL,
+    CAMERA_POSE_CHANNEL,
+    DRAW_STROKE_CHANNEL,
+    DRAW_ERASE_CHANNEL,
+    DRAW_CLEAR_CHANNEL,
+  ];
+
+  /**
+   * The first argument of every ephemeral send in the client sources: `x.send('literal', ...)`,
+   * `x.send(SOME_CHANNEL, ...)` or `sendEphemeral(...)` with either. `conn.send({ ... })` and other
+   * object-argument sends do not match. A constant must be a `@mythic/shared` export.
+   */
+  function scannedClientChannels(): Set<string> {
+    const root = fileURLToPath(new URL('../../../client/src', import.meta.url));
+    const files = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter(
+      (file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file),
+    );
+    const send = /(?:\.send|\bsendEphemeral)\(\s*(?:'([^']+)'|"([^"]+)"|([A-Z][A-Z0-9_]*))\s*,/g;
+    const found = new Set<string>();
+    for (const file of files) {
+      for (const match of readFileSync(join(root, file), 'utf8').matchAll(send)) {
+        const literal = match[1] ?? match[2];
+        const name = match[3];
+        const value =
+          literal ?? (name === undefined ? undefined : (shared as Record<string, unknown>)[name]);
+        if (typeof value !== 'string')
+          throw new Error(`${file}: cannot resolve channel ${String(name)}`);
+        found.add(value);
+      }
+    }
+    return found;
+  }
+
+  it('lists every client channel in the relay allowlist', () => {
+    for (const channel of CLIENT_CHANNELS) expect(Object.keys(RELAY_CHANNELS)).toContain(channel);
+  });
+
+  it('finds no client send on a channel outside the list above', () => {
+    const scanned = scannedClientChannels();
+    // The scan still sees the sends it is meant to see, so it cannot pass by matching nothing.
+    expect([...scanned].sort()).toEqual([...CLIENT_CHANNELS].sort());
+    for (const channel of scanned) expect(Object.keys(RELAY_CHANNELS)).toContain(channel);
   });
 });

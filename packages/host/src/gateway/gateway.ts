@@ -82,6 +82,12 @@ export function createGateway(options: GatewayOptions = {}): Gateway {
     if (ws.readyState === WebSocket.OPEN) ws.send(encodeServerMessage(message));
   }
 
+  /**
+   * Sends a host error and, when fatal, closes the socket. `message` is always a fixed literal: it
+   * never includes client input, tokens, secrets or identity data (display names, identity ids),
+   * because the client's Error details panel shows it verbatim and relies on that. Put anything
+   * variable in a typed field (as `supportedVersion`), never in the string.
+   */
   function fail(
     ws: WebSocket,
     code: Extract<ServerMessage, { t: 'error' }>['code'],
