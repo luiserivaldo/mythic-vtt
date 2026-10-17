@@ -29,7 +29,13 @@ export { prefabSave } from './prefab.save.js';
 export { prefabRemove } from './prefab.remove.js';
 export { prefabPlace } from './prefab.place.js';
 export { tokenSetStatusMarkers } from './token.setStatusMarkers.js';
-export { canReadEntityLabel, canUseEntity, isAdmin, isLayerLocked } from './entity-access.js';
+export {
+  canReadEntityLabel,
+  canUseEntity,
+  isAdmin,
+  isLayerLocked,
+  isProp,
+} from './entity-access.js';
 export { historyUndo, UndoRequest, HistoryUndoPayload } from './history.undo.js';
 export {
   historyRollback,

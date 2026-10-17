@@ -74,7 +74,7 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
       .poll(() => JSON.stringify(setup.state).includes('Rail crate'), { timeout: 10_000 })
       .toBe(true);
 
-    // A player without edit rights: Create Prop stays, disabled with its reason.
+    // A player: Create Prop stays, disabled with its reason (DM-only, MV-290).
     const player = await playerContext.newPage();
     await player.goto(table.clientUrl);
     await claimSeat(player, 'Rail seat', 'Rail Guest');
@@ -83,7 +83,7 @@ test('the rail disables, never hides, tools a seat cannot use', async ({ browser
     await expect(rail(player, 'Create Prop')).toHaveAttribute('aria-disabled', 'true');
     await expect(rail(player, 'Create Prop')).toHaveAttribute(
       'title',
-      'Your seat cannot create props',
+      'Only the DM can create props',
     );
     await expect(rail(player, 'Select')).not.toHaveAttribute('aria-disabled', 'true');
     await expect(rail(player, 'Measure')).not.toHaveAttribute('aria-disabled', 'true');

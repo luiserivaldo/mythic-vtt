@@ -58,6 +58,30 @@ describe(`${T} schema and permissions`, () => {
     expect(entityDelete.permission(state, ACTORS.otherSeat, payload)).toBe(true);
   });
 
+  it('MV-290: only admins delete a prop, even an owned or granted one', () => {
+    const state = makeCampaign();
+    const scene = state.scenes[IDS.scene];
+    if (scene)
+      scene.entities[IDS.entity] = makeEntity(IDS.entity, {
+        layer: 'props',
+        owners: [IDS.owner],
+        perms: { delete: true },
+        shape: { kind: 'box', color: '#888888', walkable: true },
+      });
+    for (const id of [IDS.owner, IDS.other]) {
+      const seat = state.seats[id];
+      if (seat) seat.permissions.delete = true;
+    }
+    expect(permissionMatrix(state, T, payload)).toEqual({
+      host: true,
+      owner: false,
+      otherSeat: false,
+      coDm: true,
+      spectator: false,
+      mod: false,
+    });
+  });
+
   it('rejects missing entities and locked layers', () => {
     expect(entityDelete.permission(makeCampaign(), ACTORS.host, payload)).toBe(false);
     const state = stateWithEntity();
