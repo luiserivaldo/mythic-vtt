@@ -75,7 +75,8 @@ export type VisionOccluder =
  * through that prop but is still blocked by everything else. An origin on the outline (within
  * `VISION_EPSILON`) is not inside: the outline stays, `visibilityPolygon` moves the origin off it
  * like off any wall, and the prop keeps blocking, so a token on a pillar's edge or corner never sees
- * through the pillar.
+ * through the pillar. Pass the footprint outlines to `visibilityPolygon` too, so that move goes out
+ * of the prop rather than into it.
  */
 export function visionOccluders(origin: Point2, occluders: readonly VisionOccluder[]): Segment[] {
   const out: Segment[] = [];
@@ -85,11 +86,18 @@ export function visionOccluders(origin: Point2, occluders: readonly VisionOcclud
       continue;
     }
     const outline = polygonSegments(occluder.outline);
-    const strictlyInside =
-      pointInPolygon(origin, occluder.outline) && !outline.some((s) => touches(origin, s));
-    if (!strictlyInside) out.push(...outline);
+    if (!strictlyInside(origin, occluder.outline, outline)) out.push(...outline);
   }
   return out;
+}
+
+/** Inside the footprint and farther than `VISION_EPSILON` from its outline. */
+function strictlyInside(
+  p: Point2,
+  outline: readonly Point2[],
+  edges: readonly Segment[] = polygonSegments(outline),
+): boolean {
+  return pointInPolygon(p, outline) && !edges.some((s) => touches(p, s));
 }
 
 /**
@@ -533,11 +541,21 @@ const isFiniteSegment = ({ a, b }: Segment) =>
  * `VISION_EPSILON`, judged on the walls as given) must never see more than a point a hair away
  * would, so it is moved off: every wall it touches gives an arm towards each endpoint farther than
  * epsilon (a mid-wall gives two opposite arms, an endpoint one), and so does every bounds edge it
- * lies on. Of the gaps between consecutive arm angles, the largest whose bisector points into the
- * bounds wins (ties within epsilon go to the gap starting at the smallest canonical angle), and the
- * origin moves `VISION_NUDGE` cells along that bisector. So a free wall tip or door jamb looks away
- * from its wall and still sees past it on both sides, a room corner sees only the outside 270°, a
- * T-junction its open 180°, and a mid-wall or crossing one deterministic side or quadrant.
+ * lies on. The candidates are the gaps between consecutive arm angles whose bisector, moved along
+ * by `VISION_NUDGE` cells, lands strictly inside the bounds (by more than epsilon). Candidates
+ * landing outside every sight-blocking footprint are preferred, so a token on a prop's edge, corner
+ * or reflex corner looks out of the prop, never into it; only when every candidate lands inside one
+ * do they all compete. Among the preferred, the largest gap wins (ties within epsilon go to the gap
+ * starting at the smallest canonical angle), and the origin moves `VISION_NUDGE` along its
+ * bisector. So a free wall tip or door jamb looks away from its wall and still sees past it on both
+ * sides, a room corner sees only the outside 270°, a T-junction its open 180°, and a mid-wall or
+ * crossing one deterministic side or quadrant.
+ *
+ * `footprints` are the closed outlines of sight-blocking props (world space), only steering that
+ * choice: their edges must also be in `segments` to block anything (`visionOccluders` gives both).
+ * "Inside" means the strict interior, as in `visionOccluders`: inside and farther than epsilon from
+ * the outline. A footprint whose strict interior holds the origin itself is ignored, as
+ * `visionOccluders` drops it, so a token inside a prop still prefers to look out of a pillar in it.
  *
  * Null (blind, never "both sides") when no gap points into the bounds, the moved point still
  * touches a wall, or the move from the origin passes within epsilon of a wall it did not touch.
@@ -547,8 +565,9 @@ export function visionOrigin(
   origin: Point2,
   segments: readonly Segment[],
   bounds: Bounds2,
+  footprints: readonly (readonly Point2[])[] = [],
 ): Point2 | null {
-  const move = visionNudge(origin, segments, bounds);
+  const move = visionNudge(origin, segments, bounds, footprints);
   if (!move) return null;
   return move.x === 0 && move.z === 0 ? origin : { x: origin.x + move.x, z: origin.z + move.z };
 }
@@ -558,7 +577,12 @@ export function visionOrigin(
  * subtracts it from origin-relative coordinates, so an integer translation of the whole scene
  * gives the same relative floats and therefore the same polygon, translated.
  */
-function visionNudge(origin: Point2, segments: readonly Segment[], bounds: Bounds2): Point2 | null {
+function visionNudge(
+  origin: Point2,
+  segments: readonly Segment[],
+  bounds: Bounds2,
+  footprints: readonly (readonly Point2[])[],
+): Point2 | null {
   const ox = origin.x;
   const oz = origin.z;
   const { minX, minZ, maxX, maxZ } = bounds;
@@ -594,13 +618,21 @@ function visionNudge(origin: Point2, segments: readonly Segment[], bounds: Bound
   if (arms.length === 0) return { x: 0, z: 0 };
 
   arms.sort((p, q) => p - q);
-  let move: Point2 | null = null;
-  let bestGap = -1;
+  // Footprints the origin is strictly inside do not block it (visionOccluders), so never steer.
+  const blocking = footprints.filter((f) => !strictlyInside(origin, f));
+  // Best candidate overall and best landing outside every footprint; the second wins if any.
+  // Gaps of at most epsilon (duplicate arms, e.g. a shared prop edge) run along a wall: the moved
+  // point would touch it, so they are never candidates.
+  let anyMove: Point2 | null = null;
+  let anyGap = 0;
+  let outMove: Point2 | null = null;
+  let outGap = 0;
   for (let i = 0; i < arms.length; i++) {
     const start = arms[i] as number;
     const gap =
       (i + 1 < arms.length ? (arms[i + 1] as number) : (arms[0] as number) + TWO_PI) - start;
-    if (!(gap > bestGap + EPS)) continue;
+    // outGap <= anyGap, so a gap that cannot beat outGap cannot beat either.
+    if (!(gap > outGap + EPS)) continue;
     const mid = start + gap / 2;
     const dx = VISION_NUDGE * Math.cos(mid);
     const dz = VISION_NUDGE * Math.sin(mid);
@@ -608,9 +640,16 @@ function visionNudge(origin: Point2, segments: readonly Segment[], bounds: Bound
     const z = oz + dz;
     // Into the bounds: strictly inside by more than epsilon, so the moved point is on no edge.
     if (x <= minX + EPS || x >= maxX - EPS || z <= minZ + EPS || z >= maxZ - EPS) continue;
-    move = { x: dx, z: dz };
-    bestGap = gap;
+    if (gap > anyGap + EPS) {
+      anyMove = { x: dx, z: dz };
+      anyGap = gap;
+    }
+    if (!blocking.some((f) => strictlyInside({ x, z }, f))) {
+      outMove = { x: dx, z: dz };
+      outGap = gap;
+    }
   }
+  const move = outMove ?? anyMove;
   if (!move) return null;
 
   // Safe fallback: the moved point must be clear of every wall, and the hop to it must not cross
@@ -647,11 +686,13 @@ function visionNudge(origin: Point2, segments: readonly Segment[], bounds: Bound
  * Rules: walls have zero thickness, and a wall seen exactly edge-on blocks nothing. An origin on a
  * wall, a wall endpoint or the bounds edge never sees more than a point a hair away: it sweeps from
  * `visionOrigin`, the origin moved `VISION_NUDGE` cells into the largest free gap between the
- * walls it touches, with every wall kept. So a mid-wall origin sees one deterministic side, a room
- * corner the outside only, and a free wall tip both sides of the wall's line. When no such point
- * is safe the result is `[]` (blind), never both sides. Otherwise the true origin lies on the
- * result (the boundary counts as inside). Shared endpoints (L-corners, T-junctions, polylines)
- * never leak.
+ * walls it touches, preferring gaps that lead out of the sight-blocking `footprints` (optional
+ * outlines that only steer this choice; see `visionOrigin`), with every wall kept. So a mid-wall
+ * origin sees one deterministic side, a room corner the outside only, a token on a prop's edge or
+ * corner looks away from the prop, and a free wall tip sees both sides of the wall's line. When no
+ * such point is safe the result is `[]` (blind), never both sides. Otherwise the true origin lies
+ * on the result (the boundary counts as inside). Shared endpoints (L-corners, T-junctions,
+ * polylines) never leak.
  *
  * Angular sweep over endpoint events, O(n log n) plus the open set scanned per event interval.
  * Between two consecutive event angles the nearest wall cannot change (crossings are split), so it
@@ -664,8 +705,9 @@ export function visibilityPolygon(
   origin: Point2,
   segments: readonly Segment[],
   bounds: Bounds2,
+  footprints: readonly (readonly Point2[])[] = [],
 ): Point2[] {
-  const move = visionNudge(origin, segments, bounds);
+  const move = visionNudge(origin, segments, bounds, footprints);
   if (!move) return [];
   // The sweep runs from the eye, origin + move; relative coordinates are (p - origin) - move.
   const mx = move.x;

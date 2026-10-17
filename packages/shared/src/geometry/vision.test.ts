@@ -310,10 +310,10 @@ describe('visibilityPolygon: named examples', () => {
   it('a token on a pillar edge or corner does not see through the pillar', () => {
     const pillar = [p(14, 7.5), p(15, 7.5), p(15, 8.5), p(14, 8.5)];
     const occluders = [{ kind: 'footprint' as const, outline: pillar }];
-    const look = (origin: Point2) => {
+    const look = (origin: Point2, footprints = [pillar]) => {
       const walls = visionOccluders(origin, occluders);
       expect(walls).toEqual(polygonSegments(pillar));
-      const poly = visibilityPolygon(origin, walls, BOUNDS);
+      const poly = visibilityPolygon(origin, walls, BOUNDS, footprints);
       expectWellFormed(poly);
       expect(pointInPolygon(origin, poly)).toBe(true);
       return poly;
@@ -326,11 +326,112 @@ describe('visibilityPolygon: named examples', () => {
     const corner = look(p(14, 7.5));
     expect(pointInPolygon(p(12, 5), corner)).toBe(true);
     expect(pointInPolygon(p(16, 9.5), corner)).toBe(false);
-    // Near edge: the same tie opens towards +X, into the pillar, so it sees only the pillar.
+    // Near edge: the tie alone would open towards +X, into the pillar; the footprint turns it out.
     const near = look(p(14, 8));
+    expect(pointInPolygon(p(12, 8), near)).toBe(true);
     expect(pointInPolygon(p(18, 8), near)).toBe(false);
-    expect(pointInPolygon(p(12, 8), near)).toBe(false);
-    expect(area(near)).toBeCloseTo(1, 4);
+    // Without the footprint it is still safe, just useless: it sees only the pillar.
+    const blindSide = look(p(14, 8), []);
+    expect(pointInPolygon(p(12, 8), blindSide)).toBe(false);
+    expect(area(blindSide)).toBeCloseTo(1, 4);
+  });
+
+  describe('an origin on a prop outline looks out of the prop', () => {
+    const pillar = [p(8, 8), p(12, 8), p(12, 12), p(8, 12)];
+    const look = (origin: Point2, outlines: readonly (readonly Point2[])[]) => {
+      const occluders = outlines.map((outline) => ({ kind: 'footprint' as const, outline }));
+      const walls = visionOccluders(origin, occluders);
+      const eye = visionOrigin(origin, walls, BOUNDS, outlines);
+      const poly = visibilityPolygon(origin, walls, BOUNDS, outlines);
+      expect(eye).not.toBeNull();
+      expectWellFormed(poly);
+      expect(pointInPolygon(origin, poly)).toBe(true);
+      // Safe with no exemptions: nothing the polygon holds is hidden from the eye.
+      for (const q of grid) {
+        if (eye && pointInPolygon(q, poly)) expect(bruteSees(eye, walls, q)).not.toBe(false);
+      }
+      return { eye: eye ?? origin, walls, poly };
+    };
+
+    it('on each pillar edge midpoint: the eye is outside and sees the open side only', () => {
+      for (const [origin, outward] of [
+        [p(8, 10), p(6, 10)],
+        [p(12, 10), p(14, 10)],
+        [p(10, 8), p(10, 6)],
+        [p(10, 12), p(10, 14)],
+      ] as const) {
+        const { eye, poly } = look(origin, [pillar]);
+        expect(pointInPolygon(eye, pillar)).toBe(false);
+        expect(pointInPolygon(p(10, 10), poly)).toBe(false);
+        expect(pointInPolygon(p(9, 11), poly)).toBe(false);
+        expect(pointInPolygon(outward, poly)).toBe(true);
+      }
+    });
+
+    it('on each pillar corner: the outside 270 degrees only', () => {
+      for (const [origin, outward] of [
+        [p(8, 8), p(6, 6)],
+        [p(12, 8), p(14, 6)],
+        [p(12, 12), p(14, 14)],
+        [p(8, 12), p(6, 14)],
+      ] as const) {
+        const { eye, poly } = look(origin, [pillar]);
+        expect(pointInPolygon(eye, pillar)).toBe(false);
+        expect(pointInPolygon(p(10, 10), poly)).toBe(false);
+        expect(pointInPolygon(outward, poly)).toBe(true);
+        // Everything but the 12 x 12 quadrant behind the pillar.
+        expect(area(poly)).toBeCloseTo(400 - 144, 4);
+      }
+    });
+
+    it('on the reflex corner of an L-shaped prop: looks into the notch, not the prop', () => {
+      const l = [p(5, 5), p(10, 5), p(10, 8), p(7, 8), p(7, 10), p(5, 10)];
+      // The largest gap (270 degrees) is the prop's interior; the 90 degree notch wins.
+      const { eye, poly } = look(p(7, 8), [l]);
+      expect(pointInPolygon(eye, l)).toBe(false);
+      expect(eye.x).toBeGreaterThan(7);
+      expect(eye.z).toBeGreaterThan(8);
+      expect(pointInPolygon(p(6, 6), poly)).toBe(false);
+      expect(pointInPolygon(p(9, 9), poly)).toBe(true);
+      expect(pointInPolygon(p(15, 15), poly)).toBe(true);
+    });
+
+    it('falls back to the plain tie rule when every gap leads into a footprint', () => {
+      // Two props sharing an edge; the origin is on it, so both sides are inside a prop.
+      const left = [p(8, 8), p(10, 8), p(10, 12), p(8, 12)];
+      const right = [p(10, 8), p(12, 8), p(12, 12), p(10, 12)];
+      const { eye, walls, poly } = look(p(10, 10), [left, right]);
+      expect(eye).toEqual(visionOrigin(p(10, 10), walls, BOUNDS));
+      expect(eye.x).toBeCloseTo(10 + VISION_NUDGE, 12); // the half-turn tie: towards +X
+      expect(pointInPolygon(p(11, 10), poly)).toBe(true);
+      expect(pointInPolygon(p(9, 10), poly)).toBe(false);
+      expect(pointInPolygon(p(14, 10), poly)).toBe(false);
+    });
+
+    it('ignores a footprint whose strict interior holds the origin, as visionOccluders does', () => {
+      const hall = [p(2, 2), p(18, 2), p(18, 18), p(2, 18)];
+      // A token inside the hall prop, on the pillar's near edge, still looks out of the pillar.
+      const { eye, poly } = look(p(8, 10), [hall, pillar]);
+      expect(eye.x).toBeLessThan(8);
+      expect(pointInPolygon(p(6, 10), poly)).toBe(true);
+      expect(pointInPolygon(p(10, 10), poly)).toBe(false);
+      // A wall inside the hall: the hall alone changes nothing.
+      const wall = [seg(5, 10, 15, 10)];
+      expect(visionOrigin(p(10, 10), wall, BOUNDS, [hall])).toEqual(
+        visionOrigin(p(10, 10), wall, BOUNDS),
+      );
+    });
+
+    it('a room with the pillar inside: an origin on the pillar sees the room, not the pillar', () => {
+      const room = rect(2, 2, 18, 18);
+      const origin = p(12, 10);
+      const walls = [...room, ...visionOccluders(origin, [{ kind: 'footprint', outline: pillar }])];
+      const poly = visibilityPolygon(origin, walls, BOUNDS, [pillar]);
+      expectWellFormed(poly);
+      expect(pointInPolygon(p(16, 10), poly)).toBe(true);
+      expect(pointInPolygon(p(10, 10), poly)).toBe(false);
+      expect(pointInPolygon(p(19, 10), poly)).toBe(false); // outside the room
+    });
   });
 
   it('a large token half behind a wall is seen through its exposed corner', () => {
@@ -619,6 +720,36 @@ const onSegmentArb = fc
     return { origin, segments };
   });
 
+// Sight-blocking footprints: integer rectangles and triangles, with walls of nonzero length around
+// them, and an origin on any wall or outline edge (often a prop's edge, corner or shared edge).
+const pointArb = fc.record({ x: coord, z: coord });
+const footprintArb = fc.oneof(
+  fc
+    .tuple(pointArb, pointArb)
+    .filter(([a, b]) => a.x !== b.x && a.z !== b.z)
+    .map(([a, b]) => [p(a.x, a.z), p(b.x, a.z), p(b.x, b.z), p(a.x, b.z)]),
+  fc
+    .tuple(pointArb, pointArb, pointArb)
+    .filter(([a, b, c]) => (b.x - a.x) * (c.z - a.z) !== (b.z - a.z) * (c.x - a.x))
+    .map((corners) => corners.map((q) => p(q.x, q.z))),
+);
+const onOutlineArb = fc
+  .tuple(
+    fc.array(
+      segmentArb.filter((s) => s.a.x !== s.b.x || s.a.z !== s.b.z),
+      { maxLength: 12 },
+    ),
+    fc.array(footprintArb, { minLength: 1, maxLength: 3 }),
+    fc.nat(),
+    fc.oneof(fc.constant(0), fc.constant(1), fc.double({ min: 0, max: 1, noNaN: true })),
+  )
+  .map(([walls, footprints, pick, t]) => {
+    const all = [...walls, ...footprints.flatMap((f) => polygonSegments(f))];
+    const s = all[pick % all.length] as Segment;
+    const origin = t === 1 ? s.b : p(s.a.x + t * (s.b.x - s.a.x), s.a.z + t * (s.b.z - s.a.z));
+    return { origin, walls, footprints };
+  });
+
 /** Sight lines this close to a wall endpoint, in radians seen from the eye, are ambiguous. */
 const GRAZE_ANGLE = 1e-8;
 /** Sample points this close to a wall or the bounds, in cells, are ambiguous. */
@@ -764,6 +895,37 @@ describe('visibilityPolygon: properties', () => {
         if (!eye) {
           expect(poly).toEqual([]);
           // The fallback fires only for a wall the origin does not touch but the nudge reaches.
+          expect(
+            segments.some((s) => {
+              const d = distToSegment(origin, s);
+              return d > 1e-9 && d <= VISION_NUDGE + 1e-9;
+            }),
+          ).toBe(true);
+          return;
+        }
+        expect(onSomething(origin, segments)).toBe(true);
+        expect(Math.hypot(eye.x - origin.x, eye.z - origin.z)).toBeCloseTo(VISION_NUDGE, 12);
+        expectWellFormed(poly);
+        expect(pointInPolygon(origin, poly)).toBe(true);
+        for (const q of [...grid, ...samples]) {
+          if (pointInPolygon(q, poly)) expect(bruteSees(eye, segments, q)).not.toBe(false);
+        }
+      }),
+      { seed: 296, numRuns: 500 },
+    );
+  });
+
+  it('an origin on a wall or prop outline, footprints passed, sees nothing its eye cannot', () => {
+    fc.assert(
+      fc.property(onOutlineArb, samplesArb, ({ origin, walls, footprints }, samples) => {
+        const segments = visionOccluders(origin, [
+          { kind: 'segments', segments: walls },
+          ...footprints.map((outline) => ({ kind: 'footprint' as const, outline })),
+        ]);
+        const poly = visibilityPolygon(origin, segments, BOUNDS, footprints);
+        const eye = visionOrigin(origin, segments, BOUNDS, footprints);
+        if (!eye) {
+          expect(poly).toEqual([]);
           expect(
             segments.some((s) => {
               const d = distToSegment(origin, s);
