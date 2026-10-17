@@ -7,6 +7,7 @@ import {
   SeatTools,
   resolveSeatTools,
 } from '../schema/index.js';
+import { seatTemplate } from '../seat-templates.js';
 import { defineAction, isHost } from './define.js';
 
 export const seatUpdate = defineAction({
@@ -66,7 +67,14 @@ export const seatUpdate = defineAction({
   modExposed: false,
 });
 
-/** True when a Co-DM seat's tools differ from the Co-DM template's (every tool on). */
+/**
+ * True when a Co-DM seat's tools differ from the Co-DM template's (every board tool on, doors
+ * off). A missing key reads as off, so a v11 Co-DM seat without `doors` still matches.
+ */
 function hasOwnTools(tools: SeatTools | undefined): boolean {
-  return tools !== undefined && SEAT_TOOLS.some((tool) => !tools[tool]);
+  const template = seatTemplate('codm').tools;
+  return (
+    tools !== undefined &&
+    SEAT_TOOLS.some((tool) => (tools[tool] ?? false) !== (template[tool] ?? false))
+  );
 }

@@ -27,25 +27,44 @@ export const SeatTools = z.strictObject({
   measure: z.boolean(),
   draw: z.boolean(),
   pins: z.boolean(),
+  /**
+   * MV-303 Q1 (FOG-01, save v12): may this seat open and close ordinary doors (`wall.setDoor`)?
+   * Optional so v11 seats load unchanged; absent means off. Never locking, unlocking or secret
+   * doors: those stay admin-only.
+   */
+  doors: z.boolean().optional(),
 });
 export type SeatTools = z.infer<typeof SeatTools>;
 export type SeatTool = keyof SeatTools;
-export const SEAT_TOOLS: readonly SeatTool[] = ['measure', 'draw', 'pins'];
+/** A seat's tools with every default filled in (`resolveSeatTools`). */
+export type ResolvedSeatTools = Record<SeatTool, boolean>;
+export const SEAT_TOOLS: readonly SeatTool[] = ['measure', 'draw', 'pins', 'doors'];
 
 /**
  * The fallback for seats without stored `tools` and for a demoted Co-DM. Measuring is open, drawing
  * and pings are off: the 0.0.1 scene defaults, frozen so a stored or replayed tool-less seat never
  * silently gains a tool. New Player seats start from `PLAYER_TEMPLATE_TOOLS` instead.
  */
-export const DEFAULT_SEAT_TOOLS: Readonly<SeatTools> = { measure: true, draw: false, pins: false };
+export const DEFAULT_SEAT_TOOLS: Readonly<ResolvedSeatTools> = {
+  measure: true,
+  draw: false,
+  pins: false,
+  doors: false,
+};
 
 /**
  * MV-288: the tools a new Player seat (and a temporary player) starts with. Measure, draw and ping
- * are open; the DM revokes them per seat in the Seats tab.
+ * are open; the DM revokes them per seat in the Seats tab. Doors stay off (MV-303 Q1) until the DM
+ * grants them per seat.
  */
-export const PLAYER_TEMPLATE_TOOLS: Readonly<SeatTools> = { measure: true, draw: true, pins: true };
+export const PLAYER_TEMPLATE_TOOLS: Readonly<ResolvedSeatTools> = {
+  measure: true,
+  draw: true,
+  pins: true,
+  doors: false,
+};
 
 /** A seat's tools with the default filled in. */
-export function resolveSeatTools(seat: { tools?: SeatTools | undefined }): SeatTools {
-  return { ...DEFAULT_SEAT_TOOLS, ...seat.tools };
+export function resolveSeatTools(seat: { tools?: SeatTools | undefined }): ResolvedSeatTools {
+  return { ...DEFAULT_SEAT_TOOLS, ...seat.tools, doors: seat.tools?.doors ?? false };
 }

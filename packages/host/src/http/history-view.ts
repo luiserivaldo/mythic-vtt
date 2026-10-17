@@ -40,7 +40,8 @@ function projection(
       const now =
         latestEntities.get(`${scene.id}/${entity.id}`) ??
         current.scenes[scene.id]?.entities[entity.id];
-      if (!view || (now && !viewEntity(audience, now, seat))) continue;
+      const nowView = now ? viewEntity(audience, now, seat) : undefined;
+      if (!view || nowView === null) continue;
       // A now-private label must not be revealed by an older public log entry.
       if (now?.token && audience.kind !== 'host') {
         const probe = viewEntity(audience, { ...now, name: 'label-probe' }, seat);
@@ -59,6 +60,10 @@ function projection(
           if (view) view = { ...view, owners: entity.owners };
         }
       }
+      // FOG-01 / PERM-03: a door that is a closed secret door today is not revealed by an older
+      // entry from when it stood open; the audience sees that wall as a plain wall throughout.
+      if (view?.wall?.door && nowView?.wall && !nowView.wall.door)
+        view = { ...view, wall: { points: view.wall.points } };
       if (view) entities[entity.id] = view;
     }
     scenes[scene.id] = { ...scene, entities };

@@ -49,6 +49,7 @@ export const SEAT_TOOL_OFF_REASON: Readonly<Record<SeatTool, string>> = {
   measure: 'The DM has turned off Measure for your seat',
   draw: 'The DM has turned off Draw for your seat',
   pins: 'The DM has turned off Ping for your seat',
+  doors: 'The DM has not let your seat open doors',
 };
 
 /** Tools that act on the board; a read-only viewer keeps only Pan (and the placeholder). */

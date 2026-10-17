@@ -12,7 +12,8 @@ export interface SeatTemplate {
   tools: SeatTools;
 }
 
-const ALL_TOOLS: SeatTools = { measure: true, draw: true, pins: true };
+// MV-303 Q1: no template opens doors; the DM grants `doors` per seat (co-DMs ignore tools).
+const ALL_TOOLS: SeatTools = { measure: true, draw: true, pins: true, doors: false };
 
 /**
  * UX-46 (MV-251): these are the permission templates. A new seat copies its template's
@@ -54,7 +55,7 @@ export const SEAT_TEMPLATES: readonly SeatTemplate[] = [
     description: 'Read-only player view; seat-less spectating remains available.',
     role: 'player',
     permissions: { view: true, move: false, edit: false, delete: false },
-    tools: { measure: false, draw: false, pins: false },
+    tools: { measure: false, draw: false, pins: false, doors: false },
   },
 ];
 

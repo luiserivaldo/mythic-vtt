@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { Campaign, CURRENT_SCHEMA_VERSION, DEFAULT_SEAT_TOOLS } from '../schema/index.js';
+import { Campaign, CURRENT_SCHEMA_VERSION } from '../schema/index.js';
 import { storeMigrate } from '../migrations/index.js';
 import { patchesFor, visibleTo } from '../visibility/index.js';
 import { checkIntent, reduceAction } from './run.js';
@@ -130,7 +130,7 @@ it('migrates campaign and nested snapshots without losing historical seat data',
       seats: Object.fromEntries(
         Object.entries(state.seats).map(([id, seat]) => [
           id,
-          { ...seat, tools: { ...DEFAULT_SEAT_TOOLS } },
+          { ...seat, tools: { measure: true, draw: false, pins: false } },
         ]),
       ),
       schemaVersion: CURRENT_SCHEMA_VERSION,

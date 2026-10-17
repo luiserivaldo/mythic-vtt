@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EntityPermissions, Id, SeatPermissions } from '../schema/index.js';
+import { EntityPermissions, Id, SeatPermissions, visionRuleViolation } from '../schema/index.js';
 import { defineAction } from './define.js';
 import { isAdmin, isAdminOn } from './entity-access.js';
 
@@ -29,7 +29,12 @@ export const permissionUpdate = defineAction({
     if (p.target === 'seat') return p.seatId in state.seats;
     const entity = state.scenes[p.sceneId]?.entities[p.entityId];
     // D32: a co-DM cannot grant itself access to DM-layer entities.
-    return entity !== undefined && isAdminOn(state, actor, entity.layer);
+    return (
+      entity !== undefined &&
+      isAdminOn(state, actor, entity.layer) &&
+      // FOG-01 (D47 (4)): an occluder may not be hidden with `perms.view`.
+      visionRuleViolation({ ...entity, perms: { ...entity.perms, ...p.permissions } }) === undefined
+    );
   },
   reduce: (draft, a) => {
     const p = a.payload;

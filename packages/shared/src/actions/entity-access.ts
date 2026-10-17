@@ -1,6 +1,14 @@
 import { viewEntity } from '../visibility/visible-to.js';
 import { canReadTokenLabel } from '../visibility/token-label.js';
-import type { Campaign, Entity, LayerId, Scene } from '../schema/index.js';
+import {
+  isFogRegion,
+  isWall,
+  visionRuleViolation,
+  type Campaign,
+  type Entity,
+  type LayerId,
+  type Scene,
+} from '../schema/index.js';
 import type { Actor } from './envelope.js';
 import { isCoDm, isHost, seatOf } from './define.js';
 
@@ -25,9 +33,31 @@ export function isProp(entity: Entity): boolean {
 }
 
 /**
+ * FOG-01 (D47 + MV-303): walls (doors included) and DM fog regions are admin-only placeables.
+ * Unlike props, a player may not even move them, whatever their ownership or entity grants.
+ */
+export function isAdminOnlyPlaceable(entity: Entity): boolean {
+  return isWall(entity) || isFogRegion(entity);
+}
+
+/** VIS-01: a wall that satisfies every vision rule (map layer, no other components, visible). */
+export function validWallEntity(entity: Entity): boolean {
+  return isWall(entity) && visionRuleViolation(entity) === undefined;
+}
+
+/** MV-303 Q2a: a fog region that satisfies every vision rule (dm layer, no other components). */
+export function validFogRegionEntity(entity: Entity): boolean {
+  return isFogRegion(entity) && visionRuleViolation(entity) === undefined;
+}
+
+/** FOG-01: the components only an admin may add or change through `entity.update`. */
+export const ADMIN_ONLY_COMPONENTS = ['wall', 'blocksSight', 'fogRegion'] as const;
+
+/**
  * PERM-01/02: a player needs both a seat capability and ownership/an entity grant. MV-290: a
  * player may never edit or delete a prop, whatever its owners or grants; moving one still follows
- * the ordinary move rule.
+ * the ordinary move rule. FOG-01: a player may not move, edit or delete a wall or fog region at
+ * all (`wall.setDoor` is the only door path a player can use).
  */
 export function canUseEntity(
   state: Campaign,
@@ -47,6 +77,7 @@ export function canUseEntity(
     return entity.perms?.[capability] === true || (owns && seat.permissions[capability]);
   }
   if (!seat || entity.layer === 'dm' || !seat.permissions.view) return false;
+  if (isAdminOnlyPlaceable(entity)) return false;
   if (capability !== 'move' && isProp(entity)) return false;
 
   const owns = entity.owners.includes(seat.id);

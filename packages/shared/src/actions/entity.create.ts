@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { isWithinBounds } from '../geometry/bounds.js';
-import { Entity, Id, resolveSceneBounds } from '../schema/index.js';
+import { Entity, Id, resolveSceneBounds, visionRuleViolation } from '../schema/index.js';
 import { defineAction } from './define.js';
 import { isAdminOn, isLayerLocked } from './entity-access.js';
 
@@ -16,6 +16,8 @@ export const entityCreate = defineAction({
       // D37: the host rejects positions off the canvas.
       isWithinBounds(resolveSceneBounds(scene), p.entity.transform.position) &&
       !isLayerLocked(scene, p.entity.layer) &&
+      // FOG-01: also checked here for callers that build the entity themselves (prefab.place).
+      visionRuleViolation(p.entity) === undefined &&
       new Set(p.entity.owners).size === p.entity.owners.length &&
       p.entity.owners.every((ownerId) => ownerId in state.seats && !state.seats[ownerId]?.archived)
     );

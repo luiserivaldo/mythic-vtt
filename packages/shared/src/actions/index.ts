@@ -33,8 +33,11 @@ export {
   canReadEntityLabel,
   canUseEntity,
   isAdmin,
+  isAdminOnlyPlaceable,
   isLayerLocked,
   isProp,
+  validFogRegionEntity,
+  validWallEntity,
 } from './entity-access.js';
 export { historyUndo, UndoRequest, HistoryUndoPayload } from './history.undo.js';
 export {
@@ -51,4 +54,5 @@ export { seatArchive } from './seat.archive.js';
 export { seatJoinTemporary } from './seat.joinTemporary.js';
 export { seatDiscardTemporary } from './seat.discardTemporary.js';
 export { campaignSetBranding } from './campaign.setBranding.js';
+export { wallSetDoor } from './wall.setDoor.js';
 export * from './temporary-seats.js';

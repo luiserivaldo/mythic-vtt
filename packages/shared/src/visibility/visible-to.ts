@@ -61,6 +61,10 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
     // LAY-04 + D32: the DM layer is visible to the host and co-DM seats only, never to players
     // (not even owners of an entity moved onto it) or spectators.
     if (entity.layer === 'dm' && !(audience.kind === 'seat' && seat?.role === 'codm')) return null;
+    const coDm = audience.kind === 'seat' && seat?.role === 'codm';
+    // MV-303 Q2a / PERM-03: a fog region's outline would show where hidden things are. It lives on
+    // the dm layer (schema), and is dropped here too in case that rule ever changes.
+    if (entity.fogRegion && !coDm) return null;
     // PERM-02: the seat-level toggle is the campaign-wide gate for entity visibility.
     if (audience.kind === 'seat' && seat?.permissions.view === false) return null;
     // PERM-02: an entity with view disabled is visible to its owners only.
@@ -69,6 +73,20 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
     // schema requires a string, so the neutral placeholder is the empty string.
     const hideName = !canReadTokenLabel(audience, entity, seat);
     let view = hideName && entity.name !== '' ? { ...entity, name: '' } : entity;
+    // FOG-01 (MV-303 Q1) / PERM-03: players and spectators must not learn a secret door exists.
+    // Closed or locked, it is a plain wall; open, it is an ordinary open door with no `secret`.
+    // The memo key carries the role, so a co-DM's whole view never reaches a player.
+    const door = view.wall?.door;
+    if (door?.secret !== undefined && !coDm) {
+      const points = view.wall?.points ?? [];
+      view = {
+        ...view,
+        wall:
+          door.secret && door.state !== 'open'
+            ? { points }
+            : { points, door: { state: door.state } },
+      };
+    }
     // TOK-06: retain the label/marker projection while also filtering independent quick fields.
     if (hideName && entity.token?.statusMarkers !== undefined) {
       const token = { ...entity.token };
@@ -76,7 +94,6 @@ export function viewEntity(audience: Audience, entity: Entity, seat?: Seat): Ent
       view = { ...view, token };
     }
     if (view.token?.quickFields) {
-      const coDm = audience.kind === 'seat' && seat?.role === 'codm';
       const entries = Object.entries(view.token.quickFields);
       const shared = entries.filter(
         ([, field]) =>

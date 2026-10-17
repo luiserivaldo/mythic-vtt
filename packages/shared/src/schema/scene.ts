@@ -37,6 +37,13 @@ export const LastingAoELimit = z.number().int().min(0).max(50);
 export const SceneBounds = z.strictObject({ width: BoundsCells, height: BoundsCells });
 export type SceneBounds = z.infer<typeof SceneBounds>;
 
+/**
+ * FOG-01 (MV-295, save v12; MV-303 Q2b): the per-scene dynamic-lighting switch. An object so later
+ * fields (light levels) have room; absent means off, so every older scene is unchanged.
+ */
+export const SceneVision = z.strictObject({ dynamicLighting: z.boolean() });
+export type SceneVision = z.infer<typeof SceneVision>;
+
 /** UI-SCN-01: a free-text folder label for grouping scenes in the DM's Scenes view. */
 export const SceneFolder = z.string().trim().min(1).max(64);
 
@@ -62,6 +69,8 @@ export const Scene = z.object({
   overlay: SceneOverlay.optional(),
   initiative: Initiative.optional(),
   maxLastingAoEsPerPlayer: LastingAoELimit.optional(),
+  // FOG-01: read through resolveSceneVision(). Not secret: clients draw the same fog (D47 (4)).
+  vision: SceneVision.optional(),
 });
 export type Scene = z.infer<typeof Scene>;
 
@@ -81,4 +90,14 @@ export function resolveGridStyle(grid: Pick<Grid, 'color' | 'opacity'>): GridSty
 /** D37: the scene canvas with the 40 x 30 default for scenes that predate bounds. */
 export function resolveSceneBounds(scene: Pick<Scene, 'bounds'>): SceneBounds {
   return scene.bounds ?? { width: DEFAULT_SCENE_WIDTH, height: DEFAULT_SCENE_HEIGHT };
+}
+
+/**
+ * FOG-01 (MV-303 Q3): the scene's vision settings with the default (dynamic lighting off) filled
+ * in. With dynamic lighting on, everything outside every vision polygon is fully dark: there is no
+ * dim or light-level model yet (light levels are reserved for a later field) and no explored-area
+ * memory (Q4).
+ */
+export function resolveSceneVision(scene: Pick<Scene, 'vision'>): SceneVision {
+  return { dynamicLighting: scene.vision?.dynamicLighting ?? false };
 }
