@@ -218,7 +218,9 @@ test('claim, temporary player, spectator and an already-claimed seat, with no pr
   expect(hello.find((m) => m['t'] === 'hello')).toMatchObject({ displayName: 'Spectator' });
   expect(hello.find((m) => m['t'] === 'hello')).not.toHaveProperty('avatar');
   expect(hello.find((m) => m['t'] === 'hello')).not.toHaveProperty('color');
-  expect(hello).toContainEqual({ t: 'join', as: 'spectator' });
+  // D46 / MV-280: the spectator intent rides on hello; no follow-up join is sent.
+  expect(hello.find((m) => m['t'] === 'hello')).toMatchObject({ as: 'spectator' });
+  expect(hello.filter((m) => m['t'] === 'join')).toEqual([]);
 
   // SES-06 and the kept avatar: Zara comes back into the Wizard seat with no screen.
   await zara.page.reload();
@@ -341,7 +343,8 @@ test('the DM seats a remembered visitor from the roster; spectators stay anonymo
   const hello = sent.find((m) => m['t'] === 'hello');
   expect(hello?.['identityId']).toMatch(/^[0-9A-Z]{26}$/);
   expect(hello?.['identityId']).not.toBe(bardIdentity.identityId);
-  expect(sent).toContainEqual({ t: 'join', as: 'spectator' });
+  expect(hello).toMatchObject({ as: 'spectator' });
+  expect(sent.filter((m) => m['t'] === 'join')).toEqual([]);
   const presence = setup.frames
     .filter((f) => f.includes('"t":"presence"'))
     .map((f) => JSON.parse(f) as { seats: { seatId: string; connected: boolean }[] })

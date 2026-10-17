@@ -1,0 +1,28 @@
+{
+  "client": [
+    {
+      "t": "hello",
+      "v": 12,
+      "identityId": "00000000000000000000000001",
+      "identitySecret": "synthetic-fixture-secret",
+      "displayName": "Spectator",
+      "as": "spectator"
+    },
+    {
+      "t": "hello",
+      "v": 12,
+      "identityId": "00000000000000000000000002",
+      "identitySecret": "synthetic-fixture-secret-2",
+      "displayName": "Fixture guest",
+      "color": "#c04e32"
+    }
+  ],
+  "server": [
+    {
+      "t": "presence",
+      "seats": [],
+      "spectators": 1,
+      "unseated": []
+    }
+  ]
+}

@@ -205,6 +205,90 @@ describe('Join As Spectator (UI-JOIN-01, C10)', () => {
   });
 });
 
+describe('Spectator declared on hello (D46, MV-280)', () => {
+  const declared = (id: string, name: string, opts: { isHost?: boolean } = {}) =>
+    Object.assign(named(id, name, opts), { declaredAs: 'spectator' as const });
+
+  it('is counted from the first presence and never listed as unseated', async () => {
+    const { engine } = setup();
+    const host = named(T.host, 'DM', { isHost: true });
+    await engine.onConnect(host);
+    const before = presenceOf(host).length;
+    expect(presenceOf(host).at(-1)?.spectators).toBe(0);
+
+    const bob = Object.assign(declared(T.bob, 'Spectator'), {
+      avatar: 'data:image/png;base64,AVATAR-BOB',
+      color: '#123456',
+    });
+    await engine.onConnect(bob);
+    await engine.idle();
+    const after = presenceOf(host).slice(before);
+    expect(after[0]?.spectators).toBe(1);
+    expect(after[0]?.unseated).toEqual([]);
+    for (const frame of presenceOf(host)) {
+      const wire = JSON.stringify(frame);
+      for (const secret of [T.bob, 'AVATAR-BOB', '#123456']) expect(wire).not.toContain(secret);
+    }
+    // Only the host ever receives presence.
+    expect(presenceOf(bob)).toEqual([]);
+
+    // The old follow-up join is still accepted and harmless.
+    await engine.onJoin(bob, { t: 'join', as: 'spectator' });
+    await engine.idle();
+    expect(presenceOf(host).at(-1)?.spectators).toBe(1);
+    expect(presenceOf(host).every((p) => !JSON.stringify(p).includes(T.bob))).toBe(true);
+
+    engine.onDisconnect(bob);
+    expect(presenceOf(host).at(-1)?.spectators).toBe(0);
+  });
+
+  it('sees exactly what an undeclared unseated visitor sees', async () => {
+    const plain = setup();
+    const carol = named(T.carol, 'Carol');
+    await plain.engine.onConnect(carol);
+    const flagged = setup();
+    const bob = declared(T.carol, 'Carol');
+    await flagged.engine.onConnect(bob);
+    await Promise.all([plain.engine.idle(), flagged.engine.idle()]);
+    const snapshot = (c: FakeConnection) => c.received.find((m) => m.t === 'snapshot');
+    expect(snapshot(bob)).toEqual(snapshot(carol));
+  });
+
+  it('is ignored for the host and for a seated identity', async () => {
+    const { engine } = setup();
+    const host = declared(T.host, 'DM', { isHost: true });
+    const alice = declared(T.alice, 'Alice');
+    await engine.onConnect(host);
+    await engine.onConnect(alice);
+    await engine.idle();
+    const last = presenceOf(host).at(-1);
+    expect(last?.spectators).toBe(0);
+    expect(last?.seats.find((s) => s.seatId === T.seatA)).toMatchObject({ connected: true });
+    // The host stays host: it still receives presence and can act.
+    await engine.onIntent(host, {
+      t: 'intent',
+      type: 'scene.rename',
+      payload: { sceneId: T.scene, name: 'Renamed' },
+      clientRef: 'r',
+    });
+    await engine.idle();
+    expect(engine.state().scenes[T.scene]?.name).toBe('Renamed');
+  });
+
+  it('cannot relay tool ephemerals, like a joined spectator', async () => {
+    const { engine } = setup();
+    const host = named(T.host, 'DM', { isHost: true });
+    const bob = declared(T.bob, 'Spectator');
+    await engine.onConnect(host);
+    await engine.onConnect(bob);
+    await engine.idle();
+    host.clear();
+    await engine.onEphemeral(bob, { t: 'ephemeral', channel: 'cursor', data: {} });
+    await engine.idle();
+    expect(host.received.filter((m) => m.t === 'ephemeral')).toEqual([]);
+  });
+});
+
 describe('Co-DM seats are host-granted (MV-269)', () => {
   const snapshotsOf = (c: FakeConnection) => c.received.filter((m) => m.t === 'snapshot');
 

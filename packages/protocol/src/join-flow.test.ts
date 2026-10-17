@@ -24,8 +24,9 @@ describe('v10 join flow', () => {
     }
     for (const frame of fixture.server)
       expect(decodeServerMessage(JSON.stringify(frame)).ok).toBe(true);
-    // UX-38 moved the wire to v11 (initiative scores); v10 frames stay decodable but unsupported.
-    expect(PROTOCOL_VERSION).toBe(11);
+    // D46 (MV-280) moved the wire to v12 (spectator hello); v10 frames stay decodable but unsupported.
+    expect(PROTOCOL_VERSION).toBe(12);
+    expect(isSupportedVersion(11)).toBe(false);
     expect(isSupportedVersion(10)).toBe(false);
     expect(isSupportedVersion(9)).toBe(false);
   });

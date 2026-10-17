@@ -8,8 +8,8 @@ export const PlayerColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 // ---------- client -> host ----------
 
-/** First message on a connection (SES-02). The secret is hashed by the host on first contact. */
-export const Hello = z.strictObject({
+/** The `hello` fields without the cross-field rule, for `.pick` (zod refuses picks on refined objects). */
+export const HelloFields = z.strictObject({
   t: z.literal('hello'),
   v: z.number().int().positive(),
   identityId: Ulid,
@@ -25,6 +25,17 @@ export const Hello = z.strictObject({
    * hello that claims host authority; additive, so the protocol version is unchanged.
    */
   hostToken: z.string().min(1).max(256).optional(),
+  /**
+   * D46 / MV-280: declares a spectator before presence is published, so the DM roster never lists
+   * this connection as unseated. Same rules as `join {as:'spectator'}`; excludes `hostToken`.
+   */
+  as: z.enum(['spectator']).optional(),
+});
+
+/** First message on a connection (SES-02). The secret is hashed by the host on first contact. */
+export const Hello = HelloFields.superRefine((hello, context) => {
+  if (hello.as !== undefined && hello.hostToken !== undefined)
+    context.addIssue({ code: 'custom', path: ['as'], message: 'as excludes hostToken' });
 });
 
 /** Sit down / start a session: claim a seat, or join as a spectator when no seat is named. */

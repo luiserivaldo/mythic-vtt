@@ -138,6 +138,17 @@ export function createEngine(options: EngineOptions): Engine {
    * connection's name, avatar and colour are never read for it (no visual credentials).
    */
   const declaredSpectators = new Set<string>();
+  /**
+   * UX-44 / D46: the one rule for "Join As Spectator", whether declared on `hello` or by `join`.
+   * The host, a seated identity and a `/watch` connection are never marked. Returns whether the
+   * connection is now a declared spectator.
+   */
+  function markDeclaredSpectator(conn: GatewayConnection): boolean {
+    if (conn.isHost || conn.isSpectator || seatIdOf(state, conn.identityId) !== undefined)
+      return false;
+    declaredSpectators.add(conn.connectionId);
+    return true;
+  }
   const ephemeralRelay = createEphemeralRelay(clock, options.ephemeral);
 
   // All state-touching work runs one item at a time, so `seq` order equals broadcast order and a
@@ -494,6 +505,9 @@ export function createEngine(options: EngineOptions): Engine {
         const audience = audienceFor(state, placeOf(conn));
         const member: Member = { conn, audience, key: audienceViewKey(state, placeOf(conn)) };
         members.set(conn.connectionId, member);
+        // D46 / MV-280: a spectator declared on `hello` is marked before the first presence, so
+        // the DM roster never lists it as unseated. Its audience and view do not change.
+        if (conn.declaredAs === 'spectator') markDeclaredSpectator(conn);
         greet(member);
         // MV-270: the same rule as `onJoin` and `session.join`: only the holder of a co-DM seat
         // is at the table before a scene is active; everyone else is told to wait.
@@ -539,10 +553,8 @@ export function createEngine(options: EngineOptions): Engine {
         if (!members.has(conn.connectionId)) return;
         if (msg.as === 'spectator') {
           // UX-44: the host keeps a count only. A seated identity or the host is not a spectator.
-          if (!conn.isHost && !conn.isSpectator && seatIdOf(state, conn.identityId) === undefined) {
-            declaredSpectators.add(conn.connectionId);
-            publishPresence();
-          }
+          // D46: a spectator already declared on `hello` may still send it; that is harmless.
+          if (markDeclaredSpectator(conn)) publishPresence();
           return;
         }
         // MV-270: a co-DM rejoining the seat it already holds (reconnect, restart, Join) is let

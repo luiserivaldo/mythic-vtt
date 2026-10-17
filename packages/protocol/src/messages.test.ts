@@ -238,13 +238,40 @@ describe('v9 initiative', () => {
 });
 
 describe('v11 initiative scores', () => {
-  it('round-trips scored initiative frames on the current handshake', () => {
+  it('round-trips scored initiative frames and keeps the v11 handshake rejected', () => {
     const fixture = JSON.parse(
       readFileSync(
         new URL('../../../fixtures/protocol/v11/initiative-scores.json', import.meta.url),
         'utf8',
       ),
     ) as { client: unknown[]; server: unknown[] };
+    for (const frame of fixture.client) {
+      const decoded = decodeClientMessage(JSON.stringify(frame));
+      expect(decoded.ok).toBe(true);
+      if (!decoded.ok) throw new Error('invalid client fixture');
+      expect(JSON.parse(encodeClientMessage(decoded.message))).toEqual(frame);
+      if (decoded.message.t === 'hello') expect(decoded.message.v).toBe(11);
+    }
+    for (const frame of fixture.server) {
+      const decoded = decodeServerMessage(JSON.stringify(frame));
+      expect(decoded.ok).toBe(true);
+      if (!decoded.ok) throw new Error('invalid server fixture');
+      expect(JSON.parse(encodeServerMessage(decoded.message))).toEqual(frame);
+    }
+    // D46 (MV-280) moved the wire to v12; the v11 frames stay decodable but are no longer supported.
+    expect(isSupportedVersion(11)).toBe(false);
+  });
+});
+
+describe('v12 spectator hello', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('../../../fixtures/protocol/v12/spectator-hello.json', import.meta.url),
+      'utf8',
+    ),
+  ) as { client: Record<string, unknown>[]; server: unknown[] };
+
+  it('round-trips the synthetic frames on the current handshake', () => {
     for (const frame of fixture.client) {
       const decoded = decodeClientMessage(JSON.stringify(frame));
       expect(decoded.ok).toBe(true);
@@ -258,5 +285,18 @@ describe('v11 initiative scores', () => {
       if (!decoded.ok) throw new Error('invalid server fixture');
       expect(JSON.parse(encodeServerMessage(decoded.message))).toEqual(frame);
     }
+  });
+
+  it('accepts only as=spectator, and never together with a host token', () => {
+    const base = fixture.client[1] ?? {};
+    const ok = (extra: Record<string, unknown>) =>
+      decodeClientMessage(JSON.stringify({ ...base, ...extra })).ok;
+    expect(ok({})).toBe(true);
+    expect(ok({ as: 'spectator' })).toBe(true);
+    expect(ok({ as: 'seat' })).toBe(false);
+    expect(ok({ as: 'temporary' })).toBe(false);
+    expect(ok({ as: '' })).toBe(false);
+    expect(ok({ hostToken: 'token' })).toBe(true);
+    expect(ok({ as: 'spectator', hostToken: 'token' })).toBe(false);
   });
 });

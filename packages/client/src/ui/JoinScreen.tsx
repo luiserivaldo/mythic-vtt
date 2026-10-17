@@ -164,7 +164,7 @@ function JoinFlow({ env }: { env: JoinEnv }) {
       if (request.kind === 'claim') session.join({ seatId: request.seatId });
       else if (request.kind === 'temporary')
         session.join({ as: 'temporary', label: profile?.displayName ?? 'Player' });
-      else if (request.kind === 'spectator') session.join({ as: 'spectator' });
+      // D46 / MV-280: a spectator declared itself on hello (`session.start`), so no join is sent.
       if (request.kind === 'spectator') setAnonymous(true);
       if (request.kind === 'spectator' || request.kind === 'returning') setPending(null);
       else setPending({ request, sentAt: refusals.count });

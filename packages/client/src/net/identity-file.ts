@@ -1,8 +1,8 @@
-import { Hello } from '@mythic/protocol';
+import { HelloFields } from '@mythic/protocol';
 import { IDENTITY_STORAGE_KEY, type Identity, type KeyValueStore } from './identity.js';
 
 export const IDENTITY_FILE_MAX_BYTES = 4096;
-const FileIdentity = Hello.pick({ identityId: true, identitySecret: true });
+const FileIdentity = HelloFields.pick({ identityId: true, identitySecret: true });
 const INVALID_FILE = 'This is not a valid Mythic identity file.';
 
 export function parseIdentityFile(text: string): Identity {
