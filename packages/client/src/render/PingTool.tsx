@@ -22,8 +22,9 @@ import { pointerClaims } from './pointer-claims.js';
 /**
  * LAY-05: ephemeral ping markers. Alt+left-clicking the board (or Ping in the right-click menus) drops a short animated marker at that spot for everyone at the
  * table. Nothing here is an action: the mark is relayed as an ephemeral message, and every client
- * draws its own copy from the ground point in the payload. The host enforces the scene's `pins`
- * toggle (PERM-05) and the ephemeral rate limits; this file only decides what to offer and draw.
+ * draws its own copy from the ground point in the payload. The host enforces the seat's `pins` tool
+ * (PERM-05; the ping permission, which TRIG-01 map pins must not reuse) and the ephemeral rate
+ * limits; this file only decides what to offer and draw.
  */
 
 /** Markers live 1.5 s, so a 250 ms sweep keeps stale geometry from outliving the animation. */

@@ -9,12 +9,15 @@ import type { Actor } from './envelope.js';
  */
 export const PING_CHANNEL = 'ping';
 
-/** PERM-05 / UI-SEAT-02: the seat tool that gates pings ("Place pins"). */
+/**
+ * PERM-05 / UI-SEAT-02: the seat tool that gates pings (the "Ping" toggle). The `pins` key is the
+ * ping permission under its 0.0.1 name; TRIG-01 map pins must not reuse it.
+ */
 export const PING_TOOL: SeatTool = 'pins';
 
 /**
  * PERM-05: ephemeral channels that a seat tool gates. `ruler.preview` (measure), the drawing
- * stroke (draw) and pings (pins) are the registered channels, so the host relay enforces the
+ * stroke (draw) and pings (`pins`, the ping permission) are the registered channels, so the host relay enforces the
  * seat's tools without a second code path. Erasing a drawing and clearing them are not tool
  * permissions: the host relay checks the author and the role instead (see `canEraseDrawing` /
  * `canClearDrawings`).

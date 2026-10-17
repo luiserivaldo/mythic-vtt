@@ -112,6 +112,10 @@ describe('tool rail states', () => {
     });
   });
 
+  it('names the ping permission "Ping" in its off reason (MV-288)', () => {
+    expect(SEAT_TOOL_OFF_REASON.pins).toBe('The DM has turned off Ping for your seat');
+  });
+
   it('disables Draw, with its own reason, when a seat may not view the board', () => {
     const states = railToolStates({
       ...base,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   Campaign,
   DEFAULT_SEAT_TOOLS,
+  PLAYER_TEMPLATE_TOOLS,
   reduceAction,
   resolveSeatTools,
   SEAT_TEMPLATES,
@@ -9,7 +10,8 @@ import {
   type ActionEnvelope,
   type SeatTools,
 } from '../index.js';
-import { ACTORS, IDS, makeCampaign, permissionMatrix } from './testing.js';
+import { ACTORS, IDS, makeCampaign, makeEntity, permissionMatrix, testId } from './testing.js';
+import { canPerform } from './run.js';
 import { canUseTool, PING_CHANNEL, PING_TOOL, TOOL_FOR_CHANNEL } from './seat-tools.js';
 import { sceneSetPlayerToggles } from './scene.setPlayerToggles.js';
 import { seatCreate } from './seat.create.js';
@@ -39,17 +41,24 @@ const NONE: SeatTools = { measure: false, draw: false, pins: false };
 const ALL: SeatTools = { measure: true, draw: true, pins: true };
 
 describe('permission templates (UX-46, UI-SEAT-02)', () => {
-  it('each template carries default tools; Player matches the 0.0.1 scene defaults', () => {
-    expect(seatTemplate('player').tools).toEqual({ measure: true, draw: false, pins: false });
-    expect(seatTemplate('player').tools).toEqual(DEFAULT_SEAT_TOOLS);
+  it('each template carries default tools; Player may measure, draw and ping (MV-288)', () => {
+    expect(seatTemplate('player').tools).toEqual({ measure: true, draw: true, pins: true });
+    expect(seatTemplate('player').tools).toEqual(PLAYER_TEMPLATE_TOOLS);
     expect(seatTemplate('spectator').tools).toEqual(NONE);
     expect(seatTemplate('dm').tools).toEqual(ALL);
     expect(seatTemplate('codm').tools).toEqual(ALL);
-    // Templates are copied, never shared: no template object is the default object.
-    for (const template of SEAT_TEMPLATES) expect(template.tools).not.toBe(DEFAULT_SEAT_TOOLS);
+    // Templates are copied, never shared: no template object is a default object.
+    for (const template of SEAT_TEMPLATES) {
+      expect(template.tools).not.toBe(DEFAULT_SEAT_TOOLS);
+      expect(template.tools).not.toBe(PLAYER_TEMPLATE_TOOLS);
+    }
   });
 
-  it('a seat without stored tools gets the Player template default', () => {
+  it('keeps the tool-less fallback frozen at the 0.0.1 scene defaults', () => {
+    expect(DEFAULT_SEAT_TOOLS).toEqual({ measure: true, draw: false, pins: false });
+  });
+
+  it('a seat without stored tools gets the frozen fallback, not the Player template', () => {
     const state = makeCampaign();
     const owner = state.seats[IDS.owner];
     if (!owner) throw new Error('seat');
@@ -135,6 +144,44 @@ describe('per-seat override (UX-46)', () => {
     expect(canUseTool(state, ACTORS.host, IDS.scene, 'draw')).toBe(true);
   });
 
+  it('the host revokes Draw and Ping on one Player seat; that seat is denied, others keep them', () => {
+    const before = makeCampaign();
+    for (const id of [IDS.owner, IDS.other]) {
+      const seat = before.seats[id];
+      if (!seat) throw new Error('seat');
+      seat.tools = { ...seatTemplate('player').tools };
+    }
+    const payload = { seatId: IDS.owner, tools: { draw: false, pins: false } };
+    expect(permissionMatrix(before, 'seat.update', payload)).toMatchObject({
+      host: true,
+      coDm: false,
+      owner: false,
+      otherSeat: false,
+    });
+    const { state } = reduceAction(before, envelope('seat.update', payload));
+    expect(state.seats[IDS.owner]?.tools).toEqual({ measure: true, draw: false, pins: false });
+    expect(canUseTool(state, ACTORS.owner, IDS.scene, 'measure')).toBe(true);
+    expect(canUseTool(state, ACTORS.owner, IDS.scene, 'draw')).toBe(false);
+    expect(canUseTool(state, ACTORS.owner, IDS.scene, PING_TOOL)).toBe(false);
+    expect(canUseTool(state, ACTORS.otherSeat, IDS.scene, 'draw')).toBe(true);
+    expect(canUseTool(state, ACTORS.otherSeat, IDS.scene, PING_TOOL)).toBe(true);
+  });
+
+  it('no seat tool grants entity.create: a player with every tool still cannot create', () => {
+    const state = withTools(IDS.owner, ALL);
+    const payload = { sceneId: IDS.scene, entity: makeEntity(testId(40), { layer: 'props' }) };
+    expect(canPerform(state, ACTORS.owner, 'entity.create', payload)).toBe(false);
+    expect(canPerform(state, ACTORS.host, 'entity.create', payload)).toBe(true);
+  });
+
+  it('gates exactly the measure, draw and ping channels', () => {
+    expect({ ...TOOL_FOR_CHANNEL }).toEqual({
+      'ruler.preview': 'measure',
+      [DRAW_STROKE_CHANNEL]: 'draw',
+      [PING_CHANNEL]: 'pins',
+    });
+  });
+
   it('gates the measure, draw and ping channels; erase, clear and cursors are not tools', () => {
     expect(TOOL_FOR_CHANNEL['ruler.preview']).toBe('measure');
     expect(TOOL_FOR_CHANNEL[DRAW_STROKE_CHANNEL]).toBe('draw');
@@ -160,9 +207,11 @@ describe('demoting a Co-DM (UX-46)', () => {
     return state.seats[IDS.coDm]?.tools;
   };
 
-  it('resets template or absent tools to the Player template', () => {
-    expect(demote(ALL)).toEqual(DEFAULT_SEAT_TOOLS);
-    expect(demote(undefined)).toEqual(DEFAULT_SEAT_TOOLS);
+  it('resets template or absent tools to the frozen fallback (measure only)', () => {
+    const fallback = { measure: true, draw: false, pins: false };
+    expect(demote(ALL)).toEqual(fallback);
+    expect(demote(undefined)).toEqual(fallback);
+    expect(fallback).toEqual(DEFAULT_SEAT_TOOLS);
   });
 
   it('keeps an explicit override, such as a migrated 0.0.1 value', () => {

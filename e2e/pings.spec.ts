@@ -229,7 +229,8 @@ test('the host gates a player ping on the seat pins tool and rate-limits a flood
     );
 
     const ping = { sceneId, x: 5, y: 0, z: 5 };
-    // `pins` is opt-in in the Player template, so a player's ping is denied. The host relays its own.
+    // A seat created without tools gets the frozen fallback (ping off), so a player's ping is denied.
+    // The host relays its own.
     player.ephemeral('ping', ping);
     host.ephemeral('ping', ping);
     await host.waitFor('host ping relayed', () => framesFrom(host.frames, hostId) === 1);

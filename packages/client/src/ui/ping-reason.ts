@@ -12,7 +12,8 @@ import { isReadOnlyViewer, viewerRole } from './viewer.js';
 /**
  * UX-40: why this viewer cannot ping right now, or `undefined` when they can. Ping lives in the
  * board and token right-click menus; like every board tool it is shown disabled with a reason
- * rather than hidden (UI-TOOL-07), and the host re-checks the seat's `pins` tool (UI-SEAT-02).
+ * rather than hidden (UI-TOOL-07), and the host re-checks the seat's `pins` tool (UI-SEAT-02). The
+ * `pins` key is the ping permission; TRIG-01 map pins must not reuse it.
  */
 export function usePingReason(): string | undefined {
   const campaign = useClientStore((s) => s.campaign);

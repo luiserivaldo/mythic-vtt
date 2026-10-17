@@ -31,7 +31,7 @@ export const SEAT_TOGGLES: readonly { key: Exclude<PermissionKey, 'view'>; label
 export const SEAT_TOOL_TOGGLES: readonly { key: SeatTool; label: string }[] = [
   { key: 'measure', label: 'Measure' },
   { key: 'draw', label: 'Draw' },
-  { key: 'pins', label: 'Place pins' },
+  { key: 'pins', label: 'Ping' },
 ];
 
 export const CODM_TOOLS_NOTE = 'Co-DMs can always use every tool';
@@ -61,7 +61,7 @@ export interface SeatRow {
   /** SES-07: the name the seated identity connected with, when the host has told us. */
   occupantName: string | undefined;
   permissions: Record<PermissionKey, boolean>;
-  /** UI-SEAT-02: the seat's own tools, with the Player template default filled in. */
+  /** UI-SEAT-02: the seat's own tools, with the `DEFAULT_SEAT_TOOLS` fallback filled in. */
   tools: SeatTools;
   badge: SeatBadge;
   /** The occupant's player colour from presence, else a stable hue from the seat name. */

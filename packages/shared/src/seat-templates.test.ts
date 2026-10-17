@@ -17,10 +17,12 @@ describe('seat role templates (M1-44)', () => {
     expect(seatTemplate('player')).toMatchObject({
       role: 'player',
       permissions: { view: true, move: true, edit: false, delete: false },
+      tools: { measure: true, draw: true, pins: true },
     });
     expect(seatTemplate('spectator')).toMatchObject({
       role: 'player',
       permissions: { view: true, move: false, edit: false, delete: false },
+      tools: { measure: false, draw: false, pins: false },
     });
   });
 

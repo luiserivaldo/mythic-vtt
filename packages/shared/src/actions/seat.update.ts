@@ -45,8 +45,8 @@ export const seatUpdate = defineAction({
     if (a.payload.binding !== undefined) seat.binding = a.payload.binding;
     if (a.payload.role !== undefined) {
       // UX-46: a demoted Co-DM must not keep the every-tool set it was created with. Tools
-      // that are absent or still the Co-DM template's reset to the Player template; anything
-      // else is an explicit override (for example a migrated 0.0.1 value) and is kept.
+      // that are absent or still the Co-DM template's reset to the `DEFAULT_SEAT_TOOLS` fallback;
+      // anything else is an explicit override (for example a migrated 0.0.1 value) and is kept.
       if (seat.role === 'codm' && a.payload.role === 'player' && !hasOwnTools(seat.tools))
         seat.tools = { ...DEFAULT_SEAT_TOOLS };
       seat.role = a.payload.role;

@@ -59,7 +59,8 @@ export const TOKEN_CONTEXT_LABELS: Readonly<Record<TokenContextActionId, string>
   'see-sheet': 'See Sheet',
   'add-condition': 'Add Condition',
   'change-layer': 'Change Layer',
-  // UX-40: ping moved off the rail; the menu button is gated by the seat's pins tool (UI-SEAT-02).
+  // UX-40: ping moved off the rail; the menu button is gated by the seat's `pins` tool (UI-SEAT-02),
+  // which is the ping permission. TRIG-01 map pins must not reuse it.
   ping: 'Ping',
   'token-options': 'Token Options',
 };

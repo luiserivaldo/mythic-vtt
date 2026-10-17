@@ -104,6 +104,7 @@ describe('seat.joinTemporary', () => {
       role: 'player',
       interactionEnabled: true,
       permissions: { view: true, move: true, edit: false, delete: false },
+      tools: { measure: true, draw: true, pins: true },
       temporary: true,
     });
     expect(Campaign.safeParse(result.state).success).toBe(true);
