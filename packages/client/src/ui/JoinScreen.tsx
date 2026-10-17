@@ -1,5 +1,5 @@
 import { IdentityTransfer } from './IdentityTransfer.js';
-import { useEffect, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
 import { useClientStore } from '../store/react.js';
 import type { JoinPayload } from '@mythic/protocol';
 import {
@@ -24,7 +24,7 @@ import {
   type Profile,
 } from './join-screen.js';
 import { useJoinEnv, type JoinEnv } from './join-context.js';
-import { dmLinkToken, HOST_SCREEN_KEY } from './host-screen.js';
+import { dmLinkToken, foreignDmLinkHost, HOST_SCREEN_KEY } from './host-screen.js';
 import { HostScreen } from './HostScreen.js';
 import './join-screen.css';
 
@@ -40,6 +40,9 @@ export function JoinScreen() {
   if (env.hostVisitor) return env.hostScreen === true ? <HostScreen env={env} /> : null;
   return <JoinFlow env={env} />;
 }
+
+/** MV-284: how long the confirm for a link to another host stays disabled after the warning. */
+const CONFIRM_ARM_MS = 500;
 
 /**
  * UI-HOST-01 / D24: "I'm the DM" grants nothing by itself. It takes the DM link the host printed
@@ -310,14 +313,38 @@ function JoinFlow({ env }: { env: JoinEnv }) {
 
 function DmStep({ onBack }: { onBack: () => void }) {
   const [link, setLink] = useState('');
+  // MV-284: a link for another host is held back until the DM clicks its own confirm button.
+  const [warned, setWarned] = useState(false);
+  // The confirm arms a moment after the warning shows, so a double click or a repeated Enter on
+  // Continue cannot land on it.
+  const [armed, setArmed] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
   const token = dmLinkToken(link);
+  const foreignHost = token === undefined ? null : foreignDmLinkHost(link, location.origin);
+  const warning = warned && foreignHost !== null;
+  useEffect(() => {
+    if (!warning) return;
+    const timer = setTimeout(() => {
+      setArmed(true);
+    }, CONFIRM_ARM_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [warning]);
   return (
     <Card title="I'm the DM">
       <form
         className="join-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (token !== undefined) openDmLink(token);
+          if (token === undefined || warning) return;
+          if (foreignHost === null) {
+            openDmLink(token);
+            return;
+          }
+          setWarned(true);
+          // Continue goes away, so Enter stays in the field, where it does nothing more.
+          input.current?.focus();
         }}
       >
         <p>
@@ -327,6 +354,7 @@ function DmStep({ onBack }: { onBack: () => void }) {
         <label>
           DM link
           <input
+            ref={input}
             type="text"
             value={link}
             autoComplete="off"
@@ -334,14 +362,37 @@ function DmStep({ onBack }: { onBack: () => void }) {
             autoFocus
             onChange={(e) => {
               setLink(e.target.value);
+              setWarned(false);
+              setArmed(false);
             }}
           />
         </label>
         {link.trim() !== '' && token === undefined && <p role="alert">That is not a DM link.</p>}
+        {warning && (
+          <p role="alert">
+            This link is for {foreignHost}, not this page. Open it there, or continue to use it
+            here.
+          </p>
+        )}
         <div className="join-actions">
-          <button type="submit" disabled={token === undefined}>
-            Continue
-          </button>
+          {warning ? (
+            <button
+              key="confirm"
+              type="button"
+              disabled={!armed}
+              onClick={(e) => {
+                // A multi-click is not a deliberate choice.
+                if (e.detail > 1 || token === undefined) return;
+                openDmLink(token);
+              }}
+            >
+              Continue anyway
+            </button>
+          ) : (
+            <button key="continue" type="submit" disabled={token === undefined}>
+              Continue
+            </button>
+          )}
           <button type="button" onClick={onBack}>
             Back
           </button>

@@ -151,6 +151,86 @@ test('the DM picks a campaign by last played, opens Invite, seats a player and s
   }
 });
 
+test('a DM link for another host is held back until the DM continues', async ({ browser }) => {
+  test.setTimeout(60_000);
+  const dataDir = await mkdtemp(join(tmpdir(), 'mythic-host-screen-origin-'));
+  let running: Running | undefined;
+  try {
+    running = await start(dataDir, ['--new-campaign', 'Far Table']);
+    const token = running.hostToken;
+    const dm = await visitor(browser, running);
+    const page = dm.page;
+    const sent: string[] = [];
+    page.on('websocket', (ws) => {
+      ws.on('framesent', (frame) => {
+        if (typeof frame.payload === 'string') sent.push(frame.payload);
+      });
+    });
+
+    // MV-284: the printed link names localhost while this page is 127.0.0.1 (another origin).
+    const foreignLink = `http://localhost:${String(running.hostPort)}/#host=${token}`;
+    const tokenSent = () => sent.some((frame) => frame.includes(token));
+    await page.getByRole('button', { name: "I'm the DM" }).click();
+    const step = page.getByRole('dialog', { name: "I'm the DM" });
+    const field = page.getByLabel('DM link');
+    const cont = page.getByRole('button', { name: 'Continue', exact: true });
+    const anyway = page.getByRole('button', { name: 'Continue anyway' });
+    await field.fill(foreignLink);
+    await cont.click();
+    await expect(step.getByRole('alert')).toHaveText(
+      `This link is for localhost:${String(running.hostPort)}, not this page. Open it there, or continue to use it here.`,
+    );
+    expect(page.url()).not.toContain('host=');
+    expect(tokenSent()).toBe(false);
+
+    // Editing the link clears the warning, so the next Continue warns again before sending.
+    await field.fill(` ${foreignLink} `);
+    await expect(step.getByRole('alert')).toHaveCount(0);
+    await expect(cont).toBeVisible();
+
+    // A double click on Continue shows the warning; its second click does not confirm.
+    await cont.dblclick();
+    await expect(anyway).toBeVisible();
+    await page.waitForTimeout(1_000);
+    expect(page.url()).not.toContain('host=');
+    expect(tokenSent()).toBe(false);
+
+    // Enter twice in the field: the first warns, the second does nothing.
+    await field.fill(foreignLink);
+    await expect(cont).toBeVisible();
+    await field.press('Enter');
+    await field.press('Enter');
+    await expect(anyway).toBeVisible();
+    await expect(field).toBeFocused();
+    await page.waitForTimeout(1_000);
+    expect(page.url()).not.toContain('host=');
+    expect(tokenSent()).toBe(false);
+
+    // Even armed, the confirm ignores the second click of a double click.
+    await expect(anyway).toBeEnabled();
+    const box = await anyway.boundingBox();
+    if (box === null) throw new Error('no Continue anyway button');
+    // Only the second press of the pair (detail 2): the first one would be a deliberate click.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down({ clickCount: 2 });
+    await page.mouse.up({ clickCount: 2 });
+    await page.waitForTimeout(1_000);
+    expect(page.url()).not.toContain('host=');
+    expect(tokenSent()).toBe(false);
+
+    // A deliberate click on the armed confirm goes on.
+    await anyway.click();
+    await expect(page.getByRole('dialog', { name: 'Choose a campaign' })).toContainText(
+      'Far Table',
+    );
+    expect(tokenSent()).toBe(true);
+    await dm.done();
+  } finally {
+    if (running) await stop(running);
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
 test('a visitor on the join link cannot reach the DM path', async ({ browser }) => {
   test.setTimeout(90_000);
   const dataDir = await mkdtemp(join(tmpdir(), 'mythic-host-screen-deny-'));

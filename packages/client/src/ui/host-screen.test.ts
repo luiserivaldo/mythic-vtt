@@ -5,6 +5,7 @@ import {
   dmLinkToken,
   fetchCampaignList,
   fetchCampaignThumbnail,
+  foreignDmLinkHost,
   hostScreenView,
   pickCampaign,
   sortCampaigns,
@@ -66,16 +67,84 @@ describe('campaignRows', () => {
 });
 
 describe('dmLinkToken', () => {
+  const real = 'AbC_d-12345678901234567890123456'; // 32 characters, like the host's own tokens
+
   it('reads the token from a pasted DM link or takes a bare token', () => {
-    expect(dmLinkToken(' http://192.168.1.4:8787/#host=AbC_d-123 ')).toBe('AbC_d-123');
-    expect(dmLinkToken('http://h/#foo=1&host=tok')).toBe('tok');
-    expect(dmLinkToken('abcdefghijklmnopqrstuvwx')).toBe('abcdefghijklmnopqrstuvwx');
+    expect(dmLinkToken(` http://192.168.1.4:8787/#host=${real} `)).toBe(real);
+    expect(dmLinkToken(`http://h/#foo=1&host=${real}`)).toBe(real);
+    expect(dmLinkToken(`#host=${real}`)).toBe(real);
+    expect(dmLinkToken(` ${real} `)).toBe(real);
+  });
+
+  it('applies the same 16 to 256 character bound to a bare token and a #host= link', () => {
+    for (const length of [16, 32, 256]) {
+      const token = 'a'.repeat(length);
+      expect(dmLinkToken(token)).toBe(token);
+      expect(dmLinkToken(`http://h/#host=${token}`)).toBe(token);
+    }
+    for (const length of [1, 15, 257]) {
+      const token = 'a'.repeat(length);
+      expect(dmLinkToken(token)).toBeUndefined();
+      expect(dmLinkToken(`http://h/#host=${token}`)).toBeUndefined();
+    }
   });
 
   it('refuses anything that is not a DM link', () => {
     for (const text of ['', 'http://h/', 'http://h/#watch=x', 'http://h/#host=', 'short', 'a b'])
       expect(dmLinkToken(text)).toBeUndefined();
-    expect(dmLinkToken('http://h/#host=<script>')).toBeUndefined();
+    expect(dmLinkToken('http://h/#host=<script>aaaaaaaaaaaaaaaa')).toBeUndefined();
+    expect(dmLinkToken(`${real} ${real}`)).toBeUndefined();
+  });
+});
+
+describe('foreignDmLinkHost', () => {
+  const page = 'http://192.168.1.4:8787';
+  const token = 'a'.repeat(32);
+
+  it('says nothing for a link to this page', () => {
+    expect(foreignDmLinkHost(`http://192.168.1.4:8787/#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(` HTTP://192.168.1.4:8787#host=${token} `, page)).toBeNull();
+    expect(foreignDmLinkHost(`http://192.168.1.4:8787/play?x=1#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(`192.168.1.4:8787/#host=${token}`, page)).toBeNull();
+  });
+
+  it('says nothing for a bare token or a bare fragment, which carry no origin', () => {
+    expect(foreignDmLinkHost(token, page)).toBeNull();
+    expect(foreignDmLinkHost(`#host=${token}`, page)).toBeNull();
+  });
+
+  it('says nothing for a relative link, which is for this page', () => {
+    expect(foreignDmLinkHost(`/#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(`/play?x=1#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(`./#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(`?x=1#host=${token}`, page)).toBeNull();
+    expect(foreignDmLinkHost(`//table.example.com/#host=${token}`, page)).toBe('table.example.com');
+  });
+
+  it('names the other host', () => {
+    expect(foreignDmLinkHost(`https://table.example.com/#host=${token}`, page)).toBe(
+      'table.example.com',
+    );
+    expect(foreignDmLinkHost(`http://localhost:8787/#host=${token}`, page)).toBe('localhost:8787');
+    expect(foreignDmLinkHost(`table.example.com:9000/#host=${token}`, page)).toBe(
+      'table.example.com:9000',
+    );
+  });
+
+  it('names the whole origin when only the port or the scheme differs', () => {
+    expect(foreignDmLinkHost(`http://192.168.1.4:9000/#host=${token}`, page)).toBe(
+      'http://192.168.1.4:9000',
+    );
+    expect(foreignDmLinkHost(`https://192.168.1.4:8787/#host=${token}`, page)).toBe(
+      'https://192.168.1.4:8787',
+    );
+    expect(
+      foreignDmLinkHost(`https://table.example.com/#host=${token}`, 'http://table.example.com'),
+    ).toBe('https://table.example.com');
+  });
+
+  it('treats an address it cannot read as another host', () => {
+    expect(foreignDmLinkHost(`http://[bad/#host=${token}`, page)).toBe('http://[bad/');
   });
 });
 

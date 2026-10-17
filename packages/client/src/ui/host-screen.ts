@@ -17,9 +17,34 @@ export type HostFetch = (url: string, init: RequestInit) => Promise<Response>;
 export function dmLinkToken(text: string): string | undefined {
   const trimmed = text.trim();
   const hash = trimmed.indexOf('#');
-  if (hash === -1) return /^[\w-]{16,256}$/.test(trimmed) ? trimmed : undefined;
-  const token = new URLSearchParams(trimmed.slice(hash + 1)).get('host');
-  return token !== null && /^[\w-]{1,256}$/.test(token) ? token : undefined;
+  const token = hash === -1 ? trimmed : new URLSearchParams(trimmed.slice(hash + 1)).get('host');
+  // The host makes 32-character tokens; a configured one may differ, so the bound is loose.
+  return token !== null && /^[\w-]{16,256}$/.test(token) ? token : undefined;
+}
+
+/**
+ * MV-284: the host a pasted DM link points at, when that is not this page's origin; null for a
+ * bare token, a bare `#host=` fragment, a relative link or a link to this page. The token would go to this page's
+ * host, so a link for another one is worth a second look. Not refused: the printed link may be the
+ * public URL while the DM opens the host on localhost or the LAN.
+ */
+export function foreignDmLinkHost(text: string, pageOrigin: string): string | null {
+  const trimmed = text.trim();
+  const hash = trimmed.indexOf('#');
+  const address = hash === -1 ? '' : trimmed.slice(0, hash);
+  if (address === '') return null;
+  let url: URL;
+  try {
+    // A relative link (`/`, `./play`, `?x=1`) is for this page; `//host/` still names one.
+    url = /^[/.?]/.test(address)
+      ? new URL(address, pageOrigin)
+      : new URL(/^https?:\/\//i.test(address) ? address : `http://${address}`);
+  } catch {
+    return address;
+  }
+  if (url.origin === pageOrigin) return null;
+  // Same host on another scheme or port still names the whole origin, so the difference shows.
+  return url.hostname === new URL(pageOrigin).hostname ? url.origin : url.host;
 }
 
 /** UI-HOST-02: last played first; never-played campaigns last, in the host's order. */
