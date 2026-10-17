@@ -1,9 +1,14 @@
 import type { Entity } from '../schema/index.js';
-import { yawFromQuaternion, type Point2 } from './primitives.js';
+import type { Point2 } from './primitives.js';
 
 // VIS-01, VIS-02 (D47): 2D vision on the board plane XZ (1 unit = 1 cell). Elevation is ignored.
 // The host filters what each seat receives with these functions and the client draws the fog with
 // the same ones, so every rule here must be deterministic and independent of input order.
+//
+// Determinism holds within one JS engine only: results are bit-identical for the same inputs on the
+// same engine. ECMAScript leaves Math.atan2, sin and cos implementation-approximated, so two engines
+// may differ by an ulp and reorder near-tied events. Host and client polygons must therefore never
+// be compared or hashed against each other: the host is the authority (D47 §5), FOG-05 only draws.
 
 export interface Segment {
   a: Point2;
@@ -28,6 +33,13 @@ const TWO_PI = Math.PI * 2;
 /** Token sight samples sit this far inside its square, so a token flush against a wall is judged
  * by points on its own side of that wall. */
 export const TOKEN_SAMPLE_INSET = 0.05;
+
+/**
+ * How far, in cells, an origin on a wall or the bounds edge is moved off it before the sweep (see
+ * `visionOrigin`). Far above `VISION_EPSILON`, so the moved point is clearly off the walls, and far
+ * below `TOKEN_SAMPLE_INSET`, so the eye stays well inside the token it belongs to.
+ */
+export const VISION_NUDGE = 1e-6;
 
 /** World segments of a wall polyline given in local XZ, rotated by `yaw` (about +Y) then placed. */
 export function wallSegments(points: readonly Point2[], position: Point2, yaw: number): Segment[] {
@@ -58,16 +70,24 @@ export type VisionOccluder =
   | { kind: 'footprint'; outline: readonly Point2[] };
 
 /**
- * The segments that block sight from `origin`. A footprint that contains the origin (boundary
- * included) is skipped entirely, so a token standing inside a sight-blocking prop is not blind; it
- * sees out through that prop but is still blocked by everything else.
+ * The segments that block sight from `origin`. A footprint whose strict interior holds the origin is
+ * skipped entirely, so a token standing inside a sight-blocking prop is not blind; it sees out
+ * through that prop but is still blocked by everything else. An origin on the outline (within
+ * `VISION_EPSILON`) is not inside: the outline stays, `visibilityPolygon` moves the origin off it
+ * like off any wall, and the prop keeps blocking, so a token on a pillar's edge or corner never sees
+ * through the pillar.
  */
 export function visionOccluders(origin: Point2, occluders: readonly VisionOccluder[]): Segment[] {
   const out: Segment[] = [];
   for (const occluder of occluders) {
-    if (occluder.kind === 'segments') out.push(...occluder.segments);
-    else if (!pointInPolygon(origin, occluder.outline))
-      out.push(...polygonSegments(occluder.outline));
+    if (occluder.kind === 'segments') {
+      out.push(...occluder.segments);
+      continue;
+    }
+    const outline = polygonSegments(occluder.outline);
+    const strictlyInside =
+      pointInPolygon(origin, occluder.outline) && !outline.some((s) => touches(origin, s));
+    if (!strictlyInside) out.push(...outline);
   }
   return out;
 }
@@ -133,8 +153,11 @@ export type SightEntity = Pick<Entity, 'transform' | 'token' | 'aoe' | 'pin'>;
 
 /**
  * Points tested for "is this entity seen" (D47). A token: its centre and the four corners of its
- * `sizeCells` square inset by `TOKEN_SAMPLE_INSET`. An AoE: its centre and the corners of its
- * footprint rectangle, oriented by its yaw (pitch and roll are ignored, like prop footprints).
+ * `sizeCells` square inset by `TOKEN_SAMPLE_INSET`. An AoE: its centre and the eight corners of its
+ * local 3D bounding box, rotated by the full rotation (yaw, pitch and roll, as geometry/aoe.ts
+ * rotates the shape), placed at its position and projected to XZ; corners that project to the same
+ * point are kept once. Box corners lie slightly outside spheres and cones, so those over-reveal a
+ * little (accepted: a sample can only make an AoE seen early, never hide one).
  * Anything else, pins included: its position.
  */
 export function sightSamples(entity: SightEntity): Point2[] {
@@ -151,39 +174,69 @@ export function sightSamples(entity: SightEntity): Point2[] {
       { x: x - h, z: z + h },
     ];
   }
-  const rect = entity.aoe ? aoeRect(entity.aoe) : undefined;
-  if (!rect) return [centre];
-  const yaw = yawFromQuaternion(entity.transform.rotation);
-  const c = Math.cos(yaw);
-  const s = Math.sin(yaw);
-  const corners: Point2[] = [centre];
-  for (const [lx, lz] of [
-    [rect.minX, rect.minZ],
-    [rect.maxX, rect.minZ],
-    [rect.maxX, rect.maxZ],
-    [rect.minX, rect.maxZ],
-  ] as const) {
-    corners.push({ x: x + c * lx + s * lz, z: z - s * lx + c * lz });
+  const box = entity.aoe ? aoeBox(entity.aoe) : undefined;
+  if (!box) return [centre];
+  const q = entity.transform.rotation;
+  const samples: Point2[] = [centre];
+  for (let corner = 0; corner < 8; corner++) {
+    const v = rotateByQuaternion(
+      corner & 1 ? box.max.x : box.min.x,
+      corner & 2 ? box.max.y : box.min.y,
+      corner & 4 ? box.max.z : box.min.z,
+      q,
+    );
+    const sample = { x: x + v.x, z: z + v.z };
+    if (!samples.some((s, i) => i > 0 && s.x === sample.x && s.z === sample.z))
+      samples.push(sample);
   }
-  return corners;
+  return samples;
+}
+
+/** `v` rotated by the unit quaternion `q`: the same formula, in the same order, as aoe.ts `rotate`. */
+function rotateByQuaternion(
+  vx: number,
+  vy: number,
+  vz: number,
+  q: { x: number; y: number; z: number; w: number },
+): { x: number; y: number; z: number } {
+  // t = 2 (u x v); v' = v + w t + u x t, with u = (q.x, q.y, q.z).
+  const tx = 2 * (q.y * vz - q.z * vy);
+  const ty = 2 * (q.z * vx - q.x * vz);
+  const tz = 2 * (q.x * vy - q.y * vx);
+  return {
+    x: vx + (tx * q.w + (q.y * tz - q.z * ty)),
+    y: vy + (ty * q.w + (q.z * tx - q.x * tz)),
+    z: vz + (tz * q.w + (q.x * ty - q.y * tx)),
+  };
 }
 
 /**
- * Local XZ footprint rectangle of an AoE, using the geometry/aoe.ts conventions: the sphere,
- * cylinder and cube are centred on the position; the cone and line extend along local +Z.
- * The pre-M3 legacy component has no defined dimensions, so it samples its position only.
+ * Local 3D bounding box of an AoE in the geometry/aoe.ts frame: the sphere, cylinder and cube are
+ * centred on the position; the cone and line extend along local +Z, the cone's rim in local XY and
+ * the line's height along local Y. The pre-M3 legacy component has no defined dimensions, so it
+ * samples its position only.
  */
-function aoeRect(aoe: NonNullable<Entity['aoe']>): Bounds2 | undefined {
+function aoeBox(
+  aoe: NonNullable<Entity['aoe']>,
+):
+  | { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+  | undefined {
+  const box = (hx: number, hy: number, minZ: number, maxZ: number) => ({
+    min: { x: -hx, y: -hy, z: minZ },
+    max: { x: hx, y: hy, z: maxZ },
+  });
   if ('radius' in aoe) {
-    if (aoe.kind === 'cone')
-      return { minX: -aoe.radius, minZ: 0, maxX: aoe.radius, maxZ: aoe.length };
-    return { minX: -aoe.radius, minZ: -aoe.radius, maxX: aoe.radius, maxZ: aoe.radius };
+    if (aoe.kind === 'cone') {
+      const r = aoe.length > 0 ? aoe.radius : 0;
+      return box(r, r, 0, aoe.length);
+    }
+    if (aoe.kind === 'cylinder') return box(aoe.radius, aoe.height / 2, -aoe.radius, aoe.radius);
+    return box(aoe.radius, aoe.radius, -aoe.radius, aoe.radius);
   }
-  if ('width' in aoe)
-    return { minX: -aoe.width / 2, minZ: 0, maxX: aoe.width / 2, maxZ: aoe.length };
+  if ('width' in aoe) return box(aoe.width / 2, aoe.height / 2, 0, aoe.length);
   if (aoe.kind === 'cube' && !('size2' in aoe)) {
     const h = aoe.size / 2;
-    return { minX: -h, minZ: -h, maxX: h, maxZ: h };
+    return box(h, h, -h, h);
   }
   return undefined;
 }
@@ -449,20 +502,141 @@ function prepareSegments(segments: readonly Segment[], bounds: Bounds2): Float64
 
 const normalizeAngle = (angle: number) => (angle > Math.PI - EPS ? angle - TWO_PI : angle);
 
-/** Whether a segment, as given, passes within epsilon of the point (endpoint order agnostic). */
-function touches(o: Point2, { a, b }: Segment): boolean {
+/** Squared distance from (px, pz) to a segment, as given (endpoint order agnostic). */
+function distance2ToSegment(px: number, pz: number, { a, b }: Segment): number {
   const flip = b.x < a.x || (b.x === a.x && b.z < a.z);
   const p = flip ? b : a;
   const q = flip ? a : b;
   const ex = q.x - p.x;
   const ez = q.z - p.z;
-  const wx = o.x - p.x;
-  const wz = o.z - p.z;
+  const wx = px - p.x;
+  const wz = pz - p.z;
   const len2 = ex * ex + ez * ez;
   const t = len2 > 0 ? Math.max(0, Math.min(1, (wx * ex + wz * ez) / len2)) : 0;
   const dx = wx - t * ex;
   const dz = wz - t * ez;
-  return dx * dx + dz * dz <= EPS * EPS;
+  return dx * dx + dz * dz;
+}
+
+/** Whether a segment, as given, passes within epsilon of the point (endpoint order agnostic). */
+function touches(o: Point2, segment: Segment): boolean {
+  return distance2ToSegment(o.x, o.z, segment) <= EPS * EPS;
+}
+
+const isFiniteSegment = ({ a, b }: Segment) =>
+  Number.isFinite(a.x) && Number.isFinite(a.z) && Number.isFinite(b.x) && Number.isFinite(b.z);
+
+/**
+ * The point `visibilityPolygon` actually sweeps from, or null when the origin must see nothing.
+ *
+ * An origin off every wall and off the bounds edge sweeps from itself. An origin on a wall (within
+ * `VISION_EPSILON`, judged on the walls as given) must never see more than a point a hair away
+ * would, so it is moved off: every wall it touches gives an arm towards each endpoint farther than
+ * epsilon (a mid-wall gives two opposite arms, an endpoint one), and so does every bounds edge it
+ * lies on. Of the gaps between consecutive arm angles, the largest whose bisector points into the
+ * bounds wins (ties within epsilon go to the gap starting at the smallest canonical angle), and the
+ * origin moves `VISION_NUDGE` cells along that bisector. So a free wall tip or door jamb looks away
+ * from its wall and still sees past it on both sides, a room corner sees only the outside 270°, a
+ * T-junction its open 180°, and a mid-wall or crossing one deterministic side or quadrant.
+ *
+ * Null (blind, never "both sides") when no gap points into the bounds, the moved point still
+ * touches a wall, or the move from the origin passes within epsilon of a wall it did not touch.
+ * Also null when the origin or bounds are not finite or the origin is outside the bounds.
+ */
+export function visionOrigin(
+  origin: Point2,
+  segments: readonly Segment[],
+  bounds: Bounds2,
+): Point2 | null {
+  const move = visionNudge(origin, segments, bounds);
+  if (!move) return null;
+  return move.x === 0 && move.z === 0 ? origin : { x: origin.x + move.x, z: origin.z + move.z };
+}
+
+/**
+ * The move `visionOrigin` applies, as an offset from the origin ({0, 0} when it stays). The sweep
+ * subtracts it from origin-relative coordinates, so an integer translation of the whole scene
+ * gives the same relative floats and therefore the same polygon, translated.
+ */
+function visionNudge(origin: Point2, segments: readonly Segment[], bounds: Bounds2): Point2 | null {
+  const ox = origin.x;
+  const oz = origin.z;
+  const { minX, minZ, maxX, maxZ } = bounds;
+  if (
+    !Number.isFinite(ox) ||
+    !Number.isFinite(oz) ||
+    !(minX <= maxX && minZ <= maxZ) ||
+    ox < minX - EPS ||
+    ox > maxX + EPS ||
+    oz < minZ - EPS ||
+    oz > maxZ + EPS
+  )
+    return null;
+
+  const arms: number[] = [];
+  const addArms = (segment: Segment) => {
+    if (!touches(origin, segment)) return;
+    for (const end of [segment.a, segment.b]) {
+      const dx = end.x - ox;
+      const dz = end.z - oz;
+      if (dx * dx + dz * dz > EPS * EPS) arms.push(normalizeAngle(Math.atan2(dz, dx)));
+    }
+  };
+  for (const segment of segments) if (isFiniteSegment(segment)) addArms(segment);
+  const corners = [
+    { x: minX, z: minZ },
+    { x: maxX, z: minZ },
+    { x: maxX, z: maxZ },
+    { x: minX, z: maxZ },
+  ];
+  for (let i = 0; i < 4; i++)
+    addArms({ a: corners[i] as Point2, b: corners[(i + 1) % 4] as Point2 });
+  if (arms.length === 0) return { x: 0, z: 0 };
+
+  arms.sort((p, q) => p - q);
+  let move: Point2 | null = null;
+  let bestGap = -1;
+  for (let i = 0; i < arms.length; i++) {
+    const start = arms[i] as number;
+    const gap =
+      (i + 1 < arms.length ? (arms[i + 1] as number) : (arms[0] as number) + TWO_PI) - start;
+    if (!(gap > bestGap + EPS)) continue;
+    const mid = start + gap / 2;
+    const dx = VISION_NUDGE * Math.cos(mid);
+    const dz = VISION_NUDGE * Math.sin(mid);
+    const x = ox + dx;
+    const z = oz + dz;
+    // Into the bounds: strictly inside by more than epsilon, so the moved point is on no edge.
+    if (x <= minX + EPS || x >= maxX - EPS || z <= minZ + EPS || z >= maxZ - EPS) continue;
+    move = { x: dx, z: dz };
+    bestGap = gap;
+  }
+  if (!move) return null;
+
+  // Safe fallback: the moved point must be clear of every wall, and the hop to it must not cross
+  // or graze one, or the sweep could see from somewhere the origin cannot.
+  const ex = ox + move.x;
+  const ez = oz + move.z;
+  const path: Segment = { a: origin, b: { x: ex, z: ez } };
+  const side = (ax: number, az: number, bx: number, bz: number, px: number, pz: number) =>
+    (bx - ax) * (pz - az) - (bz - az) * (px - ax);
+  for (const segment of segments) {
+    if (!isFiniteSegment(segment)) continue;
+    if (distance2ToSegment(ex, ez, segment) <= EPS * EPS) return null;
+    if (touches(origin, segment)) continue;
+    const { a, b } = segment;
+    if (
+      distance2ToSegment(a.x, a.z, path) <= EPS * EPS ||
+      distance2ToSegment(b.x, b.z, path) <= EPS * EPS
+    )
+      return null;
+    const d1 = side(a.x, a.z, b.x, b.z, ox, oz);
+    const d2 = side(a.x, a.z, b.x, b.z, ex, ez);
+    const d3 = side(ox, oz, ex, ez, a.x, a.z);
+    const d4 = side(ox, oz, ex, ez, b.x, b.z);
+    if (d1 * d2 < 0 && d3 * d4 < 0) return null;
+  }
+  return move;
 }
 
 /**
@@ -470,41 +644,35 @@ function touches(o: Point2, { a, b }: Segment): boolean {
  * starting from the ray towards -X and sweeping by increasing atan2(z, x). The bounds rectangle
  * always occludes; if the origin is outside the bounds the result is `[]`.
  *
- * Rules: walls have zero thickness. A segment that touches the origin (within `VISION_EPSILON`),
- * or is seen exactly edge-on, blocks nothing, so an origin on a wall or a wall endpoint sees both
- * sides. Directions with nothing to hit (an origin on the bounds edge looking out) collapse to the
- * origin, which is then a vertex. Shared endpoints (L-corners, T-junctions, polylines) never leak.
+ * Rules: walls have zero thickness, and a wall seen exactly edge-on blocks nothing. An origin on a
+ * wall, a wall endpoint or the bounds edge never sees more than a point a hair away: it sweeps from
+ * `visionOrigin`, the origin moved `VISION_NUDGE` cells into the largest free gap between the
+ * walls it touches, with every wall kept. So a mid-wall origin sees one deterministic side, a room
+ * corner the outside only, and a free wall tip both sides of the wall's line. When no such point
+ * is safe the result is `[]` (blind), never both sides. Otherwise the true origin lies on the
+ * result (the boundary counts as inside). Shared endpoints (L-corners, T-junctions, polylines)
+ * never leak.
  *
  * Angular sweep over endpoint events, O(n log n) plus the open set scanned per event interval.
  * Between two consecutive event angles the nearest wall cannot change (crossings are split), so it
  * is chosen once along the mid-angle ray and then intersected with the two exact event rays.
+ * Events within epsilon of a group's first angle share its ray, so a group can leave a wedge at
+ * most `VISION_EPSILON` radians wide; that cannot hold an inset sample, so it is not exploitable.
+ * See the module header: bit-identical within one JS engine only.
  */
 export function visibilityPolygon(
   origin: Point2,
   segments: readonly Segment[],
   bounds: Bounds2,
 ): Point2[] {
-  const ox = origin.x;
-  const oz = origin.z;
-  if (
-    !Number.isFinite(ox) ||
-    !Number.isFinite(oz) ||
-    !(bounds.minX <= bounds.maxX && bounds.minZ <= bounds.maxZ) ||
-    ox < bounds.minX - EPS ||
-    ox > bounds.maxX + EPS ||
-    oz < bounds.minZ - EPS ||
-    oz > bounds.maxZ + EPS
-  )
-    return [];
-
-  // Walls touching the origin are edge-on in every direction they occupy. Decided on the walls as
-  // given, before clipping and splitting move their endpoints.
-  const world = prepareSegments(
-    segments.some((segment) => touches(origin, segment))
-      ? segments.filter((segment) => !touches(origin, segment))
-      : segments,
-    bounds,
-  );
+  const move = visionNudge(origin, segments, bounds);
+  if (!move) return [];
+  // The sweep runs from the eye, origin + move; relative coordinates are (p - origin) - move.
+  const mx = move.x;
+  const mz = move.z;
+  const ox = origin.x + mx;
+  const oz = origin.z + mz;
+  const world = prepareSegments(segments, bounds);
   const total = world.length / 4;
 
   // Per usable segment: origin-relative endpoints, oriented so a -> b is counter-clockwise.
@@ -514,17 +682,19 @@ export function visibilityPolygon(
   const eventAngle = new Float64Array(total * 2);
   let n = 0;
   for (let i = 0; i < total; i++) {
-    let ax = (world[i * 4] as number) - ox;
-    let az = (world[i * 4 + 1] as number) - oz;
-    let bx = (world[i * 4 + 2] as number) - ox;
-    let bz = (world[i * 4 + 3] as number) - oz;
+    let ax = (world[i * 4] as number) - origin.x - mx;
+    let az = (world[i * 4 + 1] as number) - origin.z - mz;
+    let bx = (world[i * 4 + 2] as number) - origin.x - mx;
+    let bz = (world[i * 4 + 3] as number) - origin.z - mz;
     const ex = bx - ax;
     const ez = bz - az;
     const len2 = ex * ex + ez * ez;
     const t = Math.max(0, Math.min(1, -(ax * ex + az * ez) / len2));
     const cx = ax + t * ex;
     const cz = az + t * ez;
-    if (cx * cx + cz * cz <= EPS * EPS) continue; // a bounds edge through the origin
+    // Through the eye: only a wall at most 2 epsilon long can get here (a longer one gives an arm
+    // and visionOrigin moves the eye off it).
+    if (cx * cx + cz * cz <= EPS * EPS) continue;
     let angA = normalizeAngle(Math.atan2(az, ax));
     let angB = normalizeAngle(Math.atan2(bz, bx));
     let span = angB - angA;
