@@ -21,7 +21,7 @@ it('migrates zero-scene snapshots to one deterministic blank active scene withou
     Object.fromEntries(
       Object.entries(state.seats).map(([id, seat]) => [
         id,
-        // The v10-to-v11 fold's frozen 0.0.1 defaults (no `doors`: that key is v12).
+        // The v10-to-v11 fold's frozen 0.0.1 defaults (no `interact`: that key is v12).
         { ...seat, interactionEnabled: true, tools: { measure: true, draw: false, pins: false } },
       ]),
     ),

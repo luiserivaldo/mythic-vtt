@@ -3,7 +3,7 @@ import type { MigrationStep } from './runner.js';
 /**
  * FOG-01 (MV-295, save v12, TECHNICAL.md D47 as amended by MV-303): vision data. Everything it adds
  * is optional (`Entity.wall`, `Entity.blocksSight`, `Entity.fogRegion`, `Scene.vision`,
- * `SeatTools.doors`), so a v11 save is already a valid v12 save and this step is the identity
+ * `SeatTools.interact`), so a v11 save is already a valid v12 save and this step is the identity
  * apart from the snapshot's `schemaVersion`.
  *
  * The bump exists for older hosts, not for this one: a v11 host does not know walls, secret doors

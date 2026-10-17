@@ -6,8 +6,8 @@ import { canUseTool } from './seat-tools.js';
 
 /**
  * VIS-01 (FOG-01, D47 + MV-303): open or close a door. The host and co-DMs (outside the dm layer;
- * doors always live on the map layer) may toggle any door. A player needs the per-seat `doors`
- * tool, and even then only a non-secret door in the active scene (one they can see). Range, line
+ * doors always live on the map layer) may toggle any door. A player needs the per-seat `interact`
+ * permission (MV-310 Q4: doors are the first interactable objects), and even then only a non-secret door in the active scene (one they can see). Range, line
  * of sight and action cost are not rules yet. Opening or closing a door is play state, not map
  * editing, so a locked layer does not block it (moving, editing or deleting the wall still does).
  * This is the only door path a player can use; `entity.update` of `wall` stays admin-only. Undo
@@ -30,7 +30,7 @@ export const wallSetDoor = defineAction({
       entity.layer !== 'dm' &&
       p.sceneId === state.activeSceneId &&
       seatOf(state, actor)?.permissions.view === true &&
-      canUseTool(state, actor, p.sceneId, 'doors')
+      canUseTool(state, actor, p.sceneId, 'interact')
     );
   },
   reduce: (draft, a) => {

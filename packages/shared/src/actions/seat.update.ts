@@ -68,8 +68,8 @@ export const seatUpdate = defineAction({
 });
 
 /**
- * True when a Co-DM seat's tools differ from the Co-DM template's (every board tool on, doors
- * off). A missing key reads as off, so a v11 Co-DM seat without `doors` still matches.
+ * True when a Co-DM seat's tools differ from the Co-DM template's (every board tool on, interact
+ * off). A missing key reads as off, so a v11 Co-DM seat without `interact` still matches.
  */
 function hasOwnTools(tools: SeatTools | undefined): boolean {
   const template = seatTemplate('codm').tools;

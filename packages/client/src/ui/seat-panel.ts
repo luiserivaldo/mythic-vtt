@@ -33,7 +33,7 @@ export const SEAT_TOOL_TOGGLES: readonly { key: SeatTool; label: string }[] = [
   { key: 'measure', label: 'Measure' },
   { key: 'draw', label: 'Draw' },
   { key: 'pins', label: 'Ping' },
-  { key: 'doors', label: 'Doors' },
+  { key: 'interact', label: 'Interact with objects' },
 ];
 
 export const CODM_TOOLS_NOTE = 'Co-DMs can always use every tool';

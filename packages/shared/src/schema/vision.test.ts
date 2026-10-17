@@ -228,7 +228,7 @@ describe('Entity.fogRegion (D47 + MV-303)', () => {
   });
 });
 
-describe('Scene.vision and SeatTools.doors', () => {
+describe('Scene.vision and SeatTools.interact', () => {
   const scene = {
     id,
     name: 'Crypt',
@@ -263,20 +263,21 @@ describe('Scene.vision and SeatTools.doors', () => {
     expect(Scene.safeParse({ ...scene, entities: { [id]: wall() } }).success).toBe(true);
   });
 
-  it('doors is optional and resolves to off; v11 tools still parse', () => {
+  it('interact is optional and resolves to off; v11 tools still parse', () => {
     expect(SeatTools.safeParse({ measure: true, draw: false, pins: false }).success).toBe(true);
     expect(
-      SeatTools.safeParse({ measure: true, draw: false, pins: false, doors: true }).success,
+      SeatTools.safeParse({ measure: true, draw: false, pins: false, interact: true }).success,
     ).toBe(true);
     expect(
-      SeatTools.safeParse({ measure: true, draw: false, pins: false, doors: 'y' }).success,
+      SeatTools.safeParse({ measure: true, draw: false, pins: false, interact: 'y' }).success,
     ).toBe(false);
-    expect(resolveSeatTools({})).toMatchObject({ doors: false });
-    expect(resolveSeatTools({ tools: { measure: true, draw: false, pins: false } }).doors).toBe(
+    expect(resolveSeatTools({})).toMatchObject({ interact: false });
+    expect(resolveSeatTools({ tools: { measure: true, draw: false, pins: false } }).interact).toBe(
       false,
     );
     expect(
-      resolveSeatTools({ tools: { measure: true, draw: false, pins: false, doors: true } }).doors,
+      resolveSeatTools({ tools: { measure: true, draw: false, pins: false, interact: true } })
+        .interact,
     ).toBe(true);
   });
 });

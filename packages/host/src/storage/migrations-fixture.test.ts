@@ -108,7 +108,7 @@ describe('golden save v1 through the shared migrate hook', () => {
         expect(loaded.campaign.seats['01J8Z0000000000000000SEAT2']?.tools).toEqual(
           since(11)
             ? // FOG-01: the v12 fixture also lets this seat open doors.
-              { measure: false, draw: true, pins: true, ...(since(12) ? { doors: true } : {}) }
+              { measure: false, draw: true, pins: true, ...(since(12) ? { interact: true } : {}) }
             : { measure: true, draw: false, pins: false },
         );
         // FOG-01 (save v12): the vision data survives load and save; older saves have none.

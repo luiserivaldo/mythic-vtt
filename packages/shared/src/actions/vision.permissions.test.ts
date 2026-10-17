@@ -48,7 +48,7 @@ function table(): Campaign {
     const seat = state.seats[id];
     if (seat) {
       seat.permissions = { view: true, move: true, edit: true, delete: true };
-      seat.tools = { measure: true, draw: true, pins: true, doors: true };
+      seat.tools = { measure: true, draw: true, pins: true, interact: true };
     }
   }
   state.prefabs = { [PREFAB]: { id: PREFAB, name: 'Wall', entity: { ...wall(), owners: [] } } };

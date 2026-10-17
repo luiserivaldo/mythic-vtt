@@ -7,6 +7,7 @@ import {
   type Actor,
   type HistoryUndoPayload,
   type UndoRequest,
+  wallSetDoor,
 } from '@mythic/shared';
 
 // HIST-04: the host decides what may be undone. It keeps a short in-memory journal of what it
@@ -57,6 +58,36 @@ export function pathsOverlap(a: Path, b: Path): boolean {
   return true;
 }
 
+/**
+ * FOG-01 (D47): a seat's door toggle is undone by toggling the door back, so it passes the same
+ * gate as `wall.setDoor` itself (the interact permission, a non-secret door in the active scene, and so on)
+ * instead of the entity `move` rule, which no player has on a wall. The target door comes from the
+ * inverse patch, whose value is the state the undo restores.
+ */
+function doorUndoAllowed(state: Campaign, actor: Actor, entry: JournalEntry): boolean {
+  const [first] = entry.inverse;
+  if (!first) return false;
+  const [root, sceneId, key, entityId] = first.path;
+  if (root !== 'scenes' || key !== 'entities') return false;
+  if (typeof sceneId !== 'string' || typeof entityId !== 'string') return false;
+  const sameDoor = (patch: Patch) =>
+    patch.op === 'replace' &&
+    patch.path.length === 7 &&
+    patch.path[1] === sceneId &&
+    patch.path[3] === entityId &&
+    patch.path[4] === 'wall' &&
+    patch.path[5] === 'door' &&
+    patch.path[6] === 'open' &&
+    typeof patch.value === 'boolean';
+  if (!entry.inverse.every(sameDoor)) return false;
+  const payload = { sceneId, entityId, open: first.value as boolean };
+  return (
+    wallSetDoor.schema.safeParse(payload).success && wallSetDoor.permission(state, actor, payload)
+  );
+}
+
+const isDoorToggle = (entry: JournalEntry): boolean => entry.type === wallSetDoor.type;
+
 export type UndoPlan =
   | { ok: true; payload: HistoryUndoPayload }
   | { ok: false; reason: 'forbidden' | 'conflict'; detail?: string };
@@ -80,11 +111,17 @@ export function planUndo(args: {
 
   let targets: JournalEntry[];
   if (request.targetSeqs === undefined) {
-    // Ctrl+Z: the caller's newest action that is still in effect.
+    // Ctrl+Z: the caller's newest action that is still in effect. A seat's door toggle it may no
+    // longer make (the interact permission was revoked, the door became secret, ...) is skipped like any
+    // other entry it cannot undo, so older moves stay reachable; every reason skips alike.
     const last = [...journal]
       .reverse()
       .find(
-        (entry) => sameActor(entry.actor, actor) && isUndoable(entry) && !undone.has(entry.seq),
+        (entry) =>
+          sameActor(entry.actor, actor) &&
+          isUndoable(entry) &&
+          !undone.has(entry.seq) &&
+          (host || !isDoorToggle(entry) || doorUndoAllowed(state, actor, entry)),
       );
     if (!last) return forbidden('nothing to undo');
     targets = [last];
@@ -105,24 +142,27 @@ export function planUndo(args: {
 
   if (!host) {
     for (const target of targets) {
-      for (const patch of target.inverse) {
-        const [root, sceneId, key, entityId] = patch.path;
-        if (
-          root !== 'scenes' ||
-          key !== 'entities' ||
-          typeof sceneId !== 'string' ||
-          typeof entityId !== 'string'
-        )
-          return forbidden(); // scene, seat and campaign level changes are the DM's to revert
-        const scene = state.scenes[sceneId];
-        const entity = scene?.entities[entityId];
-        // A deleted entity may come back (the seat was allowed to delete it); a live one must
-        // still be something this seat may move.
-        if (scene && entity) {
-          if (isLayerLocked(scene, entity.layer) || !canUseEntity(state, actor, entity, 'move'))
-            return forbidden();
+      if (isDoorToggle(target)) {
+        if (!doorUndoAllowed(state, actor, target)) return forbidden();
+      } else
+        for (const patch of target.inverse) {
+          const [root, sceneId, key, entityId] = patch.path;
+          if (
+            root !== 'scenes' ||
+            key !== 'entities' ||
+            typeof sceneId !== 'string' ||
+            typeof entityId !== 'string'
+          )
+            return forbidden(); // scene, seat and campaign level changes are the DM's to revert
+          const scene = state.scenes[sceneId];
+          const entity = scene?.entities[entityId];
+          // A deleted entity may come back (the seat was allowed to delete it); a live one must
+          // still be something this seat may move.
+          if (scene && entity) {
+            if (isLayerLocked(scene, entity.layer) || !canUseEntity(state, actor, entity, 'move'))
+              return forbidden();
+          }
         }
-      }
       // D34: arrival order wins, so someone else's later write to the same place stands.
       for (const later of journal) {
         if (later.seq <= target.seq || inBatch.has(later.seq) || undone.has(later.seq)) continue;

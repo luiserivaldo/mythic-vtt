@@ -87,8 +87,8 @@ describe('v11 to v12 vision contract migration (FOG-01)', () => {
     );
     const campaign = Campaign.parse({ ...(fixture('v12', 'campaign.json') as object), scenes: {} });
     const tools = Object.values(campaign.seats).map((seat) => seat.tools);
-    expect(tools.some((t) => t?.doors === true)).toBe(true);
-    expect(tools.some((t) => t !== undefined && !('doors' in t))).toBe(true);
+    expect(tools.some((t) => t?.interact === true)).toBe(true);
+    expect(tools.some((t) => t !== undefined && !('interact' in t))).toBe(true);
   });
 
   it('an older host still refuses a v12 save, and this host refuses anything newer', () => {

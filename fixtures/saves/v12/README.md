@@ -13,11 +13,11 @@ unfiltered.
 - `Entity.fogRegion { points, revealed?: true }`: a 3-64 point simple polygon on the `map` layer,
   with no other components (DM fog regions; absent `revealed` = active; filtering is FOG-03/08).
 - `Scene.vision { dynamicLighting }`: absent means off.
-- `SeatTools.doors` (optional, absent = off): may this player seat open and close ordinary doors.
+- `SeatTools.interact` (optional, absent = off): may this player seat open and close ordinary doors.
 
 This synthetic fixture is the v11 fixture plus: a three-point wall, a closed door, a closed secret
 door (rotated 90 degrees), the Altar box marked `blocksSight`, an active and a revealed fog region
-on the map layer (both named), `vision: { dynamicLighting: true }` on the scene, and `doors: true` on the
-archived player seat (the Co-DM seat has no `doors` key). v1-v11 fixtures remain unchanged.
+on the map layer (both named), `vision: { dynamicLighting: true }` on the scene, and `interact: true` on the
+archived player seat (the Co-DM seat has no `interact` key). v1-v11 fixtures remain unchanged.
 
 Matching host and client use protocol v11 (unchanged: no message schema changed).

@@ -42,17 +42,17 @@ const ALL: SeatTools = { measure: true, draw: true, pins: true };
 
 describe('permission templates (UX-46, UI-SEAT-02)', () => {
   it('each template carries default tools; Player may measure, draw and ping (MV-288)', () => {
-    // MV-303 Q1: no template opens doors; the DM grants them per seat.
+    // MV-303 Q1 / MV-310 Q4: no template grants Interact; the DM grants it per seat.
     expect(seatTemplate('player').tools).toEqual({
       measure: true,
       draw: true,
       pins: true,
-      doors: false,
+      interact: false,
     });
     expect(seatTemplate('player').tools).toEqual(PLAYER_TEMPLATE_TOOLS);
-    expect(seatTemplate('spectator').tools).toEqual({ ...NONE, doors: false });
-    expect(seatTemplate('dm').tools).toEqual({ ...ALL, doors: false });
-    expect(seatTemplate('codm').tools).toEqual({ ...ALL, doors: false });
+    expect(seatTemplate('spectator').tools).toEqual({ ...NONE, interact: false });
+    expect(seatTemplate('dm').tools).toEqual({ ...ALL, interact: false });
+    expect(seatTemplate('codm').tools).toEqual({ ...ALL, interact: false });
     // Templates are copied, never shared: no template object is a default object.
     for (const template of SEAT_TEMPLATES) {
       expect(template.tools).not.toBe(DEFAULT_SEAT_TOOLS);
@@ -61,7 +61,12 @@ describe('permission templates (UX-46, UI-SEAT-02)', () => {
   });
 
   it('keeps the tool-less fallback frozen at the 0.0.1 scene defaults', () => {
-    expect(DEFAULT_SEAT_TOOLS).toEqual({ measure: true, draw: false, pins: false, doors: false });
+    expect(DEFAULT_SEAT_TOOLS).toEqual({
+      measure: true,
+      draw: false,
+      pins: false,
+      interact: false,
+    });
   });
 
   it('a seat without stored tools gets the frozen fallback, not the Player template', () => {
@@ -83,7 +88,7 @@ describe('permission templates (UX-46, UI-SEAT-02)', () => {
       false,
     );
     const { state } = reduceAction(makeCampaign(), envelope('seat.create', payload));
-    expect(state.seats[IDS.otherIdentity]?.tools).toEqual({ ...NONE, doors: false });
+    expect(state.seats[IDS.otherIdentity]?.tools).toEqual({ ...NONE, interact: false });
     expect(state.seats[IDS.otherIdentity]?.tools).not.toBe(tools);
   });
 });
@@ -97,7 +102,7 @@ describe('per-seat override (UX-46)', () => {
       measure: true,
       draw: true,
       pins: false,
-      doors: false,
+      interact: false,
     });
     expect(state.seats[IDS.other]?.tools).toBeUndefined();
     expect(canUseTool(state, ACTORS.owner, IDS.scene, 'draw')).toBe(true);
@@ -108,7 +113,7 @@ describe('per-seat override (UX-46)', () => {
       measure: true,
       draw: true,
       pins: false,
-      doors: false,
+      interact: false,
     });
   });
 
@@ -179,7 +184,7 @@ describe('per-seat override (UX-46)', () => {
       measure: true,
       draw: false,
       pins: false,
-      doors: false,
+      interact: false,
     });
     expect(canUseTool(state, ACTORS.owner, IDS.scene, 'measure')).toBe(true);
     expect(canUseTool(state, ACTORS.owner, IDS.scene, 'draw')).toBe(false);
@@ -229,10 +234,10 @@ describe('demoting a Co-DM (UX-46)', () => {
   };
 
   it('resets template or absent tools to the frozen fallback (measure only)', () => {
-    const fallback = { measure: true, draw: false, pins: false, doors: false };
-    // ALL is a v11 Co-DM seat (no `doors` key): a missing key still matches the template.
+    const fallback = { measure: true, draw: false, pins: false, interact: false };
+    // ALL is a v11 Co-DM seat (no `interact` key): a missing key still matches the template.
     expect(demote(ALL)).toEqual(fallback);
-    expect(demote({ ...ALL, doors: false })).toEqual(fallback);
+    expect(demote({ ...ALL, interact: false })).toEqual(fallback);
     expect(demote(undefined)).toEqual(fallback);
     expect(fallback).toEqual(DEFAULT_SEAT_TOOLS);
   });

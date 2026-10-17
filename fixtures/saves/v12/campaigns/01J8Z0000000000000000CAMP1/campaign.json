@@ -50,7 +50,7 @@
         "measure": false,
         "draw": true,
         "pins": true,
-        "doors": true
+        "interact": true
       },
       "interactionEnabled": false,
       "archived": true,

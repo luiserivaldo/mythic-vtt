@@ -22,13 +22,13 @@ const envelope = (p: unknown, actor: Actor = ACTORS.host): ActionEnvelope => ({
   ts: 1_000,
 });
 
-function withDoor(door: DoorComponent | null = { open: false }, doorsTool = false) {
+function withDoor(door: DoorComponent | null = { open: false }, interactTool = false) {
   const state = makeCampaign();
   const scene = state.scenes[IDS.scene];
   if (!scene) throw new Error('scene');
   scene.entities[DOOR] = makeEntity(DOOR, {
     layer: 'map',
-    // Ownership and every grant must not matter: doors follow the seat tool only.
+    // Ownership and every grant must not matter: doors follow the Interact permission only.
     owners: [IDS.owner],
     perms: { move: true, edit: true, delete: true },
     wall: {
@@ -44,7 +44,8 @@ function withDoor(door: DoorComponent | null = { open: false }, doorsTool = fals
     if (seat) seat.permissions = { view: true, move: true, edit: true, delete: true };
   }
   const owner = state.seats[IDS.owner];
-  if (owner && doorsTool) owner.tools = { measure: true, draw: true, pins: true, doors: true };
+  if (owner && interactTool)
+    owner.tools = { measure: true, draw: true, pins: true, interact: true };
   return state;
 }
 
@@ -66,7 +67,7 @@ describe(`${T} schema`, () => {
 });
 
 describe(`${T} permissions (D47 + MV-303)`, () => {
-  it('without the doors tool only the host and co-DM may toggle, whatever the player grants', () => {
+  it('without the interact permission only the host and co-DM may toggle, whatever the player grants', () => {
     expect(permissionMatrix(withDoor(), T, payload())).toEqual({
       host: true,
       coDm: true,
@@ -77,7 +78,7 @@ describe(`${T} permissions (D47 + MV-303)`, () => {
     });
   });
 
-  it('a seat with the doors tool may open and close a non-secret door', () => {
+  it('a seat with the interact permission may open and close a non-secret door', () => {
     expect(permissionMatrix(withDoor({ open: false }, true), T, payload(true))).toEqual({
       host: true,
       coDm: true,

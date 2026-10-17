@@ -132,7 +132,12 @@ describe('add a seat from a template', () => {
   });
 
   it("shows each seat's own tools, with the fallback default when none are stored (UX-46)", () => {
-    expect(SEAT_TOOL_TOGGLES.map((t) => t.label)).toEqual(['Measure', 'Draw', 'Ping', 'Doors']);
+    expect(SEAT_TOOL_TOGGLES.map((t) => t.label)).toEqual([
+      'Measure',
+      'Draw',
+      'Ping',
+      'Interact with objects',
+    ]);
     const campaign = table();
     const seat = campaign.seats[A];
     if (!seat) throw new Error('fixture');
@@ -140,15 +145,15 @@ describe('add a seat from a template', () => {
       measure: true,
       draw: false,
       pins: false,
-      doors: false,
+      interact: false,
     });
-    // A v11 seat has no `doors` key: it reads as off (MV-303 Q1).
+    // A v11 seat has no `interact` key: it reads as off (MV-303 Q1).
     seat.tools = { measure: false, draw: true, pins: true };
     expect(seatRows(campaign, null).find((r) => r.id === A)?.tools).toEqual({
       ...seat.tools,
-      doors: false,
+      interact: false,
     });
-    seat.tools = { measure: false, draw: true, pins: true, doors: true };
+    seat.tools = { measure: false, draw: true, pins: true, interact: true };
     expect(seatRows(campaign, null).find((r) => r.id === A)?.tools).toEqual(seat.tools);
   });
 
@@ -157,20 +162,20 @@ describe('add a seat from a template', () => {
       label: 'Player',
       role: 'player',
       permissions: { view: true, move: true, edit: false, delete: false },
-      tools: { measure: true, draw: true, pins: true, doors: false },
+      tools: { measure: true, draw: true, pins: true, interact: false },
     });
     expect(newSeatFields('codm', ' Lieutenant ')).toEqual({
       label: 'Lieutenant',
       role: 'codm',
       permissions: { view: true, move: true, edit: true, delete: true },
-      tools: { measure: true, draw: true, pins: true, doors: false },
+      tools: { measure: true, draw: true, pins: true, interact: false },
     });
     expect(newSeatFields('spectator', 'Watcher')?.permissions.move).toBe(false);
     expect(newSeatFields('spectator', 'Watcher')?.tools).toEqual({
       measure: false,
       draw: false,
       pins: false,
-      doors: false,
+      interact: false,
     });
   });
 

@@ -28,17 +28,18 @@ export const SeatTools = z.strictObject({
   draw: z.boolean(),
   pins: z.boolean(),
   /**
-   * MV-303 Q1 (FOG-01, save v12): may this seat open and close ordinary doors (`wall.setDoor`)?
-   * Optional so v11 seats load unchanged; absent means off. Never secret doors: those stay
-   * admin-only. Co-DMs ignore it (they may always toggle doors).
+   * MV-303 Q1 / MV-310 Q4 (FOG-01, save v12): may this seat interact with interactable objects?
+   * Not a board tool: the interact button in an object's context window. Doors are the first
+   * interactable (`wall.setDoor`, ordinary doors only; secret doors stay admin-only). Optional so
+   * v11 seats load unchanged; absent means off. Co-DMs ignore it (they may always toggle doors).
    */
-  doors: z.boolean().optional(),
+  interact: z.boolean().optional(),
 });
 export type SeatTools = z.infer<typeof SeatTools>;
 export type SeatTool = keyof SeatTools;
 /** A seat's tools with every default filled in (`resolveSeatTools`). */
 export type ResolvedSeatTools = Record<SeatTool, boolean>;
-export const SEAT_TOOLS: readonly SeatTool[] = ['measure', 'draw', 'pins', 'doors'];
+export const SEAT_TOOLS: readonly SeatTool[] = ['measure', 'draw', 'pins', 'interact'];
 
 /**
  * The fallback for seats without stored `tools` and for a demoted Co-DM. Measuring is open, drawing
@@ -49,22 +50,22 @@ export const DEFAULT_SEAT_TOOLS: Readonly<ResolvedSeatTools> = {
   measure: true,
   draw: false,
   pins: false,
-  doors: false,
+  interact: false,
 };
 
 /**
  * MV-288: the tools a new Player seat (and a temporary player) starts with. Measure, draw and ping
- * are open; the DM revokes them per seat in the Seats tab. Doors stay off (MV-303 Q1) until the DM
- * grants them per seat.
+ * are open; the DM revokes them per seat in the Seats tab. Interact stays off (MV-303 Q1, MV-310
+ * Q4) until the DM grants it per seat.
  */
 export const PLAYER_TEMPLATE_TOOLS: Readonly<ResolvedSeatTools> = {
   measure: true,
   draw: true,
   pins: true,
-  doors: false,
+  interact: false,
 };
 
 /** A seat's tools with the default filled in. */
 export function resolveSeatTools(seat: { tools?: SeatTools | undefined }): ResolvedSeatTools {
-  return { ...DEFAULT_SEAT_TOOLS, ...seat.tools, doors: seat.tools?.doors ?? false };
+  return { ...DEFAULT_SEAT_TOOLS, ...seat.tools, interact: seat.tools?.interact ?? false };
 }

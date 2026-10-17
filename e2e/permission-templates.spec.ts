@@ -13,6 +13,8 @@ interface Tools {
   measure: boolean;
   draw: boolean;
   pins: boolean;
+  /** FOG-01 (MV-295): stored by templates; a seat migrated from 0.0.1 has no key (off). */
+  interact?: boolean;
 }
 interface Campaign {
   id: string;
@@ -110,6 +112,7 @@ test('a template sets a new seat tools and a per-seat override changes what the 
       measure: true,
       draw: true,
       pins: true,
+      interact: false,
     });
 
     const player = await playerContext.newPage();

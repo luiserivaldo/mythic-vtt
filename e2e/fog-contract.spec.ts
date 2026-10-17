@@ -4,7 +4,8 @@ import { RawClient, startTable, testUlid, type Reply, type Table } from './harne
 // FOG-01 (MV-295; D47 2bde4e3) / PERM-03: the vision contract over the wire. A closed secret door
 // reaches players and spectators only as a plain wall, an open one only as an ordinary open door,
 // and the `secret` flag never at all; wall and fog-region names never reach them; walls, fog
-// regions and sight blocking are DM data; and doors open for a player only with the Doors tool.
+// regions and sight blocking are DM data; and doors open for a player only with the
+// per-seat Interact permission.
 // Frames are captured raw at the transport level, so the check does not depend on the app.
 
 let table: Table;
@@ -247,29 +248,30 @@ test('secret doors, vision names and DM-only vision data never reach players or 
     player.intent('entity.update', { sceneId: SCENE, entityId: FOG, changes: { name: 'x' } }),
   );
   await rejected(player.intent('entity.delete', { sceneId: SCENE, entityId: FOG }));
-  // Without the Doors tool, no door at all.
+  // Without the Interact permission, no door at all.
   const setDoor = (entityId: string, open: boolean) =>
     player.intent('wall.setDoor', { sceneId: SCENE, entityId, open });
   await rejected(setDoor(DOOR, true));
   await rejected(setDoor(SECRET, true));
 
-  // --- the DM grants Doors: open and close a normal door --------------------------------------------
-  await ok(host.intent('seat.update', { seatId: SEAT, tools: { doors: true } }));
+  // --- the DM grants Interact: open and close a normal door -----------------------------------------
+  await ok(host.intent('seat.update', { seatId: SEAT, tools: { interact: true } }));
   await settle([player]);
   await ok(setDoor(DOOR, true));
   await settle([player, spectator]);
   expect(wallOf(spectator, DOOR)).toEqual({ points: segment, door: { open: true } });
   await ok(setDoor(DOOR, false));
   // A secret door stays out of reach even with the tool, and its rejection is word for word the one
-  // for a plain wall, a non-wall entity and an unknown id, so it reveals nothing.
-  const reasons = await Promise.all(
+  // for a plain wall, a non-wall entity and an unknown id, so it reveals nothing. The whole reply is
+  // compared (only the echoed clientRef differs), which also pins that no `detail` goes on the wire.
+  const replies = await Promise.all(
     [SECRET, PLAIN_WALL, CRATE, testUlid('NOSUCH', 1)].map(async (id) => {
       const r = await setDoor(id, true);
       expect(r, JSON.stringify(r)).toMatchObject({ t: 'reject' });
-      return r.reason;
+      return { ...r, clientRef: '' };
     }),
   );
-  expect(new Set(reasons).size, JSON.stringify(reasons)).toBe(1);
+  for (const r of replies) expect(r).toEqual({ t: 'reject', clientRef: '', reason: 'forbidden' });
   await settle([player, spectator]);
   expect(wallOf(player, DOOR)).toEqual({ points: segment, door: { open: false } });
 
